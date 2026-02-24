@@ -466,6 +466,20 @@ components:
         asset_type:
           type: string
           example: table
+        description:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        classifications:
+          type: array
+          items:
+            type: string
         properties:
           type: object
           additionalProperties: true
@@ -475,7 +489,7 @@ components:
         updated_at:
           type: string
           format: date-time
-      required: [id, qualified_name, display_name, asset_type, properties, created_at, updated_at]
+      required: [id, qualified_name, display_name, asset_type, tags, classifications, properties, created_at, updated_at]
     CreateAssetRequest:
       type: object
       properties:
@@ -485,6 +499,22 @@ components:
           type: string
         asset_type:
           type: string
+        description:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        classifications:
+          type: array
+          nullable: true
+          items:
+            type: string
         properties:
           type: object
           additionalProperties: true
@@ -502,6 +532,22 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        description:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        classifications:
+          type: array
+          nullable: true
+          items:
+            type: string
     IngestionRequest:
       type: object
       properties:

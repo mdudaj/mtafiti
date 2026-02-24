@@ -144,3 +144,56 @@ def test_asset_mutations_emit_events_when_configured(monkeypatch):
     assert calls[0]['payload']['tenant_id'] == tenant.schema_name
     assert calls[0]['payload']['correlation_id'] == 'corr-1'
     assert calls[0]['payload']['user_id'] == 'user-1'
+
+
+@pytest.mark.django_db(transaction=True)
+def test_asset_optional_catalog_fields_roundtrip_and_validation():
+    host = f"tenanta-{uuid.uuid4().hex[:6]}.example"
+    with schema_context('public'):
+        tenant = Tenant(schema_name=f't_{uuid.uuid4().hex[:8]}', name=f"Tenant A {uuid.uuid4().hex[:6]}")
+        tenant.save()
+        Domain(domain=host, tenant=tenant, is_primary=True).save()
+
+    client = Client()
+    created_resp = client.post(
+        '/api/v1/assets',
+        data=json.dumps(
+            {
+                'qualified_name': 'db.dataset',
+                'asset_type': 'table',
+                'description': 'Main dataset',
+                'owner': 'data-platform',
+                'tags': ['gold'],
+                'classifications': ['pii'],
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert created_resp.status_code == 201
+    created = created_resp.json()
+    assert created['description'] == 'Main dataset'
+    assert created['owner'] == 'data-platform'
+    assert created['tags'] == ['gold']
+    assert created['classifications'] == ['pii']
+
+    updated_resp = client.put(
+        f"/api/v1/assets/{created['id']}",
+        data=json.dumps({'description': None, 'owner': None, 'tags': None, 'classifications': ['internal']}),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert updated_resp.status_code == 200
+    updated = updated_resp.json()
+    assert updated['description'] is None
+    assert updated['owner'] is None
+    assert updated['tags'] == []
+    assert updated['classifications'] == ['internal']
+
+    invalid_tags = client.put(
+        f"/api/v1/assets/{created['id']}",
+        data=json.dumps({'tags': ['ok', 123]}),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert invalid_tags.status_code == 400

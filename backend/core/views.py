@@ -49,6 +49,10 @@ def _asset_to_dict(asset: DataAsset) -> dict[str, Any]:
         'qualified_name': asset.qualified_name,
         'display_name': asset.display_name,
         'asset_type': asset.asset_type,
+        'description': asset.description or None,
+        'owner': asset.owner or None,
+        'tags': asset.tags,
+        'classifications': asset.classifications,
         'properties': asset.properties,
         'created_at': asset.created_at.isoformat(),
         'updated_at': asset.updated_at.isoformat(),
@@ -61,6 +65,14 @@ def _parse_json_body(request):
         return json.loads(body or '{}')
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
+
+
+def _parse_string_list(value: Any) -> list[str] | None:
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        return None
+    return value
 
 
 def _ingestion_to_dict(ing: IngestionRequest) -> dict[str, Any]:
@@ -171,13 +183,29 @@ def assets(request):
 
         qualified_name = payload.get('qualified_name')
         asset_type = payload.get('asset_type')
+        description = payload.get('description')
+        owner = payload.get('owner')
         if not qualified_name or not asset_type:
             return JsonResponse({'error': 'qualified_name and asset_type are required'}, status=400)
+        if description is not None and not isinstance(description, str):
+            return JsonResponse({'error': 'description must be a string'}, status=400)
+        if owner is not None and not isinstance(owner, str):
+            return JsonResponse({'error': 'owner must be a string'}, status=400)
+        tags = _parse_string_list(payload.get('tags'))
+        if tags is None:
+            return JsonResponse({'error': 'tags must be an array of strings'}, status=400)
+        classifications = _parse_string_list(payload.get('classifications'))
+        if classifications is None:
+            return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
 
         asset = DataAsset.objects.create(
             qualified_name=qualified_name,
             display_name=payload.get('display_name') or qualified_name,
             asset_type=asset_type,
+            description=description or '',
+            owner=owner or '',
+            tags=tags,
+            classifications=classifications,
             properties=payload.get('properties') or {},
         )
         tenant_schema = _tenant_schema(request)
@@ -217,6 +245,24 @@ def asset_detail(request, asset_id: str):
             if payload['display_name'] is None:
                 return JsonResponse({'error': 'display_name cannot be null'}, status=400)
             asset.display_name = payload['display_name']
+        if 'description' in payload:
+            if payload['description'] is not None and not isinstance(payload['description'], str):
+                return JsonResponse({'error': 'description must be a string'}, status=400)
+            asset.description = payload['description'] or ''
+        if 'owner' in payload:
+            if payload['owner'] is not None and not isinstance(payload['owner'], str):
+                return JsonResponse({'error': 'owner must be a string'}, status=400)
+            asset.owner = payload['owner'] or ''
+        if 'tags' in payload:
+            tags = _parse_string_list(payload['tags'])
+            if tags is None:
+                return JsonResponse({'error': 'tags must be an array of strings'}, status=400)
+            asset.tags = tags
+        if 'classifications' in payload:
+            classifications = _parse_string_list(payload['classifications'])
+            if classifications is None:
+                return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
+            asset.classifications = classifications
         if 'properties' in payload:
             props = payload['properties']
             if props is None:
