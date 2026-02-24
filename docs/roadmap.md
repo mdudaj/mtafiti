@@ -14,7 +14,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 1. **Audit events**: emit consistent audit events for mutating actions (tenants, assets, lineage, policies).
 2. **Policy enforcement**: RBAC/ABAC checks in API handlers and background tasks, integrated with identity.
-3. **Search**: metadata search (indexing strategy + query API) while keeping tenant isolation intact.
+3. **Search**: metadata search (indexing strategy + query API) while keeping tenant isolation intact (see `docs/search.md`).
 4. **Metrics**: add `/metrics` (Prometheus) and define initial SLOs for API and worker workloads.
 
 ## Mid-term

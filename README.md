@@ -10,6 +10,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Governance & policy](docs/governance.md)
 * [Ingestion](docs/ingestion.md)
 * [Lineage](docs/lineage.md)
+* [Search](docs/search.md)
 * [Observability](docs/observability.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
