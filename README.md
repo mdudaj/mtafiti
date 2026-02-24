@@ -2,6 +2,11 @@
 
 This repository contains an initial scaffold for a Kubernetes-native, multi-tenant EDMP backend.
 
+## Design docs
+
+* [Architecture overview](docs/architecture.md)
+* [Kubernetes deployment notes](docs/kubernetes.md)
+
 ## Backend (Django + schema-per-tenant)
 
 * Framework: Django
