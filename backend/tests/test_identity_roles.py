@@ -31,7 +31,7 @@ def test_role_enforcement_is_opt_in():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_tenant_create_requires_tenant_admin_when_enforced(monkeypatch):
+def test_tenant_create_enforces_tenant_admin_role(monkeypatch):
     monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
 
     client = Client()
@@ -54,7 +54,7 @@ def test_tenant_create_requires_tenant_admin_when_enforced(monkeypatch):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_catalog_mutations_require_catalog_editor_when_enforced(monkeypatch):
+def test_catalog_mutations_enforce_catalog_editor_role(monkeypatch):
     monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
     host = _create_tenant_host()
     client = Client()

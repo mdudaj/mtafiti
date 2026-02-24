@@ -13,6 +13,10 @@ def _request_roles(request) -> set[str]:
 
 
 def require_role(request, role: str):
+    """Require a role for the request when EDMP_ENFORCE_ROLES is enabled.
+
+    Returns None when access is allowed, otherwise returns a 403 JsonResponse.
+    """
     if not _roles_enforced():
         return None
     if role in _request_roles(request):
