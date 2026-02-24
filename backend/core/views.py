@@ -12,7 +12,7 @@ def livez(request):
 
 
 def healthz(request):
-    return livez(request)
+    return JsonResponse({'status': 'ok'})
 
 
 def readyz(request):
