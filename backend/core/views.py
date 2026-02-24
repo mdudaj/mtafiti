@@ -10,9 +10,12 @@ def health(request):
 def probe_ok(request):
     return JsonResponse({'status': 'ok'})
 
+def livez(request):
+    return probe_ok(request)
 
-livez = probe_ok
-healthz = probe_ok
+
+def healthz(request):
+    return probe_ok(request)
 
 
 def readyz(request):

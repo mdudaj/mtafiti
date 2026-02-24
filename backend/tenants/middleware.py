@@ -11,6 +11,8 @@ class EDMPTenantMiddleware(TenantMainMiddleware):
     falling back to the public schema.
     """
 
+    # Normalized paths (no trailing slashes). We normalize request paths via
+    # rstrip('/') before matching.
     PUBLIC_ENDPOINT_PATHS = {'/healthz', '/livez', '/readyz'}
 
     def process_request(self, request):
