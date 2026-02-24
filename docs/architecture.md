@@ -67,6 +67,7 @@ This section describes the next pieces to design and implement while keeping the
 * Prefer JSON-only endpoints with explicit error payloads: `{"error": "<code>"}`.
 * Tenant-scoped APIs require tenant resolution via hostname (`EDMPTenantMiddleware`).
 * Public/control-plane APIs continue to bypass tenant resolution (e.g. `/api/v1/tenants`).
+* See `docs/openapi.yaml` for the current HTTP surface (scaffold).
 
 ### Identity & access (authn/authz)
 

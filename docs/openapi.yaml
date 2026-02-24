@@ -1,0 +1,363 @@
+openapi: 3.0.3
+info:
+  title: EDMP HTTP API (scaffold)
+  version: 0.1.0
+  description: |
+    This is a lightweight OpenAPI description of the current EDMP backend scaffold.
+
+    **Multi-tenancy note**: Tenant-scoped endpoints (e.g. `/api/v1/assets`) are resolved by the request `Host`
+    header via `EDMPTenantMiddleware`. Control-plane endpoints (e.g. `/api/v1/tenants`) bypass tenant resolution.
+servers:
+  - url: http://localhost:8000
+tags:
+  - name: probes
+  - name: tenants
+  - name: assets
+paths:
+  /healthz:
+    get:
+      tags: [probes]
+      summary: Health probe (no tenant required)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeOk'
+  /livez:
+    get:
+      tags: [probes]
+      summary: Liveness probe (no tenant required)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeOk'
+  /readyz:
+    get:
+      tags: [probes]
+      summary: Readiness probe (no tenant required; checks DB connectivity)
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeOk'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not-ready
+  /api/v1/tenants:
+    get:
+      tags: [tenants]
+      summary: List tenants (control plane)
+      responses:
+        '200':
+          description: Tenant list
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tenant'
+                required: [items]
+    post:
+      tags: [tenants]
+      summary: Create a tenant (control plane)
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assets:
+    get:
+      tags: [assets]
+      summary: List assets (tenant-scoped)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 500
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Asset list
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DataAsset'
+                required: [items]
+        '400':
+          description: Invalid pagination params
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [assets]
+      summary: Create an asset (tenant-scoped)
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetRequest'
+      responses:
+        '201':
+          description: Asset created
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAsset'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assets/{asset_id}:
+    parameters:
+      - name: asset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [assets]
+      summary: Get an asset (tenant-scoped)
+      responses:
+        '200':
+          description: Asset
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAsset'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [assets]
+      summary: Update an asset (tenant-scoped)
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssetRequest'
+      responses:
+        '200':
+          description: Updated asset
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/XCorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataAsset'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  parameters:
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional correlation ID. If not provided, the server generates one.
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional user identifier for audit/event metadata (scaffold).
+  headers:
+    XCorrelationId:
+      schema:
+        type: string
+      description: Correlation ID for the request/response.
+  schemas:
+    ProbeOk:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+      required: [status]
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 1
+        schema_name:
+          type: string
+          example: t_ab12cd34
+        name:
+          type: string
+          example: Tenant A
+        created_on:
+          type: string
+          format: date
+        domains:
+          type: array
+          items:
+            type: string
+          example: [tenant-a.example.com]
+      required: [id, schema_name, name, created_on, domains]
+    CreateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        domain:
+          type: string
+          description: Primary tenant domain (hostname or URL; normalized server-side).
+        schema_name:
+          type: string
+          description: Optional explicit schema name (defaults to `t_<random>`).
+      required: [name, domain]
+    DataAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        qualified_name:
+          type: string
+          example: warehouse.sales.orders
+        display_name:
+          type: string
+          example: Orders
+        asset_type:
+          type: string
+          example: table
+        properties:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, qualified_name, display_name, asset_type, properties, created_at, updated_at]
+    CreateAssetRequest:
+      type: object
+      properties:
+        qualified_name:
+          type: string
+        display_name:
+          type: string
+        asset_type:
+          type: string
+        properties:
+          type: object
+          additionalProperties: true
+      required: [qualified_name, asset_type]
+    UpdateAssetRequest:
+      type: object
+      properties:
+        display_name:
+          nullable: true
+          type: string
+        asset_type:
+          type: string
+          description: Present but immutable; changing it results in 400.
+        properties:
+          nullable: true
+          type: object
+          additionalProperties: true

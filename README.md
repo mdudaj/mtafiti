@@ -6,6 +6,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 
 * [Architecture overview](docs/architecture.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
+* [OpenAPI (HTTP surface)](docs/openapi.yaml)
 
 ## Backend (Django + schema-per-tenant)
 
