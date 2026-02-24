@@ -112,7 +112,7 @@ def asset_detail(request, asset_id: str):
                 return JsonResponse({'error': 'display_name cannot be null'}, status=400)
             asset.display_name = payload['display_name']
         if 'properties' in payload:
-            props = payload.get('properties')
+            props = payload['properties']
             if props is None:
                 asset.properties = {}
             else:
