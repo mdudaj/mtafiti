@@ -1,1 +1,26 @@
-# Enterprise Research Data Management Platform
+# Enterprise Data Management Platform (EDMP)
+
+This repository contains an initial scaffold for a Kubernetes-native, multi-tenant EDMP backend.
+
+## Backend (Django + schema-per-tenant)
+
+* Framework: Django
+* Multi-tenancy: `django-tenants` (schema-per-tenant)
+* Async: Celery (RabbitMQ-backed)
+
+### Local dev prerequisites
+
+* Python 3.12+
+* PostgreSQL (local service is fine)
+
+### Run tests
+
+```bash
+cd backend
+python -m venv ../.venv
+source ../.venv/bin/activate
+pip install -r requirements-dev.txt
+
+export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
+pytest
+```
