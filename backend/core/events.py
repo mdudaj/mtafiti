@@ -47,3 +47,31 @@ def publish_event(
     finally:
         connection.close()
 
+
+def maybe_publish_event(
+    *,
+    event_type: str,
+    tenant_id: str,
+    routing_key: str,
+    correlation_id: str | None = None,
+    user_id: str | None = None,
+    data: dict[str, Any] | None = None,
+    exchange: str | None = None,
+    rabbitmq_url: str | None = None,
+) -> None:
+    rabbitmq_url = rabbitmq_url or os.environ.get('RABBITMQ_URL')
+    if not rabbitmq_url:
+        return
+    exchange = exchange or os.environ.get('EDMP_EVENT_EXCHANGE', 'edmp.events')
+
+    payload = build_event_payload(
+        event_type=event_type,
+        tenant_id=tenant_id,
+        correlation_id=correlation_id,
+        user_id=user_id,
+        data=data,
+    )
+    try:
+        publish_event(exchange=exchange, routing_key=routing_key, payload=payload, rabbitmq_url=rabbitmq_url)
+    except Exception:
+        return

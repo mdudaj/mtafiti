@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 
 from django.core.exceptions import ValidationError
@@ -7,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_tenants.utils import schema_context
 
+from core.events import maybe_publish_event
 from .models import Domain, Tenant
 
 
@@ -59,6 +61,15 @@ def tenants(request):
             except IntegrityError:
                 return JsonResponse({'error': 'conflict'}, status=409)
 
+            maybe_publish_event(
+                event_type='tenant.created',
+                tenant_id=tenant.schema_name,
+                routing_key=f'{tenant.schema_name}.control.tenant.created',
+                correlation_id=request.headers.get('X-Correlation-Id'),
+                user_id=request.headers.get('X-User-Id'),
+                data=_tenant_to_dict(tenant),
+                rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            )
             return JsonResponse(_tenant_to_dict(tenant), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
