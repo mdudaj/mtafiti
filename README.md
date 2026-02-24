@@ -8,6 +8,8 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Roadmap (design increments)](docs/roadmap.md)
 * [Identity & access](docs/identity.md)
 * [Governance & policy](docs/governance.md)
+* [Ingestion](docs/ingestion.md)
+* [Lineage](docs/lineage.md)
 * [Observability](docs/observability.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
