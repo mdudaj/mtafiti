@@ -31,7 +31,7 @@ def normalize_domain(value: str) -> str:
     value = value.rstrip('.')
 
     # Strip port (best-effort; IPv6 URLs should use the scheme form and be
-    # handled via urlsplit() above).
+    # handled via urlsplit above).
     if ':' in value and not value.startswith('['):
         value = value.split(':', 1)[0]
 
@@ -39,19 +39,20 @@ def normalize_domain(value: str) -> str:
 
 
 class Domain(DomainMixin):
-    def clean_fields(self, exclude=None) -> None:
+    def _normalize(self) -> None:
         if self.domain:
             self.domain = normalize_domain(self.domain)
+
+    def clean_fields(self, exclude=None) -> None:
+        self._normalize()
         return super().clean_fields(exclude=exclude)
 
     def clean(self) -> None:
         super().clean()
-        if self.domain:
-            self.domain = normalize_domain(self.domain)
+        self._normalize()
 
     def save(self, *args, **kwargs):
-        if self.domain:
-            self.domain = normalize_domain(self.domain)
+        self._normalize()
         return super().save(*args, **kwargs)
 
 
