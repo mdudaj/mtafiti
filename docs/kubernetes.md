@@ -18,6 +18,8 @@ See:
 * `deploy/k8s/backend.yaml`
 * `deploy/k8s/worker.yaml`
 * `deploy/k8s/migrate-job.yaml`
+* `deploy/k8s/postgres.yaml` (example dependency; StatefulSet + PVC)
+* `deploy/k8s/rabbitmq.yaml` (example dependency; Deployment)
 
 Notes:
 
@@ -26,6 +28,20 @@ Notes:
   * `CELERY_BROKER_URL` (Celery/RabbitMQ)
   * `RABBITMQ_URL` (domain event publishing; can be the same as `CELERY_BROKER_URL`)
 * `DJANGO_SECRET_KEY` should be provided via a Kubernetes Secret.
+* The dependency manifests are intentionally minimal and are not intended to be production-hardened (TLS, backups, HA, resource limits, etc.).
+
+### Secret prerequisites (example)
+
+The example manifests assume a Secret named `edmp-backend-secrets` exists with at least:
+
+* `DJANGO_SECRET_KEY`
+* `POSTGRES_PASSWORD`
+
+See `deploy/k8s/secrets.example.yaml` for a placeholder you can adapt.
+
+### RabbitMQ credentials (example)
+
+`deploy/k8s/rabbitmq.yaml` uses the container image defaults (e.g. `guest/guest`), which is **not** appropriate for production. Configure dedicated credentials (and TLS) and update `CELERY_BROKER_URL` / `RABBITMQ_URL` accordingly.
 
 ## Recommended runtime components (logical)
 
