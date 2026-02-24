@@ -19,7 +19,7 @@ class EDMPTenantMiddleware(TenantMainMiddleware):
         # Kubernetes liveness/readiness probes typically don't send a tenant
         # hostname. For a multi-tenant app, these endpoints must still work to
         # allow the platform to determine container health.
-        path = request.path.rstrip('/') or '/'
+        path = request.path.rstrip('/')
         if path in self.PUBLIC_ENDPOINT_PATHS:
             connection.set_schema_to_public()
             request.tenant = None
