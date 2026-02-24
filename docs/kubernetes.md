@@ -18,6 +18,8 @@ See:
 * `deploy/k8s/backend.yaml`
 * `deploy/k8s/worker.yaml`
 * `deploy/k8s/migrate-job.yaml`
+* `deploy/k8s/postgres.yaml` (example dependency; StatefulSet + PVC)
+* `deploy/k8s/rabbitmq.yaml` (example dependency; Deployment)
 
 Notes:
 
@@ -26,6 +28,7 @@ Notes:
   * `CELERY_BROKER_URL` (Celery/RabbitMQ)
   * `RABBITMQ_URL` (domain event publishing; can be the same as `CELERY_BROKER_URL`)
 * `DJANGO_SECRET_KEY` should be provided via a Kubernetes Secret.
+* The dependency manifests are intentionally minimal and are not intended to be production-hardened (TLS, backups, HA, resource limits, etc.).
 
 ## Recommended runtime components (logical)
 
