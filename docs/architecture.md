@@ -109,6 +109,8 @@ Design for connector-style ingestion without coupling to any single tool:
 * Celery tasks: perform normalization, validation, and persistence inside tenant schema.
 * Long-running/large ingestions: move to job-style execution (Kubernetes Jobs) while keeping the API surface stable.
 
+See also: [ingestion notes](ingestion.md).
+
 ### Catalog expansion (incremental)
 
 Keep `DataAsset` minimal, but design for:
@@ -117,6 +119,8 @@ Keep `DataAsset` minimal, but design for:
 * Qualified name uniqueness (likely per tenant + asset_type in the future)
 * Optional fields: description, owner, tags, classifications
 * Relationship graph (future): lineage edges between assets (table → dashboard, dataset → model, etc.)
+
+See also: [lineage notes](lineage.md).
 
 ### Observability & SLOs
 
