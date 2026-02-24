@@ -7,6 +7,9 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * Framework: Django
 * Multi-tenancy: `django-tenants` (schema-per-tenant)
 * Async: Celery (RabbitMQ-backed)
+* Kubernetes probes:
+  * `GET /healthz` / `GET /livez` (liveness; no tenant host required)
+  * `GET /readyz` (readiness; performs a DB round-trip; no tenant host required)
 
 ### Local dev prerequisites
 
