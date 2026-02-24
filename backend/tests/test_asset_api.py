@@ -77,6 +77,16 @@ def test_asset_update_roundtrip():
     assert removed.status_code == 200
     assert 'owner' not in removed.json()['properties']
 
+    multi = client.put(
+        f"/api/v1/assets/{created['id']}",
+        data=json.dumps({'properties': {'missing': None, 'env': 'prod'}}),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert multi.status_code == 200
+    assert multi.json()['properties']['env'] == 'prod'
+    assert 'missing' not in multi.json()['properties']
+
     cannot_change_type = client.put(
         f"/api/v1/assets/{created['id']}",
         data=json.dumps({'asset_type': 'view'}),

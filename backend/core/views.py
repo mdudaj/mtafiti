@@ -56,6 +56,10 @@ def _parse_json_body(request):
 
 @csrf_exempt
 def assets(request):
+    """List/create tenant-scoped DataAssets.
+
+    GET supports simple offset pagination via ?limit= (default 100, max 500) and ?offset= (default 0).
+    """
     if request.method == 'GET':
         try:
             limit = int(request.GET.get('limit', '100'))
