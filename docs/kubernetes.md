@@ -18,6 +18,7 @@ See:
 * `deploy/k8s/backend.yaml`
 * `deploy/k8s/worker.yaml`
 * `deploy/k8s/migrate-job.yaml`
+* `deploy/k8s/ingress.yaml` (example edge routing; control-plane + wildcard tenant hostnames)
 * `deploy/k8s/postgres.yaml` (example dependency; StatefulSet + PVC)
 * `deploy/k8s/rabbitmq.yaml` (example dependency; Deployment)
 

@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edmp-backend
+spec:
+  rules:
+    # Control-plane hostname (tenant admin APIs).
+    - host: control.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: edmp-backend
+                port:
+                  number: 80
+    # Tenant host routing (schema-per-tenant is resolved from Host header).
+    - host: "*.tenant.example.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: edmp-backend
+                port:
+                  number: 80
+

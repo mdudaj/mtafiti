@@ -80,6 +80,12 @@ Initial implementation can start as a simple header-based identity (for local/de
   * Tenant plane: scoped roles per tenant (e.g. `catalog.reader`, `catalog.editor`, `policy.admin`).
 * **Audit**: emit an audit event for mutating actions (tenant creation, asset changes, policy changes).
 
+### Edge routing (Ingress / gateway)
+
+* Tenant resolution depends on the original `Host` header.
+* Deploy an Ingress/gateway that routes both a control-plane hostname and wildcard tenant hostnames to the backend service.
+* See `deploy/k8s/ingress.yaml` for a minimal example.
+
 ### Eventing model
 
 RabbitMQ topic exchange is the first building block.
