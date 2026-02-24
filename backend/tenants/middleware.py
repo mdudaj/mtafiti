@@ -1,5 +1,5 @@
 from django.db import connection
-from django.http import HttpResponseNotFound
+from django.http import JsonResponse
 from django_tenants.middleware.main import TenantMainMiddleware
 
 
@@ -29,4 +29,4 @@ class EDMPTenantMiddleware(TenantMainMiddleware):
         return super().process_request(request)
 
     def no_tenant_found(self, request, hostname):
-        return HttpResponseNotFound('Tenant not found')
+        return JsonResponse({'error': 'tenant_not_found'}, status=404)

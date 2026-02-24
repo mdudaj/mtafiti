@@ -52,6 +52,7 @@ TENANT_APPS = [
 INSTALLED_APPS = SHARED_APPS + TENANT_APPS
 
 MIDDLEWARE = [
+    'core.middleware.CorrelationIdMiddleware',
     'tenants.middleware.EDMPTenantMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

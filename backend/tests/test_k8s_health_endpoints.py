@@ -7,9 +7,10 @@ from django.test import Client
 @pytest.mark.django_db(transaction=True)
 def test_healthz_does_not_require_tenant_host():
     client = Client()
-    resp = client.get('/healthz', HTTP_HOST='unknown.example')
+    resp = client.get('/healthz', HTTP_HOST='unknown.example', HTTP_X_CORRELATION_ID='corr-1')
     assert resp.status_code == 200
     assert resp.json() == {'status': 'ok'}
+    assert resp.headers['X-Correlation-Id'] == 'corr-1'
 
 
 @pytest.mark.django_db(transaction=True)

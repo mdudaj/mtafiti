@@ -13,7 +13,9 @@ def test_requests_without_tenant_are_rejected():
     client = Client()
     resp = client.get('/', HTTP_HOST='unknown.example')
     assert resp.status_code == 404
-    assert b'Tenant not found' in resp.content
+    assert resp.json() == {'error': 'tenant_not_found'}
+    assert resp.headers.get('X-Correlation-Id')
+    uuid.UUID(resp.headers['X-Correlation-Id'])
 
 
 @pytest.mark.django_db(transaction=True)
@@ -41,4 +43,3 @@ def test_schema_per_tenant_isolated_data_and_routing():
     resp = client.get('/', HTTP_HOST='tenanta.example')
     assert resp.status_code == 200
     assert resp.json()['schema'] == tenant_a.schema_name
-

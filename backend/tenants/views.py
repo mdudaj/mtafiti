@@ -65,7 +65,7 @@ def tenants(request):
                 event_type='tenant.created',
                 tenant_id=tenant.schema_name,
                 routing_key=f'{tenant.schema_name}.control.tenant.created',
-                correlation_id=request.headers.get('X-Correlation-Id'),
+                correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
                 user_id=request.headers.get('X-User-Id'),
                 data=_tenant_to_dict(tenant),
                 rabbitmq_url=os.environ.get('RABBITMQ_URL'),
