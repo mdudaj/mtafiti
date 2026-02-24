@@ -352,12 +352,12 @@ components:
       type: object
       properties:
         display_name:
-          nullable: true
           type: string
+          nullable: true
         asset_type:
           type: string
           description: Present but immutable; changing it results in 400.
         properties:
-          nullable: true
           type: object
+          nullable: true
           additionalProperties: true
