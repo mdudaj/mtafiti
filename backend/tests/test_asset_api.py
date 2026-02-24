@@ -5,6 +5,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
+import core.events as events
 from tenants.models import Domain, Tenant
 
 
@@ -94,3 +95,52 @@ def test_asset_update_roundtrip():
         HTTP_HOST=host,
     )
     assert cannot_change_type.status_code == 400
+
+
+@pytest.mark.django_db(transaction=True)
+def test_asset_mutations_emit_events_when_configured(monkeypatch):
+    calls = []
+
+    def fake_publish_event(*, exchange, routing_key, payload, rabbitmq_url=None):
+        calls.append({'exchange': exchange, 'routing_key': routing_key, 'payload': payload, 'rabbitmq_url': rabbitmq_url})
+
+    monkeypatch.setattr(events, 'publish_event', fake_publish_event)
+    monkeypatch.setenv('RABBITMQ_URL', 'amqp://test/')
+    monkeypatch.setenv('EDMP_EVENT_EXCHANGE', 'edmp.events')
+
+    host = f"tenanta-{uuid.uuid4().hex[:6]}.example"
+    with schema_context('public'):
+        tenant = Tenant(schema_name=f't_{uuid.uuid4().hex[:8]}', name=f"Tenant A {uuid.uuid4().hex[:6]}")
+        tenant.save()
+        Domain(domain=host, tenant=tenant, is_primary=True).save()
+
+    client = Client()
+    created_resp = client.post(
+        '/api/v1/assets',
+        data=json.dumps({'qualified_name': 'db.table', 'asset_type': 'table'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_CORRELATION_ID='corr-1',
+        HTTP_X_USER_ID='user-1',
+    )
+    assert created_resp.status_code == 201
+    created = created_resp.json()
+
+    updated_resp = client.put(
+        f"/api/v1/assets/{created['id']}",
+        data=json.dumps({'display_name': 'Table'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_CORRELATION_ID='corr-1',
+        HTTP_X_USER_ID='user-1',
+    )
+    assert updated_resp.status_code == 200
+
+    assert [c['routing_key'] for c in calls] == [
+        f'{tenant.schema_name}.catalog.asset.created',
+        f'{tenant.schema_name}.catalog.asset.updated',
+    ]
+    assert calls[0]['payload']['event_type'] == 'asset.created'
+    assert calls[0]['payload']['tenant_id'] == tenant.schema_name
+    assert calls[0]['payload']['correlation_id'] == 'corr-1'
+    assert calls[0]['payload']['user_id'] == 'user-1'

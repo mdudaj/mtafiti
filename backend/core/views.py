@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 
 from django.db import connection
@@ -6,7 +7,13 @@ from django.db.utils import DatabaseError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from .events import maybe_publish_event
 from .models import DataAsset
+
+
+def _tenant_schema(request) -> str:
+    tenant = getattr(request, 'tenant', None)
+    return tenant.schema_name if tenant else connection.schema_name
 
 
 def health(request):
@@ -89,6 +96,16 @@ def assets(request):
             asset_type=asset_type,
             properties=payload.get('properties') or {},
         )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='asset.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.catalog.asset.created',
+            correlation_id=request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_asset_to_dict(asset),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
         return JsonResponse(_asset_to_dict(asset), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -131,6 +148,16 @@ def asset_detail(request, asset_id: str):
                         merged[k] = v
                 asset.properties = merged
         asset.save()
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='asset.updated',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.catalog.asset.updated',
+            correlation_id=request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_asset_to_dict(asset),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
         return JsonResponse(_asset_to_dict(asset))
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
