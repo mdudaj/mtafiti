@@ -18,12 +18,14 @@ from django.contrib import admin
 from django.urls import path
 
 from core.views import asset_detail, assets, health, healthz, livez, readyz
+from tenants.views import tenants
 
 urlpatterns = [
     path('', health, name='health'),
     path('healthz', healthz, name='healthz'),
     path('livez', livez, name='livez'),
     path('readyz', readyz, name='readyz'),
+    path('api/v1/tenants', tenants, name='tenants'),
     path('api/v1/assets', assets, name='assets'),
     path('api/v1/assets/<uuid:asset_id>', asset_detail, name='asset_detail'),
     path('admin/', admin.site.urls),
