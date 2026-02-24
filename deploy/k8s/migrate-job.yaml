@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: edmp-migrate
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: ghcr.io/mdudaj/edmp-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "migrate_schemas", "--noinput"]
+          env:
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: edmp-backend-secrets
+                  key: DJANGO_SECRET_KEY
+            - name: POSTGRES_DB
+              value: edmp
+            - name: POSTGRES_USER
+              value: edmp
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edmp-backend-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"

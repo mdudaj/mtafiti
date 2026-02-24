@@ -16,11 +16,15 @@ These endpoints do **not** require tenant host resolution.
 See:
 
 * `deploy/k8s/backend.yaml`
+* `deploy/k8s/worker.yaml`
+* `deploy/k8s/migrate-job.yaml`
 
 Notes:
 
 * Provide PostgreSQL connectivity via `POSTGRES_*` env vars.
-* Provide broker connectivity via `CELERY_BROKER_URL` (RabbitMQ).
+* Provide broker connectivity via:
+  * `CELERY_BROKER_URL` (Celery/RabbitMQ)
+  * `RABBITMQ_URL` (domain event publishing; can be the same as `CELERY_BROKER_URL`)
 * `DJANGO_SECRET_KEY` should be provided via a Kubernetes Secret.
 
 ## Recommended runtime components (logical)
@@ -37,7 +41,8 @@ Even if initially deployed as a single pod, the platform design assumes these co
 For `django-tenants`, schema creation happens on tenant creation (`auto_create_schema = True`).
 Operationally in Kubernetes:
 
-* Run shared migrations as a **Job** during deploys (or an init container), before scaling web/worker.
+* Run migrations as a **Job** during deploys (or an init container), before scaling web/worker.
+  * Example: `deploy/k8s/migrate-job.yaml`
 * Ensure readiness probes only pass after DB is reachable (`/readyz` already checks this).
 
 ## Configuration & secrets

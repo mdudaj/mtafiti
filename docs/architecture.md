@@ -30,10 +30,13 @@ Probe endpoints are explicitly treated as public (no tenant required):
 
 * `build_event_payload(...)` to standardize event metadata (tenant id, correlation id, timestamp, etc.)
 * `publish_event(...)` to publish JSON events to RabbitMQ via `pika`
+* Event publishing is enabled when `RABBITMQ_URL` is configured (otherwise it is a no-op).
 
 ### Background processing (Celery)
 
 Celery is configured in `backend/config/celery.py` and uses `TenantTask` (`backend/core/celery.py`) to enforce that tasks execute inside a tenant schema context.
+
+In Kubernetes, run Celery workers as a separate Deployment (see `deploy/k8s/worker.yaml`) so that web and worker scaling can be tuned independently.
 
 ### Metadata catalog (minimal slice)
 
