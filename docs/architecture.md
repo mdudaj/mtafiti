@@ -31,6 +31,7 @@ Probe endpoints are explicitly treated as public (no tenant required):
 * `build_event_payload(...)` to standardize event metadata (tenant id, correlation id, timestamp, etc.)
 * `publish_event(...)` to publish JSON events to RabbitMQ via `pika`
 * Event publishing is enabled when `RABBITMQ_URL` is configured (otherwise it is a no-op).
+* See [events design notes](events.md) for the current envelope and routing conventions.
 
 ### Background processing (Celery)
 
