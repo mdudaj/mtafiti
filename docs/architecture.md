@@ -61,6 +61,7 @@ This is the intended direction for expanding EDMP capabilities:
 ## Next design increments (near-term)
 
 This section describes the next pieces to design and implement while keeping the codebase intentionally small.
+For a short prioritized list, see [docs/roadmap.md](roadmap.md).
 
 ### API conventions
 
@@ -79,6 +80,8 @@ Initial implementation can start as a simple header-based identity (for local/de
   * Control plane: tenant admin actions restricted to platform operators.
   * Tenant plane: scoped roles per tenant (e.g. `catalog.reader`, `catalog.editor`, `policy.admin`).
 * **Audit**: emit an audit event for mutating actions (tenant creation, asset changes, policy changes).
+
+See also: [identity & access notes](identity.md) and [governance & policy notes](governance.md).
 
 ### Edge routing (Ingress / gateway)
 
@@ -122,3 +125,5 @@ Keep `DataAsset` minimal, but design for:
   * `/readyz`: dependency-level OK (DB round-trip)
 * Logging: JSON logs with correlation id when present (ingress can inject `X-Correlation-Id`; Django is configured with a JSON console formatter)
 * Metrics (future): expose `/metrics` (Prometheus) and track queue depth, task latency, request latency.
+
+See also: [observability notes](observability.md).
