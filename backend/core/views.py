@@ -56,7 +56,16 @@ def _parse_json_body(request):
 @csrf_exempt
 def assets(request):
     if request.method == 'GET':
-        items = [_asset_to_dict(a) for a in DataAsset.objects.order_by('created_at')[:100]]
+        try:
+            limit = int(request.GET.get('limit', '100'))
+            offset = int(request.GET.get('offset', '0'))
+        except ValueError:
+            return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+        limit = min(max(limit, 1), 500)
+        offset = max(offset, 0)
+
+        qs = DataAsset.objects.order_by('created_at')[offset : offset + limit]
+        items = [_asset_to_dict(a) for a in qs]
         return JsonResponse({'items': items})
 
     if request.method == 'POST':
@@ -104,7 +113,13 @@ def asset_detail(request, asset_id: str):
             if props is None:
                 asset.properties = {}
             else:
-                asset.properties = {**(asset.properties or {}), **(props or {})}
+                merged = dict(asset.properties or {})
+                for k, v in (props or {}).items():
+                    if v is None:
+                        merged.pop(k, None)
+                    else:
+                        merged[k] = v
+                asset.properties = merged
         asset.save()
         return JsonResponse(_asset_to_dict(asset))
 

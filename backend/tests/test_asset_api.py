@@ -68,6 +68,15 @@ def test_asset_update_roundtrip():
     assert resp.json()['display_name'] == 'Table'
     assert resp.json()['properties']['owner'] == 'data-team'
 
+    removed = client.put(
+        f"/api/v1/assets/{created['id']}",
+        data=json.dumps({'properties': {'owner': None}}),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert removed.status_code == 200
+    assert 'owner' not in removed.json()['properties']
+
     cannot_change_type = client.put(
         f"/api/v1/assets/{created['id']}",
         data=json.dumps({'asset_type': 'view'}),
