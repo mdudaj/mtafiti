@@ -155,3 +155,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Celery (RabbitMQ-backed)
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'rpc://')
+
+# Logging (cloud-native friendly, includes correlation_id when present)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'correlation_id': {'()': 'core.logging.CorrelationIdFilter'},
+    },
+    'formatters': {
+        'json': {'()': 'core.logging.JsonFormatter'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['correlation_id'],
+            'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+    },
+}

@@ -114,5 +114,5 @@ Keep `DataAsset` minimal, but design for:
 * Probes:
   * `/livez`: process-level OK
   * `/readyz`: dependency-level OK (DB round-trip)
-* Logging: JSON logs with correlation id when present (ingress can inject `X-Correlation-Id`)
+* Logging: JSON logs with correlation id when present (ingress can inject `X-Correlation-Id`; Django is configured with a JSON console formatter)
 * Metrics (future): expose `/metrics` (Prometheus) and track queue depth, task latency, request latency.
