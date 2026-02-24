@@ -5,6 +5,10 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 ## Design docs
 
 * [Architecture overview](docs/architecture.md)
+* [Roadmap (design increments)](docs/roadmap.md)
+* [Identity & access](docs/identity.md)
+* [Governance & policy](docs/governance.md)
+* [Observability](docs/observability.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
 * [Eventing conventions](docs/events.md)
