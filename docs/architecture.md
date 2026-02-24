@@ -21,7 +21,7 @@ This repository is intentionally small: it provides a starting point for a **clo
 
 Probe endpoints are explicitly treated as public (no tenant required):
 
-* `GET /healthz` and `GET /livez` → always OK
+* `GET /healthz` and `GET /livez` → always OK (use either for liveness checks)
 * `GET /readyz` → performs a DB round-trip (returns `503` if DB is unavailable)
 
 ### Eventing (RabbitMQ topic exchange)
@@ -44,4 +44,3 @@ This is the intended direction for expanding EDMP capabilities:
 * **Metadata plane**: catalog, lineage, ownership, tags/classification.
 * **Governance / policy**: RBAC/ABAC, audit events, retention policies, and data access controls.
 * **Observability**: logs, metrics, traces; SLOs aligned with readiness/liveness behavior.
-
