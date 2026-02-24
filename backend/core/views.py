@@ -66,7 +66,7 @@ def _ingestion_to_dict(ing: IngestionRequest) -> dict[str, Any]:
         'id': str(ing.id),
         'connector': ing.connector,
         'source': ing.source,
-        'mode': ing.mode or None,
+        'mode': ing.mode if ing.mode else None,
         'status': ing.status,
         'created_at': ing.created_at.isoformat(),
         'updated_at': ing.updated_at.isoformat(),
@@ -108,6 +108,7 @@ def ingestions(request):
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
 
 
+@csrf_exempt
 def ingestion_detail(request, ingestion_id: str):
     try:
         ing = IngestionRequest.objects.get(id=ingestion_id)
