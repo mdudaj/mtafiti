@@ -40,7 +40,7 @@ spec:
             - name: CELERY_BROKER_URL
               value: amqp://guest:guest@rabbitmq:5672//
             - name: RABBITMQ_URL
-              value: amqp://guest:guest@rabbitmq:5672/
+              value: amqp://guest:guest@rabbitmq:5672//
           livenessProbe:
             httpGet:
               path: /livez
