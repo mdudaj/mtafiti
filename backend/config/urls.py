@@ -17,11 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from core.views import health, livez, readyz
+from core.views import health, healthz, livez, readyz
 
 urlpatterns = [
     path('', health, name='health'),
-    path('healthz', livez, name='healthz'),
+    path('healthz', healthz, name='healthz'),
     path('livez', livez, name='livez'),
     path('readyz', readyz, name='readyz'),
     path('admin/', admin.site.urls),

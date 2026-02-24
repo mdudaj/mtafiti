@@ -10,6 +10,10 @@ def livez(request):
     return JsonResponse({'status': 'ok'})
 
 
+def healthz(request):
+    return livez(request)
+
+
 def readyz(request):
     try:
         connection.ensure_connection()
@@ -18,5 +22,3 @@ def readyz(request):
     except Exception:
         return JsonResponse({'status': 'not-ready'}, status=503)
     return JsonResponse({'status': 'ok'})
-
-# Create your views here.
