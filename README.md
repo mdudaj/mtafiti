@@ -15,6 +15,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Connector execution model](docs/connectors.md)
 * [Lineage](docs/lineage.md)
 * [Search](docs/search.md)
+* [Data quality](docs/data-quality.md)
 * [Observability](docs/observability.md)
 * [Metrics](docs/metrics.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
