@@ -12,6 +12,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Policy enforcement](docs/policy.md)
 * [Data retention & lifecycle](docs/retention.md)
 * [Audit events](docs/audit.md)
+* [Request context propagation](docs/request-context.md)
 * [Ingestion](docs/ingestion.md)
 * [Connector execution model](docs/connectors.md)
 * [Workflow orchestration](docs/orchestration.md)

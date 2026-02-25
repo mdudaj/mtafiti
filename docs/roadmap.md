@@ -14,11 +14,12 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 1. **Audit events**: emit consistent audit events for mutating actions (tenants, assets, lineage, policies) (see `docs/audit.md`).
 2. **Policy enforcement**: RBAC/ABAC checks in API handlers and background tasks, integrated with identity (see `docs/policy.md`).
-3. **Search**: metadata search (indexing strategy + query API) while keeping tenant isolation intact (see `docs/search.md`).
-4. **Metrics**: add `/metrics` (Prometheus) and define initial SLOs for API and worker workloads (see `docs/metrics.md`).
-5. **Data quality**: define tenant-scoped quality rules, evaluation lifecycle, and result/event conventions (see `docs/data-quality.md`).
-6. **Data contracts**: define tenant-scoped schema/expectation contracts and lifecycle conventions for producer-consumer alignment (see `docs/data-contracts.md`).
-7. **Retention lifecycle**: define tenant-scoped retention rules, hold/approval flow, and archive/delete event conventions (see `docs/retention.md`).
+3. **Request context propagation**: define correlation/user/tenant context capture and async propagation conventions (see `docs/request-context.md`).
+4. **Search**: metadata search (indexing strategy + query API) while keeping tenant isolation intact (see `docs/search.md`).
+5. **Metrics**: add `/metrics` (Prometheus) and define initial SLOs for API and worker workloads (see `docs/metrics.md`).
+6. **Data quality**: define tenant-scoped quality rules, evaluation lifecycle, and result/event conventions (see `docs/data-quality.md`).
+7. **Data contracts**: define tenant-scoped schema/expectation contracts and lifecycle conventions for producer-consumer alignment (see `docs/data-contracts.md`).
+8. **Retention lifecycle**: define tenant-scoped retention rules, hold/approval flow, and archive/delete event conventions (see `docs/retention.md`).
 
 ## Mid-term
 
