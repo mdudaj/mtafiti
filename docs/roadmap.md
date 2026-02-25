@@ -8,7 +8,8 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 2. **Catalog growth**: optional asset fields (`description`, `owner`, `tags`, `classifications`) on the minimal API.
 3. **Lineage graph**: tenant-scoped edge upsert/query conventions (see `docs/lineage.md`).
 4. **Ingestion framework**: ingestion request/status API as the base integration entrypoint (see `docs/ingestion.md`).
-5. **Observability baseline**: health/readiness probes and structured logging with correlation ids (see `docs/observability.md`).
+5. **Eventing conventions**: optional RabbitMQ-backed domain-event publishing and routing-key conventions (see `docs/events.md`).
+6. **Observability baseline**: health/readiness probes and structured logging with correlation ids (see `docs/observability.md`).
 
 ## Near-term (next)
 
