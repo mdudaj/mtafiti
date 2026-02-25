@@ -21,6 +21,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Data quality](docs/data-quality.md)
 * [Data contracts](docs/data-contracts.md)
 * [Reference data management](docs/reference-data.md)
+* [Master data management](docs/master-data.md)
 * [Business glossary](docs/glossary.md)
 * [Observability](docs/observability.md)
 * [Metrics](docs/metrics.md)
