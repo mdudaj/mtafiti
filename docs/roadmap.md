@@ -27,6 +27,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 * **Connector execution model**: expand ingestion into connector plugins and job-style long-running execution paths (see `docs/connectors.md`).
 * **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
+* **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).
 * **Data access requests**: define tenant-scoped request/approval/revocation conventions for governed asset access (see `docs/access-requests.md`).
 * **Reference data management**: define tenant-scoped reference datasets, change control, and asset linkage conventions (see `docs/reference-data.md`).
 * **Master data management**: define tenant-scoped canonical entity records, survivorship rules, and stewardship conventions (see `docs/master-data.md`).
