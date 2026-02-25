@@ -26,5 +26,5 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 ## Out of scope for this scaffold (yet)
 
-* Full workflow orchestration and scheduling (Airflow/Argo/etc.) — prefer clean integration points first.
+* Full workflow orchestration and scheduling (Airflow/Argo/etc.) — prefer clean integration points first (see `docs/orchestration.md`).
 * Large-scale data lake/warehouse provisioning — EDMP should integrate with existing compute/storage layers.

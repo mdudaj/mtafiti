@@ -14,6 +14,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Audit events](docs/audit.md)
 * [Ingestion](docs/ingestion.md)
 * [Connector execution model](docs/connectors.md)
+* [Workflow orchestration](docs/orchestration.md)
 * [Lineage](docs/lineage.md)
 * [Search](docs/search.md)
 * [Data quality](docs/data-quality.md)
