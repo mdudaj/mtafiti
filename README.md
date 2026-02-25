@@ -8,6 +8,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Roadmap (design increments)](docs/roadmap.md)
 * [Identity & access](docs/identity.md)
 * [Governance & policy](docs/governance.md)
+* [Policy enforcement](docs/policy.md)
 * [Audit events](docs/audit.md)
 * [Ingestion](docs/ingestion.md)
 * [Lineage](docs/lineage.md)
