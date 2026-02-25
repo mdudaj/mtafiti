@@ -18,6 +18,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Lineage](docs/lineage.md)
 * [Search](docs/search.md)
 * [Data quality](docs/data-quality.md)
+* [Data contracts](docs/data-contracts.md)
 * [Observability](docs/observability.md)
 * [Metrics](docs/metrics.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
