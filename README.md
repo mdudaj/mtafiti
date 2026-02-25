@@ -23,6 +23,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Reference data management](docs/reference-data.md)
 * [Master data management](docs/master-data.md)
 * [Business glossary](docs/glossary.md)
+* [Data stewardship operations](docs/stewardship.md)
 * [Observability](docs/observability.md)
 * [Metrics](docs/metrics.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)

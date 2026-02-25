@@ -28,6 +28,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Reference data management**: define tenant-scoped reference datasets, change control, and asset linkage conventions (see `docs/reference-data.md`).
 * **Master data management**: define tenant-scoped canonical entity records, survivorship rules, and stewardship conventions (see `docs/master-data.md`).
 * **Business glossary**: define tenant-scoped business terms, ownership, and asset-linking conventions (see `docs/glossary.md`).
+* **Data stewardship operations**: define tenant-scoped stewardship queues, assignment/triage lifecycle, and resolution events across governance domains (see `docs/stewardship.md`).
 * **Workflow orchestration**: define lightweight scheduled/event-driven workflow runs built on connector executions (see `docs/orchestration.md`).
 
 ## Out of scope for this scaffold (yet)
