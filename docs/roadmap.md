@@ -20,7 +20,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 ## Mid-term
 
 * **Connector execution model**: expand ingestion into connector plugins and job-style long-running execution paths (see `docs/connectors.md`).
-* **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls.
+* **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
 
 ## Out of scope for this scaffold (yet)
 
