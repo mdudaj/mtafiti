@@ -11,6 +11,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Policy enforcement](docs/policy.md)
 * [Audit events](docs/audit.md)
 * [Ingestion](docs/ingestion.md)
+* [Connector execution model](docs/connectors.md)
 * [Lineage](docs/lineage.md)
 * [Search](docs/search.md)
 * [Observability](docs/observability.md)
