@@ -9,6 +9,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Identity & access](docs/identity.md)
 * [Governance & policy](docs/governance.md)
 * [Governance workflows](docs/governance-workflows.md)
+* [Data access requests](docs/access-requests.md)
 * [Catalog growth](docs/catalog.md)
 * [Policy enforcement](docs/policy.md)
 * [Data retention & lifecycle](docs/retention.md)
