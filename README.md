@@ -10,6 +10,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Governance & policy](docs/governance.md)
 * [Governance workflows](docs/governance-workflows.md)
 * [Policy enforcement](docs/policy.md)
+* [Data retention & lifecycle](docs/retention.md)
 * [Audit events](docs/audit.md)
 * [Ingestion](docs/ingestion.md)
 * [Connector execution model](docs/connectors.md)
