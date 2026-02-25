@@ -26,7 +26,13 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 ## Mid-term
 
 * **Connector execution model**: expand ingestion into connector plugins and job-style long-running execution paths (see `docs/connectors.md`).
+* **Workflow engine and UI baseline**: establish Viewflow-driven lifecycle orchestration and django-material navigation contracts (see `docs/workflow-ui.md`).
 * **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
+* **Platform services baseline**: formalize Helm-managed core services (Keycloak, MinIO, Redis, ONLYOFFICE, JupyterHub, observability stack) (see `docs/platform-services.md`).
+* **Platform security hardening**: formalize mTLS, network-policy boundaries, secret handling, and immutable audit controls (see `docs/platform-security.md`).
+* **Printing and gateway**: define tenant-scoped print lifecycle and gateway dispatch/retry conventions (see `docs/printing.md`).
+* **Collaboration**: define ONLYOFFICE integration and tenant-scoped versioned document lifecycle (see `docs/collaboration.md`).
+* **Notebook infrastructure**: define JupyterHub/KubeSpawner pod isolation and execution event conventions (see `docs/notebooks.md`).
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).
 * **Data residency controls**: define tenant-scoped residency profiles and region enforcement conventions for connectors and governed exports (see `docs/residency.md`).
 * **Data access requests**: define tenant-scoped request/approval/revocation conventions for governed asset access (see `docs/access-requests.md`).
@@ -37,6 +43,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Data products**: define tenant-scoped product metadata, ownership, and lifecycle conventions built on existing catalog and governance foundations (see `docs/data-products.md`).
 * **Data sharing**: define tenant-scoped provider/consumer share lifecycle, constraint handling, and revocation conventions for governed distribution (see `docs/data-sharing.md`).
 * **Metadata versioning**: define tenant-scoped draft/publish/supersede conventions for auditable metadata evolution (see `docs/metadata-versioning.md`).
+* **Agentic AI execution**: define tenant-scoped tool governance, timeout controls, and execution audit/event conventions (see `docs/agentic-ai.md`).
 * **Data stewardship operations**: define tenant-scoped stewardship queues, assignment/triage lifecycle, and resolution events across governance domains (see `docs/stewardship.md`).
 * **Workflow orchestration**: define lightweight scheduled/event-driven workflow runs built on connector executions (see `docs/orchestration.md`).
 

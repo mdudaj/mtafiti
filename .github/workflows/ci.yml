@@ -8,7 +8,20 @@ permissions:
   contents: read
 
 jobs:
+  docs-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+      - name: Validate docs workflow rules
+        run: python .github/scripts/check_docs_workflow.py --base-ref "${{ github.base_ref }}"
+
   backend-tests:
+    needs: docs-gate
     runs-on: ubuntu-latest
     services:
       postgres:
