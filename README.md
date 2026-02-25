@@ -13,6 +13,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Lineage](docs/lineage.md)
 * [Search](docs/search.md)
 * [Observability](docs/observability.md)
+* [Metrics](docs/metrics.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
 * [Eventing conventions](docs/events.md)
