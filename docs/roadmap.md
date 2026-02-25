@@ -29,6 +29,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
 * **Reference data management**: define tenant-scoped reference datasets, change control, and asset linkage conventions (see `docs/reference-data.md`).
 * **Master data management**: define tenant-scoped canonical entity records, survivorship rules, and stewardship conventions (see `docs/master-data.md`).
+* **Data classification taxonomy**: define tenant-scoped sensitivity levels and lifecycle conventions used by policy, retention, and stewardship flows (see `docs/classification.md`).
 * **Business glossary**: define tenant-scoped business terms, ownership, and asset-linking conventions (see `docs/glossary.md`).
 * **Data products**: define tenant-scoped product metadata, ownership, and lifecycle conventions built on existing catalog and governance foundations (see `docs/data-products.md`).
 * **Data stewardship operations**: define tenant-scoped stewardship queues, assignment/triage lifecycle, and resolution events across governance domains (see `docs/stewardship.md`).
