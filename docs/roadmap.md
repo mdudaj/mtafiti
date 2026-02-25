@@ -6,7 +6,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 1. **Identity (authn) + roles (authz)**: basic role checks with clear OIDC/JWT integration points (see `docs/identity.md`).
 2. **Governance foundations**: initial governance and policy design baseline for roles, metadata classifications, and audit conventions (see `docs/governance.md`).
-3. **Catalog growth**: optional asset fields (`description`, `owner`, `tags`, `classifications`) on the minimal API.
+3. **Catalog growth**: optional asset fields (`description`, `owner`, `tags`, `classifications`) on the minimal API (see `docs/catalog.md`).
 4. **Lineage graph**: tenant-scoped edge upsert/query conventions (see `docs/lineage.md`).
 5. **Ingestion framework**: ingestion request/status API as the base integration entrypoint (see `docs/ingestion.md`).
 6. **Eventing conventions**: optional RabbitMQ-backed domain-event publishing and routing-key conventions (see `docs/events.md`).
