@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from typing import Any
 
@@ -8,13 +9,24 @@ from django.db import connection
 from django.db.models import Max, Q
 from django.db.utils import DatabaseError
 from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from .events import maybe_publish_audit_event, maybe_publish_event
 from .identity import require_any_role, require_role
 from .metrics import DB_READINESS_ERRORS, metrics_response
-from .models import DataAsset, DataContract, IngestionRequest, LineageEdge, QualityCheckResult, QualityRule
-from .tasks import evaluate_quality_rule
+from .models import (
+    DataAsset,
+    DataContract,
+    IngestionRequest,
+    LineageEdge,
+    QualityCheckResult,
+    QualityRule,
+    RetentionHold,
+    RetentionRule,
+    RetentionRun,
+)
+from .tasks import evaluate_quality_rule, execute_retention_run
 
 
 def _tenant_schema(request) -> str:
@@ -146,6 +158,45 @@ def _contract_to_dict(contract: DataContract) -> dict[str, Any]:
     }
 
 
+def _retention_rule_to_dict(rule: RetentionRule) -> dict[str, Any]:
+    return {
+        'id': str(rule.id),
+        'scope': rule.scope,
+        'action': rule.action,
+        'retention_period': rule.retention_period,
+        'grace_period': rule.grace_period or None,
+        'created_at': rule.created_at.isoformat(),
+        'updated_at': rule.updated_at.isoformat(),
+    }
+
+
+def _retention_hold_to_dict(hold: RetentionHold) -> dict[str, Any]:
+    return {
+        'id': str(hold.id),
+        'asset_id': str(hold.asset_id),
+        'reason': hold.reason,
+        'active': hold.active,
+        'created_at': hold.created_at.isoformat(),
+        'released_at': hold.released_at.isoformat() if hold.released_at else None,
+    }
+
+
+def _retention_run_to_dict(run: RetentionRun) -> dict[str, Any]:
+    return {
+        'id': str(run.id),
+        'rule_id': str(run.rule_id),
+        'mode': run.mode,
+        'status': run.status,
+        'summary': run.summary,
+        'created_at': run.created_at.isoformat(),
+        'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+    }
+
+
+def _is_day_duration(value: str) -> bool:
+    return bool(re.fullmatch(r'P\d+D', value or ''))
+
+
 def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_value: int) -> int | None:
     if value is None or value == '':
         return default
@@ -192,6 +243,159 @@ def search_assets(request):
     count = qs.count()
     results = [_asset_to_dict(a) for a in qs[offset : offset + limit]]
     return JsonResponse({'count': count, 'results': results})
+
+
+@csrf_exempt
+def retention_rules(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        rules = RetentionRule.objects.order_by('-updated_at')
+        return JsonResponse({'items': [_retention_rule_to_dict(r) for r in rules]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        action = payload.get('action')
+        retention_period = payload.get('retention_period')
+        if action not in {RetentionRule.Action.ARCHIVE, RetentionRule.Action.DELETE}:
+            return JsonResponse({'error': 'action must be archive or delete'}, status=400)
+        if not _is_day_duration(retention_period):
+            return JsonResponse({'error': 'retention_period must be ISO day duration (PnD)'}, status=400)
+        grace_period = payload.get('grace_period') or ''
+        if grace_period and not _is_day_duration(grace_period):
+            return JsonResponse({'error': 'grace_period must be ISO day duration (PnD)'}, status=400)
+        scope = payload.get('scope') or {}
+        if not isinstance(scope, dict):
+            return JsonResponse({'error': 'scope must be an object'}, status=400)
+
+        rule = RetentionRule.objects.create(
+            scope=scope,
+            action=action,
+            retention_period=retention_period,
+            grace_period=grace_period,
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='retention.rule.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.retention.rule.created',
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_retention_rule_to_dict(rule),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='retention.rule.created',
+            resource_type='retention_rule',
+            resource_id=str(rule.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_retention_rule_to_dict(rule),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_retention_rule_to_dict(rule), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def retention_holds(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        only_active = request.GET.get('active', 'true').lower() in {'1', 'true', 'yes'}
+        qs = RetentionHold.objects.order_by('-created_at')
+        if only_active:
+            qs = qs.filter(active=True)
+        return JsonResponse({'items': [_retention_hold_to_dict(h) for h in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return JsonResponse({'error': 'asset_id is required'}, status=400)
+        try:
+            asset = DataAsset.objects.get(id=asset_id)
+        except (ValidationError, DataAsset.DoesNotExist):
+            return JsonResponse({'error': 'asset_not_found'}, status=404)
+        hold = RetentionHold.objects.create(asset=asset, reason=(payload.get('reason') or ''))
+        return JsonResponse(_retention_hold_to_dict(hold), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def retention_hold_release(request, hold_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        hold = RetentionHold.objects.get(id=hold_id)
+    except (ValidationError, RetentionHold.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    hold.active = False
+    hold.released_at = timezone.now()
+    hold.save(update_fields=['active', 'released_at'])
+    return JsonResponse(_retention_hold_to_dict(hold))
+
+
+@csrf_exempt
+def retention_runs(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        rule_id = request.GET.get('rule_id')
+        runs = RetentionRun.objects.order_by('-created_at')
+        if rule_id:
+            runs = runs.filter(rule_id=rule_id)
+        return JsonResponse({'items': [_retention_run_to_dict(r) for r in runs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        rule_id = payload.get('rule_id')
+        mode = payload.get('mode') or RetentionRun.Mode.DRY_RUN
+        if mode not in {RetentionRun.Mode.DRY_RUN, RetentionRun.Mode.EXECUTE}:
+            return JsonResponse({'error': 'mode must be dry_run or execute'}, status=400)
+        try:
+            rule = RetentionRule.objects.get(id=rule_id)
+        except (ValidationError, RetentionRule.DoesNotExist):
+            return JsonResponse({'error': 'rule_not_found'}, status=404)
+        run = RetentionRun.objects.create(rule=rule, mode=mode, status=RetentionRun.Status.STARTED)
+        tenant_schema = _tenant_schema(request)
+        result = execute_retention_run.apply(
+            kwargs={
+                'tenant_schema': tenant_schema,
+                'run_id': str(run.id),
+                'correlation_id': getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+                'user_id': request.headers.get('X-User-Id'),
+                'request_id': request.headers.get('X-Request-Id') or request.headers.get('X-Request-ID'),
+            }
+        ).get(propagate=True)
+        refreshed = RetentionRun.objects.get(id=run.id)
+        return JsonResponse({'run': _retention_run_to_dict(refreshed), 'result': result}, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
 
 
 @csrf_exempt

@@ -106,3 +106,45 @@ class DataContract(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['asset', 'version'], name='uniq_contract_asset_version'),
         ]
+
+
+class RetentionRule(models.Model):
+    class Action(models.TextChoices):
+        ARCHIVE = 'archive'
+        DELETE = 'delete'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scope = models.JSONField(default=dict, blank=True)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    retention_period = models.CharField(max_length=32)
+    grace_period = models.CharField(max_length=32, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class RetentionHold(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(DataAsset, on_delete=models.CASCADE, related_name='retention_holds')
+    reason = models.CharField(max_length=512, blank=True, default='')
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+
+
+class RetentionRun(models.Model):
+    class Mode(models.TextChoices):
+        DRY_RUN = 'dry_run'
+        EXECUTE = 'execute'
+
+    class Status(models.TextChoices):
+        STARTED = 'started'
+        COMPLETED = 'completed'
+        FAILED = 'failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    rule = models.ForeignKey(RetentionRule, on_delete=models.CASCADE, related_name='runs')
+    mode = models.CharField(max_length=16, choices=Mode.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.STARTED)
+    summary = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
