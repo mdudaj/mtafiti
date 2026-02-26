@@ -84,3 +84,25 @@ class QualityCheckResult(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices)
     details = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class DataContract(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = 'draft'
+        ACTIVE = 'active'
+        DEPRECATED = 'deprecated'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(DataAsset, on_delete=models.CASCADE, related_name='contracts')
+    version = models.IntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    schema = models.JSONField(default=dict, blank=True)
+    expectations = models.JSONField(default=list, blank=True)
+    owners = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['asset', 'version'], name='uniq_contract_asset_version'),
+        ]

@@ -5,7 +5,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.db.utils import DatabaseError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .events import maybe_publish_audit_event, maybe_publish_event
 from .identity import require_any_role, require_role
 from .metrics import DB_READINESS_ERRORS, metrics_response
-from .models import DataAsset, IngestionRequest, LineageEdge, QualityCheckResult, QualityRule
+from .models import DataAsset, DataContract, IngestionRequest, LineageEdge, QualityCheckResult, QualityRule
 from .tasks import evaluate_quality_rule
 
 
@@ -132,6 +132,20 @@ def _quality_result_to_dict(result: QualityCheckResult) -> dict[str, Any]:
     }
 
 
+def _contract_to_dict(contract: DataContract) -> dict[str, Any]:
+    return {
+        'id': str(contract.id),
+        'asset_id': str(contract.asset_id),
+        'version': contract.version,
+        'status': contract.status,
+        'schema': contract.schema,
+        'expectations': contract.expectations,
+        'owners': contract.owners,
+        'created_at': contract.created_at.isoformat(),
+        'updated_at': contract.updated_at.isoformat(),
+    }
+
+
 def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_value: int) -> int | None:
     if value is None or value == '':
         return default
@@ -178,6 +192,182 @@ def search_assets(request):
     count = qs.count()
     results = [_asset_to_dict(a) for a in qs[offset : offset + limit]]
     return JsonResponse({'count': count, 'results': results})
+
+
+@csrf_exempt
+def contracts(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        asset_id = request.GET.get('asset_id')
+        qs = DataContract.objects.order_by('-updated_at')
+        if asset_id:
+            qs = qs.filter(asset_id=asset_id)
+        return JsonResponse({'items': [_contract_to_dict(c) for c in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_role(request, 'catalog.editor')
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return JsonResponse({'error': 'asset_id is required'}, status=400)
+        try:
+            asset = DataAsset.objects.get(id=asset_id)
+        except (ValidationError, DataAsset.DoesNotExist):
+            return JsonResponse({'error': 'asset_not_found'}, status=404)
+
+        schema = payload.get('schema') or {}
+        expectations = payload.get('expectations') or []
+        owners = payload.get('owners') or []
+        if not isinstance(schema, dict):
+            return JsonResponse({'error': 'schema must be an object'}, status=400)
+        if not isinstance(expectations, list):
+            return JsonResponse({'error': 'expectations must be a list'}, status=400)
+        if not isinstance(owners, list) or any(not isinstance(owner, str) for owner in owners):
+            return JsonResponse({'error': 'owners must be a list of strings'}, status=400)
+
+        version = payload.get('version')
+        if version is None:
+            version = (DataContract.objects.filter(asset_id=asset_id).aggregate(max_v=Max('version')).get('max_v') or 0) + 1
+        elif not isinstance(version, int) or version < 1:
+            return JsonResponse({'error': 'version must be a positive integer'}, status=400)
+
+        contract = DataContract.objects.create(
+            asset=asset,
+            version=version,
+            status=DataContract.Status.DRAFT,
+            schema=schema,
+            expectations=expectations,
+            owners=owners,
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='contract.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.contract.created',
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_contract_to_dict(contract),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='contract.created',
+            resource_type='data_contract',
+            resource_id=str(contract.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_contract_to_dict(contract),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_contract_to_dict(contract), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def contract_detail(request, contract_id: str):
+    try:
+        contract = DataContract.objects.get(id=contract_id)
+    except (ValidationError, DataContract.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    return JsonResponse(_contract_to_dict(contract))
+
+
+@csrf_exempt
+def asset_contracts(request, asset_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    contracts_qs = DataContract.objects.filter(asset_id=asset_id).order_by('-version')
+    return JsonResponse({'items': [_contract_to_dict(c) for c in contracts_qs]})
+
+
+@csrf_exempt
+def contract_activate(request, contract_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        contract = DataContract.objects.get(id=contract_id)
+    except (ValidationError, DataContract.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    DataContract.objects.filter(asset_id=contract.asset_id, status=DataContract.Status.ACTIVE).exclude(id=contract.id).update(
+        status=DataContract.Status.DEPRECATED
+    )
+    contract.status = DataContract.Status.ACTIVE
+    contract.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='contract.activated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.contract.activated',
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_contract_to_dict(contract),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='contract.activated',
+        resource_type='data_contract',
+        resource_id=str(contract.id),
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_contract_to_dict(contract),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_contract_to_dict(contract))
+
+
+@csrf_exempt
+def contract_deprecate(request, contract_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        contract = DataContract.objects.get(id=contract_id)
+    except (ValidationError, DataContract.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    contract.status = DataContract.Status.DEPRECATED
+    contract.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='contract.deprecated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.contract.deprecated',
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_contract_to_dict(contract),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='contract.deprecated',
+        resource_type='data_contract',
+        resource_id=str(contract.id),
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_contract_to_dict(contract),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_contract_to_dict(contract))
 
 
 @csrf_exempt
