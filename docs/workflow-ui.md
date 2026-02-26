@@ -36,3 +36,26 @@ Rules:
 
 * External workflow engines replacing Viewflow.
 * Client-heavy SPA workflow designer.
+
+## API and lifecycle (implemented scaffold slice)
+
+Endpoints:
+
+* `GET/POST /api/v1/workflows/definitions`
+* `GET /api/v1/workflows/definitions/<definition_id>`
+* `GET/POST /api/v1/workflows/runs`
+* `POST /api/v1/workflows/runs/<run_id>/transition`
+* `GET /api/v1/workflows/runs/<run_id>/tasks`
+
+Workflow transitions:
+
+* `draft -> in_review` (`submit`)
+* `in_review -> approved|rejected` (`approve|reject`)
+* `approved -> active|rolled_back` (`activate|rollback`)
+* `active -> superseded|rolled_back` (`supersede|rollback`)
+
+Role enforcement:
+
+* Definition create: `policy.admin|tenant.admin`
+* Run create/submit: `catalog.editor|tenant.admin`
+* Review/approval transitions: `policy.admin|tenant.admin`

@@ -42,6 +42,9 @@ from .models import (
     RetentionHold,
     RetentionRule,
     RetentionRun,
+    WorkflowDefinition,
+    WorkflowRun,
+    WorkflowTask,
 )
 from .tasks import evaluate_quality_rule, execute_connector_run, execute_retention_run
 
@@ -435,6 +438,43 @@ def _connector_run_to_dict(run: ConnectorRun) -> dict[str, Any]:
         'finished_at': run.finished_at.isoformat() if run.finished_at else None,
         'created_at': run.created_at.isoformat(),
         'updated_at': run.updated_at.isoformat(),
+    }
+
+
+def _workflow_definition_to_dict(definition: WorkflowDefinition) -> dict[str, Any]:
+    return {
+        'id': str(definition.id),
+        'name': definition.name,
+        'description': definition.description,
+        'domain_ref': definition.domain_ref,
+        'created_at': definition.created_at.isoformat(),
+        'updated_at': definition.updated_at.isoformat(),
+    }
+
+
+def _workflow_run_to_dict(run: WorkflowRun) -> dict[str, Any]:
+    return {
+        'id': str(run.id),
+        'definition_id': str(run.definition_id),
+        'subject_ref': run.subject_ref,
+        'status': run.status,
+        'submitted_by': run.submitted_by or None,
+        'reviewed_by': run.reviewed_by or None,
+        'payload': run.payload,
+        'created_at': run.created_at.isoformat(),
+        'updated_at': run.updated_at.isoformat(),
+    }
+
+
+def _workflow_task_to_dict(task: WorkflowTask) -> dict[str, Any]:
+    return {
+        'id': str(task.id),
+        'run_id': str(task.run_id),
+        'task_type': task.task_type,
+        'assignee': task.assignee or None,
+        'status': task.status,
+        'created_at': task.created_at.isoformat(),
+        'completed_at': task.completed_at.isoformat() if task.completed_at else None,
     }
 
 
@@ -2855,6 +2895,254 @@ def quality_results(request):
         qs = qs.filter(rule__asset_id=asset_id)
     items = [_quality_result_to_dict(r) for r in qs[offset : offset + limit]]
     return JsonResponse({'items': items})
+
+
+@csrf_exempt
+def workflow_definitions(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        definitions = WorkflowDefinition.objects.order_by('-updated_at')
+        return JsonResponse(
+            {'items': [_workflow_definition_to_dict(item) for item in definitions]}
+        )
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        definition = WorkflowDefinition.objects.create(
+            name=name,
+            description=(payload.get('description') or ''),
+            domain_ref=(payload.get('domain_ref') or ''),
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='workflow.definition.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.workflow.definition.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_workflow_definition_to_dict(definition),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='workflow.definition.created',
+            resource_type='workflow_definition',
+            resource_id=str(definition.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_workflow_definition_to_dict(definition),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_workflow_definition_to_dict(definition), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def workflow_definition_detail(request, definition_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        definition = WorkflowDefinition.objects.get(id=definition_id)
+    except (ValidationError, WorkflowDefinition.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    return JsonResponse(_workflow_definition_to_dict(definition))
+
+
+@csrf_exempt
+def workflow_runs(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = WorkflowRun.objects.order_by('-created_at')
+        definition_id = request.GET.get('definition_id')
+        if definition_id:
+            qs = qs.filter(definition_id=definition_id)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_workflow_run_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        definition_id = payload.get('definition_id')
+        if not definition_id:
+            return JsonResponse({'error': 'definition_id is required'}, status=400)
+        try:
+            definition = WorkflowDefinition.objects.get(id=definition_id)
+        except (ValidationError, WorkflowDefinition.DoesNotExist):
+            return JsonResponse({'error': 'definition_not_found'}, status=404)
+        run = WorkflowRun.objects.create(
+            definition=definition,
+            subject_ref=(payload.get('subject_ref') or ''),
+            payload=payload.get('payload') or {},
+            status=WorkflowRun.Status.DRAFT,
+            submitted_by=request.headers.get('X-User-Id') or '',
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='workflow.run.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.workflow.run.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_workflow_run_to_dict(run),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='workflow.run.created',
+            resource_type='workflow_run',
+            resource_id=str(run.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_workflow_run_to_dict(run),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_workflow_run_to_dict(run), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+def _workflow_transition_allowed(run: WorkflowRun, action: str) -> bool:
+    allowed = {
+        WorkflowRun.Status.DRAFT: {'submit'},
+        WorkflowRun.Status.IN_REVIEW: {'approve', 'reject'},
+        WorkflowRun.Status.APPROVED: {'activate', 'rollback'},
+        WorkflowRun.Status.ACTIVE: {'supersede', 'rollback'},
+    }
+    return action in allowed.get(run.status, set())
+
+
+@csrf_exempt
+def workflow_run_transition(request, run_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = payload.get('action')
+    if action not in {'submit', 'approve', 'reject', 'activate', 'supersede', 'rollback'}:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+    try:
+        run = WorkflowRun.objects.get(id=run_id)
+    except (ValidationError, WorkflowRun.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if not _workflow_transition_allowed(run, action):
+        return JsonResponse({'error': 'invalid_transition'}, status=400)
+
+    if action == 'submit':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        run.status = WorkflowRun.Status.IN_REVIEW
+        WorkflowTask.objects.create(
+            run=run,
+            task_type='review',
+            assignee=(payload.get('assignee') or ''),
+            status=WorkflowTask.Status.OPEN,
+        )
+    elif action in {'approve', 'reject'}:
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        run.status = (
+            WorkflowRun.Status.APPROVED
+            if action == 'approve'
+            else WorkflowRun.Status.REJECTED
+        )
+        run.reviewed_by = request.headers.get('X-User-Id') or ''
+        WorkflowTask.objects.filter(run=run, status=WorkflowTask.Status.OPEN).update(
+            status=WorkflowTask.Status.COMPLETED,
+            completed_at=timezone.now(),
+        )
+    elif action == 'activate':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        run.status = WorkflowRun.Status.ACTIVE
+    elif action == 'supersede':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        run.status = WorkflowRun.Status.SUPERSEDED
+    else:
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        run.status = WorkflowRun.Status.ROLLED_BACK
+
+    run.save(update_fields=['status', 'reviewed_by', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    event_type = f'workflow.run.{action}'
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_workflow_run_to_dict(run),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='workflow_run',
+        resource_id=str(run.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_workflow_run_to_dict(run),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_workflow_run_to_dict(run))
+
+
+@csrf_exempt
+def workflow_run_tasks(request, run_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    tasks = WorkflowTask.objects.filter(run_id=run_id).order_by('-created_at')
+    return JsonResponse({'items': [_workflow_task_to_dict(item) for item in tasks]})
 
 
 @csrf_exempt

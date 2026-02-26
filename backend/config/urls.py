@@ -79,6 +79,11 @@ from core.views import (
     reference_datasets,
     readyz,
     search_assets,
+    workflow_definition_detail,
+    workflow_definitions,
+    workflow_run_tasks,
+    workflow_run_transition,
+    workflow_runs,
 )
 from tenants.views import tenants
 
@@ -89,6 +94,23 @@ urlpatterns = [
     path('readyz', readyz, name='readyz'),
     path('metrics', metrics, name='metrics'),
     path('api/v1/tenants', tenants, name='tenants'),
+    path('api/v1/workflows/definitions', workflow_definitions, name='workflow_definitions'),
+    path(
+        'api/v1/workflows/definitions/<uuid:definition_id>',
+        workflow_definition_detail,
+        name='workflow_definition_detail',
+    ),
+    path('api/v1/workflows/runs', workflow_runs, name='workflow_runs'),
+    path(
+        'api/v1/workflows/runs/<uuid:run_id>/transition',
+        workflow_run_transition,
+        name='workflow_run_transition',
+    ),
+    path(
+        'api/v1/workflows/runs/<uuid:run_id>/tasks',
+        workflow_run_tasks,
+        name='workflow_run_tasks',
+    ),
     path('api/v1/assets', assets, name='assets'),
     path('api/v1/assets/<uuid:asset_id>', asset_detail, name='asset_detail'),
     path('api/v1/assets/<uuid:asset_id>/classifications', asset_classifications, name='asset_classifications'),

@@ -535,3 +535,55 @@ class ConnectorRun(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class WorkflowDefinition(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    description = models.CharField(max_length=512, blank=True, default="")
+    domain_ref = models.CharField(max_length=256, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="uniq_workflow_definition_name")
+        ]
+
+
+class WorkflowRun(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        IN_REVIEW = "in_review"
+        APPROVED = "approved"
+        ACTIVE = "active"
+        SUPERSEDED = "superseded"
+        ROLLED_BACK = "rolled_back"
+        REJECTED = "rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    definition = models.ForeignKey(
+        WorkflowDefinition, on_delete=models.CASCADE, related_name="runs"
+    )
+    subject_ref = models.CharField(max_length=256, blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    submitted_by = models.CharField(max_length=200, blank=True, default="")
+    reviewed_by = models.CharField(max_length=200, blank=True, default="")
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class WorkflowTask(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open"
+        COMPLETED = "completed"
+        CANCELLED = "cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.ForeignKey(WorkflowRun, on_delete=models.CASCADE, related_name="tasks")
+    task_type = models.CharField(max_length=64)
+    assignee = models.CharField(max_length=200, blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
