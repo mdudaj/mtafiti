@@ -5,6 +5,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
+import core.events as events
 from tenants.models import Domain, Tenant
 
 
@@ -66,3 +67,38 @@ def test_ingestion_create_validates_payload():
     )
     assert invalid_source.status_code == 400
 
+
+@pytest.mark.django_db(transaction=True)
+def test_ingestion_create_emits_domain_and_audit_events_when_configured(monkeypatch):
+    calls = []
+
+    def fake_publish_event(*, exchange, routing_key, payload, rabbitmq_url=None):
+        calls.append({'exchange': exchange, 'routing_key': routing_key, 'payload': payload, 'rabbitmq_url': rabbitmq_url})
+
+    monkeypatch.setattr(events, 'publish_event', fake_publish_event)
+    monkeypatch.setenv('RABBITMQ_URL', 'amqp://test/')
+    monkeypatch.setenv('EDMP_EVENT_EXCHANGE', 'edmp.events')
+
+    host = f"tenanta-{uuid.uuid4().hex[:6]}.example"
+    with schema_context('public'):
+        tenant = Tenant(schema_name=f't_{uuid.uuid4().hex[:8]}', name=f"Tenant A {uuid.uuid4().hex[:6]}")
+        tenant.save()
+        Domain(domain=host, tenant=tenant, is_primary=True).save()
+
+    client = Client()
+    created = client.post(
+        '/api/v1/ingestions',
+        data=json.dumps({'connector': 'dbt', 'source': {'project': 'x'}}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_CORRELATION_ID='corr-1',
+        HTTP_X_USER_ID='user-1',
+    )
+    assert created.status_code == 201
+
+    assert [c['routing_key'] for c in calls] == [
+        f'{tenant.schema_name}.ingestion.created',
+        f'{tenant.schema_name}.audit.ingestion.created',
+    ]
+    assert calls[0]['payload']['event_type'] == 'ingestion.created'
+    assert calls[1]['payload']['event_type'] == 'audit.ingestion.created'

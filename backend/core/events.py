@@ -79,3 +79,32 @@ def maybe_publish_event(
     except Exception:
         logger.exception('Failed to publish event %s to %s', event_type, routing_key)
         return
+
+
+def maybe_publish_audit_event(
+    *,
+    tenant_id: str,
+    action: str,
+    resource_type: str,
+    resource_id: str | None = None,
+    correlation_id: str | None = None,
+    user_id: str | None = None,
+    data: dict[str, Any] | None = None,
+    exchange: str | None = None,
+    rabbitmq_url: str | None = None,
+) -> None:
+    maybe_publish_event(
+        event_type=f'audit.{action}',
+        tenant_id=tenant_id,
+        routing_key=f'{tenant_id}.audit.{action}',
+        correlation_id=correlation_id,
+        user_id=user_id,
+        data={
+            'action': action,
+            'resource_type': resource_type,
+            'resource_id': resource_id,
+            'details': data or {},
+        },
+        exchange=exchange,
+        rabbitmq_url=rabbitmq_url,
+    )

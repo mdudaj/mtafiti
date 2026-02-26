@@ -76,9 +76,12 @@ def test_tenant_create_emits_event_when_configured(monkeypatch):
     assert created.status_code == 201
     schema_name = created.json()['schema_name']
 
-    assert len(calls) == 1
-    assert calls[0]['routing_key'] == f'{schema_name}.control.tenant.created'
+    assert [c['routing_key'] for c in calls] == [
+        f'{schema_name}.control.tenant.created',
+        f'{schema_name}.audit.tenant.created',
+    ]
     assert calls[0]['payload']['event_type'] == 'tenant.created'
     assert calls[0]['payload']['tenant_id'] == schema_name
     assert calls[0]['payload']['correlation_id'] == 'corr-1'
     assert calls[0]['payload']['user_id'] == 'user-1'
+    assert calls[1]['payload']['event_type'] == 'audit.tenant.created'

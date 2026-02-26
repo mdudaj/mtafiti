@@ -63,6 +63,8 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 ### Run tests
 
 ```bash
+docker compose up -d --wait postgres
+
 cd backend
 python -m venv ../.venv
 source ../.venv/bin/activate
@@ -70,6 +72,9 @@ pip install -r requirements-dev.txt
 
 export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
 pytest
+
+# optional cleanup
+docker compose down
 ```
 
 Note: Django creates a separate test database (e.g. `test_edmp_test`) during `pytest`, so the configured `POSTGRES_USER` must have the `CREATEDB` privilege (or be a superuser).

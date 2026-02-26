@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_tenants.utils import schema_context
 
-from core.events import maybe_publish_event
+from core.events import maybe_publish_audit_event, maybe_publish_event
 from core.identity import require_role
 from .models import Domain, Tenant
 
@@ -69,6 +69,16 @@ def tenants(request):
                 event_type='tenant.created',
                 tenant_id=tenant.schema_name,
                 routing_key=f'{tenant.schema_name}.control.tenant.created',
+                correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+                user_id=request.headers.get('X-User-Id'),
+                data=_tenant_to_dict(tenant),
+                rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            )
+            maybe_publish_audit_event(
+                tenant_id=tenant.schema_name,
+                action='tenant.created',
+                resource_type='tenant',
+                resource_id=str(tenant.id),
                 correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
                 user_id=request.headers.get('X-User-Id'),
                 data=_tenant_to_dict(tenant),

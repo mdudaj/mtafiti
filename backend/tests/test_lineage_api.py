@@ -167,10 +167,13 @@ def test_lineage_edge_upsert_emits_event_when_configured(monkeypatch):
     )
     assert upserted.status_code == 200
 
-    assert len(calls) == 1
-    assert calls[0]['routing_key'] == f'{tenant.schema_name}.lineage.edge.upserted'
+    assert [c['routing_key'] for c in calls] == [
+        f'{tenant.schema_name}.lineage.edge.upserted',
+        f'{tenant.schema_name}.audit.lineage.edge.upserted',
+    ]
     assert calls[0]['payload']['event_type'] == 'lineage.edge.upserted'
     assert calls[0]['payload']['tenant_id'] == tenant.schema_name
     assert calls[0]['payload']['correlation_id'] == 'corr-1'
     assert calls[0]['payload']['user_id'] == 'user-1'
     assert len(calls[0]['payload']['data']['items']) == 1
+    assert calls[1]['payload']['event_type'] == 'audit.lineage.edge.upserted'

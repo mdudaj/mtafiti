@@ -138,12 +138,16 @@ def test_asset_mutations_emit_events_when_configured(monkeypatch):
 
     assert [c['routing_key'] for c in calls] == [
         f'{tenant.schema_name}.catalog.asset.created',
+        f'{tenant.schema_name}.audit.asset.created',
         f'{tenant.schema_name}.catalog.asset.updated',
+        f'{tenant.schema_name}.audit.asset.updated',
     ]
     assert calls[0]['payload']['event_type'] == 'asset.created'
     assert calls[0]['payload']['tenant_id'] == tenant.schema_name
     assert calls[0]['payload']['correlation_id'] == 'corr-1'
     assert calls[0]['payload']['user_id'] == 'user-1'
+    assert calls[1]['payload']['event_type'] == 'audit.asset.created'
+    assert calls[3]['payload']['event_type'] == 'audit.asset.updated'
 
 
 @pytest.mark.django_db(transaction=True)

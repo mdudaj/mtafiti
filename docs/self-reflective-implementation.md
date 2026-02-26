@@ -43,6 +43,7 @@ Handoffs without this contract should be rejected and returned.
 
 * Repository symbol/code index and architecture map.
 * Standard one-command runners for lint, tests, and build.
+* Docker Compose-backed local test dependencies (at minimum Postgres; RabbitMQ when event-path integration is needed).
 * Test-impact mapping (which tests cover changed files).
 * Recent CI failures and artifact/log access.
 * Known-flaky test catalog and retry policy.
@@ -64,3 +65,18 @@ A task is complete only when:
 * required tests/lint/build checks pass,
 * reviewer signs off on correctness/security concerns,
 * and integration gates pass without open blockers.
+
+## Local QA bootstrap (recommended)
+
+Use a deterministic local dependency bootstrap before running backend tests:
+
+```bash
+docker compose up -d --wait postgres
+cd backend
+python -m venv ../.venv
+source ../.venv/bin/activate
+pip install -r requirements-dev.txt
+export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
+pytest -q
+docker compose down
+```

@@ -9,7 +9,7 @@ from django.db.utils import DatabaseError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from .events import maybe_publish_event
+from .events import maybe_publish_audit_event, maybe_publish_event
 from .identity import require_role
 from .models import DataAsset, IngestionRequest, LineageEdge
 
@@ -143,6 +143,16 @@ def ingestions(request):
             data=_ingestion_to_dict(ing),
             rabbitmq_url=os.environ.get('RABBITMQ_URL'),
         )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='ingestion.created',
+            resource_type='ingestion',
+            resource_id=str(ing.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_ingestion_to_dict(ing),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
         return JsonResponse(_ingestion_to_dict(ing), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -225,6 +235,16 @@ def assets(request):
             data=_asset_to_dict(asset),
             rabbitmq_url=os.environ.get('RABBITMQ_URL'),
         )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='asset.created',
+            resource_type='asset',
+            resource_id=str(asset.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_asset_to_dict(asset),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
         return JsonResponse(_asset_to_dict(asset), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -298,6 +318,16 @@ def asset_detail(request, asset_id: str):
             data=_asset_to_dict(asset),
             rabbitmq_url=os.environ.get('RABBITMQ_URL'),
         )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='asset.updated',
+            resource_type='asset',
+            resource_id=str(asset.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_asset_to_dict(asset),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
         return JsonResponse(_asset_to_dict(asset))
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -353,6 +383,15 @@ def lineage_edges(request):
             event_type='lineage.edge.upserted',
             tenant_id=tenant_schema,
             routing_key=f'{tenant_schema}.lineage.edge.upserted',
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data={'items': out},
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='lineage.edge.upserted',
+            resource_type='lineage_edge',
             correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
             user_id=request.headers.get('X-User-Id'),
             data={'items': out},
