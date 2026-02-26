@@ -7,11 +7,12 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.models import Q
 from django.db.utils import DatabaseError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from .events import maybe_publish_audit_event, maybe_publish_event
 from .identity import require_any_role, require_role
+from .metrics import DB_READINESS_ERRORS, metrics_response
 from .models import DataAsset, IngestionRequest, LineageEdge
 
 
@@ -41,8 +42,14 @@ def readyz(request):
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
     except DatabaseError:
+        DB_READINESS_ERRORS.inc()
         return JsonResponse({'status': 'not-ready'}, status=503)
     return JsonResponse({'status': 'ok'})
+
+
+def metrics(request):
+    body, content_type = metrics_response()
+    return HttpResponse(body, content_type=content_type)
 
 
 def _asset_to_dict(asset: DataAsset) -> dict[str, Any]:

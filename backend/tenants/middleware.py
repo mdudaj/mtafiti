@@ -13,7 +13,7 @@ class EDMPTenantMiddleware(TenantMainMiddleware):
 
     # Normalized paths (no trailing slashes). We normalize request paths via
     # rstrip('/') before matching.
-    PUBLIC_ENDPOINT_PATHS = {'/healthz', '/livez', '/readyz'}
+    PUBLIC_ENDPOINT_PATHS = {'/healthz', '/livez', '/readyz', '/metrics'}
     PUBLIC_ENDPOINT_PREFIXES = ('/api/v1/tenants', '/admin')
 
     def process_request(self, request):

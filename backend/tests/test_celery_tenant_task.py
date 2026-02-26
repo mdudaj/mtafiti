@@ -1,4 +1,5 @@
 import pytest
+from prometheus_client import REGISTRY
 
 from core.logging import get_correlation_id, get_request_id, get_tenant_id, get_user_id
 from core.tasks import context_ping, ping
@@ -13,6 +14,9 @@ def test_celery_task_requires_tenant_schema():
 def test_celery_task_runs_with_tenant_schema():
     res = ping.apply(kwargs={'tenant_schema': 'public'})
     assert res.get() == 'pong:public'
+    assert REGISTRY.get_sample_value(
+        'edmp_celery_task_executions_total', labels={'task': ping.name, 'status': 'success'}
+    ) >= 1
 
 
 def test_celery_task_restores_context_from_kwargs():

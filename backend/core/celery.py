@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import time
+
 from celery import Task
 from django_tenants.utils import schema_context
 
 from .logging import correlation_id_var, request_id_var, tenant_id_var, user_id_var
+from .metrics import CELERY_TASK_DURATION_SECONDS, CELERY_TASK_EXECUTIONS
 
 
 class TenantTask(Task):
@@ -21,10 +24,18 @@ class TenantTask(Task):
         user_token = user_id_var.set(user_id)
         request_token = request_id_var.set(request_id)
         tenant_token = tenant_id_var.set(schema_name)
+        start = time.perf_counter()
+        task_name = self.name or self.__class__.__name__
         try:
             with schema_context(schema_name):
-                return super().__call__(*args, **task_kwargs)
+                result = super().__call__(*args, **task_kwargs)
+            CELERY_TASK_EXECUTIONS.labels(task=task_name, status='success').inc()
+            return result
+        except Exception:
+            CELERY_TASK_EXECUTIONS.labels(task=task_name, status='failure').inc()
+            raise
         finally:
+            CELERY_TASK_DURATION_SECONDS.labels(task=task_name).observe(time.perf_counter() - start)
             correlation_id_var.reset(corr_token)
             user_id_var.reset(user_token)
             request_id_var.reset(request_token)

@@ -17,7 +17,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from core.views import asset_detail, assets, health, healthz, ingestion_detail, ingestions, lineage_edges, livez, readyz, search_assets
+from core.views import (
+    asset_detail,
+    assets,
+    health,
+    healthz,
+    ingestion_detail,
+    ingestions,
+    lineage_edges,
+    livez,
+    metrics,
+    readyz,
+    search_assets,
+)
 from tenants.views import tenants
 
 urlpatterns = [
@@ -25,6 +37,7 @@ urlpatterns = [
     path('healthz', healthz, name='healthz'),
     path('livez', livez, name='livez'),
     path('readyz', readyz, name='readyz'),
+    path('metrics', metrics, name='metrics'),
     path('api/v1/tenants', tenants, name='tenants'),
     path('api/v1/assets', assets, name='assets'),
     path('api/v1/assets/<uuid:asset_id>', asset_detail, name='asset_detail'),
