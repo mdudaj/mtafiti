@@ -16,6 +16,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 10. **Reference data management**: tenant-scoped reference dataset/version lifecycle with single-active-version activation conventions (see `docs/reference-data.md`).
 11. **Master data management**: tenant-scoped canonical master record versioning and merge approval lifecycle (see `docs/master-data.md`).
 12. **Data classification taxonomy**: tenant-scoped classification lifecycle with active-only asset assignment conventions (see `docs/classification.md`).
+13. **Printing and gateway**: tenant-scoped print job lifecycle with gateway status updates and print events (see `docs/printing.md`).
 
 ## Near-term (next)
 
@@ -35,7 +36,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
 * **Platform services baseline**: formalize Helm-managed core services (Keycloak, MinIO, Redis, ONLYOFFICE, JupyterHub, observability stack) (see `docs/platform-services.md`).
 * **Platform security hardening**: formalize mTLS, network-policy boundaries, secret handling, and immutable audit controls (see `docs/platform-security.md`).
-* **Printing and gateway**: define tenant-scoped print lifecycle and gateway dispatch/retry conventions (see `docs/printing.md`).
 * **Collaboration**: define ONLYOFFICE integration and tenant-scoped versioned document lifecycle (see `docs/collaboration.md`).
 * **Notebook infrastructure**: define JupyterHub/KubeSpawner pod isolation and execution event conventions (see `docs/notebooks.md`).
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).

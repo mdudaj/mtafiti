@@ -330,3 +330,27 @@ class Classification(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['name'], name='uniq_classification_name'),
         ]
+
+
+class PrintJob(models.Model):
+    class Format(models.TextChoices):
+        ZPL = 'zpl'
+        PDF = 'pdf'
+
+    class Status(models.TextChoices):
+        PENDING = 'pending'
+        RETRYING = 'retrying'
+        COMPLETED = 'completed'
+        FAILED = 'failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template_ref = models.CharField(max_length=256)
+    payload = models.JSONField(default=dict, blank=True)
+    output_format = models.CharField(max_length=16, choices=Format.choices)
+    destination = models.CharField(max_length=200)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    retry_count = models.IntegerField(default=0)
+    gateway_metadata = models.JSONField(default=dict, blank=True)
+    error_message = models.CharField(max_length=512, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

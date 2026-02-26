@@ -43,3 +43,19 @@ This note defines tenant-safe label printing using a gateway-based architecture.
 
 * Direct in-cluster printer management.
 * Site-specific printer fleet provisioning automation.
+
+## API and events (implemented scaffold slice)
+
+Endpoints:
+
+* `POST /api/v1/printing/jobs` (create `pending` print job)
+* `GET /api/v1/printing/jobs`
+* `GET /api/v1/printing/jobs/<job_id>`
+* `POST /api/v1/printing/jobs/<job_id>/status` (`retrying | completed | failed`)
+
+Events:
+
+* `print.requested`
+* `print.retrying`
+* `print.completed`
+* `print.failed`

@@ -27,6 +27,7 @@ from .models import (
     MasterMergeCandidate,
     MasterRecord,
     PrivacyProfile,
+    PrintJob,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
@@ -325,6 +326,22 @@ def _classification_to_dict(classification: Classification) -> dict[str, Any]:
         'status': classification.status,
         'created_at': classification.created_at.isoformat(),
         'updated_at': classification.updated_at.isoformat(),
+    }
+
+
+def _print_job_to_dict(print_job: PrintJob) -> dict[str, Any]:
+    return {
+        'id': str(print_job.id),
+        'template_ref': print_job.template_ref,
+        'payload': print_job.payload,
+        'output_format': print_job.output_format,
+        'destination': print_job.destination,
+        'status': print_job.status,
+        'retry_count': print_job.retry_count,
+        'gateway_metadata': print_job.gateway_metadata,
+        'error_message': print_job.error_message or None,
+        'created_at': print_job.created_at.isoformat(),
+        'updated_at': print_job.updated_at.isoformat(),
     }
 
 
@@ -1762,6 +1779,168 @@ def asset_classifications(request, asset_id: str):
         rabbitmq_url=os.environ.get('RABBITMQ_URL'),
     )
     return JsonResponse(_asset_to_dict(asset))
+
+
+@csrf_exempt
+def print_jobs(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        status_filter = request.GET.get('status')
+        qs = PrintJob.objects.order_by('-created_at')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_print_job_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        template_ref = (payload.get('template_ref') or '').strip()
+        destination = (payload.get('destination') or '').strip()
+        output_format = payload.get('output_format')
+        if not template_ref or not destination or not output_format:
+            return JsonResponse(
+                {'error': 'template_ref, destination, and output_format are required'},
+                status=400,
+            )
+        if output_format not in {PrintJob.Format.ZPL, PrintJob.Format.PDF}:
+            return JsonResponse({'error': 'invalid_output_format'}, status=400)
+        print_payload = payload.get('payload') or {}
+        if not isinstance(print_payload, dict):
+            return JsonResponse({'error': 'payload must be an object'}, status=400)
+
+        print_job = PrintJob.objects.create(
+            template_ref=template_ref,
+            payload=print_payload,
+            output_format=output_format,
+            destination=destination,
+            status=PrintJob.Status.PENDING,
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='print.requested',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.print.requested',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_print_job_to_dict(print_job),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='print.requested',
+            resource_type='print_job',
+            resource_id=str(print_job.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_print_job_to_dict(print_job),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_print_job_to_dict(print_job), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def print_job_detail(request, job_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        print_job = PrintJob.objects.get(id=job_id)
+    except (ValidationError, PrintJob.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    return JsonResponse(_print_job_to_dict(print_job))
+
+
+@csrf_exempt
+def print_job_status(request, job_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        print_job = PrintJob.objects.get(id=job_id)
+    except (ValidationError, PrintJob.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    status_value = payload.get('status')
+    if status_value not in {
+        PrintJob.Status.RETRYING,
+        PrintJob.Status.COMPLETED,
+        PrintJob.Status.FAILED,
+    }:
+        return JsonResponse({'error': 'invalid_status'}, status=400)
+    retry_count = payload.get('retry_count')
+    if retry_count is not None and not isinstance(retry_count, int):
+        return JsonResponse({'error': 'retry_count must be an integer'}, status=400)
+    gateway_metadata = payload.get('gateway_metadata')
+    if gateway_metadata is not None and not isinstance(gateway_metadata, dict):
+        return JsonResponse(
+            {'error': 'gateway_metadata must be an object'},
+            status=400,
+        )
+    error_message = payload.get('error_message')
+    if error_message is not None and not isinstance(error_message, str):
+        return JsonResponse({'error': 'error_message must be a string'}, status=400)
+
+    print_job.status = status_value
+    if retry_count is not None:
+        print_job.retry_count = retry_count
+    if gateway_metadata is not None:
+        print_job.gateway_metadata = gateway_metadata
+    if error_message is not None:
+        print_job.error_message = error_message
+    print_job.save(
+        update_fields=[
+            'status',
+            'retry_count',
+            'gateway_metadata',
+            'error_message',
+            'updated_at',
+        ]
+    )
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type=f'print.{status_value}',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.print.{status_value}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_print_job_to_dict(print_job),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=f'print.{status_value}',
+        resource_type='print_job',
+        resource_id=str(print_job.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_print_job_to_dict(print_job),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_print_job_to_dict(print_job))
 
 
 @csrf_exempt
