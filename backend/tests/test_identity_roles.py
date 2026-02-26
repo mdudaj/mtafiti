@@ -139,3 +139,75 @@ def test_catalog_mutations_enforce_catalog_editor_role(monkeypatch):
         HTTP_X_USER_ROLES='catalog.editor',
     )
     assert allowed_lineage.status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_catalog_reads_enforce_reader_or_stronger_role(monkeypatch):
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    host = _create_tenant_host()
+    client = Client()
+
+    created_a = client.post(
+        '/api/v1/assets',
+        data=json.dumps({'qualified_name': 'db.a', 'asset_type': 'table'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created_a.status_code == 201
+
+    created_b = client.post(
+        '/api/v1/assets',
+        data=json.dumps({'qualified_name': 'db.b', 'asset_type': 'table'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created_b.status_code == 201
+
+    created_ing = client.post(
+        '/api/v1/ingestions',
+        data=json.dumps({'connector': 'dbt', 'source': {'project': 'x'}}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created_ing.status_code == 201
+
+    created_lineage = client.post(
+        '/api/v1/lineage/edges',
+        data=json.dumps(
+            {'items': [{'from_asset_id': created_a.json()['id'], 'to_asset_id': created_b.json()['id'], 'edge_type': 'reads_from'}]}
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created_lineage.status_code == 200
+
+    assert client.get('/api/v1/assets', HTTP_HOST=host).status_code == 403
+    assert client.get(f"/api/v1/assets/{created_a.json()['id']}", HTTP_HOST=host).status_code == 403
+    assert client.get(f"/api/v1/ingestions/{created_ing.json()['id']}", HTTP_HOST=host).status_code == 403
+    assert client.get(f"/api/v1/lineage/edges?asset_id={created_a.json()['id']}", HTTP_HOST=host).status_code == 403
+
+    assert client.get('/api/v1/assets', HTTP_HOST=host, HTTP_X_USER_ROLES='catalog.reader').status_code == 200
+    assert client.get(f"/api/v1/assets/{created_a.json()['id']}", HTTP_HOST=host, HTTP_X_USER_ROLES='catalog.reader').status_code == 200
+    assert (
+        client.get(f"/api/v1/ingestions/{created_ing.json()['id']}", HTTP_HOST=host, HTTP_X_USER_ROLES='catalog.reader').status_code
+        == 200
+    )
+    assert (
+        client.get(f"/api/v1/lineage/edges?asset_id={created_a.json()['id']}", HTTP_HOST=host, HTTP_X_USER_ROLES='catalog.reader').status_code
+        == 200
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_tenant_list_enforces_tenant_admin_role(monkeypatch):
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    client = Client()
+    denied = client.get('/api/v1/tenants', HTTP_HOST='control.example')
+    assert denied.status_code == 403
+
+    allowed = client.get('/api/v1/tenants', HTTP_HOST='control.example', HTTP_X_USER_ROLES='tenant.admin')
+    assert allowed.status_code == 200

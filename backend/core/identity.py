@@ -22,3 +22,13 @@ def require_role(request, role: str):
     if role in _request_roles(request):
         return None
     return JsonResponse({'error': 'forbidden'}, status=403)
+
+
+def require_any_role(request, roles: set[str]):
+    """Require one of the provided roles when EDMP_ENFORCE_ROLES is enabled."""
+    if not _roles_enforced():
+        return None
+    request_roles = _request_roles(request)
+    if request_roles.intersection(roles):
+        return None
+    return JsonResponse({'error': 'forbidden'}, status=403)

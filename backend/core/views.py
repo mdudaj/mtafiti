@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from .events import maybe_publish_audit_event, maybe_publish_event
-from .identity import require_role
+from .identity import require_any_role, require_role
 from .models import DataAsset, IngestionRequest, LineageEdge
 
 
@@ -166,6 +166,9 @@ def ingestion_detail(request, ingestion_id: str):
         return JsonResponse({'error': 'not_found'}, status=404)
 
     if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
         return JsonResponse(_ingestion_to_dict(ing))
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -178,6 +181,9 @@ def assets(request):
     GET supports simple offset pagination via ?limit= (default 100, max 500) and ?offset= (default 0).
     """
     if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
         try:
             limit = int(request.GET.get('limit', '100'))
             offset = int(request.GET.get('offset', '0'))
@@ -258,6 +264,9 @@ def asset_detail(request, asset_id: str):
         return JsonResponse({'error': 'not_found'}, status=404)
 
     if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
         return JsonResponse(_asset_to_dict(asset))
 
     if request.method == 'PUT':
@@ -400,6 +409,9 @@ def lineage_edges(request):
         return JsonResponse({'items': out})
 
     if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
         asset_id = request.GET.get('asset_id')
         if not asset_id:
             return JsonResponse({'error': 'asset_id is required'}, status=400)

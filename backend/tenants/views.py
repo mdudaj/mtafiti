@@ -36,6 +36,9 @@ def tenants(request):
     """Public control-plane API for tenant administration (scaffold)."""
     with schema_context('public'):
         if request.method == 'GET':
+            forbidden = require_role(request, 'tenant.admin')
+            if forbidden:
+                return forbidden
             items = [_tenant_to_dict(t) for t in Tenant.objects.order_by('created_on')]
             return JsonResponse({'items': items})
 
