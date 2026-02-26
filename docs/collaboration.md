@@ -34,3 +34,19 @@ Each record should include tenant id, actor id, correlation id, and timestamp.
 
 * Cross-tenant document sharing.
 * Replacing ONLYOFFICE with a different editor engine.
+
+## API and events (implemented scaffold slice)
+
+Endpoints:
+
+* `GET/POST /api/v1/collaboration/documents`
+* `GET/PATCH /api/v1/collaboration/documents/<document_id>`
+* `POST /api/v1/collaboration/documents/<document_id>/session` (`view|edit`)
+* `GET/POST /api/v1/collaboration/documents/<document_id>/versions`
+
+Events:
+
+* `collaboration.document.created`
+* `collaboration.session.started`
+* `collaboration.session.viewed`
+* `collaboration.version.persisted`

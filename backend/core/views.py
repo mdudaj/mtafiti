@@ -19,6 +19,8 @@ from .metrics import DB_READINESS_ERRORS, metrics_response
 from .models import (
     AccessRequest,
     Classification,
+    CollaborationDocument,
+    CollaborationDocumentVersion,
     ConsentEvent,
     DataAsset,
     DataContract,
@@ -342,6 +344,37 @@ def _print_job_to_dict(print_job: PrintJob) -> dict[str, Any]:
         'error_message': print_job.error_message or None,
         'created_at': print_job.created_at.isoformat(),
         'updated_at': print_job.updated_at.isoformat(),
+    }
+
+
+def _collaboration_document_to_dict(
+    document: CollaborationDocument,
+) -> dict[str, Any]:
+    latest_version = document.versions.order_by('-version').first()
+    return {
+        'id': str(document.id),
+        'title': document.title,
+        'object_key': document.object_key,
+        'content_type': document.content_type or None,
+        'owner': document.owner or None,
+        'status': document.status,
+        'latest_version': latest_version.version if latest_version else None,
+        'created_at': document.created_at.isoformat(),
+        'updated_at': document.updated_at.isoformat(),
+    }
+
+
+def _collaboration_version_to_dict(
+    version: CollaborationDocumentVersion,
+) -> dict[str, Any]:
+    return {
+        'id': str(version.id),
+        'document_id': str(version.document_id),
+        'version': version.version,
+        'object_key': version.object_key,
+        'summary': version.summary,
+        'editor': version.editor or None,
+        'created_at': version.created_at.isoformat(),
     }
 
 
@@ -1941,6 +1974,256 @@ def print_job_status(request, job_id: str):
         rabbitmq_url=os.environ.get('RABBITMQ_URL'),
     )
     return JsonResponse(_print_job_to_dict(print_job))
+
+
+@csrf_exempt
+def collaboration_documents(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        documents = CollaborationDocument.objects.order_by('-updated_at')
+        return JsonResponse(
+            {'items': [_collaboration_document_to_dict(item) for item in documents]}
+        )
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        title = (payload.get('title') or '').strip()
+        object_key = (payload.get('object_key') or '').strip()
+        if not title or not object_key:
+            return JsonResponse(
+                {'error': 'title and object_key are required'},
+                status=400,
+            )
+        content_type = payload.get('content_type') or ''
+        owner = payload.get('owner') or request.headers.get('X-User-Id') or ''
+        if content_type and not isinstance(content_type, str):
+            return JsonResponse({'error': 'content_type must be a string'}, status=400)
+        if owner and not isinstance(owner, str):
+            return JsonResponse({'error': 'owner must be a string'}, status=400)
+
+        document = CollaborationDocument.objects.create(
+            title=title,
+            object_key=object_key,
+            content_type=content_type,
+            owner=owner,
+            status='active',
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='collaboration.document.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.collaboration.document.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_collaboration_document_to_dict(document),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='collaboration.document.created',
+            resource_type='collaboration_document',
+            resource_id=str(document.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_collaboration_document_to_dict(document),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_collaboration_document_to_dict(document), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def collaboration_document_detail(request, document_id: str):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        try:
+            document = CollaborationDocument.objects.get(id=document_id)
+        except (ValidationError, CollaborationDocument.DoesNotExist):
+            return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse(_collaboration_document_to_dict(document))
+
+    if request.method == 'PATCH':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        try:
+            document = CollaborationDocument.objects.get(id=document_id)
+        except (ValidationError, CollaborationDocument.DoesNotExist):
+            return JsonResponse({'error': 'not_found'}, status=404)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        if 'title' in payload:
+            title = payload.get('title')
+            if not isinstance(title, str) or not title.strip():
+                return JsonResponse({'error': 'title must be a non-empty string'}, status=400)
+            document.title = title.strip()
+        if 'owner' in payload:
+            owner = payload.get('owner')
+            if owner is not None and not isinstance(owner, str):
+                return JsonResponse({'error': 'owner must be a string'}, status=400)
+            document.owner = owner or ''
+        document.save(update_fields=['title', 'owner', 'updated_at'])
+        return JsonResponse(_collaboration_document_to_dict(document))
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def collaboration_document_session(request, document_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        document = CollaborationDocument.objects.get(id=document_id)
+    except (ValidationError, CollaborationDocument.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    mode = payload.get('mode') or 'edit'
+    if mode not in {'view', 'edit'}:
+        return JsonResponse({'error': 'mode must be view or edit'}, status=400)
+    if mode == 'edit':
+        forbidden_edit = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden_edit:
+            return forbidden_edit
+
+    tenant_schema = _tenant_schema(request)
+    session_token = str(uuid.uuid4())
+    event_type = (
+        'collaboration.session.started'
+        if mode == 'edit'
+        else 'collaboration.session.viewed'
+    )
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={
+            'document': _collaboration_document_to_dict(document),
+            'mode': mode,
+            'session_token': session_token,
+        },
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='collaboration_document',
+        resource_id=str(document.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={'mode': mode, 'session_token': session_token},
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(
+        {
+            'document_id': str(document.id),
+            'mode': mode,
+            'session_token': session_token,
+        }
+    )
+
+
+@csrf_exempt
+def collaboration_document_versions(request, document_id: str):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        versions = CollaborationDocumentVersion.objects.filter(
+            document_id=document_id
+        ).order_by('-version')
+        return JsonResponse(
+            {'items': [_collaboration_version_to_dict(item) for item in versions]}
+        )
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        try:
+            document = CollaborationDocument.objects.get(id=document_id)
+        except (ValidationError, CollaborationDocument.DoesNotExist):
+            return JsonResponse({'error': 'not_found'}, status=404)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        object_key = (payload.get('object_key') or '').strip()
+        if not object_key:
+            return JsonResponse({'error': 'object_key is required'}, status=400)
+        latest_version = (
+            CollaborationDocumentVersion.objects.filter(document_id=document_id)
+            .order_by('-version')
+            .first()
+        )
+        next_version = 1 if latest_version is None else latest_version.version + 1
+        version = CollaborationDocumentVersion.objects.create(
+            document=document,
+            version=next_version,
+            object_key=object_key,
+            summary=(payload.get('summary') or ''),
+            editor=(payload.get('editor') or request.headers.get('X-User-Id') or ''),
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='collaboration.version.persisted',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.collaboration.version.persisted',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data={
+                'document': _collaboration_document_to_dict(document),
+                'version': _collaboration_version_to_dict(version),
+            },
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='collaboration.version.persisted',
+            resource_type='collaboration_document',
+            resource_id=str(document.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_collaboration_version_to_dict(version),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_collaboration_version_to_dict(version), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
 
 
 @csrf_exempt

@@ -354,3 +354,34 @@ class PrintJob(models.Model):
     error_message = models.CharField(max_length=512, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class CollaborationDocument(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    object_key = models.CharField(max_length=512)
+    content_type = models.CharField(max_length=100, blank=True, default='')
+    owner = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(max_length=16, default='active')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['object_key'], name='uniq_collaboration_object_key'),
+        ]
+
+
+class CollaborationDocumentVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(CollaborationDocument, on_delete=models.CASCADE, related_name='versions')
+    version = models.IntegerField()
+    object_key = models.CharField(max_length=512)
+    summary = models.CharField(max_length=512, blank=True, default='')
+    editor = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['document', 'version'], name='uniq_collaboration_doc_version'),
+        ]
