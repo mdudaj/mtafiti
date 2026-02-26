@@ -78,6 +78,10 @@ Every implementation task in this project should be executed end-to-end in one f
 
 Tasks should not be reported as done while still waiting on test execution or post-implementation validation.
 
+### Python style requirement
+
+All Python code changes in this repository must adhere to PEP 8 (imports, naming, whitespace, and readable line structure) and should be written to pass existing test/lint quality gates without follow-up style cleanups.
+
 ## Local QA bootstrap (recommended)
 
 Use a deterministic local dependency bootstrap before running backend tests:

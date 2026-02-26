@@ -59,6 +59,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 
 * Python 3.12+
 * PostgreSQL (local service is fine)
+* Python code contributions should follow PEP 8 conventions.
 
 ### Run tests
 

@@ -261,3 +261,45 @@ class ReferenceDatasetVersion(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['dataset', 'version'], name='uniq_reference_dataset_version'),
         ]
+
+
+class MasterRecord(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = 'draft'
+        ACTIVE = 'active'
+        SUPERSEDED = 'superseded'
+        ARCHIVED = 'archived'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    entity_type = models.CharField(max_length=100)
+    master_id = models.UUIDField(default=uuid.uuid4, db_index=True)
+    version = models.IntegerField(default=1)
+    attributes = models.JSONField(default=dict, blank=True)
+    survivorship_policy = models.JSONField(default=dict, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['entity_type', 'master_id', 'version'], name='uniq_master_record_version'),
+        ]
+
+
+class MasterMergeCandidate(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending'
+        APPROVED = 'approved'
+        REJECTED = 'rejected'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    entity_type = models.CharField(max_length=100)
+    target_master_id = models.UUIDField(db_index=True)
+    source_master_refs = models.JSONField(default=list, blank=True)
+    proposed_attributes = models.JSONField(default=dict, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    approved_by = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

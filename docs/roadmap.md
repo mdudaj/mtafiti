@@ -14,6 +14,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 8. **Data residency controls**: tenant-scoped residency profile lifecycle and region allow/deny checks with event/audit conventions (see `docs/residency.md`).
 9. **Data access requests**: tenant-scoped access request/decision lifecycle with status transitions and audit/event conventions (see `docs/access-requests.md`).
 10. **Reference data management**: tenant-scoped reference dataset/version lifecycle with single-active-version activation conventions (see `docs/reference-data.md`).
+11. **Master data management**: tenant-scoped canonical master record versioning and merge approval lifecycle (see `docs/master-data.md`).
 
 ## Near-term (next)
 
@@ -37,7 +38,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Collaboration**: define ONLYOFFICE integration and tenant-scoped versioned document lifecycle (see `docs/collaboration.md`).
 * **Notebook infrastructure**: define JupyterHub/KubeSpawner pod isolation and execution event conventions (see `docs/notebooks.md`).
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).
-* **Master data management**: define tenant-scoped canonical entity records, survivorship rules, and stewardship conventions (see `docs/master-data.md`).
 * **Data classification taxonomy**: define tenant-scoped sensitivity levels and lifecycle conventions used by policy, retention, and stewardship flows (see `docs/classification.md`).
 * **Business glossary**: define tenant-scoped business terms, ownership, and asset-linking conventions (see `docs/glossary.md`).
 * **Data products**: define tenant-scoped product metadata, ownership, and lifecycle conventions built on existing catalog and governance foundations (see `docs/data-products.md`).

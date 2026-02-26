@@ -23,6 +23,8 @@ from .models import (
     DataContract,
     IngestionRequest,
     LineageEdge,
+    MasterMergeCandidate,
+    MasterRecord,
     PrivacyProfile,
     ReferenceDataset,
     ReferenceDatasetVersion,
@@ -277,6 +279,38 @@ def _reference_dataset_version_to_dict(version: ReferenceDatasetVersion) -> dict
         'values': version.values,
         'created_at': version.created_at.isoformat(),
         'updated_at': version.updated_at.isoformat(),
+    }
+
+
+def _master_record_to_dict(record: MasterRecord) -> dict[str, Any]:
+    return {
+        'id': str(record.id),
+        'entity_type': record.entity_type,
+        'master_id': str(record.master_id),
+        'version': record.version,
+        'attributes': record.attributes,
+        'survivorship_policy': record.survivorship_policy,
+        'confidence': record.confidence,
+        'status': record.status,
+        'created_at': record.created_at.isoformat(),
+        'updated_at': record.updated_at.isoformat(),
+    }
+
+
+def _master_merge_candidate_to_dict(
+    candidate: MasterMergeCandidate,
+) -> dict[str, Any]:
+    return {
+        'id': str(candidate.id),
+        'entity_type': candidate.entity_type,
+        'target_master_id': str(candidate.target_master_id),
+        'source_master_refs': candidate.source_master_refs,
+        'proposed_attributes': candidate.proposed_attributes,
+        'confidence': candidate.confidence,
+        'status': candidate.status,
+        'approved_by': candidate.approved_by or None,
+        'created_at': candidate.created_at.isoformat(),
+        'updated_at': candidate.updated_at.isoformat(),
     }
 
 
@@ -1208,7 +1242,284 @@ def reference_dataset_version_values(request, dataset_id: str, version: int):
         dataset_version = ReferenceDatasetVersion.objects.get(dataset_id=dataset_id, version=version)
     except (ValidationError, ReferenceDatasetVersion.DoesNotExist):
         return JsonResponse({'error': 'version_not_found'}, status=404)
-    return JsonResponse({'dataset_id': str(dataset_version.dataset_id), 'version': dataset_version.version, 'values': dataset_version.values})
+    return JsonResponse(
+        {
+            'dataset_id': str(dataset_version.dataset_id),
+            'version': dataset_version.version,
+            'values': dataset_version.values,
+        }
+    )
+
+
+@csrf_exempt
+def master_records(request, entity_type: str):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = MasterRecord.objects.filter(entity_type=entity_type).order_by(
+            '-updated_at'
+        )
+        master_id = request.GET.get('master_id')
+        if master_id:
+            qs = qs.filter(master_id=master_id)
+        return JsonResponse({'items': [_master_record_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        attributes = payload.get('attributes') or {}
+        survivorship_policy = payload.get('survivorship_policy') or {}
+        if not isinstance(attributes, dict):
+            return JsonResponse({'error': 'attributes must be an object'}, status=400)
+        if not isinstance(survivorship_policy, dict):
+            return JsonResponse(
+                {'error': 'survivorship_policy must be an object'},
+                status=400,
+            )
+        confidence = payload.get('confidence')
+        if confidence is not None and not isinstance(confidence, (int, float)):
+            return JsonResponse({'error': 'confidence must be numeric'}, status=400)
+
+        status_value = payload.get('status') or MasterRecord.Status.ACTIVE
+        if status_value not in {
+            MasterRecord.Status.DRAFT,
+            MasterRecord.Status.ACTIVE,
+            MasterRecord.Status.ARCHIVED,
+        }:
+            return JsonResponse({'error': 'invalid_status'}, status=400)
+
+        raw_master_id = payload.get('master_id')
+        tenant_schema = _tenant_schema(request)
+        if raw_master_id:
+            try:
+                master_id = uuid.UUID(str(raw_master_id))
+            except ValueError:
+                return JsonResponse({'error': 'invalid_master_id'}, status=400)
+            latest = (
+                MasterRecord.objects.filter(
+                    entity_type=entity_type,
+                    master_id=master_id,
+                )
+                .order_by('-version')
+                .first()
+            )
+            if latest is None:
+                return JsonResponse({'error': 'master_not_found'}, status=404)
+            if status_value == MasterRecord.Status.ACTIVE:
+                MasterRecord.objects.filter(
+                    entity_type=entity_type,
+                    master_id=master_id,
+                    status=MasterRecord.Status.ACTIVE,
+                ).update(status=MasterRecord.Status.SUPERSEDED, updated_at=timezone.now())
+            created = MasterRecord.objects.create(
+                entity_type=entity_type,
+                master_id=master_id,
+                version=latest.version + 1,
+                attributes=attributes,
+                survivorship_policy=survivorship_policy,
+                confidence=float(confidence) if confidence is not None else None,
+                status=status_value,
+            )
+            event_type = 'master-data.record.updated'
+        else:
+            created = MasterRecord.objects.create(
+                entity_type=entity_type,
+                version=1,
+                attributes=attributes,
+                survivorship_policy=survivorship_policy,
+                confidence=float(confidence) if confidence is not None else None,
+                status=status_value,
+            )
+            event_type = 'master-data.record.created'
+
+        maybe_publish_event(
+            event_type=event_type,
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.{event_type}',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_master_record_to_dict(created),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action=event_type,
+            resource_type='master_record',
+            resource_id=str(created.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_master_record_to_dict(created),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_master_record_to_dict(created), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def master_record_detail(request, entity_type: str, master_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+
+    qs = MasterRecord.objects.filter(entity_type=entity_type, master_id=master_id)
+    version = request.GET.get('version')
+    if version:
+        try:
+            parsed_version = int(version)
+        except ValueError:
+            return JsonResponse({'error': 'version must be an integer'}, status=400)
+        record = qs.filter(version=parsed_version).first()
+    else:
+        record = qs.order_by('-version').first()
+    if record is None:
+        return JsonResponse({'error': 'not_found'}, status=404)
+    return JsonResponse(_master_record_to_dict(record))
+
+
+@csrf_exempt
+def master_merge_candidates(request, entity_type: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    target_master_id = payload.get('target_master_id')
+    proposed_attributes = payload.get('proposed_attributes') or {}
+    source_master_refs = payload.get('source_master_refs') or []
+    confidence = payload.get('confidence')
+    if not target_master_id:
+        return JsonResponse({'error': 'target_master_id is required'}, status=400)
+    if not isinstance(proposed_attributes, dict):
+        return JsonResponse(
+            {'error': 'proposed_attributes must be an object'},
+            status=400,
+        )
+    if not isinstance(source_master_refs, list):
+        return JsonResponse(
+            {'error': 'source_master_refs must be a list'},
+            status=400,
+        )
+    if confidence is not None and not isinstance(confidence, (int, float)):
+        return JsonResponse({'error': 'confidence must be numeric'}, status=400)
+    try:
+        parsed_target_master_id = uuid.UUID(str(target_master_id))
+    except ValueError:
+        return JsonResponse({'error': 'invalid_target_master_id'}, status=400)
+    if not MasterRecord.objects.filter(
+        entity_type=entity_type,
+        master_id=parsed_target_master_id,
+    ).exists():
+        return JsonResponse({'error': 'target_master_not_found'}, status=404)
+    candidate = MasterMergeCandidate.objects.create(
+        entity_type=entity_type,
+        target_master_id=parsed_target_master_id,
+        source_master_refs=source_master_refs,
+        proposed_attributes=proposed_attributes,
+        confidence=float(confidence) if confidence is not None else None,
+    )
+    return JsonResponse(_master_merge_candidate_to_dict(candidate), status=201)
+
+
+@csrf_exempt
+def master_merge_candidate_approve(request, entity_type: str, candidate_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        candidate = MasterMergeCandidate.objects.get(
+            id=candidate_id,
+            entity_type=entity_type,
+        )
+    except (ValidationError, MasterMergeCandidate.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if candidate.status != MasterMergeCandidate.Status.PENDING:
+        return JsonResponse({'error': 'candidate_not_pending'}, status=400)
+    latest = (
+        MasterRecord.objects.filter(
+            entity_type=entity_type,
+            master_id=candidate.target_master_id,
+        )
+        .order_by('-version')
+        .first()
+    )
+    if latest is None:
+        return JsonResponse({'error': 'target_master_not_found'}, status=404)
+    MasterRecord.objects.filter(
+        entity_type=entity_type,
+        master_id=candidate.target_master_id,
+        status=MasterRecord.Status.ACTIVE,
+    ).update(status=MasterRecord.Status.SUPERSEDED, updated_at=timezone.now())
+    merged = MasterRecord.objects.create(
+        entity_type=entity_type,
+        master_id=candidate.target_master_id,
+        version=latest.version + 1,
+        attributes=candidate.proposed_attributes,
+        survivorship_policy=latest.survivorship_policy,
+        confidence=candidate.confidence,
+        status=MasterRecord.Status.ACTIVE,
+    )
+    candidate.status = MasterMergeCandidate.Status.APPROVED
+    candidate.approved_by = (
+        request.headers.get('X-User-Id')
+        or request.headers.get('X-User-ID')
+        or ''
+    )
+    candidate.save(update_fields=['status', 'approved_by', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='master-data.record.merged',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.master-data.record.merged',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={
+            'candidate': _master_merge_candidate_to_dict(candidate),
+            'record': _master_record_to_dict(merged),
+        },
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='master-data.record.merged',
+        resource_type='master_record',
+        resource_id=str(merged.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={
+            'candidate': _master_merge_candidate_to_dict(candidate),
+            'record': _master_record_to_dict(merged),
+        },
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(
+        {
+            'candidate': _master_merge_candidate_to_dict(candidate),
+            'record': _master_record_to_dict(merged),
+        }
+    )
 
 
 @csrf_exempt

@@ -32,11 +32,12 @@ Define tenant-scoped conventions for mastering shared business entities (for exa
 4. Approved changes create a new master version and emit a tenant-scoped event.
 5. Consumers reference `master_id` + version semantics for reproducible downstream processing.
 
-## API and eventing direction
+## API and eventing (implemented scaffold slice)
 
-* API (future):
-  * `POST /api/v1/master-data/<entity_type>/records`
+* API:
+  * `GET/POST /api/v1/master-data/<entity_type>/records`
   * `GET /api/v1/master-data/<entity_type>/records/<master_id>`
+  * `POST /api/v1/master-data/<entity_type>/merge-candidates`
   * `POST /api/v1/master-data/<entity_type>/merge-candidates/<id>/approve`
 * Events:
   * `master-data.record.created`
@@ -44,3 +45,8 @@ Define tenant-scoped conventions for mastering shared business entities (for exa
   * `master-data.record.merged`
   * `master-data.record.split`
 
+Implemented lifecycle behavior:
+
+* Records are versioned per `entity_type + master_id`, with latest-by-version retrieval.
+* New active versions supersede older active versions for the same master.
+* Approving a merge candidate creates the next master version and emits merge/audit events.
