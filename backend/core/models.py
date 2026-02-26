@@ -56,3 +56,31 @@ class LineageEdge(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['from_asset', 'to_asset', 'edge_type'], name='uniq_lineage_edge'),
         ]
+
+
+class QualityRule(models.Model):
+    class Severity(models.TextChoices):
+        WARNING = 'warning'
+        ERROR = 'error'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(DataAsset, on_delete=models.CASCADE, related_name='quality_rules')
+    rule_type = models.CharField(max_length=100)
+    params = models.JSONField(default=dict, blank=True)
+    severity = models.CharField(max_length=16, choices=Severity.choices, default=Severity.WARNING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class QualityCheckResult(models.Model):
+    class Status(models.TextChoices):
+        PASS = 'pass'
+        WARN = 'warn'
+        FAIL = 'fail'
+        ERROR = 'error'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    rule = models.ForeignKey(QualityRule, on_delete=models.CASCADE, related_name='results')
+    status = models.CharField(max_length=16, choices=Status.choices)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)

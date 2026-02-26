@@ -13,7 +13,8 @@ from django.views.decorators.csrf import csrf_exempt
 from .events import maybe_publish_audit_event, maybe_publish_event
 from .identity import require_any_role, require_role
 from .metrics import DB_READINESS_ERRORS, metrics_response
-from .models import DataAsset, IngestionRequest, LineageEdge
+from .models import DataAsset, IngestionRequest, LineageEdge, QualityCheckResult, QualityRule
+from .tasks import evaluate_quality_rule
 
 
 def _tenant_schema(request) -> str:
@@ -108,6 +109,29 @@ def _edge_to_dict(edge: LineageEdge) -> dict[str, Any]:
     }
 
 
+def _quality_rule_to_dict(rule: QualityRule) -> dict[str, Any]:
+    return {
+        'id': str(rule.id),
+        'asset_id': str(rule.asset_id),
+        'rule_type': rule.rule_type,
+        'params': rule.params,
+        'severity': rule.severity,
+        'created_at': rule.created_at.isoformat(),
+        'updated_at': rule.updated_at.isoformat(),
+    }
+
+
+def _quality_result_to_dict(result: QualityCheckResult) -> dict[str, Any]:
+    return {
+        'id': str(result.id),
+        'rule_id': str(result.rule_id),
+        'asset_id': str(result.rule.asset_id),
+        'status': result.status,
+        'details': result.details,
+        'created_at': result.created_at.isoformat(),
+    }
+
+
 def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_value: int) -> int | None:
     if value is None or value == '':
         return default
@@ -154,6 +178,98 @@ def search_assets(request):
     count = qs.count()
     results = [_asset_to_dict(a) for a in qs[offset : offset + limit]]
     return JsonResponse({'count': count, 'results': results})
+
+
+@csrf_exempt
+def quality_rules(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        asset_id = request.GET.get('asset_id')
+        qs = QualityRule.objects.order_by('-updated_at')
+        if asset_id:
+            qs = qs.filter(asset_id=asset_id)
+        items = [_quality_rule_to_dict(r) for r in qs]
+        return JsonResponse({'items': items})
+
+    if request.method == 'POST':
+        forbidden = require_role(request, 'catalog.editor')
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        asset_id = payload.get('asset_id')
+        rule_type = payload.get('rule_type')
+        if not asset_id or not rule_type:
+            return JsonResponse({'error': 'asset_id and rule_type are required'}, status=400)
+        try:
+            asset = DataAsset.objects.get(id=asset_id)
+        except (ValidationError, DataAsset.DoesNotExist):
+            return JsonResponse({'error': 'asset_not_found'}, status=404)
+        params = payload.get('params') or {}
+        if not isinstance(params, dict):
+            return JsonResponse({'error': 'params must be an object'}, status=400)
+        severity = payload.get('severity') or QualityRule.Severity.WARNING
+        if severity not in {QualityRule.Severity.WARNING, QualityRule.Severity.ERROR}:
+            return JsonResponse({'error': 'severity must be warning or error'}, status=400)
+
+        rule = QualityRule.objects.create(asset=asset, rule_type=rule_type, params=params, severity=severity)
+        return JsonResponse(_quality_rule_to_dict(rule), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def quality_rule_evaluate(request, rule_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_role(request, 'catalog.editor')
+    if forbidden:
+        return forbidden
+    try:
+        QualityRule.objects.get(id=rule_id)
+    except (ValidationError, QualityRule.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+
+    tenant_schema = _tenant_schema(request)
+    result = evaluate_quality_rule.apply(
+        kwargs={
+            'tenant_schema': tenant_schema,
+            'rule_id': rule_id,
+            'correlation_id': getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            'user_id': request.headers.get('X-User-Id'),
+            'request_id': request.headers.get('X-Request-Id') or request.headers.get('X-Request-ID'),
+        }
+    ).get(propagate=True)
+    return JsonResponse(result)
+
+
+@csrf_exempt
+def quality_results(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    rule_id = request.GET.get('rule_id')
+    asset_id = request.GET.get('asset_id')
+    try:
+        limit = int(request.GET.get('limit', '100'))
+        offset = int(request.GET.get('offset', '0'))
+    except ValueError:
+        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+    limit = min(max(limit, 1), 500)
+    offset = max(offset, 0)
+
+    qs = QualityCheckResult.objects.select_related('rule').order_by('-created_at')
+    if rule_id:
+        qs = qs.filter(rule_id=rule_id)
+    if asset_id:
+        qs = qs.filter(rule__asset_id=asset_id)
+    items = [_quality_result_to_dict(r) for r in qs[offset : offset + limit]]
+    return JsonResponse({'items': items})
 
 
 @csrf_exempt
