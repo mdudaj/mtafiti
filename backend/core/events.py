@@ -7,6 +7,8 @@ from typing import Any
 
 import pika
 
+from .logging import get_correlation_id, get_request_id, get_user_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,13 +18,15 @@ def build_event_payload(
     tenant_id: str,
     correlation_id: str | None = None,
     user_id: str | None = None,
+    request_id: str | None = None,
     data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         'event_type': event_type,
         'tenant_id': tenant_id,
-        'correlation_id': correlation_id or str(uuid.uuid4()),
-        'user_id': user_id,
+        'correlation_id': correlation_id or get_correlation_id() or str(uuid.uuid4()),
+        'user_id': user_id if user_id is not None else get_user_id(),
+        'request_id': request_id if request_id is not None else get_request_id(),
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'data': data or {},
     }
@@ -58,6 +62,7 @@ def maybe_publish_event(
     routing_key: str,
     correlation_id: str | None = None,
     user_id: str | None = None,
+    request_id: str | None = None,
     data: dict[str, Any] | None = None,
     exchange: str | None = None,
     rabbitmq_url: str | None = None,
@@ -72,6 +77,7 @@ def maybe_publish_event(
         tenant_id=tenant_id,
         correlation_id=correlation_id,
         user_id=user_id,
+        request_id=request_id,
         data=data,
     )
     try:
@@ -89,6 +95,7 @@ def maybe_publish_audit_event(
     resource_id: str | None = None,
     correlation_id: str | None = None,
     user_id: str | None = None,
+    request_id: str | None = None,
     data: dict[str, Any] | None = None,
     exchange: str | None = None,
     rabbitmq_url: str | None = None,
@@ -99,6 +106,7 @@ def maybe_publish_audit_event(
         routing_key=f'{tenant_id}.audit.{action}',
         correlation_id=correlation_id,
         user_id=user_id,
+        request_id=request_id,
         data={
             'action': action,
             'resource_type': resource_type,
