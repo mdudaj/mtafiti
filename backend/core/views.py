@@ -5,6 +5,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.db.models import Q
 from django.db.utils import DatabaseError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -108,6 +109,44 @@ def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_v
     except ValueError:
         return None
     return min(max(parsed, min_value), max_value)
+
+
+@csrf_exempt
+def search_assets(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+
+    query = (request.GET.get('q') or '').strip()
+    if not query:
+        return JsonResponse({'error': 'q is required'}, status=400)
+
+    try:
+        limit = int(request.GET.get('limit', '100'))
+        offset = int(request.GET.get('offset', '0'))
+    except ValueError:
+        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+    limit = min(max(limit, 1), 500)
+    offset = max(offset, 0)
+
+    query_lower = query.lower()
+    qs = DataAsset.objects.filter(
+        Q(display_name__icontains=query)
+        | Q(qualified_name__icontains=query)
+        | Q(description__icontains=query)
+        | Q(asset_type__iexact=query)
+        | Q(owner__iexact=query)
+        | Q(tags__contains=[query])
+        | Q(tags__contains=[query_lower])
+        | Q(classifications__contains=[query])
+        | Q(classifications__contains=[query_lower])
+    ).order_by('-updated_at', 'id')
+
+    count = qs.count()
+    results = [_asset_to_dict(a) for a in qs[offset : offset + limit]]
+    return JsonResponse({'count': count, 'results': results})
 
 
 @csrf_exempt
