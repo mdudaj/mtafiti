@@ -179,3 +179,23 @@ class ConsentEvent(models.Model):
     consent_state = models.CharField(max_length=16, choices=ConsentState.choices)
     reason = models.CharField(max_length=512, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ResidencyProfile(models.Model):
+    class EnforcementMode(models.TextChoices):
+        ADVISORY = 'advisory'
+        ENFORCED = 'enforced'
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft'
+        ACTIVE = 'active'
+        DEPRECATED = 'deprecated'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    allowed_regions = models.JSONField(default=list, blank=True)
+    blocked_regions = models.JSONField(default=list, blank=True)
+    enforcement_mode = models.CharField(max_length=16, choices=EnforcementMode.choices, default=EnforcementMode.ADVISORY)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

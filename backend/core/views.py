@@ -22,6 +22,7 @@ from .models import (
     IngestionRequest,
     LineageEdge,
     PrivacyProfile,
+    ResidencyProfile,
     QualityCheckResult,
     QualityRule,
     RetentionHold,
@@ -219,6 +220,19 @@ def _consent_event_to_dict(event: ConsentEvent) -> dict[str, Any]:
         'consent_state': event.consent_state,
         'reason': event.reason,
         'created_at': event.created_at.isoformat(),
+    }
+
+
+def _residency_profile_to_dict(profile: ResidencyProfile) -> dict[str, Any]:
+    return {
+        'id': str(profile.id),
+        'name': profile.name,
+        'allowed_regions': profile.allowed_regions,
+        'blocked_regions': profile.blocked_regions,
+        'enforcement_mode': profile.enforcement_mode,
+        'status': profile.status,
+        'created_at': profile.created_at.isoformat(),
+        'updated_at': profile.updated_at.isoformat(),
     }
 
 
@@ -638,6 +652,224 @@ def privacy_consent_events(request):
         return JsonResponse(_consent_event_to_dict(event), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def residency_profiles(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        qs = ResidencyProfile.objects.order_by('-updated_at')
+        return JsonResponse({'items': [_residency_profile_to_dict(p) for p in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+
+        allowed_regions = payload.get('allowed_regions')
+        blocked_regions = payload.get('blocked_regions')
+        if allowed_regions is None:
+            allowed_regions = []
+        if blocked_regions is None:
+            blocked_regions = []
+        if not isinstance(allowed_regions, list) or any(not isinstance(v, str) for v in allowed_regions):
+            return JsonResponse({'error': 'allowed_regions must be a list of strings'}, status=400)
+        if not isinstance(blocked_regions, list) or any(not isinstance(v, str) for v in blocked_regions):
+            return JsonResponse({'error': 'blocked_regions must be a list of strings'}, status=400)
+
+        enforcement_mode = payload.get('enforcement_mode', ResidencyProfile.EnforcementMode.ADVISORY)
+        if enforcement_mode not in {ResidencyProfile.EnforcementMode.ADVISORY, ResidencyProfile.EnforcementMode.ENFORCED}:
+            return JsonResponse({'error': 'invalid_enforcement_mode'}, status=400)
+
+        profile = ResidencyProfile.objects.create(
+            name=name,
+            allowed_regions=allowed_regions,
+            blocked_regions=blocked_regions,
+            enforcement_mode=enforcement_mode,
+            status=ResidencyProfile.Status.DRAFT,
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='residency.profile.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.residency.profile.created',
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_residency_profile_to_dict(profile),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='residency.profile.created',
+            resource_type='residency_profile',
+            resource_id=str(profile.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_residency_profile_to_dict(profile),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_residency_profile_to_dict(profile), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def residency_profile_detail(request, profile_id: str):
+    try:
+        profile = ResidencyProfile.objects.get(id=profile_id)
+    except (ValidationError, ResidencyProfile.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    return JsonResponse(_residency_profile_to_dict(profile))
+
+
+@csrf_exempt
+def residency_profile_activate(request, profile_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        profile = ResidencyProfile.objects.get(id=profile_id)
+    except (ValidationError, ResidencyProfile.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    profile.status = ResidencyProfile.Status.ACTIVE
+    profile.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='residency.profile.activated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.residency.profile.activated',
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_residency_profile_to_dict(profile),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='residency.profile.activated',
+        resource_type='residency_profile',
+        resource_id=str(profile.id),
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_residency_profile_to_dict(profile),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_residency_profile_to_dict(profile))
+
+
+@csrf_exempt
+def residency_profile_deprecate(request, profile_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        profile = ResidencyProfile.objects.get(id=profile_id)
+    except (ValidationError, ResidencyProfile.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    profile.status = ResidencyProfile.Status.DEPRECATED
+    profile.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='residency.profile.deprecated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.residency.profile.deprecated',
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_residency_profile_to_dict(profile),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='residency.profile.deprecated',
+        resource_type='residency_profile',
+        resource_id=str(profile.id),
+        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_residency_profile_to_dict(profile),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_residency_profile_to_dict(profile))
+
+
+@csrf_exempt
+def residency_check(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    profile_id = payload.get('profile_id')
+    target_region = payload.get('target_region')
+    if not profile_id or not isinstance(target_region, str):
+        return JsonResponse({'error': 'profile_id and target_region are required'}, status=400)
+    try:
+        profile = ResidencyProfile.objects.get(id=profile_id)
+    except (ValidationError, ResidencyProfile.DoesNotExist):
+        return JsonResponse({'error': 'profile_not_found'}, status=404)
+
+    denied_by_block = target_region in set(profile.blocked_regions or [])
+    denied_by_allow = bool(profile.allowed_regions) and target_region not in set(profile.allowed_regions)
+    allowed = not (denied_by_block or denied_by_allow)
+    denied_reason = ''
+    if denied_by_block:
+        denied_reason = 'blocked_region'
+    elif denied_by_allow:
+        denied_reason = 'outside_allowed_regions'
+    enforced = profile.enforcement_mode == ResidencyProfile.EnforcementMode.ENFORCED
+    response = {
+        'profile_id': str(profile.id),
+        'target_region': target_region,
+        'allowed': allowed,
+        'decision': 'allow' if allowed else 'deny',
+        'enforced': enforced,
+        'status': profile.status,
+    }
+    if denied_reason:
+        response['reason'] = denied_reason
+    if not allowed:
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='residency.violation.detected',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.residency.violation.detected',
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=response,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='residency.violation.detected',
+            resource_type='residency_profile',
+            resource_id=str(profile.id),
+            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=response,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+    if not allowed and enforced:
+        return JsonResponse(response, status=403)
+    return JsonResponse(response)
 
 
 @csrf_exempt

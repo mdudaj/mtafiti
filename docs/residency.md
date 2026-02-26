@@ -29,18 +29,22 @@ Suggested minimal fields:
   * policy checks can block exports when target region is outside allowed scope
 * Deprecation: profile remains readable for audit history but is blocked for new assignments.
 
-## API and events (incremental direction)
+## API and events (implemented scaffold slice)
 
-Candidate endpoints:
+Endpoints:
 
-* `POST /api/v1/residency/profiles`
-* `GET /api/v1/residency/profiles/<id>`
+* `POST /api/v1/residency/profiles` (create draft profile; `policy.admin | tenant.admin`)
 * `GET /api/v1/residency/profiles`
+* `GET /api/v1/residency/profiles/<id>`
+* `POST /api/v1/residency/profiles/<id>/activate` (`policy.admin | tenant.admin`)
+* `POST /api/v1/residency/profiles/<id>/deprecate` (`policy.admin | tenant.admin`)
+* `POST /api/v1/residency/check` (returns allow/deny decision; enforced profiles return `403` on deny)
 
-Candidate events:
+Events:
 
 * `residency.profile.created`
 * `residency.profile.activated`
+* `residency.profile.deprecated`
 * `residency.violation.detected`
 
 Use the existing event envelope and tenant-scoped routing conventions from `docs/events.md`.

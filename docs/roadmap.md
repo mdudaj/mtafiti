@@ -11,6 +11,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 5. **Ingestion framework**: ingestion request/status API as the base integration entrypoint (see `docs/ingestion.md`).
 6. **Eventing conventions**: optional RabbitMQ-backed domain-event publishing and routing-key conventions (see `docs/events.md`).
 7. **Observability baseline**: health/readiness probes and structured logging with correlation ids (see `docs/observability.md`).
+8. **Data residency controls**: tenant-scoped residency profile lifecycle and region allow/deny checks with event/audit conventions (see `docs/residency.md`).
 
 ## Near-term (next)
 
@@ -34,7 +35,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 * **Collaboration**: define ONLYOFFICE integration and tenant-scoped versioned document lifecycle (see `docs/collaboration.md`).
 * **Notebook infrastructure**: define JupyterHub/KubeSpawner pod isolation and execution event conventions (see `docs/notebooks.md`).
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).
-* **Data residency controls**: define tenant-scoped residency profiles and region enforcement conventions for connectors and governed exports (see `docs/residency.md`).
 * **Data access requests**: define tenant-scoped request/approval/revocation conventions for governed asset access (see `docs/access-requests.md`).
 * **Reference data management**: define tenant-scoped reference datasets, change control, and asset linkage conventions (see `docs/reference-data.md`).
 * **Master data management**: define tenant-scoped canonical entity records, survivorship rules, and stewardship conventions (see `docs/master-data.md`).
