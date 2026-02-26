@@ -28,6 +28,9 @@ from .models import (
     LineageEdge,
     MasterMergeCandidate,
     MasterRecord,
+    NotebookExecution,
+    NotebookSession,
+    NotebookWorkspace,
     PrivacyProfile,
     PrintJob,
     ReferenceDataset,
@@ -375,6 +378,46 @@ def _collaboration_version_to_dict(
         'summary': version.summary,
         'editor': version.editor or None,
         'created_at': version.created_at.isoformat(),
+    }
+
+
+def _notebook_workspace_to_dict(workspace: NotebookWorkspace) -> dict[str, Any]:
+    return {
+        'id': str(workspace.id),
+        'name': workspace.name,
+        'owner': workspace.owner or None,
+        'image': workspace.image or None,
+        'cpu_limit': workspace.cpu_limit or None,
+        'memory_limit': workspace.memory_limit or None,
+        'storage_mounts': workspace.storage_mounts,
+        'status': workspace.status,
+        'created_at': workspace.created_at.isoformat(),
+        'updated_at': workspace.updated_at.isoformat(),
+    }
+
+
+def _notebook_session_to_dict(session: NotebookSession) -> dict[str, Any]:
+    return {
+        'id': str(session.id),
+        'workspace_id': str(session.workspace_id),
+        'user_id': session.user_id or None,
+        'pod_name': session.pod_name or None,
+        'status': session.status,
+        'metadata': session.metadata,
+        'started_at': session.started_at.isoformat(),
+        'ended_at': session.ended_at.isoformat() if session.ended_at else None,
+    }
+
+
+def _notebook_execution_to_dict(execution: NotebookExecution) -> dict[str, Any]:
+    return {
+        'id': str(execution.id),
+        'session_id': str(execution.session_id),
+        'cell_ref': execution.cell_ref or None,
+        'status': execution.status,
+        'metadata': execution.metadata,
+        'requested_at': execution.requested_at.isoformat(),
+        'completed_at': execution.completed_at.isoformat() if execution.completed_at else None,
     }
 
 
@@ -2224,6 +2267,309 @@ def collaboration_document_versions(request, document_id: str):
         return JsonResponse(_collaboration_version_to_dict(version), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def notebook_workspaces(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        workspaces = NotebookWorkspace.objects.order_by('-updated_at')
+        return JsonResponse(
+            {'items': [_notebook_workspace_to_dict(item) for item in workspaces]}
+        )
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        storage_mounts = payload.get('storage_mounts')
+        if storage_mounts is None:
+            storage_mounts = []
+        if not isinstance(storage_mounts, list) or any(
+            not isinstance(item, str) for item in storage_mounts
+        ):
+            return JsonResponse(
+                {'error': 'storage_mounts must be an array of strings'},
+                status=400,
+            )
+        workspace = NotebookWorkspace.objects.create(
+            name=name,
+            owner=(payload.get('owner') or request.headers.get('X-User-Id') or ''),
+            image=(payload.get('image') or ''),
+            cpu_limit=(payload.get('cpu_limit') or ''),
+            memory_limit=(payload.get('memory_limit') or ''),
+            storage_mounts=storage_mounts,
+            status='active',
+        )
+        tenant_schema = _tenant_schema(request)
+        maybe_publish_event(
+            event_type='notebook.workspace.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.notebook.workspace.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_notebook_workspace_to_dict(workspace),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='notebook.workspace.created',
+            resource_type='notebook_workspace',
+            resource_id=str(workspace.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=_notebook_workspace_to_dict(workspace),
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(_notebook_workspace_to_dict(workspace), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def notebook_workspace_sessions(request, workspace_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        workspace = NotebookWorkspace.objects.get(id=workspace_id)
+    except (ValidationError, NotebookWorkspace.DoesNotExist):
+        return JsonResponse({'error': 'workspace_not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    metadata = payload.get('metadata') or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+    session = NotebookSession.objects.create(
+        workspace=workspace,
+        user_id=(payload.get('user_id') or request.headers.get('X-User-Id') or ''),
+        pod_name=(payload.get('pod_name') or ''),
+        metadata=metadata,
+        status=NotebookSession.Status.STARTED,
+    )
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='notebook.session.started',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.notebook.session.started',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_session_to_dict(session),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='notebook.session.started',
+        resource_type='notebook_session',
+        resource_id=str(session.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_session_to_dict(session),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_notebook_session_to_dict(session), status=201)
+
+
+@csrf_exempt
+def notebook_sessions(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    qs = NotebookSession.objects.order_by('-started_at')
+    workspace_id = request.GET.get('workspace_id')
+    if workspace_id:
+        qs = qs.filter(workspace_id=workspace_id)
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return JsonResponse({'items': [_notebook_session_to_dict(item) for item in qs]})
+
+
+@csrf_exempt
+def notebook_session_terminate(request, session_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        session = NotebookSession.objects.get(id=session_id)
+    except (ValidationError, NotebookSession.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    reason = payload.get('reason') or 'terminated'
+    if reason not in {'terminated', 'resource_limit'}:
+        return JsonResponse(
+            {'error': 'reason must be terminated or resource_limit'},
+            status=400,
+        )
+    session.status = (
+        NotebookSession.Status.TERMINATED
+        if reason == 'terminated'
+        else NotebookSession.Status.RESOURCE_LIMITED
+    )
+    session.ended_at = timezone.now()
+    metadata = session.metadata or {}
+    metadata['termination_reason'] = reason
+    session.metadata = metadata
+    session.save(update_fields=['status', 'ended_at', 'metadata'])
+    tenant_schema = _tenant_schema(request)
+    event_type = (
+        'notebook.session.terminated'
+        if reason == 'terminated'
+        else 'notebook.resource_limit.terminated'
+    )
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_session_to_dict(session),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='notebook_session',
+        resource_id=str(session.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_session_to_dict(session),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_notebook_session_to_dict(session))
+
+
+@csrf_exempt
+def notebook_session_executions(request, session_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        session = NotebookSession.objects.get(id=session_id)
+    except (ValidationError, NotebookSession.DoesNotExist):
+        return JsonResponse({'error': 'session_not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    metadata = payload.get('metadata') or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+    execution = NotebookExecution.objects.create(
+        session=session,
+        cell_ref=(payload.get('cell_ref') or ''),
+        metadata=metadata,
+        status=NotebookExecution.Status.REQUESTED,
+    )
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='notebook.execution.requested',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.notebook.execution.requested',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_execution_to_dict(execution),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='notebook.execution.requested',
+        resource_type='notebook_execution',
+        resource_id=str(execution.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_execution_to_dict(execution),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_notebook_execution_to_dict(execution), status=201)
+
+
+@csrf_exempt
+def notebook_execution_complete(request, execution_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        execution = NotebookExecution.objects.get(id=execution_id)
+    except (ValidationError, NotebookExecution.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    status_value = payload.get('status') or NotebookExecution.Status.COMPLETED
+    if status_value not in {
+        NotebookExecution.Status.COMPLETED,
+        NotebookExecution.Status.FAILED,
+    }:
+        return JsonResponse(
+            {'error': 'status must be completed or failed'},
+            status=400,
+        )
+    metadata = payload.get('metadata')
+    if metadata is not None and not isinstance(metadata, dict):
+        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+    execution.status = status_value
+    execution.completed_at = timezone.now()
+    if metadata is not None:
+        execution.metadata = metadata
+    execution.save(update_fields=['status', 'completed_at', 'metadata'])
+    tenant_schema = _tenant_schema(request)
+    maybe_publish_event(
+        event_type='notebook.execution.completed',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.notebook.execution.completed',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_execution_to_dict(execution),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='notebook.execution.completed',
+        resource_type='notebook_execution',
+        resource_id=str(execution.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=_notebook_execution_to_dict(execution),
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(_notebook_execution_to_dict(execution))
 
 
 @csrf_exempt
