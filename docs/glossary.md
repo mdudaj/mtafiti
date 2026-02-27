@@ -45,3 +45,24 @@ Candidate events:
 * `glossary.term.linked_to_asset`
 
 Use the existing event envelope and tenant-scoped routing conventions from `docs/events.md`.
+
+## Implemented scaffold baseline
+
+Current scaffold implementation includes:
+
+* `GET/POST /api/v1/glossary/terms`
+* `GET /api/v1/glossary/terms/<term_id>`
+* `POST /api/v1/glossary/terms/<term_id>/approve`
+* `POST /api/v1/glossary/terms/<term_id>/deprecate`
+* `POST /api/v1/assets/<asset_id>/terms/<term_id>`
+
+Behavior implemented:
+
+* tenant-scoped glossary terms with lifecycle states `draft|approved|deprecated`
+* owner/steward arrays and policy-vocabulary classification validation (`public|internal|confidential|restricted`)
+* approved-only asset linking and deprecation gate on new links
+* glossary events and audit events:
+  * `glossary.term.created`
+  * `glossary.term.approved`
+  * `glossary.term.deprecated`
+  * `glossary.term.linked_to_asset`

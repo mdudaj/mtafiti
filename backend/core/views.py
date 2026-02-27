@@ -25,6 +25,7 @@ from .models import (
     ConsentEvent,
     DataAsset,
     DataContract,
+    GlossaryTerm,
     GovernancePolicy,
     GovernancePolicyTransition,
     IngestionRequest,
@@ -522,6 +523,21 @@ def _governance_policy_to_dict(policy: GovernancePolicy) -> dict[str, Any]:
         'rollback_target_id': str(policy.rollback_target_id) if policy.rollback_target_id else None,
         'created_at': policy.created_at.isoformat(),
         'updated_at': policy.updated_at.isoformat(),
+    }
+
+
+def _glossary_term_to_dict(term: GlossaryTerm) -> dict[str, Any]:
+    return {
+        'id': str(term.id),
+        'name': term.name,
+        'definition': term.definition or None,
+        'status': term.status,
+        'owners': term.owners,
+        'stewards': term.stewards,
+        'related_asset_ids': term.related_asset_ids,
+        'classifications': term.classifications,
+        'created_at': term.created_at.isoformat(),
+        'updated_at': term.updated_at.isoformat(),
     }
 
 
@@ -2955,6 +2971,237 @@ def quality_results(request):
         qs = qs.filter(rule__asset_id=asset_id)
     items = [_quality_result_to_dict(r) for r in qs[offset : offset + limit]]
     return JsonResponse({'items': items})
+
+
+@csrf_exempt
+def glossary_terms(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = GlossaryTerm.objects.order_by('-updated_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_glossary_term_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(
+            request,
+            {'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        if GlossaryTerm.objects.filter(name=name).exists():
+            return JsonResponse({'error': 'name_already_exists'}, status=409)
+        owners = _parse_string_list(payload.get('owners'))
+        if owners is None:
+            return JsonResponse({'error': 'owners must be an array of strings'}, status=400)
+        stewards = _parse_string_list(payload.get('stewards'))
+        if stewards is None:
+            return JsonResponse({'error': 'stewards must be an array of strings'}, status=400)
+        classifications = _parse_string_list(payload.get('classifications'))
+        if classifications is None:
+            return JsonResponse(
+                {'error': 'classifications must be an array of strings'},
+                status=400,
+            )
+        invalid = _validate_classification_values(classifications)
+        if invalid:
+            return JsonResponse(
+                {'error': 'unknown_classifications', 'items': invalid},
+                status=400,
+            )
+        term = GlossaryTerm.objects.create(
+            name=name,
+            definition=(payload.get('definition') or ''),
+            status=GlossaryTerm.Status.DRAFT,
+            owners=owners,
+            stewards=stewards,
+            classifications=classifications,
+            related_asset_ids=[],
+        )
+        tenant_schema = _tenant_schema(request)
+        data = _glossary_term_to_dict(term)
+        maybe_publish_event(
+            event_type='glossary.term.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.glossary.term.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='glossary.term.created',
+            resource_type='glossary_term',
+            resource_id=str(term.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(data, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def glossary_term_detail(request, term_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        term = GlossaryTerm.objects.get(id=term_id)
+    except (ValidationError, GlossaryTerm.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    return JsonResponse(_glossary_term_to_dict(term))
+
+
+@csrf_exempt
+def glossary_term_approve(request, term_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        term = GlossaryTerm.objects.get(id=term_id)
+    except (ValidationError, GlossaryTerm.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if term.status == GlossaryTerm.Status.DEPRECATED:
+        return JsonResponse({'error': 'term_deprecated'}, status=400)
+    term.status = GlossaryTerm.Status.APPROVED
+    term.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    data = _glossary_term_to_dict(term)
+    maybe_publish_event(
+        event_type='glossary.term.approved',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.glossary.term.approved',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='glossary.term.approved',
+        resource_type='glossary_term',
+        resource_id=str(term.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def glossary_term_deprecate(request, term_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        term = GlossaryTerm.objects.get(id=term_id)
+    except (ValidationError, GlossaryTerm.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    term.status = GlossaryTerm.Status.DEPRECATED
+    term.save(update_fields=['status', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    data = _glossary_term_to_dict(term)
+    maybe_publish_event(
+        event_type='glossary.term.deprecated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.glossary.term.deprecated',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='glossary.term.deprecated',
+        resource_type='glossary_term',
+        resource_id=str(term.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def asset_glossary_term_link(request, asset_id: str, term_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_role(request, 'catalog.editor')
+    if forbidden:
+        return forbidden
+    try:
+        asset = DataAsset.objects.get(id=asset_id)
+    except (ValidationError, DataAsset.DoesNotExist):
+        return JsonResponse({'error': 'asset_not_found'}, status=404)
+    try:
+        term = GlossaryTerm.objects.get(id=term_id)
+    except (ValidationError, GlossaryTerm.DoesNotExist):
+        return JsonResponse({'error': 'term_not_found'}, status=404)
+    if term.status != GlossaryTerm.Status.APPROVED:
+        return JsonResponse({'error': 'term_not_approved'}, status=400)
+    related_asset_ids = list(term.related_asset_ids or [])
+    asset_ref = str(asset.id)
+    if asset_ref not in related_asset_ids:
+        related_asset_ids.append(asset_ref)
+        term.related_asset_ids = related_asset_ids
+        term.save(update_fields=['related_asset_ids', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    data = _glossary_term_to_dict(term)
+    maybe_publish_event(
+        event_type='glossary.term.linked_to_asset',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.glossary.term.linked_to_asset',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={'term': data, 'asset': _asset_to_dict(asset)},
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='glossary.term.linked_to_asset',
+        resource_type='glossary_term',
+        resource_id=str(term.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={'term': data, 'asset': _asset_to_dict(asset)},
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(data)
 
 
 @csrf_exempt

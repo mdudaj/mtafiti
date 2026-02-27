@@ -634,3 +634,26 @@ class GovernancePolicyTransition(models.Model):
     reason = models.CharField(max_length=512, blank=True, default="")
     actor_id = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class GlossaryTerm(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        APPROVED = "approved"
+        DEPRECATED = "deprecated"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    definition = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    owners = models.JSONField(default=list, blank=True)
+    stewards = models.JSONField(default=list, blank=True)
+    related_asset_ids = models.JSONField(default=list, blank=True)
+    classifications = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="uniq_glossary_term_name"),
+        ]
