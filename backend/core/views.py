@@ -25,6 +25,7 @@ from .models import (
     ConsentEvent,
     DataAsset,
     DataContract,
+    DataShare,
     DataProduct,
     GlossaryTerm,
     GovernancePolicy,
@@ -567,6 +568,59 @@ def _data_product_to_dict(product: DataProduct) -> dict[str, Any]:
         'created_at': product.created_at.isoformat(),
         'updated_at': product.updated_at.isoformat(),
     }
+
+
+def _data_share_to_dict(share: DataShare) -> dict[str, Any]:
+    return {
+        'id': str(share.id),
+        'asset_id': str(share.asset_id),
+        'consumer_ref': share.consumer_ref,
+        'purpose': share.purpose or None,
+        'constraints': share.constraints,
+        'linked_access_request_ids': share.linked_access_request_ids,
+        'status': share.status,
+        'expires_at': share.expires_at.isoformat() if share.expires_at else None,
+        'approved_by': share.approved_by or None,
+        'created_at': share.created_at.isoformat(),
+        'updated_at': share.updated_at.isoformat(),
+    }
+
+
+def _normalize_share_constraints(value: Any) -> dict[str, Any] | None:
+    constraints = value or {}
+    if not isinstance(constraints, dict):
+        return None
+    normalized = dict(constraints)
+    masking_profile = normalized.get('masking_profile')
+    if masking_profile is not None and not isinstance(masking_profile, str):
+        return None
+    row_filters = normalized.get('row_filters')
+    if row_filters is not None:
+        parsed = _parse_string_list(row_filters)
+        if parsed is None:
+            return None
+        normalized['row_filters'] = parsed
+    allowed_regions = normalized.get('allowed_regions')
+    if allowed_regions is not None:
+        parsed = _parse_string_list(allowed_regions)
+        if parsed is None:
+            return None
+        normalized['allowed_regions'] = parsed
+    return normalized
+
+
+def _refresh_share_expiry(share: DataShare):
+    if (
+        share.expires_at
+        and share.status in {
+            DataShare.Status.DRAFT,
+            DataShare.Status.APPROVED,
+            DataShare.Status.ACTIVE,
+        }
+        and share.expires_at <= timezone.now()
+    ):
+        share.status = DataShare.Status.EXPIRED
+        share.save(update_fields=['status', 'updated_at'])
 
 
 def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_value: int) -> int | None:
@@ -1334,6 +1388,177 @@ def access_request_decision(request, request_id: str):
         rabbitmq_url=os.environ.get('RABBITMQ_URL'),
     )
     return JsonResponse(_access_request_to_dict(access_request))
+
+
+@csrf_exempt
+def data_shares(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = DataShare.objects.order_by('-updated_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        asset_id = request.GET.get('asset_id')
+        if asset_id:
+            qs = qs.filter(asset_id=asset_id)
+        items = []
+        for share in qs:
+            _refresh_share_expiry(share)
+            items.append(_data_share_to_dict(share))
+        return JsonResponse({'items': items})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        asset_id = payload.get('asset_id')
+        consumer_ref = (payload.get('consumer_ref') or '').strip()
+        if not asset_id or not consumer_ref:
+            return JsonResponse({'error': 'asset_id and consumer_ref are required'}, status=400)
+        try:
+            asset = DataAsset.objects.get(id=asset_id)
+        except (ValidationError, DataAsset.DoesNotExist):
+            return JsonResponse({'error': 'asset_not_found'}, status=404)
+        linked_access_request_ids = _parse_uuid_string_list(payload.get('linked_access_request_ids'))
+        if linked_access_request_ids is None:
+            return JsonResponse(
+                {'error': 'linked_access_request_ids must be an array of UUID strings'},
+                status=400,
+            )
+        constraints = _normalize_share_constraints(payload.get('constraints'))
+        if constraints is None:
+            return JsonResponse({'error': 'invalid_constraints'}, status=400)
+        expires_at = None
+        if payload.get('expires_at'):
+            parsed = parse_datetime(str(payload.get('expires_at')))
+            if not parsed:
+                return JsonResponse({'error': 'invalid_expires_at'}, status=400)
+            if timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+            expires_at = parsed
+        share = DataShare.objects.create(
+            asset=asset,
+            consumer_ref=consumer_ref,
+            purpose=(payload.get('purpose') or ''),
+            constraints=constraints,
+            linked_access_request_ids=linked_access_request_ids,
+            status=DataShare.Status.DRAFT,
+            expires_at=expires_at,
+        )
+        tenant_schema = _tenant_schema(request)
+        data = _data_share_to_dict(share)
+        maybe_publish_event(
+            event_type='data_share.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.data_share.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='data_share.created',
+            resource_type='data_share',
+            resource_id=str(share.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(data, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def data_share_detail(request, share_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        share = DataShare.objects.get(id=share_id)
+    except (ValidationError, DataShare.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    _refresh_share_expiry(share)
+    return JsonResponse(_data_share_to_dict(share))
+
+
+@csrf_exempt
+def data_share_transition(request, share_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        share = DataShare.objects.get(id=share_id)
+    except (ValidationError, DataShare.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    _refresh_share_expiry(share)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = payload.get('action')
+    if action not in {'approve', 'activate', 'revoke'}:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+    transitions = {
+        DataShare.Status.DRAFT: {'approve'},
+        DataShare.Status.APPROVED: {'activate', 'revoke'},
+        DataShare.Status.ACTIVE: {'revoke'},
+    }
+    if action not in transitions.get(share.status, set()):
+        return JsonResponse({'error': 'invalid_transition'}, status=400)
+    if action == 'approve':
+        share.status = DataShare.Status.APPROVED
+        share.approved_by = (payload.get('approver') or request.headers.get('X-User-Id') or '').strip()
+        event_type = 'data_share.approved'
+    elif action == 'activate':
+        share.status = DataShare.Status.ACTIVE
+        event_type = 'data_share.activated'
+    else:
+        share.status = DataShare.Status.REVOKED
+        event_type = 'data_share.revoked'
+    share.save(update_fields=['status', 'approved_by', 'updated_at'])
+    tenant_schema = _tenant_schema(request)
+    data = _data_share_to_dict(share)
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='data_share',
+        resource_id=str(share.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(data)
 
 
 @csrf_exempt

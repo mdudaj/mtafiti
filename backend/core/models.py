@@ -679,3 +679,24 @@ class DataProduct(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["name"], name="uniq_data_product_name"),
         ]
+
+
+class DataShare(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        APPROVED = "approved"
+        ACTIVE = "active"
+        REVOKED = "revoked"
+        EXPIRED = "expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(DataAsset, on_delete=models.CASCADE, related_name="data_shares")
+    consumer_ref = models.CharField(max_length=256)
+    purpose = models.CharField(max_length=256, blank=True, default="")
+    constraints = models.JSONField(default=dict, blank=True)
+    linked_access_request_ids = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

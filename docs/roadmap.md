@@ -26,6 +26,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 20. **Platform security hardening**: Helm-level secret handling, pod security contexts, and network-policy boundaries for core services (see `docs/platform-security.md`).
 21. **Business glossary**: tenant-scoped term lifecycle, ownership, and asset-linking APIs with glossary event/audit conventions (see `docs/glossary.md`).
 22. **Data products**: tenant-scoped product metadata and lifecycle APIs with activation guardrails tied to active data contracts (see `docs/data-products.md`).
+23. **Data sharing**: tenant-scoped provider/consumer share lifecycle APIs with constraint validation, expiry handling, and revocation conventions (see `docs/data-sharing.md`).
 
 ## Near-term (next)
 
@@ -41,7 +42,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 ## Mid-term
 
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).
-* **Data sharing**: define tenant-scoped provider/consumer share lifecycle, constraint handling, and revocation conventions for governed distribution (see `docs/data-sharing.md`).
 * **Metadata versioning**: define tenant-scoped draft/publish/supersede conventions for auditable metadata evolution (see `docs/metadata-versioning.md`).
 * **Agentic AI execution**: define tenant-scoped tool governance, timeout controls, and execution audit/event conventions (see `docs/agentic-ai.md`).
 * **Self-reflective delivery workflow**: define implementation-agent roles, handoff contracts, retry budgets, and quality gates for faster feature delivery (see `docs/self-reflective-implementation.md`).
