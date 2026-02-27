@@ -21,6 +21,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 15. **Notebook infrastructure**: tenant-scoped notebook workspace/session/execution lifecycle with execution and termination events (see `docs/notebooks.md`).
 16. **Connector execution model**: connector run lifecycle with worker/job paths, execution progress, and cancellation conventions (see `docs/connectors.md`).
 17. **Workflow engine and UI baseline**: workflow definition/run/task lifecycle with server-side transition role checks (see `docs/workflow-ui.md`).
+18. **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
 
 ## Near-term (next)
 
@@ -35,7 +36,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 
 ## Mid-term
 
-* **Governance depth**: policy lifecycle workflows (review/approve/rollback) and stronger classification controls (see `docs/governance-workflows.md`).
 * **Platform services baseline**: formalize Helm-managed core services (Keycloak, MinIO, Redis, ONLYOFFICE, JupyterHub, observability stack) (see `docs/platform-services.md`).
 * **Platform security hardening**: formalize mTLS, network-policy boundaries, secret handling, and immutable audit controls (see `docs/platform-security.md`).
 * **Data privacy management**: define tenant-scoped privacy profiles, consent state handling, and policy/retention integration conventions (see `docs/privacy.md`).

@@ -2,6 +2,24 @@
 
 This note defines a governance-depth increment for EDMP focused on policy lifecycle workflows and stronger classification controls.
 
+## Implemented baseline
+
+Current scaffold implementation includes:
+
+* `GET/POST /api/v1/governance/policies`
+* `GET /api/v1/governance/policies/<policy_id>`
+* `POST /api/v1/governance/policies/<policy_id>/transition` with actions:
+  * `submit_for_review`
+  * `approve`
+  * `activate`
+  * `rollback`
+* transition history records on every policy lifecycle change
+* rollback restore of the latest previously active (superseded) version for the same policy name
+* classification guardrails on asset mutations:
+  * reject unknown values outside `public|internal|confidential|restricted`
+  * require `policy.admin|tenant.admin` for sensitivity upgrades
+* equivalent classification checks in connector worker execution (`execute_connector_run`) for async mutation entrypoints
+
 ## Goals
 
 * Add a tenant-scoped policy lifecycle with explicit review, approve, and rollback states.

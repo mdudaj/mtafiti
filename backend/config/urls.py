@@ -38,6 +38,9 @@ from core.views import (
     contract_deprecate,
     contract_detail,
     contracts,
+    governance_policies,
+    governance_policy_detail,
+    governance_policy_transition,
     health,
     healthz,
     ingestion_detail,
@@ -94,6 +97,17 @@ urlpatterns = [
     path('readyz', readyz, name='readyz'),
     path('metrics', metrics, name='metrics'),
     path('api/v1/tenants', tenants, name='tenants'),
+    path('api/v1/governance/policies', governance_policies, name='governance_policies'),
+    path(
+        'api/v1/governance/policies/<uuid:policy_id>',
+        governance_policy_detail,
+        name='governance_policy_detail',
+    ),
+    path(
+        'api/v1/governance/policies/<uuid:policy_id>/transition',
+        governance_policy_transition,
+        name='governance_policy_transition',
+    ),
     path('api/v1/workflows/definitions', workflow_definitions, name='workflow_definitions'),
     path(
         'api/v1/workflows/definitions/<uuid:definition_id>',

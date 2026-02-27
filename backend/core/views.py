@@ -25,6 +25,8 @@ from .models import (
     ConsentEvent,
     DataAsset,
     DataContract,
+    GovernancePolicy,
+    GovernancePolicyTransition,
     IngestionRequest,
     LineageEdge,
     MasterMergeCandidate,
@@ -115,6 +117,36 @@ def _parse_string_list(value: Any) -> list[str] | None:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         return None
     return value
+
+
+CLASSIFICATION_SENSITIVITY = {
+    Classification.Level.PUBLIC: 0,
+    Classification.Level.INTERNAL: 1,
+    Classification.Level.CONFIDENTIAL: 2,
+    Classification.Level.RESTRICTED: 3,
+}
+
+
+def _classification_max_sensitivity(values: list[str]) -> int:
+    return max((CLASSIFICATION_SENSITIVITY.get(item, -1) for item in values), default=-1)
+
+
+def _validate_classification_values(values: list[str]) -> list[str]:
+    allowed = set(CLASSIFICATION_SENSITIVITY)
+    return sorted({item for item in values if item not in allowed})
+
+
+def _enforce_sensitivity_upgrade_role(
+    request,
+    *,
+    existing_values: list[str],
+    next_values: list[str],
+):
+    if _classification_max_sensitivity(next_values) <= _classification_max_sensitivity(
+        existing_values
+    ):
+        return None
+    return require_any_role(request, {'policy.admin', 'tenant.admin'})
 
 
 def _ingestion_to_dict(ing: IngestionRequest) -> dict[str, Any]:
@@ -475,6 +507,21 @@ def _workflow_task_to_dict(task: WorkflowTask) -> dict[str, Any]:
         'status': task.status,
         'created_at': task.created_at.isoformat(),
         'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+    }
+
+
+def _governance_policy_to_dict(policy: GovernancePolicy) -> dict[str, Any]:
+    return {
+        'id': str(policy.id),
+        'name': policy.name,
+        'version': policy.version,
+        'status': policy.status,
+        'rules': policy.rules,
+        'reason': policy.reason or None,
+        'actor_id': policy.actor_id or None,
+        'rollback_target_id': str(policy.rollback_target_id) if policy.rollback_target_id else None,
+        'created_at': policy.created_at.isoformat(),
+        'updated_at': policy.updated_at.isoformat(),
     }
 
 
@@ -1871,6 +1918,12 @@ def asset_classifications(request, asset_id: str):
             status=400,
         )
     selected = classifications_value or []
+    invalid = _validate_classification_values(selected)
+    if invalid:
+        return JsonResponse(
+            {'error': 'unknown_classifications', 'items': invalid},
+            status=400,
+        )
     if selected:
         active_names = set(
             Classification.objects.filter(
@@ -1887,13 +1940,20 @@ def asset_classifications(request, asset_id: str):
                 },
                 status=400,
             )
+    forbidden = _enforce_sensitivity_upgrade_role(
+        request,
+        existing_values=asset.classifications or [],
+        next_values=selected,
+    )
+    if forbidden:
+        return forbidden
     asset.classifications = selected
     asset.save(update_fields=['classifications', 'updated_at'])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='asset.classifications.updated',
+        event_type='asset.classification.changed',
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.asset.classifications.updated',
+        routing_key=f'{tenant_schema}.asset.classification.changed',
         correlation_id=getattr(request, 'correlation_id', None)
         or request.headers.get('X-Correlation-Id'),
         user_id=request.headers.get('X-User-Id'),
@@ -1902,7 +1962,7 @@ def asset_classifications(request, asset_id: str):
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='asset.classifications.updated',
+        action='asset.classification.changed',
         resource_type='asset',
         resource_id=str(asset.id),
         correlation_id=getattr(request, 'correlation_id', None)
@@ -2898,6 +2958,202 @@ def quality_results(request):
 
 
 @csrf_exempt
+def governance_policies(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = GovernancePolicy.objects.order_by('-updated_at')
+        name = (request.GET.get('name') or '').strip()
+        if name:
+            qs = qs.filter(name=name)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_governance_policy_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        rules = payload.get('rules') or {}
+        if not isinstance(rules, dict):
+            return JsonResponse({'error': 'rules must be an object'}, status=400)
+
+        latest_version = (
+            GovernancePolicy.objects.filter(name=name).aggregate(max_version=Max('version')).get('max_version') or 0
+        )
+        policy = GovernancePolicy.objects.create(
+            name=name,
+            version=latest_version + 1,
+            status=GovernancePolicy.Status.DRAFT,
+            rules=rules,
+            reason=(payload.get('reason') or '').strip(),
+            actor_id=request.headers.get('X-User-Id') or '',
+        )
+        return JsonResponse(_governance_policy_to_dict(policy), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def governance_policy_detail(request, policy_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        policy = GovernancePolicy.objects.get(id=policy_id)
+    except (ValidationError, GovernancePolicy.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    return JsonResponse(_governance_policy_to_dict(policy))
+
+
+def _governance_transition_allowed(policy: GovernancePolicy, action: str) -> bool:
+    allowed = {
+        GovernancePolicy.Status.DRAFT: {'submit_for_review'},
+        GovernancePolicy.Status.IN_REVIEW: {'approve'},
+        GovernancePolicy.Status.APPROVED: {'activate'},
+        GovernancePolicy.Status.ACTIVE: {'rollback'},
+    }
+    return action in allowed.get(policy.status, set())
+
+
+def _create_policy_transition(
+    *,
+    policy: GovernancePolicy,
+    from_status: str,
+    action: str,
+    reason: str,
+    actor_id: str,
+):
+    GovernancePolicyTransition.objects.create(
+        policy=policy,
+        from_status=from_status,
+        to_status=policy.status,
+        action=action,
+        reason=reason,
+        actor_id=actor_id,
+    )
+
+
+@csrf_exempt
+def governance_policy_transition(request, policy_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = payload.get('action')
+    if action not in {'submit_for_review', 'approve', 'activate', 'rollback'}:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+    try:
+        policy = GovernancePolicy.objects.get(id=policy_id)
+    except (ValidationError, GovernancePolicy.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if not _governance_transition_allowed(policy, action):
+        return JsonResponse({'error': 'invalid_transition'}, status=400)
+
+    reason = (payload.get('reason') or '').strip()
+    actor_id = request.headers.get('X-User-Id') or ''
+    from_status = policy.status
+    rollback_target = None
+    if action == 'submit_for_review':
+        policy.status = GovernancePolicy.Status.IN_REVIEW
+        event_type = 'policy.submitted_for_review'
+    elif action == 'approve':
+        policy.status = GovernancePolicy.Status.APPROVED
+        event_type = 'policy.approved'
+    elif action == 'activate':
+        policy.status = GovernancePolicy.Status.ACTIVE
+        GovernancePolicy.objects.filter(
+            name=policy.name,
+            status=GovernancePolicy.Status.ACTIVE,
+        ).exclude(id=policy.id).update(
+            status=GovernancePolicy.Status.SUPERSEDED,
+            updated_at=timezone.now(),
+        )
+        event_type = 'policy.activated'
+    else:
+        rollback_target = (
+            GovernancePolicy.objects.filter(
+                name=policy.name,
+                status=GovernancePolicy.Status.SUPERSEDED,
+            )
+            .exclude(id=policy.id)
+            .order_by('-version')
+            .first()
+        )
+        if rollback_target is None:
+            return JsonResponse({'error': 'rollback_target_not_found'}, status=400)
+        policy.status = GovernancePolicy.Status.ROLLED_BACK
+        rollback_target.status = GovernancePolicy.Status.ACTIVE
+        rollback_target.reason = reason
+        rollback_target.actor_id = actor_id
+        rollback_target.save(update_fields=['status', 'reason', 'actor_id', 'updated_at'])
+        _create_policy_transition(
+            policy=rollback_target,
+            from_status=GovernancePolicy.Status.SUPERSEDED,
+            action='restore_from_rollback',
+            reason=reason,
+            actor_id=actor_id,
+        )
+        event_type = 'policy.rolled_back'
+
+    policy.reason = reason
+    policy.actor_id = actor_id
+    policy.rollback_target = rollback_target
+    policy.save(update_fields=['status', 'reason', 'actor_id', 'rollback_target', 'updated_at'])
+    _create_policy_transition(
+        policy=policy,
+        from_status=from_status,
+        action=action,
+        reason=reason,
+        actor_id=actor_id,
+    )
+    tenant_schema = _tenant_schema(request)
+    payload = _governance_policy_to_dict(policy)
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=payload,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='governance_policy',
+        resource_id=str(policy.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=payload,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(payload)
+
+
+@csrf_exempt
 def workflow_definitions(request):
     if request.method == 'GET':
         forbidden = require_any_role(
@@ -3404,6 +3660,12 @@ def assets(request):
         classifications = _parse_string_list(payload.get('classifications'))
         if classifications is None:
             return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
+        invalid = _validate_classification_values(classifications)
+        if invalid:
+            return JsonResponse(
+                {'error': 'unknown_classifications', 'items': invalid},
+                status=400,
+            )
 
         asset = DataAsset.objects.create(
             qualified_name=qualified_name,
@@ -3485,6 +3747,19 @@ def asset_detail(request, asset_id: str):
             classifications = _parse_string_list(payload['classifications'])
             if classifications is None:
                 return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
+            invalid = _validate_classification_values(classifications)
+            if invalid:
+                return JsonResponse(
+                    {'error': 'unknown_classifications', 'items': invalid},
+                    status=400,
+                )
+            forbidden = _enforce_sensitivity_upgrade_role(
+                request,
+                existing_values=asset.classifications or [],
+                next_values=classifications,
+            )
+            if forbidden:
+                return forbidden
             asset.classifications = classifications
         if 'properties' in payload:
             props = payload['properties']

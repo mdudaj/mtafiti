@@ -8,6 +8,7 @@ from .celery import TenantTask
 from .events import maybe_publish_audit_event, maybe_publish_event
 from .logging import get_correlation_id, get_request_id, get_tenant_id, get_user_id
 from .models import (
+    Classification,
     ConnectorRun,
     DataAsset,
     IngestionRequest,
@@ -16,6 +17,17 @@ from .models import (
     RetentionHold,
     RetentionRun,
 )
+
+CLASSIFICATION_SENSITIVITY = {
+    Classification.Level.PUBLIC: 0,
+    Classification.Level.INTERNAL: 1,
+    Classification.Level.CONFIDENTIAL: 2,
+    Classification.Level.RESTRICTED: 3,
+}
+
+
+def _classification_max_sensitivity(values: list[str]) -> int:
+    return max((CLASSIFICATION_SENSITIVITY.get(item, -1) for item in values), default=-1)
 
 
 @shared_task(base=TenantTask)
@@ -215,8 +227,32 @@ def execute_connector_run(*, tenant_schema: str, run_id: str) -> dict[str, str |
     force_status = source.get("force_status")
     processed_entities = int(source.get("processed_entities", 0) or 0)
     failed_entities = int(source.get("failed_entities", 0) or 0)
+    incoming_classifications = source.get("classifications") or []
+    existing_classifications = source.get("existing_classifications") or []
+    actor_roles = set(source.get("actor_roles") or [])
+    invalid_classifications = sorted(
+        {
+            value
+            for value in incoming_classifications
+            if value not in CLASSIFICATION_SENSITIVITY
+        }
+    )
 
-    if force_status == "failed":
+    if invalid_classifications:
+        run.status = ConnectorRun.Status.FAILED
+        run.error_message = "unknown classifications: " + ", ".join(
+            invalid_classifications
+        )
+        ingestion.status = IngestionRequest.Status.FAILED
+    elif (
+        _classification_max_sensitivity(incoming_classifications)
+        > _classification_max_sensitivity(existing_classifications)
+        and not actor_roles.intersection({"policy.admin", "tenant.admin"})
+    ):
+        run.status = ConnectorRun.Status.FAILED
+        run.error_message = "classification sensitivity upgrade requires policy.admin"
+        ingestion.status = IngestionRequest.Status.FAILED
+    elif force_status == "failed":
         run.status = ConnectorRun.Status.FAILED
         run.error_message = str(source.get("error_message") or "connector execution failed")
         ingestion.status = IngestionRequest.Status.FAILED

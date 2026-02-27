@@ -168,7 +168,7 @@ def test_asset_optional_catalog_fields_roundtrip_and_validation():
                 'description': 'Main dataset',
                 'owner': 'data-platform',
                 'tags': ['gold'],
-                'classifications': ['pii'],
+                'classifications': ['internal'],
             }
         ),
         content_type='application/json',
@@ -179,7 +179,7 @@ def test_asset_optional_catalog_fields_roundtrip_and_validation():
     assert created['description'] == 'Main dataset'
     assert created['owner'] == 'data-platform'
     assert created['tags'] == ['gold']
-    assert created['classifications'] == ['pii']
+    assert created['classifications'] == ['internal']
 
     updated_resp = client.put(
         f"/api/v1/assets/{created['id']}",

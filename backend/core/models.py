@@ -587,3 +587,50 @@ class WorkflowTask(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+
+
+class GovernancePolicy(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        IN_REVIEW = "in_review"
+        APPROVED = "approved"
+        ACTIVE = "active"
+        SUPERSEDED = "superseded"
+        ROLLED_BACK = "rolled_back"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    version = models.IntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    rules = models.JSONField(default=dict, blank=True)
+    reason = models.CharField(max_length=512, blank=True, default="")
+    actor_id = models.CharField(max_length=200, blank=True, default="")
+    rollback_target = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rollback_children",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "version"], name="uniq_governance_policy_name_version"
+            )
+        ]
+
+
+class GovernancePolicyTransition(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    policy = models.ForeignKey(
+        GovernancePolicy, on_delete=models.CASCADE, related_name="transitions"
+    )
+    from_status = models.CharField(max_length=16)
+    to_status = models.CharField(max_length=16)
+    action = models.CharField(max_length=64)
+    reason = models.CharField(max_length=512, blank=True, default="")
+    actor_id = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)

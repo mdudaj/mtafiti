@@ -36,7 +36,7 @@ def test_classification_lifecycle_and_asset_assignment():
         '/api/v1/classifications',
         data=json.dumps(
             {
-                'name': 'pii',
+                'name': 'restricted',
                 'level': 'restricted',
                 'description': 'Contains personal data',
                 'tags': ['privacy', 'gdpr'],
@@ -67,12 +67,12 @@ def test_classification_lifecycle_and_asset_assignment():
 
     assigned = client.post(
         f'/api/v1/assets/{asset_id}/classifications',
-        data=json.dumps({'classifications': ['pii']}),
+        data=json.dumps({'classifications': ['restricted']}),
         content_type='application/json',
         HTTP_HOST=host,
     )
     assert assigned.status_code == 200
-    assert assigned.json()['classifications'] == ['pii']
+    assert assigned.json()['classifications'] == ['restricted']
 
     deprecated = client.post(
         f'/api/v1/classifications/{classification_id}/deprecate',
@@ -83,7 +83,7 @@ def test_classification_lifecycle_and_asset_assignment():
 
     blocked = client.post(
         f'/api/v1/assets/{asset_id}/classifications',
-        data=json.dumps({'classifications': ['pii']}),
+        data=json.dumps({'classifications': ['restricted']}),
         content_type='application/json',
         HTTP_HOST=host,
     )
@@ -128,7 +128,7 @@ def test_classification_role_enforcement_when_enabled(monkeypatch):
 
     denied_create = client.post(
         '/api/v1/classifications',
-        data=json.dumps({'name': 'pii', 'level': 'restricted'}),
+        data=json.dumps({'name': 'restricted', 'level': 'restricted'}),
         content_type='application/json',
         HTTP_HOST=host,
         HTTP_X_USER_ROLES='catalog.editor',
@@ -137,7 +137,7 @@ def test_classification_role_enforcement_when_enabled(monkeypatch):
 
     created = client.post(
         '/api/v1/classifications',
-        data=json.dumps({'name': 'pii', 'level': 'restricted'}),
+        data=json.dumps({'name': 'restricted', 'level': 'restricted'}),
         content_type='application/json',
         HTTP_HOST=host,
         HTTP_X_USER_ROLES='policy.admin',
@@ -170,7 +170,7 @@ def test_classification_role_enforcement_when_enabled(monkeypatch):
 
     denied_assignment = client.post(
         f'/api/v1/assets/{asset_id}/classifications',
-        data=json.dumps({'classifications': ['pii']}),
+        data=json.dumps({'classifications': ['restricted']}),
         content_type='application/json',
         HTTP_HOST=host,
     )
@@ -178,10 +178,10 @@ def test_classification_role_enforcement_when_enabled(monkeypatch):
 
     allowed_assignment = client.post(
         f'/api/v1/assets/{asset_id}/classifications',
-        data=json.dumps({'classifications': ['pii']}),
+        data=json.dumps({'classifications': ['restricted']}),
         content_type='application/json',
         HTTP_HOST=host,
-        HTTP_X_USER_ROLES='catalog.editor',
+        HTTP_X_USER_ROLES='catalog.editor,policy.admin',
     )
     assert allowed_assignment.status_code == 200
 
