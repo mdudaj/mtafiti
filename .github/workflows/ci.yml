@@ -23,6 +23,12 @@ jobs:
   backend-tests:
     needs: docs-gate
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+        shard_count: [2]
+    name: backend-tests (shard ${{ matrix.shard }}/${{ matrix.shard_count }})
     services:
       postgres:
         image: postgres:16
@@ -52,7 +58,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
+      - name: Select shard tests
+        run: |
+          python .github/scripts/pytest_shard.py \
+            --tests-root backend/tests \
+            --relative-to backend \
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count "${{ matrix.shard_count }}" > shard_tests.txt
+          test -s shard_tests.txt
       - name: Run tests
         run: |
           cd backend
-          pytest -q
+          pytest -q $(cat ../shard_tests.txt)
