@@ -45,6 +45,7 @@ from .models import (
     PrivacyAction,
     PrivacyProfile,
     PrintJob,
+    Project,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
@@ -236,6 +237,7 @@ def _enforce_sensitivity_upgrade_role(
 def _ingestion_to_dict(ing: IngestionRequest) -> dict[str, Any]:
     return {
         'id': str(ing.id),
+        'project_id': str(ing.project_id) if ing.project_id else None,
         'connector': ing.connector,
         'source': ing.source,
         'mode': ing.mode if ing.mode else None,
@@ -593,6 +595,7 @@ def _notebook_execution_to_dict(execution: NotebookExecution) -> dict[str, Any]:
 def _connector_run_to_dict(run: ConnectorRun) -> dict[str, Any]:
     return {
         'id': str(run.id),
+        'project_id': str(run.ingestion.project_id) if run.ingestion.project_id else None,
         'ingestion_id': str(run.ingestion_id),
         'execution_path': run.execution_path,
         'status': run.status,
@@ -646,6 +649,7 @@ def _workflow_task_to_dict(task: WorkflowTask) -> dict[str, Any]:
 def _orchestration_workflow_to_dict(workflow: OrchestrationWorkflow) -> dict[str, Any]:
     return {
         'id': str(workflow.id),
+        'project_id': str(workflow.project_id) if workflow.project_id else None,
         'name': workflow.name,
         'trigger_type': workflow.trigger_type,
         'trigger_value': workflow.trigger_value or None,
@@ -659,6 +663,7 @@ def _orchestration_workflow_to_dict(workflow: OrchestrationWorkflow) -> dict[str
 def _orchestration_run_to_dict(run: OrchestrationRun) -> dict[str, Any]:
     return {
         'id': str(run.id),
+        'project_id': str(run.project_id) if run.project_id else None,
         'workflow_id': str(run.workflow_id),
         'trigger_context': run.trigger_context,
         'status': run.status,
@@ -683,6 +688,19 @@ def _governance_policy_to_dict(policy: GovernancePolicy) -> dict[str, Any]:
         'rollback_target_id': str(policy.rollback_target_id) if policy.rollback_target_id else None,
         'created_at': policy.created_at.isoformat(),
         'updated_at': policy.updated_at.isoformat(),
+    }
+
+
+def _project_to_dict(project: Project) -> dict[str, Any]:
+    return {
+        'id': str(project.id),
+        'name': project.name,
+        'code': project.code or None,
+        'institution_ref': project.institution_ref or None,
+        'status': project.status,
+        'sync_config': project.sync_config,
+        'created_at': project.created_at.isoformat(),
+        'updated_at': project.updated_at.isoformat(),
     }
 
 
@@ -4909,6 +4927,45 @@ def workflow_run_tasks(request, run_id: str):
 
 
 @csrf_exempt
+def projects(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = Project.objects.order_by('-created_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_project_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        project = Project.objects.create(
+            name=name,
+            code=(payload.get('code') or '').strip(),
+            institution_ref=(payload.get('institution_ref') or '').strip(),
+            status=(payload.get('status') or 'active').strip() or 'active',
+            sync_config=payload.get('sync_config')
+            if isinstance(payload.get('sync_config'), dict)
+            else {},
+        )
+        return JsonResponse(_project_to_dict(project), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
 def orchestration_workflows(request):
     if request.method == 'GET':
         forbidden = require_any_role(
@@ -4918,6 +4975,9 @@ def orchestration_workflows(request):
         if forbidden:
             return forbidden
         qs = OrchestrationWorkflow.objects.order_by('-created_at')
+        project_id = request.GET.get('project_id')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
         status_filter = request.GET.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
@@ -4941,13 +5001,28 @@ def orchestration_workflows(request):
         trigger_type = payload.get('trigger_type') or OrchestrationWorkflow.TriggerType.EVENT
         if trigger_type not in OrchestrationWorkflow.TriggerType.values:
             return JsonResponse({'error': 'invalid_trigger_type'}, status=400)
+        project_id = payload.get('project_id')
+        project = None
+        if project_id:
+            try:
+                project = Project.objects.get(id=project_id)
+            except (ValidationError, Project.DoesNotExist):
+                return JsonResponse({'error': 'project_not_found'}, status=404)
         workflow_status = payload.get('status') or OrchestrationWorkflow.Status.ACTIVE
         if workflow_status not in OrchestrationWorkflow.Status.values:
             return JsonResponse({'error': 'invalid_status'}, status=400)
         steps = _parse_orchestration_steps(payload.get('steps'))
         if steps is None:
             return JsonResponse({'error': 'invalid_steps'}, status=400)
+        for step in steps:
+            try:
+                ingestion = IngestionRequest.objects.get(id=step['ingestion_id'])
+            except (ValidationError, IngestionRequest.DoesNotExist):
+                return JsonResponse({'error': 'step_ingestion_not_found'}, status=404)
+            if project and ingestion.project_id != project.id:
+                return JsonResponse({'error': 'step_project_mismatch'}, status=400)
         workflow = OrchestrationWorkflow.objects.create(
+            project=project,
             name=name,
             trigger_type=trigger_type,
             trigger_value=(payload.get('trigger_value') or '').strip(),
@@ -4992,6 +5067,9 @@ def orchestration_runs(request):
         if forbidden:
             return forbidden
         qs = OrchestrationRun.objects.order_by('-created_at')
+        project_id = request.GET.get('project_id')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
         workflow_id = request.GET.get('workflow_id')
         if workflow_id:
             qs = qs.filter(workflow_id=workflow_id)
@@ -5017,6 +5095,7 @@ def orchestration_runs(request):
         if workflow.status != OrchestrationWorkflow.Status.ACTIVE:
             return JsonResponse({'error': 'workflow_not_active'}, status=400)
         run = OrchestrationRun.objects.create(
+            project=workflow.project,
             workflow=workflow,
             trigger_context=payload.get('trigger_context')
             if isinstance(payload.get('trigger_context'), dict)
@@ -5205,10 +5284,13 @@ def connector_runs(request):
         )
         if forbidden:
             return forbidden
-        qs = ConnectorRun.objects.order_by('-created_at')
+        qs = ConnectorRun.objects.select_related('ingestion').order_by('-created_at')
         ingestion_id = request.GET.get('ingestion_id')
         if ingestion_id:
             qs = qs.filter(ingestion_id=ingestion_id)
+        project_id = request.GET.get('project_id')
+        if project_id:
+            qs = qs.filter(ingestion__project_id=project_id)
         status_filter = request.GET.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
@@ -5338,6 +5420,16 @@ def connector_run_cancel(request, run_id: str):
 @csrf_exempt
 def ingestions(request):
     """Create tenant-scoped ingestion requests."""
+    if request.method == 'GET':
+        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        qs = IngestionRequest.objects.order_by('-created_at')
+        project_id = request.GET.get('project_id')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        return JsonResponse({'items': [_ingestion_to_dict(item) for item in qs]})
+
     if request.method == 'POST':
         forbidden = require_role(request, 'catalog.editor')
         if forbidden:
@@ -5348,12 +5440,20 @@ def ingestions(request):
 
         connector = payload.get('connector')
         source = payload.get('source')
+        project_id = payload.get('project_id')
         if not connector:
             return JsonResponse({'error': 'connector is required'}, status=400)
         if source is None or not isinstance(source, dict):
             return JsonResponse({'error': 'source must be an object'}, status=400)
+        project = None
+        if project_id:
+            try:
+                project = Project.objects.get(id=project_id)
+            except (ValidationError, Project.DoesNotExist):
+                return JsonResponse({'error': 'project_not_found'}, status=404)
 
         ing = IngestionRequest.objects.create(
+            project=project,
             connector=connector,
             source=source,
             mode=payload.get('mode') or '',

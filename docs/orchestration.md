@@ -48,6 +48,7 @@ Trigger evaluation should enqueue workflow runs; workers remain responsible for 
   * `POST/GET /api/v1/orchestration/workflows`
   * `POST/GET /api/v1/orchestration/runs`
   * `POST /api/v1/orchestration/runs/{run_id}/transition`
+  * `project_id` support on workflows/runs for tenant-local project scoping
 * Trigger model:
   * workflow supports `schedule` and `event` trigger types with `trigger_value`.
 * Run lifecycle statuses:
@@ -55,6 +56,7 @@ Trigger evaluation should enqueue workflow runs; workers remain responsible for 
 * Execution semantics:
   * run steps reference ingestion requests and execute via existing connector-run worker path.
   * each step captures connector run id + terminal status in `step_results`.
+  * when workflow has `project_id`, all step ingestions must belong to the same project.
 * Event and audit conventions:
   * `orchestration.workflow.created`
   * `orchestration.run.queued`

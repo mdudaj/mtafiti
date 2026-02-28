@@ -49,6 +49,7 @@ Endpoints:
 * `GET /api/v1/connectors/runs`
 * `POST /api/v1/connectors/runs/<run_id>/cancel`
 * `GET /api/v1/ingestions/<id>` now includes execution state/start-finish/retry/progress when a run exists.
+* `GET /api/v1/connectors/runs?project_id=<project_id>` filters connector runs by project-scoped ingestions.
 
 Current behavior:
 

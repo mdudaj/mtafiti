@@ -5,7 +5,12 @@ from django.db import models
 
 class Project(models.Model):
     name = models.CharField(max_length=200)
+    code = models.CharField(max_length=64, blank=True, default="")
+    institution_ref = models.CharField(max_length=200, blank=True, default="")
+    sync_config = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, default="active")
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
         return self.name
@@ -36,6 +41,9 @@ class IngestionRequest(models.Model):
         FAILED = "failed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="ingestions"
+    )
     connector = models.CharField(max_length=100)
     source = models.JSONField(default=dict, blank=True)
     mode = models.CharField(max_length=32, blank=True)
@@ -712,6 +720,9 @@ class OrchestrationWorkflow(models.Model):
         PAUSED = "paused"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="orchestration_workflows"
+    )
     name = models.CharField(max_length=200)
     trigger_type = models.CharField(
         max_length=16, choices=TriggerType.choices, default=TriggerType.EVENT
@@ -737,6 +748,9 @@ class OrchestrationRun(models.Model):
         CANCELLED = "cancelled"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="orchestration_runs"
+    )
     workflow = models.ForeignKey(
         OrchestrationWorkflow, on_delete=models.CASCADE, related_name="runs"
     )

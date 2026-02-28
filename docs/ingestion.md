@@ -20,12 +20,21 @@ Initial payload (suggested):
 * `connector`: string (`"dbt"`, `"snowflake"`, `"s3"`, etc.)
 * `source`: connector-specific object (opaque to the platform initially)
 * `mode`: `"snapshot"` | `"incremental"` (optional)
+* `project_id`: optional tenant-local project scope for connector sync ownership
 
 The handler should:
 
 1. validate the request shape (basic schema + size limits)
 2. persist an ingestion record (status = `queued`)
 3. enqueue a Celery task with the `ingestion_id`
+
+## Tenant project scoping (implemented)
+
+Ingestion requests now support optional project-level scoping inside a tenant:
+
+* `POST /api/v1/projects` and `GET /api/v1/projects`
+* `POST /api/v1/ingestions` accepts optional `project_id`
+* `GET /api/v1/ingestions?project_id=<project_id>` filters ingestion requests by project
 
 ## Background execution (Celery → later Jobs)
 
