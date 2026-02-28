@@ -48,6 +48,7 @@ from .models import (
     Project,
     ProjectInvitation,
     ProjectMembership,
+    ProjectMembershipRoleHistory,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
@@ -58,6 +59,7 @@ from .models import (
     RetentionRule,
     RetentionRun,
     UserNotification,
+    UserProfile,
     WorkflowDefinition,
     WorkflowRun,
     WorkflowTask,
@@ -786,6 +788,32 @@ def _project_invitation_to_dict(invitation: ProjectInvitation) -> dict[str, Any]
         'accepted_by': invitation.accepted_by or None,
         'created_at': invitation.created_at.isoformat(),
         'updated_at': invitation.updated_at.isoformat(),
+    }
+
+
+def _user_profile_to_dict(profile: UserProfile) -> dict[str, Any]:
+    return {
+        'id': str(profile.id),
+        'email': profile.email,
+        'display_name': profile.display_name or None,
+        'status': profile.status,
+        'last_login_at': profile.last_login_at.isoformat() if profile.last_login_at else None,
+        'created_at': profile.created_at.isoformat(),
+        'updated_at': profile.updated_at.isoformat(),
+    }
+
+
+def _project_membership_role_history_to_dict(history: ProjectMembershipRoleHistory) -> dict[str, Any]:
+    return {
+        'id': str(history.id),
+        'membership_id': str(history.membership_id),
+        'action': history.action,
+        'previous_role': history.previous_role or None,
+        'new_role': history.new_role or None,
+        'previous_status': history.previous_status or None,
+        'new_status': history.new_status or None,
+        'actor_id': history.actor_id or None,
+        'created_at': history.created_at.isoformat(),
     }
 
 
@@ -5051,6 +5079,197 @@ def projects(request):
 
 
 @csrf_exempt
+def users(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = UserProfile.objects.order_by('-created_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        email_filter = (request.GET.get('email') or '').strip().lower()
+        if email_filter:
+            qs = qs.filter(email=email_filter)
+        return _paginated_response(request, qs, _user_profile_to_dict)
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        email = (payload.get('email') or '').strip().lower()
+        if not email:
+            return JsonResponse({'error': 'email is required'}, status=400)
+        if UserProfile.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'user_already_exists'}, status=409)
+        status = (payload.get('status') or UserProfile.Status.ACTIVE).strip()
+        if status not in UserProfile.Status.values:
+            return JsonResponse({'error': 'invalid_status'}, status=400)
+        profile = UserProfile.objects.create(
+            email=email,
+            display_name=(payload.get('display_name') or '').strip(),
+            status=status,
+        )
+        return JsonResponse(_user_profile_to_dict(profile), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def user_detail(request, user_id: str):
+    try:
+        profile = UserProfile.objects.get(id=user_id)
+    except (ValidationError, UserProfile.DoesNotExist):
+        return JsonResponse({'error': 'user_not_found'}, status=404)
+
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        return JsonResponse(_user_profile_to_dict(profile))
+
+    if request.method not in {'PUT', 'PATCH'}:
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    update_fields = []
+    if 'display_name' in payload:
+        profile.display_name = (payload.get('display_name') or '').strip()
+        update_fields.append('display_name')
+    if 'status' in payload:
+        status = (payload.get('status') or '').strip()
+        if status not in UserProfile.Status.values:
+            return JsonResponse({'error': 'invalid_status'}, status=400)
+        profile.status = status
+        update_fields.append('status')
+    if not update_fields:
+        return JsonResponse({'error': 'no_changes_requested'}, status=400)
+    update_fields.append('updated_at')
+    profile.save(update_fields=update_fields)
+    return JsonResponse(_user_profile_to_dict(profile))
+
+
+@csrf_exempt
+def project_members(request, project_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+    try:
+        project = Project.objects.get(id=project_id)
+    except (ValidationError, Project.DoesNotExist):
+        return JsonResponse({'error': 'project_not_found'}, status=404)
+    qs = ProjectMembership.objects.filter(project=project).order_by('-created_at')
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return _paginated_response(request, qs, _project_membership_to_dict)
+
+
+@csrf_exempt
+def project_member_lifecycle(request, project_id: str, membership_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = (payload.get('action') or '').strip()
+    if not action:
+        return JsonResponse({'error': 'action is required'}, status=400)
+
+    try:
+        project = Project.objects.get(id=project_id)
+        membership = ProjectMembership.objects.get(id=membership_id, project=project)
+    except (ValidationError, Project.DoesNotExist, ProjectMembership.DoesNotExist):
+        return JsonResponse({'error': 'membership_not_found'}, status=404)
+
+    previous_role = membership.role
+    previous_status = membership.status
+    actor_id = request.headers.get('X-User-Id') or ''
+
+    if action == 'revoke':
+        if membership.status == ProjectMembership.Status.INACTIVE:
+            return JsonResponse({'error': 'membership_already_inactive'}, status=400)
+        membership.status = ProjectMembership.Status.INACTIVE
+    elif action == 'reactivate':
+        if membership.status == ProjectMembership.Status.ACTIVE:
+            return JsonResponse({'error': 'membership_already_active'}, status=400)
+        membership.status = ProjectMembership.Status.ACTIVE
+    elif action == 'change_role':
+        role = (payload.get('role') or '').strip()
+        if role not in ProjectMembership.Role.values:
+            return JsonResponse({'error': 'invalid_role'}, status=400)
+        if role == membership.role:
+            return JsonResponse({'error': 'role_unchanged'}, status=400)
+        membership.role = role
+    else:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+
+    membership.save(update_fields=['role', 'status', 'updated_at'])
+    history = ProjectMembershipRoleHistory.objects.create(
+        membership=membership,
+        action=action,
+        previous_role=previous_role,
+        new_role=membership.role,
+        previous_status=previous_status,
+        new_status=membership.status,
+        actor_id=actor_id,
+    )
+    tenant_schema = _tenant_schema(request)
+    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
+    event_data = {
+        'project_id': str(project.id),
+        'membership': _project_membership_to_dict(membership),
+        'history': _project_membership_role_history_to_dict(history),
+    }
+    maybe_publish_event(
+        event_type='project.member.lifecycle.updated',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.project.member.lifecycle.updated',
+        correlation_id=correlation_id,
+        user_id=actor_id or None,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='project.member.lifecycle.updated',
+        resource_type='project',
+        resource_id=str(project.id),
+        correlation_id=correlation_id,
+        user_id=actor_id or None,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(
+        {
+            'membership': _project_membership_to_dict(membership),
+            'history': _project_membership_role_history_to_dict(history),
+        }
+    )
+
+
+@csrf_exempt
 def project_member_invites(request, project_id: str):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -5076,11 +5295,13 @@ def project_member_invites(request, project_id: str):
     tenant_schema = _tenant_schema(request)
     correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
     user_id = request.headers.get('X-User-Id') or ''
-    existing_user = ProjectMembership.objects.filter(
-        user_email=email, status=ProjectMembership.Status.ACTIVE
-    ).exists()
+    existing_user = UserProfile.objects.filter(email=email).exists()
 
     if existing_user:
+        UserProfile.objects.filter(email=email).exclude(status=UserProfile.Status.ACTIVE).update(
+            status=UserProfile.Status.ACTIVE,
+            updated_at=timezone.now(),
+        )
         membership, _ = ProjectMembership.objects.update_or_create(
             project=project,
             user_email=email,
@@ -5138,6 +5359,13 @@ def project_member_invites(request, project_id: str):
         )
 
     expires_minutes = 60 * 24 * 7
+    UserProfile.objects.get_or_create(
+        email=email,
+        defaults={
+            'status': UserProfile.Status.INVITED,
+            'display_name': '',
+        },
+    )
     invitation = ProjectInvitation.objects.create(
         project=project,
         email=email,
@@ -5222,6 +5450,17 @@ def project_invitation_accept(request):
         return JsonResponse({'error': 'invitation_expired'}, status=400)
 
     accepted_by = (payload.get('user_id') or request.headers.get('X-User-Id') or invitation.email).strip()
+    profile, _ = UserProfile.objects.get_or_create(
+        email=invitation.email,
+        defaults={
+            'status': UserProfile.Status.ACTIVE,
+            'display_name': '',
+        },
+    )
+    if profile.status != UserProfile.Status.ACTIVE:
+        profile.status = UserProfile.Status.ACTIVE
+    profile.last_login_at = timezone.now()
+    profile.save(update_fields=['status', 'last_login_at', 'updated_at'])
     membership, _ = ProjectMembership.objects.update_or_create(
         project=invitation.project,
         user_email=invitation.email,

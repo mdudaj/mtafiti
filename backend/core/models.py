@@ -86,6 +86,35 @@ class UserNotification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class UserProfile(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active"
+        INVITED = "invited"
+        DISABLED = "disabled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=320, unique=True)
+    display_name = models.CharField(max_length=200, blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class ProjectMembershipRoleHistory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    membership = models.ForeignKey(
+        ProjectMembership, on_delete=models.CASCADE, related_name="role_history"
+    )
+    action = models.CharField(max_length=32)
+    previous_role = models.CharField(max_length=64, blank=True, default="")
+    new_role = models.CharField(max_length=64, blank=True, default="")
+    previous_status = models.CharField(max_length=16, blank=True, default="")
+    new_status = models.CharField(max_length=16, blank=True, default="")
+    actor_id = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class DataAsset(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     qualified_name = models.CharField(max_length=512, unique=True)

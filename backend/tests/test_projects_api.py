@@ -5,7 +5,13 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
-from core.models import ProjectInvitation, ProjectMembership, UserNotification
+from core.models import (
+    ProjectInvitation,
+    ProjectMembership,
+    ProjectMembershipRoleHistory,
+    UserNotification,
+    UserProfile,
+)
 from tenants.models import Domain, Tenant
 
 
@@ -191,17 +197,7 @@ def test_project_member_invite_existing_user_sends_notification():
         content_type="application/json",
         HTTP_HOST=host,
     )
-    existing_project = client.post(
-        "/api/v1/projects",
-        data=json.dumps({"name": "Existing Program"}),
-        content_type="application/json",
-        HTTP_HOST=host,
-    )
-    ProjectMembership.objects.create(
-        project_id=existing_project.json()["id"],
-        user_email="existing@example.com",
-        role=ProjectMembership.Role.RESEARCHER,
-    )
+    UserProfile.objects.create(email="existing@example.com", status=UserProfile.Status.ACTIVE)
 
     invite = client.post(
         f"/api/v1/projects/{project.json()['id']}/members/invite",
@@ -263,4 +259,83 @@ def test_project_member_invite_new_user_generates_one_time_link_and_acceptance()
             channel=UserNotification.Channel.EMAIL,
         ).count()
         == 1
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_user_directory_and_membership_lifecycle_endpoints():
+    host, _ = _create_tenants()
+    client = Client()
+    created_user = client.post(
+        "/api/v1/users",
+        data=json.dumps({"email": "member@example.com", "display_name": "Member One"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    assert created_user.status_code == 201
+    user_id = created_user.json()["id"]
+    assert client.get(f"/api/v1/users/{user_id}", HTTP_HOST=host).status_code == 200
+
+    updated_user = client.patch(
+        f"/api/v1/users/{user_id}",
+        data=json.dumps({"status": "disabled"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    assert updated_user.status_code == 200
+    assert updated_user.json()["status"] == "disabled"
+
+    project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Lifecycle Study"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    invite = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/invite",
+        data=json.dumps({"email": "member@example.com", "role": "researcher"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    membership_id = invite.json()["membership"]["id"]
+    members = client.get(f"/api/v1/projects/{project.json()['id']}/members", HTTP_HOST=host)
+    assert members.status_code == 200
+    assert len(members.json()["items"]) == 1
+
+    changed_role = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/{membership_id}/lifecycle",
+        data=json.dumps({"action": "change_role", "role": "data_manager"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    assert changed_role.status_code == 200
+    assert changed_role.json()["membership"]["role"] == "data_manager"
+
+    revoked = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/{membership_id}/lifecycle",
+        data=json.dumps({"action": "revoke"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["membership"]["status"] == "inactive"
+
+    reactivated = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/{membership_id}/lifecycle",
+        data=json.dumps({"action": "reactivate"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    assert reactivated.status_code == 200
+    assert reactivated.json()["membership"]["status"] == "active"
+    assert (
+        ProjectMembershipRoleHistory.objects.filter(
+            membership_id=membership_id,
+            action__in=["change_role", "revoke", "reactivate"],
+        ).count()
+        == 3
     )

@@ -51,14 +51,14 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 45. **Data quality**: added tenant-scoped quality rule lifecycle and evaluation result APIs with quality event/audit conventions (see `docs/data-quality.md`).
 46. **Data contracts**: added tenant-scoped contract lifecycle APIs with activation/deprecation and producer-consumer compatibility guardrails (see `docs/data-contracts.md`).
 47. **Retention lifecycle**: added tenant-scoped retention rule/hold/run APIs with release flow and archive/delete execution conventions (see `docs/retention.md`).
+48. **Identity lifecycle expansion**: added tenant-scoped user directory/profile state APIs plus project membership lifecycle endpoints (role changes, revoke/reactivate) with role-history tracking (see `docs/identity-lifecycle.md`).
 
 ## Near-term (next)
 
-1. **Identity lifecycle expansion**: add first-class user directory/profile state and membership lifecycle APIs to support invites, revocations, and role history.
-2. **Notification delivery hardening**: add pluggable provider delivery (email/webhook), retries, and dead-letter handling for user/project notifications.
-3. **Invitation security hardening**: add explicit invite revoke/resend endpoints, token hashing-at-rest, and strict TTL/attempt policies.
-4. **Scalability follow-through**: add DB indexes and load-profile checks for high-volume operational endpoints.
-5. **CI/test throughput optimization**: reduce local/CI feedback time with focused suites and shard improvements.
+1. **Notification delivery hardening**: add pluggable provider delivery (email/webhook), retries, and dead-letter handling for user/project notifications.
+2. **Invitation security hardening**: add explicit invite revoke/resend endpoints, token hashing-at-rest, and strict TTL/attempt policies.
+3. **Scalability follow-through**: add DB indexes and load-profile checks for high-volume operational endpoints.
+4. **CI/test throughput optimization**: reduce local/CI feedback time with focused suites and shard improvements.
 
 ## Mid-term
 
