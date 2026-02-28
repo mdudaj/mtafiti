@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import hmac
+import hashlib
 from datetime import timedelta
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -21,12 +23,19 @@ def _webhook_timeout_seconds() -> float:
     return min(max(parsed, 1.0), 30.0)
 
 
-def _post_json(url: str, payload: dict, *, timeout: float) -> tuple[bool, str]:
+def _webhook_secret() -> str:
+    return (os.environ.get("EDMP_NOTIFICATION_WEBHOOK_SECRET") or "").strip()
+
+
+def _post_json(url: str, payload: dict, *, timeout: float, headers: dict[str, str] | None = None) -> tuple[bool, str]:
     body = json.dumps(payload).encode("utf-8")
+    request_headers = {"Content-Type": "application/json"}
+    if headers:
+        request_headers.update(headers)
     req = urllib_request.Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=request_headers,
         method="POST",
     )
     try:
@@ -63,10 +72,17 @@ def _deliver_via_provider(notification: UserNotification) -> tuple[bool, str]:
             "provider": notification.provider,
             "payload": payload,
         }
+        webhook_headers: dict[str, str] = {}
+        secret = _webhook_secret()
+        if secret:
+            body = json.dumps(event_payload).encode("utf-8")
+            signature = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+            webhook_headers["X-EDMP-Signature"] = f"sha256={signature}"
         return _post_json(
             webhook_url,
             event_payload,
             timeout=_webhook_timeout_seconds(),
+            headers=webhook_headers,
         )
     return False, "unsupported_notification_channel"
 
