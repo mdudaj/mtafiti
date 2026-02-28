@@ -42,6 +42,8 @@ POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=lo
   ../.venv/bin/pytest -q tests/test_performance_baseline.py
 ```
 
+CI runs performance baseline in a dedicated `performance-baseline-tests` lane so the main backend shard lanes keep faster feedback while still enforcing the same thresholds.
+
 ## Bottleneck hypothesis and next optimization path
 
 Primary near-term bottleneck risk is ORM-heavy list endpoints under larger datasets (N+1/serialization overhead) rather than middleware/probe paths.
@@ -64,3 +66,4 @@ Next optimization path for Wave 3:
 1. Add pagination defaults and capped page sizes for high-volume list APIs.
 2. Introduce selective field projection for list responses.
 3. Add database index review for the most common filter combinations (`status`, `project_id`, `workflow_id`).
+4. Continue rebalancing CI shards as test distribution changes.

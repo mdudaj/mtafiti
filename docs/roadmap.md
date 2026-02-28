@@ -55,10 +55,11 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 49. **Notification delivery hardening**: added notification provider/retry/dead-letter model fields with queue dispatch/retry APIs and delivery status visibility (see `docs/notification-delivery.md`).
 50. **Invitation security hardening**: added invite revoke/resend APIs, hashed token storage at rest, and strict TTL/attempt enforcement for one-time login links (see `docs/invitation-security.md` and `docs/project-membership.md`).
 51. **Scalability follow-through**: added high-volume index coverage for list/filter hot paths and expanded baseline latency checks for notification queue listing (see `docs/performance-baseline.md`).
+52. **CI/test throughput optimization**: increased shard parallelism, split performance baseline into a dedicated CI lane, and documented faster local feedback commands (see `README.md` and `docs/performance-baseline.md`).
 
 ## Near-term (next)
 
-1. **CI/test throughput optimization**: reduce local/CI feedback time with focused suites and shard improvements.
+No additional near-term items are currently queued in this scaffold.
 
 ## Mid-term
 

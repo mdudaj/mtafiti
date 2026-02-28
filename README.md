@@ -83,6 +83,12 @@ pip install -r requirements-dev.txt
 export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
 pytest
 
+# faster local feedback (skip dedicated perf baseline lane)
+pytest -q -k "not performance_baseline"
+
+# run perf baseline separately
+pytest -q tests/test_performance_baseline.py
+
 # optional cleanup
 docker compose down
 ```

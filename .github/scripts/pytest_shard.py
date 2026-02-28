@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--relative-to", default="")
     parser.add_argument("--shard-index", type=int, required=True)
     parser.add_argument("--shard-count", type=int, required=True)
+    parser.add_argument("--exclude", action="append", default=[])
     args = parser.parse_args()
 
     tests_root = Path(args.tests_root)
@@ -30,6 +31,8 @@ def main() -> int:
     selected: list[str] = []
     for path in candidates:
         normalized = path.as_posix()
+        if any(excluded in normalized for excluded in args.exclude):
+            continue
         if stable_bucket(normalized, args.shard_count) == args.shard_index:
             if relative_base:
                 selected.append(path.relative_to(relative_base).as_posix())

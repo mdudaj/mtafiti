@@ -28,8 +28,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1]
-        shard_count: [2]
+        shard: [0, 1, 2, 3]
+        shard_count: [4]
     name: backend-tests (shard ${{ matrix.shard }}/${{ matrix.shard_count }})
     services:
       postgres:
@@ -66,9 +66,47 @@ jobs:
             --tests-root backend/tests \
             --relative-to backend \
             --shard-index "${{ matrix.shard }}" \
-            --shard-count "${{ matrix.shard_count }}" > shard_tests.txt
+            --shard-count "${{ matrix.shard_count }}" \
+            --exclude "backend/tests/test_performance_baseline.py" > shard_tests.txt
           test -s shard_tests.txt
       - name: Run tests
         run: |
           cd backend
           pytest -q $(cat ../shard_tests.txt)
+
+  performance-baseline-tests:
+    needs: docs-gate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: edmp_test
+          POSTGRES_USER: edmp
+          POSTGRES_PASSWORD: edmp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U edmp -d edmp_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_DB: edmp_test
+      POSTGRES_USER: edmp
+      POSTGRES_PASSWORD: edmp
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+      - name: Run performance baseline tests
+        run: |
+          cd backend
+          pytest -q tests/test_performance_baseline.py
