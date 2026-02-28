@@ -2,6 +2,8 @@
 
 This guide provides first-response procedures for common EDMP operational incidents.
 
+For panel/alert definitions and severity thresholds, see [operations dashboards and alerts](operations-dashboards-alerts.md).
+
 ## Scope
 
 Runbooks in this document cover:

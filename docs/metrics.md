@@ -42,3 +42,4 @@ Define initial service objectives:
 ## Baseline performance checks
 
 See [performance baseline](performance-baseline.md) for repeatable API/worker load profiles and CI-enforced latency thresholds.
+See [operations dashboards and alerts](operations-dashboards-alerts.md) for operator panel and threshold definitions.

@@ -45,6 +45,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Metrics](docs/metrics.md)
 * [Performance baseline](docs/performance-baseline.md)
 * [Operational runbooks and incident playbooks](docs/operations-runbooks.md)
+* [Operational dashboards and alert rules](docs/operations-dashboards-alerts.md)
 * [Kubernetes deployment notes](docs/kubernetes.md)
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
 * [Eventing conventions](docs/events.md)

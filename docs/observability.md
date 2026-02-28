@@ -25,6 +25,7 @@ When needed, expose `/metrics` (Prometheus) with at least:
 
 Current baseline checks for latency/error regression are documented in [performance baseline](performance-baseline.md).
 Operational first-response and recovery steps are documented in [operations runbooks](operations-runbooks.md).
+Dashboard and alert specification is documented in [operations dashboards and alerts](operations-dashboards-alerts.md).
 
 ## Tracing (future)
 
