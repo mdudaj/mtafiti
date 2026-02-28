@@ -12,6 +12,55 @@ from .logging import get_correlation_id, get_request_id, get_user_id
 logger = logging.getLogger(__name__)
 
 
+_REQUIRED_ENVELOPE_FIELDS = {
+    'event_type': str,
+    'tenant_id': str,
+    'correlation_id': str,
+    'timestamp': str,
+    'data': dict,
+}
+
+_REQUIRED_DOMAIN_DATA_FIELDS = {
+    'workflow.definition.': {'id', 'name'},
+    'workflow.run.': {'id', 'definition_id', 'status'},
+    'orchestration.workflow.': {'id', 'name', 'trigger_type', 'status'},
+    'orchestration.run.': {'id', 'workflow_id', 'status', 'step_results'},
+    'stewardship.item.': {'id', 'item_type', 'subject_ref', 'severity', 'status'},
+    'agent.run.': {'id', 'prompt', 'allowed_tools', 'timeout_seconds', 'status'},
+}
+
+_REQUIRED_AUDIT_DATA_FIELDS = {'action', 'resource_type', 'resource_id', 'details'}
+
+
+def validate_event_payload(payload: dict[str, Any]) -> None:
+    for field_name, field_type in _REQUIRED_ENVELOPE_FIELDS.items():
+        value = payload.get(field_name)
+        if not isinstance(value, field_type):
+            raise ValueError(f'invalid_event_payload:{field_name}')
+        if field_type is str and not value:
+            raise ValueError(f'invalid_event_payload:{field_name}')
+
+    event_type = payload['event_type']
+    data = payload['data']
+
+    if event_type.startswith('audit.'):
+        missing = sorted(_REQUIRED_AUDIT_DATA_FIELDS - set(data.keys()))
+        if missing:
+            raise ValueError(f'invalid_audit_payload:missing={",".join(missing)}')
+        if not isinstance(data.get('details'), dict):
+            raise ValueError('invalid_audit_payload:details')
+        return
+
+    for event_prefix, required_fields in _REQUIRED_DOMAIN_DATA_FIELDS.items():
+        if event_type.startswith(event_prefix):
+            missing = sorted(required_fields - set(data.keys()))
+            if missing:
+                raise ValueError(
+                    f'invalid_domain_payload:{event_prefix}missing={",".join(missing)}'
+                )
+            return
+
+
 def build_event_payload(
     *,
     event_type: str,
@@ -80,6 +129,7 @@ def maybe_publish_event(
         request_id=request_id,
         data=data,
     )
+    validate_event_payload(payload)
     try:
         publish_event(exchange=exchange, routing_key=routing_key, payload=payload, rabbitmq_url=rabbitmq_url)
     except Exception:

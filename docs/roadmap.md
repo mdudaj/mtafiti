@@ -34,6 +34,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 28. **Workflow orchestration**: lightweight tenant-scoped orchestration workflow/run APIs with schedule/event triggers, connector-backed step execution, and orchestration event/audit conventions (see `docs/orchestration.md`).
 29. **User interface expansion tracking**: defined next UI phase scope, API-to-UI mappings, role visibility matrix, tenant isolation scenarios, and acceptance checks for operational dashboards (see `docs/workflow-ui.md`).
 30. **API versioning conventions**: documented version/deprecation policy, migration guidance, and response contract regression checks (see `docs/api-versioning.md`).
+31. **Event/audit schema validation gates**: added schema validation for workflow/orchestration/stewardship/agent/audit event families with regression tests that fail on contract drift (see `docs/events.md` and `docs/audit.md`).
 
 ## Near-term (next)
 

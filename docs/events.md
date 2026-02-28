@@ -36,6 +36,20 @@ Field notes:
 * `user_id`: optional; currently taken from `X-User-Id` (scaffold) for audit/event metadata.
 * `data`: event-specific payload (tenant, asset, policy, etc.).
 
+## Schema validation gates
+
+Event payloads are validated before publish. Validation covers:
+
+* envelope fields (`event_type`, `tenant_id`, `correlation_id`, `timestamp`, `data`)
+* domain family data contracts for:
+  * `workflow.definition.*` and `workflow.run.*`
+  * `orchestration.workflow.*` and `orchestration.run.*`
+  * `stewardship.item.*`
+  * `agent.run.*`
+* audit payload shape for all `audit.*` events (`action`, `resource_type`, `resource_id`, `details`).
+
+Regression tests in `backend/tests/test_event_payload.py` and `backend/tests/test_event_schema_gates.py` act as CI gates for schema conformance.
+
 ## Configuration
 
 Required for publishing:
@@ -45,4 +59,3 @@ Required for publishing:
 Optional:
 
 * `EDMP_EVENT_EXCHANGE` (default `edmp.events`)
-

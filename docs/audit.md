@@ -26,6 +26,13 @@ Reuse the existing envelope in `docs/events.md` and include domain-specific `dat
 * `actor.user_id` (from `X-User-Id` in current scaffold)
 * `changes` (optional; key-level diffs for updates)
 
+Audit payload validation requires:
+
+* `data.action`
+* `data.resource_type`
+* `data.resource_id` (nullable when resource id is unavailable)
+* `data.details` (object)
+
 ## Implementation notes
 
 1. Emit from API handlers only after successful mutation/commit.
