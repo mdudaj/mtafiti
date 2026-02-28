@@ -15,7 +15,10 @@ The baseline uses deterministic local/CI profiles in `backend/tests/test_perform
 3. **API paginated catalog profile**
    * Run 40x `GET /api/v1/assets?page=1&page_size=20`.
    * Measures bounded-response latency and verifies pagination path performance.
-4. **Worker ping profile**
+4. **API notification queue profile**
+   * Seed 200 notifications, then run 40x `GET /api/v1/notifications?status=pending&page=1&page_size=50`.
+   * Measures filtered queue-list latency under moderate volume.
+5. **Worker ping profile**
    * 30x `core.tasks.ping` task executions via `TenantTask`.
    * Measures task execution latency and verifies task metrics emission.
 
@@ -24,6 +27,7 @@ The baseline uses deterministic local/CI profiles in `backend/tests/test_perform
 * Health endpoint p95 latency `< 100ms`.
 * Asset list endpoint p95 latency `< 300ms`.
 * Paginated asset list endpoint p95 latency `< 250ms`.
+* Notification list endpoint p95 latency `< 300ms`.
 * Worker ping task p95 latency `< 200ms`.
 * Error budget for the profiles: `0` responses with status `>=500`.
 
@@ -46,13 +50,14 @@ Primary near-term bottleneck risk is ORM-heavy list endpoints under larger datas
 
 High-frequency list filters observed in current APIs:
 
-* `ingestions`: `project_id`
-* `connector_runs`: `status`, `ingestion_id`, `ingestion__project_id`
-* `orchestration_runs`: `project_id`, `workflow_id`, `status`
-* `projects`: `status`
+* `ingestions`: `project_id`, `status`, recency sort
+* `connector_runs`: `status`, `ingestion_id`, recency sort
+* `orchestration_runs`: `project_id`, `workflow_id`, `status`, recency sort
+* `projects`: `status`, recency sort
+* `project_memberships`: `project_id`, `status`, recency sort
+* `user_notifications`: `delivery_status`, `next_attempt_at`, `user_email`, recency sort
 
-Current hardening in this wave focuses on bounded page sizes and predictable list cost.  
-Next DB optimization increment should validate/select indexes against production query plans for the filters above.
+Current hardening in this wave includes bounded page sizes plus explicit DB indexes for the filter/sort combinations above.
 
 Next optimization path for Wave 3:
 

@@ -12,6 +12,11 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="project_status_created_idx"),
+        ]
+
     def __str__(self) -> str:
         return self.name
 
@@ -44,6 +49,9 @@ class ProjectMembership(models.Model):
             models.UniqueConstraint(
                 fields=["project", "user_email"], name="uniq_project_member_email"
             ),
+        ]
+        indexes = [
+            models.Index(fields=["project", "status", "-created_at"], name="proj_member_list_idx"),
         ]
 
 
@@ -105,6 +113,15 @@ class UserNotification(models.Model):
     last_error = models.CharField(max_length=512, blank=True, default="")
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["delivery_status", "next_attempt_at", "-created_at"],
+                name="notif_queue_scan_idx",
+            ),
+            models.Index(fields=["user_email", "-created_at"], name="notif_user_created_idx"),
+        ]
 
 
 class UserProfile(models.Model):
@@ -172,6 +189,11 @@ class IngestionRequest(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["project", "status", "-created_at"], name="ingest_proj_status_idx"),
+        ]
 
 
 class LineageEdge(models.Model):
@@ -777,6 +799,12 @@ class ConnectorRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="connector_status_created_idx"),
+            models.Index(fields=["ingestion", "status", "-created_at"], name="connector_ingest_status_idx"),
+        ]
+
 
 class WorkflowDefinition(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -884,6 +912,12 @@ class OrchestrationRun(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["project", "status", "-created_at"], name="orch_proj_status_idx"),
+            models.Index(fields=["workflow", "status", "-created_at"], name="orch_workflow_status_idx"),
+        ]
 
 
 class GovernancePolicy(models.Model):

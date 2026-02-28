@@ -6,6 +6,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
+from core.models import UserNotification
 from core.tasks import ping
 from tenants.models import Domain, Tenant
 
@@ -30,7 +31,7 @@ def _p95(values: list[float]) -> float:
 
 @pytest.mark.django_db(transaction=True)
 def test_api_latency_baseline_profiles():
-    host, _ = _create_tenant_host()
+    host, tenant_schema = _create_tenant_host()
     client = Client()
 
     for idx in range(20):
@@ -68,10 +69,32 @@ def test_api_latency_baseline_profiles():
         if response.status_code >= 500:
             error_count += 1
 
+    with schema_context(tenant_schema):
+        for idx in range(200):
+            UserNotification.objects.create(
+                user_email=f'user{idx}@example.com',
+                notification_type='ops_alert',
+                channel=UserNotification.Channel.EMAIL,
+                delivery_status=UserNotification.DeliveryStatus.PENDING,
+                payload={'seq': idx},
+            )
+
+    notification_list_latencies: list[float] = []
+    for _ in range(40):
+        start = time.perf_counter()
+        response = client.get(
+            '/api/v1/notifications?status=pending&page=1&page_size=50',
+            HTTP_HOST=host,
+        )
+        notification_list_latencies.append(time.perf_counter() - start)
+        if response.status_code >= 500:
+            error_count += 1
+
     assert error_count == 0
     assert _p95(health_latencies) < 0.100
     assert _p95(list_latencies) < 0.300
     assert _p95(paginated_list_latencies) < 0.250
+    assert _p95(notification_list_latencies) < 0.300
 
 
 @pytest.mark.django_db(transaction=True)
