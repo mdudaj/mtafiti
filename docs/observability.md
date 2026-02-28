@@ -23,7 +23,8 @@ When needed, expose `/metrics` (Prometheus) with at least:
 * Celery queue depth and task latency
 * DB connection pool saturation / error rate
 
+Current baseline checks for latency/error regression are documented in [performance baseline](performance-baseline.md).
+
 ## Tracing (future)
 
 Adopt OpenTelemetry once service boundaries and dependencies expand beyond the initial scaffold. Correlation ids should remain stable even when full tracing is enabled.
-

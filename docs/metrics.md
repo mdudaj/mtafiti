@@ -38,3 +38,7 @@ Define initial service objectives:
 * Per-tenant usage billing metrics.
 * Custom business KPI dashboards.
 * Full tracing-derived RED/USE correlation (can follow in a tracing increment).
+
+## Baseline performance checks
+
+See [performance baseline](performance-baseline.md) for repeatable API/worker load profiles and CI-enforced latency thresholds.

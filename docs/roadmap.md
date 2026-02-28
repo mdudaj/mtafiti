@@ -35,6 +35,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 29. **User interface expansion tracking**: defined next UI phase scope, API-to-UI mappings, role visibility matrix, tenant isolation scenarios, and acceptance checks for operational dashboards (see `docs/workflow-ui.md`).
 30. **API versioning conventions**: documented version/deprecation policy, migration guidance, and response contract regression checks (see `docs/api-versioning.md`).
 31. **Event/audit schema validation gates**: added schema validation for workflow/orchestration/stewardship/agent/audit event families with regression tests that fail on contract drift (see `docs/events.md` and `docs/audit.md`).
+32. **Performance and scale baseline**: defined repeatable API/worker load profiles with measurable latency/error thresholds and documented next optimization path (see `docs/performance-baseline.md`).
 
 ## Near-term (next)
 
