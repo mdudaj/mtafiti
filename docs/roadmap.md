@@ -60,6 +60,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 54. **Notification provider integration**: added webhook HTTP delivery execution with timeout/error mapping and provider-focused dispatch regression coverage (see `docs/notification-delivery.md`).
 55. **Webhook signing for provider delivery**: added optional HMAC request signing for webhook notifications with signature regression tests and configuration docs (see `docs/notification-delivery.md`).
 56. **OpenAPI parity expansion for identity/notification/membership APIs**: documented newly delivered user directory, notification dispatch/retry, and project membership invitation lifecycle endpoints and expanded drift-gate coverage for these critical routes/schemas (see `docs/openapi.yaml` and `.github/scripts/check_openapi_contract.py`).
+57. **Contract regression coverage for new identity/notification/membership APIs**: expanded API versioning contract tests to assert stable response fields for user directory, notification dispatch, project membership lifecycle, and invitation resend/revoke flows (see `backend/tests/test_api_versioning_contracts.py`).
 
 ## Near-term (next)
 
