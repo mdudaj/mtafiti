@@ -7,10 +7,12 @@ This note defines a minimal policy-enforcement increment for EDMP.
 * Enforce role-based access checks consistently in tenant-scoped APIs.
 * Establish a path to attribute-based policy checks without changing API shapes.
 * Reuse current request context (`X-User-Id`, `X-User-Roles`, correlation id) across API and worker paths.
+* Prefer validated JWT claim mapping into request context over trusting raw public headers.
 
 ## Enforcement model (initial)
 
 * Keep enforcement opt-in via `EDMP_ENFORCE_ROLES` for phased rollout.
+* If bearer auth is enabled (`EDMP_OIDC_REQUIRED=true`), reject missing/invalid tokens explicitly before role evaluation.
 * Require:
   * read APIs: `catalog.reader` (or stronger)
   * mutating APIs: `catalog.editor` or `tenant.admin` depending on resource type

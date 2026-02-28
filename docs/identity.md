@@ -37,6 +37,29 @@ Prefer validation at the edge (Ingress/API gateway) and forward selected claims 
 
 If edge validation is not available, validate JWTs in Django and produce the same request context.
 
+### Current hardening path in scaffold
+
+The backend now supports HS256 bearer token validation in middleware for `/api/*` routes:
+
+* `Authorization: Bearer <jwt>` parsing and signature validation.
+* Registered claim checks: `sub`, `exp`/`nbf` (when present), optional `iss` and `aud`.
+* Claim mapping:
+  * `sub` -> `X-User-Id`
+  * `roles` (array or comma-separated string) -> `X-User-Roles`
+  * optional `tid` checked against resolved tenant schema (mismatch => `403`).
+
+Configuration:
+
+* `EDMP_OIDC_REQUIRED=true|false` (when true, missing bearer token returns `401` on API routes).
+* `EDMP_OIDC_JWT_SECRET=<shared-secret>` (required for in-app HS256 validation).
+* `EDMP_OIDC_ISSUER=<issuer>` (optional strict match).
+* `EDMP_OIDC_AUDIENCE=<aud1,aud2>` (optional allowed audience set).
+
+Fallback behavior:
+
+* When `EDMP_OIDC_REQUIRED=false`, requests without bearer tokens can still use header-based identity for local/dev.
+* When a bearer token is present but invalid, request is rejected (`401`) instead of falling back.
+
 ### Token claims (suggested)
 
 * `sub`: user id

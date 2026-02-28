@@ -36,6 +36,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 30. **API versioning conventions**: documented version/deprecation policy, migration guidance, and response contract regression checks (see `docs/api-versioning.md`).
 31. **Event/audit schema validation gates**: added schema validation for workflow/orchestration/stewardship/agent/audit event families with regression tests that fail on contract drift (see `docs/events.md` and `docs/audit.md`).
 32. **Performance and scale baseline**: defined repeatable API/worker load profiles with measurable latency/error thresholds and documented next optimization path (see `docs/performance-baseline.md`).
+33. **OIDC/JWT hardening**: added bearer token validation, issuer/audience checks, claim mapping to user/roles context, tenant-claim guardrails, and invalid-token failure tests (see `docs/identity.md` and `docs/policy.md`).
 
 ## Near-term (next)
 

@@ -55,6 +55,7 @@ MIDDLEWARE = [
     'core.middleware.CorrelationIdMiddleware',
     'core.middleware.ApiVersionMiddleware',
     'tenants.middleware.EDMPTenantMiddleware',
+    'core.middleware.OIDCJWTMiddleware',
     'core.middleware.RequestContextMiddleware',
     'core.metrics.MetricsMiddleware',
     'django.middleware.security.SecurityMiddleware',

@@ -2,6 +2,7 @@ import uuid
 
 from django.http import JsonResponse
 
+from .identity import authenticate_request
 from .logging import correlation_id_var, request_id_var, tenant_id_var, user_id_var
 
 
@@ -42,6 +43,18 @@ class ApiVersionMiddleware:
                 response = self.get_response(request)
             response['X-API-Version'] = self.SUPPORTED_VERSION
             return response
+        return self.get_response(request)
+
+
+class OIDCJWTMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path.startswith('/api/'):
+            auth_failure = authenticate_request(request)
+            if auth_failure:
+                return auth_failure
         return self.get_response(request)
 
 
