@@ -46,6 +46,7 @@ from .models import (
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
+    StewardshipItem,
     QualityCheckResult,
     QualityRule,
     RetentionHold,
@@ -344,6 +345,23 @@ def _agent_run_to_dict(agent_run: AgentRun) -> dict[str, Any]:
         'finished_at': agent_run.finished_at.isoformat() if agent_run.finished_at else None,
         'created_at': agent_run.created_at.isoformat(),
         'updated_at': agent_run.updated_at.isoformat(),
+    }
+
+
+def _stewardship_item_to_dict(item: StewardshipItem) -> dict[str, Any]:
+    return {
+        'id': str(item.id),
+        'item_type': item.item_type,
+        'subject_ref': item.subject_ref,
+        'severity': item.severity,
+        'status': item.status,
+        'assignee': item.assignee or None,
+        'due_at': item.due_at.isoformat() if item.due_at else None,
+        'resolution': item.resolution,
+        'actor_id': item.actor_id or None,
+        'created_at': item.created_at.isoformat(),
+        'updated_at': item.updated_at.isoformat(),
+        'resolved_at': item.resolved_at.isoformat() if item.resolved_at else None,
     }
 
 
@@ -1435,6 +1453,188 @@ def agent_run_transition(request, run_id: str):
         or request.headers.get('X-Correlation-Id'),
         user_id=request.headers.get('X-User-Id'),
         data=payload_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(payload_data)
+
+
+@csrf_exempt
+def stewardship_items(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+        )
+        if forbidden:
+            return forbidden
+        qs = StewardshipItem.objects.order_by('-created_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        severity_filter = request.GET.get('severity')
+        if severity_filter:
+            qs = qs.filter(severity=severity_filter)
+        item_type_filter = request.GET.get('item_type')
+        if item_type_filter:
+            qs = qs.filter(item_type=item_type_filter)
+        assignee_filter = request.GET.get('assignee')
+        if assignee_filter:
+            qs = qs.filter(assignee=assignee_filter)
+        return JsonResponse({'items': [_stewardship_item_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        item_type = payload.get('item_type')
+        subject_ref = (payload.get('subject_ref') or '').strip()
+        severity = payload.get('severity') or StewardshipItem.Severity.MEDIUM
+        if item_type not in StewardshipItem.ItemType.values:
+            return JsonResponse({'error': 'invalid_item_type'}, status=400)
+        if severity not in StewardshipItem.Severity.values:
+            return JsonResponse({'error': 'invalid_severity'}, status=400)
+        if not subject_ref:
+            return JsonResponse({'error': 'subject_ref is required'}, status=400)
+        due_at = None
+        due_at_value = payload.get('due_at')
+        if due_at_value is not None:
+            if not isinstance(due_at_value, str):
+                return JsonResponse({'error': 'due_at must be an ISO datetime string'}, status=400)
+            due_at = parse_datetime(due_at_value)
+            if due_at is None:
+                return JsonResponse({'error': 'invalid_due_at'}, status=400)
+        item = StewardshipItem.objects.create(
+            item_type=item_type,
+            subject_ref=subject_ref,
+            severity=severity,
+            assignee=(payload.get('assignee') or ''),
+            due_at=due_at,
+            status=StewardshipItem.Status.OPEN,
+            actor_id=(request.headers.get('X-User-Id') or ''),
+        )
+        tenant_schema = _tenant_schema(request)
+        payload_data = _stewardship_item_to_dict(item)
+        maybe_publish_event(
+            event_type='stewardship.item.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.stewardship.item.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='stewardship.item.created',
+            resource_type='stewardship_item',
+            resource_id=str(item.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(payload_data, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+def _stewardship_transition_allowed(item: StewardshipItem, action: str) -> bool:
+    allowed = {
+        StewardshipItem.Status.OPEN: {'start_review', 'block', 'resolve', 'dismiss'},
+        StewardshipItem.Status.IN_REVIEW: {'block', 'resolve', 'dismiss'},
+        StewardshipItem.Status.BLOCKED: {'start_review', 'resolve', 'dismiss'},
+        StewardshipItem.Status.RESOLVED: {'reopen'},
+        StewardshipItem.Status.DISMISSED: {'reopen'},
+    }
+    return action in allowed.get(item.status, set())
+
+
+@csrf_exempt
+def stewardship_item_transition(request, item_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        item = StewardshipItem.objects.get(id=item_id)
+    except (ValidationError, StewardshipItem.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = payload.get('action')
+    if action not in {'assign', 'start_review', 'block', 'resolve', 'dismiss', 'reopen'}:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+
+    update_fields = ['updated_at']
+    if action == 'assign':
+        assignee = (payload.get('assignee') or '').strip()
+        if not assignee:
+            return JsonResponse({'error': 'assignee is required'}, status=400)
+        item.assignee = assignee
+        item.actor_id = request.headers.get('X-User-Id') or item.actor_id
+        update_fields.extend(['assignee', 'actor_id'])
+        event_type = 'stewardship.item.assigned'
+    else:
+        if not _stewardship_transition_allowed(item, action):
+            return JsonResponse({'error': 'invalid_transition'}, status=400)
+        if action == 'start_review':
+            item.status = StewardshipItem.Status.IN_REVIEW
+            item.resolved_at = None
+        elif action == 'block':
+            item.status = StewardshipItem.Status.BLOCKED
+            item.resolved_at = None
+        elif action == 'resolve':
+            resolution = payload.get('resolution') or {}
+            if not isinstance(resolution, dict):
+                return JsonResponse({'error': 'resolution must be an object'}, status=400)
+            item.status = StewardshipItem.Status.RESOLVED
+            item.resolution = resolution
+            item.resolved_at = timezone.now()
+            update_fields.append('resolution')
+        elif action == 'dismiss':
+            item.status = StewardshipItem.Status.DISMISSED
+            item.resolved_at = timezone.now()
+        else:
+            item.status = StewardshipItem.Status.OPEN
+            item.resolution = {}
+            item.resolved_at = None
+            update_fields.append('resolution')
+        item.actor_id = request.headers.get('X-User-Id') or item.actor_id
+        update_fields.extend(['status', 'resolved_at', 'actor_id'])
+        event_type = (
+            'stewardship.item.resolved'
+            if item.status == StewardshipItem.Status.RESOLVED
+            else 'stewardship.item.transitioned'
+        )
+    item.save(update_fields=update_fields)
+
+    tenant_schema = _tenant_schema(request)
+    payload_data = _stewardship_item_to_dict(item)
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={**payload_data, 'transition_action': action},
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='stewardship_item',
+        resource_id=str(item.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data={**payload_data, 'transition_action': action},
         rabbitmq_url=os.environ.get('RABBITMQ_URL'),
     )
     return JsonResponse(payload_data)

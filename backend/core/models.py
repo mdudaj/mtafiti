@@ -286,6 +286,43 @@ class AgentRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class StewardshipItem(models.Model):
+    class ItemType(models.TextChoices):
+        QUALITY_EXCEPTION = "quality_exception"
+        CONTRACT_VIOLATION = "contract_violation"
+        RETENTION_HOLD = "retention_hold"
+        GLOSSARY_REVIEW = "glossary_review"
+        MDM_MERGE_REVIEW = "mdm_merge_review"
+
+    class Severity(models.TextChoices):
+        LOW = "low"
+        MEDIUM = "medium"
+        HIGH = "high"
+        CRITICAL = "critical"
+
+    class Status(models.TextChoices):
+        OPEN = "open"
+        IN_REVIEW = "in_review"
+        BLOCKED = "blocked"
+        RESOLVED = "resolved"
+        DISMISSED = "dismissed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item_type = models.CharField(max_length=32, choices=ItemType.choices)
+    subject_ref = models.CharField(max_length=512)
+    severity = models.CharField(
+        max_length=16, choices=Severity.choices, default=Severity.MEDIUM
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    assignee = models.CharField(max_length=200, blank=True, default="")
+    due_at = models.DateTimeField(null=True, blank=True)
+    resolution = models.JSONField(default=dict, blank=True)
+    actor_id = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+
 class ResidencyProfile(models.Model):
     class EnforcementMode(models.TextChoices):
         ADVISORY = "advisory"

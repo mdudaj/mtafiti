@@ -43,3 +43,23 @@ Define a lightweight tenant-scoped stewardship model so governance users can tri
   * `stewardship.item.assigned`
   * `stewardship.item.transitioned`
   * `stewardship.item.resolved`
+
+## Implemented scaffold slice
+
+* API surface:
+  * `POST/GET /api/v1/stewardship/items`
+  * `POST /api/v1/stewardship/items/{item_id}/transition`
+* Implemented item types:
+  * `quality_exception | contract_violation | retention_hold | glossary_review | mdm_merge_review`
+* Implemented lifecycle statuses:
+  * `open | in_review | blocked | resolved | dismissed`
+* Transition actions:
+  * `assign`, `start_review`, `block`, `resolve`, `dismiss`, `reopen`
+* Role gates:
+  * create: `catalog.editor | policy.admin | tenant.admin`
+  * transition: `policy.admin | tenant.admin`
+* Event and audit conventions:
+  * `stewardship.item.created`
+  * `stewardship.item.assigned`
+  * `stewardship.item.transitioned`
+  * `stewardship.item.resolved`
