@@ -64,6 +64,7 @@ from .models import (
     WorkflowRun,
     WorkflowTask,
 )
+from .notifications import dispatch_notification, process_notification_queue
 from .tasks import evaluate_quality_rule, execute_connector_run, execute_retention_run
 
 
@@ -814,6 +815,26 @@ def _project_membership_role_history_to_dict(history: ProjectMembershipRoleHisto
         'new_status': history.new_status or None,
         'actor_id': history.actor_id or None,
         'created_at': history.created_at.isoformat(),
+    }
+
+
+def _notification_to_dict(notification: UserNotification) -> dict[str, Any]:
+    return {
+        'id': str(notification.id),
+        'user_email': notification.user_email,
+        'notification_type': notification.notification_type,
+        'channel': notification.channel,
+        'provider': notification.provider,
+        'delivery_status': notification.delivery_status,
+        'attempts': notification.attempts,
+        'max_attempts': notification.max_attempts,
+        'next_attempt_at': notification.next_attempt_at.isoformat() if notification.next_attempt_at else None,
+        'delivered_at': notification.delivered_at.isoformat() if notification.delivered_at else None,
+        'dead_lettered_at': notification.dead_lettered_at.isoformat() if notification.dead_lettered_at else None,
+        'last_error': notification.last_error or None,
+        'payload': notification.payload,
+        'read_at': notification.read_at.isoformat() if notification.read_at else None,
+        'created_at': notification.created_at.isoformat(),
     }
 
 
@@ -5163,6 +5184,97 @@ def user_detail(request, user_id: str):
 
 
 @csrf_exempt
+def notifications(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = UserNotification.objects.order_by('-created_at')
+        status_filter = (request.GET.get('status') or '').strip()
+        if status_filter:
+            qs = qs.filter(delivery_status=status_filter)
+        channel_filter = (request.GET.get('channel') or '').strip()
+        if channel_filter:
+            qs = qs.filter(channel=channel_filter)
+        return _paginated_response(request, qs, _notification_to_dict)
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        user_email = (payload.get('user_email') or '').strip().lower()
+        notification_type = (payload.get('notification_type') or '').strip()
+        channel = (payload.get('channel') or '').strip()
+        if not user_email:
+            return JsonResponse({'error': 'user_email is required'}, status=400)
+        if not notification_type:
+            return JsonResponse({'error': 'notification_type is required'}, status=400)
+        if channel not in UserNotification.Channel.values:
+            return JsonResponse({'error': 'invalid_channel'}, status=400)
+        max_attempts = payload.get('max_attempts') or 3
+        if not isinstance(max_attempts, int) or max_attempts < 1:
+            return JsonResponse({'error': 'invalid_max_attempts'}, status=400)
+        notification = UserNotification.objects.create(
+            user_email=user_email,
+            notification_type=notification_type,
+            channel=channel,
+            provider=(payload.get('provider') or 'default').strip() or 'default',
+            max_attempts=max_attempts,
+            payload=payload.get('payload') if isinstance(payload.get('payload'), dict) else {},
+        )
+        return JsonResponse(_notification_to_dict(notification), status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def notification_dispatch(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    limit = payload.get('limit') if isinstance(payload.get('limit'), int) else 100
+    limit = min(max(limit, 1), 500)
+    summary = process_notification_queue(limit=limit)
+    return JsonResponse(summary)
+
+
+@csrf_exempt
+def notification_retry(request, notification_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        notification = UserNotification.objects.get(id=notification_id)
+    except (ValidationError, UserNotification.DoesNotExist):
+        return JsonResponse({'error': 'notification_not_found'}, status=404)
+    if notification.delivery_status == UserNotification.DeliveryStatus.SENT:
+        return JsonResponse({'error': 'notification_already_sent'}, status=400)
+    if notification.delivery_status == UserNotification.DeliveryStatus.DEAD_LETTER:
+        notification.attempts = 0
+        notification.dead_lettered_at = None
+    notification.delivery_status = UserNotification.DeliveryStatus.PENDING
+    notification.next_attempt_at = None
+    notification.save(
+        update_fields=['attempts', 'delivery_status', 'next_attempt_at', 'dead_lettered_at']
+    )
+    updated = dispatch_notification(notification)
+    return JsonResponse(_notification_to_dict(updated))
+
+
+@csrf_exempt
 def project_members(request, project_id: str):
     if request.method != 'GET':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -5315,6 +5427,7 @@ def project_member_invites(request, project_id: str):
             user_email=email,
             notification_type='project_membership_invite',
             channel=UserNotification.Channel.IN_APP,
+            provider='default',
             payload={
                 'project_id': str(project.id),
                 'project_name': project.name,
@@ -5380,6 +5493,7 @@ def project_member_invites(request, project_id: str):
         user_email=email,
         notification_type='project_membership_invite_link',
         channel=UserNotification.Channel.EMAIL,
+        provider='default',
         payload={
             'project_id': str(project.id),
             'project_name': project.name,

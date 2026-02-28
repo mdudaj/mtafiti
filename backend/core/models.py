@@ -76,12 +76,29 @@ class UserNotification(models.Model):
     class Channel(models.TextChoices):
         IN_APP = "in_app"
         EMAIL = "email"
+        WEBHOOK = "webhook"
+
+    class DeliveryStatus(models.TextChoices):
+        PENDING = "pending"
+        SENT = "sent"
+        FAILED = "failed"
+        DEAD_LETTER = "dead_letter"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_email = models.EmailField(max_length=320)
     notification_type = models.CharField(max_length=64)
     channel = models.CharField(max_length=16, choices=Channel.choices)
     payload = models.JSONField(default=dict, blank=True)
+    provider = models.CharField(max_length=32, default="default")
+    delivery_status = models.CharField(
+        max_length=16, choices=DeliveryStatus.choices, default=DeliveryStatus.PENDING
+    )
+    attempts = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=3)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    dead_lettered_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=512, blank=True, default="")
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -8,6 +8,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [Roadmap (design increments)](docs/roadmap.md)
 * [Identity & access](docs/identity.md)
 * [Identity lifecycle and membership operations](docs/identity-lifecycle.md)
+* [Notification delivery hardening](docs/notification-delivery.md)
 * [Governance & policy](docs/governance.md)
 * [Governance workflows](docs/governance-workflows.md)
 * [Workflow engine and UI](docs/workflow-ui.md)

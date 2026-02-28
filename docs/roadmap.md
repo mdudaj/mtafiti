@@ -52,13 +52,13 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 46. **Data contracts**: added tenant-scoped contract lifecycle APIs with activation/deprecation and producer-consumer compatibility guardrails (see `docs/data-contracts.md`).
 47. **Retention lifecycle**: added tenant-scoped retention rule/hold/run APIs with release flow and archive/delete execution conventions (see `docs/retention.md`).
 48. **Identity lifecycle expansion**: added tenant-scoped user directory/profile state APIs plus project membership lifecycle endpoints (role changes, revoke/reactivate) with role-history tracking (see `docs/identity-lifecycle.md`).
+49. **Notification delivery hardening**: added notification provider/retry/dead-letter model fields with queue dispatch/retry APIs and delivery status visibility (see `docs/notification-delivery.md`).
 
 ## Near-term (next)
 
-1. **Notification delivery hardening**: add pluggable provider delivery (email/webhook), retries, and dead-letter handling for user/project notifications.
-2. **Invitation security hardening**: add explicit invite revoke/resend endpoints, token hashing-at-rest, and strict TTL/attempt policies.
-3. **Scalability follow-through**: add DB indexes and load-profile checks for high-volume operational endpoints.
-4. **CI/test throughput optimization**: reduce local/CI feedback time with focused suites and shard improvements.
+1. **Invitation security hardening**: add explicit invite revoke/resend endpoints, token hashing-at-rest, and strict TTL/attempt policies.
+2. **Scalability follow-through**: add DB indexes and load-profile checks for high-volume operational endpoints.
+3. **CI/test throughput optimization**: reduce local/CI feedback time with focused suites and shard improvements.
 
 ## Mid-term
 
