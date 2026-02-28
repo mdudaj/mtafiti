@@ -42,6 +42,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 36. **Pagination and list endpoint performance hardening**: added bounded default pagination and page-size caps for high-volume list APIs with pagination regression and baseline latency checks (see `docs/performance-baseline.md`).
 37. **Operational dashboards and alert rules**: defined dashboard panels for API/worker/queue health, alert severities and thresholds, and explicit alert-to-runbook triage mappings (see `docs/operations-dashboards-alerts.md`).
 38. **API contract drift gates and consumer safety checks**: added OpenAPI-to-route/schema drift checks, expanded critical contract regression tests, and standardized API change/deprecation communication checklist (see `docs/api-versioning.md` and `docs/api-change-management.md`).
+39. **Project membership invitation workflow**: added project role invites (`principal_investigator`, `researcher`, `data_manager`) with existing-user notifications, one-time login invite links for new users, and acceptance flow (see `docs/project-membership.md`).
 
 ## Near-term (next)
 

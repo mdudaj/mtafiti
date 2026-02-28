@@ -16,6 +16,76 @@ class Project(models.Model):
         return self.name
 
 
+class ProjectMembership(models.Model):
+    class Role(models.TextChoices):
+        PRINCIPAL_INVESTIGATOR = "principal_investigator"
+        RESEARCHER = "researcher"
+        DATA_MANAGER = "data_manager"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active"
+        INACTIVE = "inactive"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="memberships"
+    )
+    user_email = models.EmailField(max_length=320)
+    role = models.CharField(max_length=64, choices=Role.choices)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.ACTIVE
+    )
+    invited_by = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "user_email"], name="uniq_project_member_email"
+            ),
+        ]
+
+
+class ProjectInvitation(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        ACCEPTED = "accepted"
+        EXPIRED = "expired"
+        REVOKED = "revoked"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="invitations"
+    )
+    email = models.EmailField(max_length=320)
+    role = models.CharField(max_length=64, choices=ProjectMembership.Role.choices)
+    token = models.CharField(max_length=64, unique=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    invited_by = models.CharField(max_length=200, blank=True, default="")
+    accepted_by = models.CharField(max_length=200, blank=True, default="")
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class UserNotification(models.Model):
+    class Channel(models.TextChoices):
+        IN_APP = "in_app"
+        EMAIL = "email"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_email = models.EmailField(max_length=320)
+    notification_type = models.CharField(max_length=64)
+    channel = models.CharField(max_length=16, choices=Channel.choices)
+    payload = models.JSONField(default=dict, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class DataAsset(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     qualified_name = models.CharField(max_length=512, unique=True)

@@ -17,6 +17,7 @@ This repository is intentionally small: it provides a starting point for a **clo
 * `EDMPTenantMiddleware` resolves tenants by hostname; requests without a tenant are rejected.
 * Each tenant gets an isolated PostgreSQL schema (`auto_create_schema = True`).
 * Within a tenant (institution boundary), multiple tenant-local projects can be defined to scope ingestion, connector runs, and orchestration workflows.
+* Project collaboration supports role-based invitations (`principal_investigator`, `researcher`, `data_manager`) with existing-user notifications and one-time login links for new users.
 
 ### Health / readiness probes (Kubernetes)
 

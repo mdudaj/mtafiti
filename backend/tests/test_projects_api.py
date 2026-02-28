@@ -5,6 +5,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
+from core.models import ProjectInvitation, ProjectMembership, UserNotification
 from tenants.models import Domain, Tenant
 
 
@@ -178,3 +179,88 @@ def test_project_role_and_orchestration_project_validation(monkeypatch):
     )
     assert mismatch_workflow.status_code == 400
     assert mismatch_workflow.json()["error"] == "step_project_mismatch"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_project_member_invite_existing_user_sends_notification():
+    host, _ = _create_tenants()
+    client = Client()
+    project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Cancer Study"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    existing_project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Existing Program"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    ProjectMembership.objects.create(
+        project_id=existing_project.json()["id"],
+        user_email="existing@example.com",
+        role=ProjectMembership.Role.RESEARCHER,
+    )
+
+    invite = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/invite",
+        data=json.dumps({"email": "existing@example.com", "role": "principal_investigator"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    assert invite.status_code == 201
+    assert invite.json()["delivery"] == "existing_user_notification"
+    assert invite.json()["membership"]["user_email"] == "existing@example.com"
+    assert invite.json()["membership"]["role"] == "principal_investigator"
+    assert ProjectInvitation.objects.filter(email="existing@example.com").count() == 0
+    assert (
+        UserNotification.objects.filter(
+            user_email="existing@example.com",
+            channel=UserNotification.Channel.IN_APP,
+        ).count()
+        == 1
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_project_member_invite_new_user_generates_one_time_link_and_acceptance():
+    host, _ = _create_tenants()
+    client = Client()
+    project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Cancer Study"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    invite = client.post(
+        f"/api/v1/projects/{project.json()['id']}/members/invite",
+        data=json.dumps({"email": "new-user@example.com", "role": "data_manager"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="owner@example.com",
+    )
+    assert invite.status_code == 201
+    assert invite.json()["delivery"] == "one_time_login_link"
+    assert "invite-login?token=" in invite.json()["invite_link"]
+    assert invite.json()["invitation"]["id"]
+
+    accept = client.post(
+        "/api/v1/projects/invitations/accept",
+        data=json.dumps({"token": invite.json()["invite_link"].split("token=")[-1]}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ID="new-user@example.com",
+    )
+    assert accept.status_code == 200
+    assert accept.json()["membership"]["user_email"] == "new-user@example.com"
+    assert accept.json()["membership"]["role"] == "data_manager"
+    assert accept.json()["invitation"]["status"] == "accepted"
+    assert (
+        UserNotification.objects.filter(
+            user_email="new-user@example.com",
+            channel=UserNotification.Channel.EMAIL,
+        ).count()
+        == 1
+    )

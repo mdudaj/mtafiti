@@ -46,6 +46,8 @@ from .models import (
     PrivacyProfile,
     PrintJob,
     Project,
+    ProjectInvitation,
+    ProjectMembership,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
@@ -55,6 +57,7 @@ from .models import (
     RetentionHold,
     RetentionRule,
     RetentionRun,
+    UserNotification,
     WorkflowDefinition,
     WorkflowRun,
     WorkflowTask,
@@ -754,6 +757,35 @@ def _project_to_dict(project: Project) -> dict[str, Any]:
         'sync_config': project.sync_config,
         'created_at': project.created_at.isoformat(),
         'updated_at': project.updated_at.isoformat(),
+    }
+
+
+def _project_membership_to_dict(membership: ProjectMembership) -> dict[str, Any]:
+    return {
+        'id': str(membership.id),
+        'project_id': str(membership.project_id),
+        'user_email': membership.user_email,
+        'role': membership.role,
+        'status': membership.status,
+        'invited_by': membership.invited_by or None,
+        'created_at': membership.created_at.isoformat(),
+        'updated_at': membership.updated_at.isoformat(),
+    }
+
+
+def _project_invitation_to_dict(invitation: ProjectInvitation) -> dict[str, Any]:
+    return {
+        'id': str(invitation.id),
+        'project_id': str(invitation.project_id),
+        'email': invitation.email,
+        'role': invitation.role,
+        'status': invitation.status,
+        'expires_at': invitation.expires_at.isoformat(),
+        'accepted_at': invitation.accepted_at.isoformat() if invitation.accepted_at else None,
+        'invited_by': invitation.invited_by or None,
+        'accepted_by': invitation.accepted_by or None,
+        'created_at': invitation.created_at.isoformat(),
+        'updated_at': invitation.updated_at.isoformat(),
     }
 
 
@@ -5016,6 +5048,227 @@ def projects(request):
         return JsonResponse(_project_to_dict(project), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def project_member_invites(request, project_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+
+    try:
+        project = Project.objects.get(id=project_id)
+    except (ValidationError, Project.DoesNotExist):
+        return JsonResponse({'error': 'project_not_found'}, status=404)
+
+    email = (payload.get('email') or '').strip().lower()
+    if not email:
+        return JsonResponse({'error': 'email is required'}, status=400)
+    role = (payload.get('role') or '').strip()
+    if role not in ProjectMembership.Role.values:
+        return JsonResponse({'error': 'invalid_role'}, status=400)
+
+    tenant_schema = _tenant_schema(request)
+    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
+    user_id = request.headers.get('X-User-Id') or ''
+    existing_user = ProjectMembership.objects.filter(
+        user_email=email, status=ProjectMembership.Status.ACTIVE
+    ).exists()
+
+    if existing_user:
+        membership, _ = ProjectMembership.objects.update_or_create(
+            project=project,
+            user_email=email,
+            defaults={
+                'role': role,
+                'status': ProjectMembership.Status.ACTIVE,
+                'invited_by': user_id,
+            },
+        )
+        notification = UserNotification.objects.create(
+            user_email=email,
+            notification_type='project_membership_invite',
+            channel=UserNotification.Channel.IN_APP,
+            payload={
+                'project_id': str(project.id),
+                'project_name': project.name,
+                'role': role,
+            },
+        )
+        event_data = {
+            'project_id': str(project.id),
+            'project_name': project.name,
+            'email': email,
+            'role': role,
+            'delivery': 'in_app',
+            'notification_id': str(notification.id),
+            'membership': _project_membership_to_dict(membership),
+        }
+        maybe_publish_event(
+            event_type='project.member.invited',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.project.member.invited',
+            correlation_id=correlation_id,
+            user_id=user_id or None,
+            data=event_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='project.member.invited',
+            resource_type='project',
+            resource_id=str(project.id),
+            correlation_id=correlation_id,
+            user_id=user_id or None,
+            data=event_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(
+            {
+                'delivery': 'existing_user_notification',
+                'notification_id': str(notification.id),
+                'membership': _project_membership_to_dict(membership),
+            },
+            status=201,
+        )
+
+    expires_minutes = 60 * 24 * 7
+    invitation = ProjectInvitation.objects.create(
+        project=project,
+        email=email,
+        role=role,
+        token=uuid.uuid4().hex,
+        invited_by=user_id,
+        expires_at=timezone.now() + timedelta(minutes=expires_minutes),
+    )
+    app_base_url = os.environ.get('EDMP_APP_BASE_URL', 'http://localhost:8000').rstrip('/')
+    invite_link = f'{app_base_url}/invite-login?token={invitation.token}'
+    notification = UserNotification.objects.create(
+        user_email=email,
+        notification_type='project_membership_invite_link',
+        channel=UserNotification.Channel.EMAIL,
+        payload={
+            'project_id': str(project.id),
+            'project_name': project.name,
+            'role': role,
+            'invite_link': invite_link,
+            'expires_at': invitation.expires_at.isoformat(),
+        },
+    )
+    event_data = {
+        'project_id': str(project.id),
+        'project_name': project.name,
+        'email': email,
+        'role': role,
+        'delivery': 'one_time_login_link',
+        'invite_link': invite_link,
+        'invitation': _project_invitation_to_dict(invitation),
+        'notification_id': str(notification.id),
+    }
+    maybe_publish_event(
+        event_type='project.invitation.created',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.project.invitation.created',
+        correlation_id=correlation_id,
+        user_id=user_id or None,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='project.invitation.created',
+        resource_type='project',
+        resource_id=str(project.id),
+        correlation_id=correlation_id,
+        user_id=user_id or None,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(
+        {
+            'delivery': 'one_time_login_link',
+            'notification_id': str(notification.id),
+            'invite_link': invite_link,
+            'invitation': _project_invitation_to_dict(invitation),
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+def project_invitation_accept(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    token = (payload.get('token') or '').strip()
+    if not token:
+        return JsonResponse({'error': 'token is required'}, status=400)
+    try:
+        invitation = ProjectInvitation.objects.select_related('project').get(token=token)
+    except ProjectInvitation.DoesNotExist:
+        return JsonResponse({'error': 'invitation_not_found'}, status=404)
+    if invitation.status != ProjectInvitation.Status.PENDING:
+        return JsonResponse({'error': 'invitation_not_pending'}, status=400)
+    if invitation.expires_at <= timezone.now():
+        invitation.status = ProjectInvitation.Status.EXPIRED
+        invitation.save(update_fields=['status', 'updated_at'])
+        return JsonResponse({'error': 'invitation_expired'}, status=400)
+
+    accepted_by = (payload.get('user_id') or request.headers.get('X-User-Id') or invitation.email).strip()
+    membership, _ = ProjectMembership.objects.update_or_create(
+        project=invitation.project,
+        user_email=invitation.email,
+        defaults={
+            'role': invitation.role,
+            'status': ProjectMembership.Status.ACTIVE,
+            'invited_by': invitation.invited_by,
+        },
+    )
+    invitation.status = ProjectInvitation.Status.ACCEPTED
+    invitation.accepted_by = accepted_by
+    invitation.accepted_at = timezone.now()
+    invitation.save(update_fields=['status', 'accepted_by', 'accepted_at', 'updated_at'])
+
+    tenant_schema = _tenant_schema(request)
+    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
+    event_data = {
+        'project_id': str(invitation.project_id),
+        'email': invitation.email,
+        'role': invitation.role,
+        'membership': _project_membership_to_dict(membership),
+    }
+    maybe_publish_event(
+        event_type='project.invitation.accepted',
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.project.invitation.accepted',
+        correlation_id=correlation_id,
+        user_id=accepted_by,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action='project.invitation.accepted',
+        resource_type='project',
+        resource_id=str(invitation.project_id),
+        correlation_id=correlation_id,
+        user_id=accepted_by,
+        data=event_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(
+        {
+            'membership': _project_membership_to_dict(membership),
+            'invitation': _project_invitation_to_dict(invitation),
+        }
+    )
 
 
 @csrf_exempt

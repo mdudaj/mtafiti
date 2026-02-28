@@ -80,6 +80,8 @@ from core.views import (
     print_job_detail,
     print_job_status,
     print_jobs,
+    project_invitation_accept,
+    project_member_invites,
     projects,
     privacy_consent_events,
     privacy_action_decision,
@@ -310,6 +312,16 @@ urlpatterns = [
     path('api/v1/quality/rules/<uuid:rule_id>/evaluate', quality_rule_evaluate, name='quality_rule_evaluate'),
     path('api/v1/quality/results', quality_results, name='quality_results'),
     path('api/v1/projects', projects, name='projects'),
+    path(
+        'api/v1/projects/<int:project_id>/members/invite',
+        project_member_invites,
+        name='project_member_invites',
+    ),
+    path(
+        'api/v1/projects/invitations/accept',
+        project_invitation_accept,
+        name='project_invitation_accept',
+    ),
     path('api/v1/orchestration/workflows', orchestration_workflows, name='orchestration_workflows'),
     path('api/v1/orchestration/runs', orchestration_runs, name='orchestration_runs'),
     path(
