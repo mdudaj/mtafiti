@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 from datetime import timedelta
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from django.db.models import Q
 from django.utils import timezone
@@ -8,12 +12,63 @@ from django.utils import timezone
 from .models import UserNotification
 
 
+def _webhook_timeout_seconds() -> float:
+    raw = os.environ.get("EDMP_NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS", "5")
+    try:
+        parsed = float(raw)
+    except ValueError:
+        parsed = 5.0
+    return min(max(parsed, 1.0), 30.0)
+
+
+def _post_json(url: str, payload: dict, *, timeout: float) -> tuple[bool, str]:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib_request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=timeout) as resp:
+            status = getattr(resp, "status", 200)
+            if status >= 400:
+                return False, f"webhook_http_{status}"
+    except urllib_error.HTTPError as exc:
+        return False, f"webhook_http_{exc.code}"
+    except (urllib_error.URLError, TimeoutError, OSError):
+        return False, "webhook_delivery_failed"
+    return True, ""
+
+
 def _deliver_via_provider(notification: UserNotification) -> tuple[bool, str]:
     payload = notification.payload or {}
+    if notification.channel in {
+        UserNotification.Channel.EMAIL,
+        UserNotification.Channel.IN_APP,
+    }:
+        return True, ""
     if notification.channel == UserNotification.Channel.WEBHOOK:
-        if not isinstance(payload, dict) or not payload.get("webhook_url"):
+        if not isinstance(payload, dict):
+            return False, "invalid_webhook_payload"
+        webhook_url = payload.get("webhook_url")
+        if not isinstance(webhook_url, str) or not webhook_url.strip():
             return False, "missing_webhook_url"
-    return True, ""
+        if not webhook_url.startswith(("http://", "https://")):
+            return False, "invalid_webhook_url"
+        event_payload = {
+            "user_email": notification.user_email,
+            "notification_type": notification.notification_type,
+            "channel": notification.channel,
+            "provider": notification.provider,
+            "payload": payload,
+        }
+        return _post_json(
+            webhook_url,
+            event_payload,
+            timeout=_webhook_timeout_seconds(),
+        )
+    return False, "unsupported_notification_channel"
 
 
 def dispatch_notification(notification: UserNotification) -> UserNotification:

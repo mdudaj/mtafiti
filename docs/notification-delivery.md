@@ -25,5 +25,7 @@ This increment hardens tenant-scoped notification delivery with provider abstrac
 
 The current provider interface is pluggable through `provider` and `channel`.
 
-* `email` and `in_app` simulate successful dispatch in scaffold mode.
-* `webhook` requires `payload.webhook_url`; missing URL triggers retry/dead-letter flow.
+* `email` and `in_app` run through the same dispatch pipeline and succeed in scaffold mode.
+* `webhook` performs HTTP POST delivery with JSON payload; it requires `payload.webhook_url` using `http://` or `https://`.
+* Webhook timeout is configured by `EDMP_NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS` (clamped safety range `1..30` seconds).
+* Provider or delivery failures map to explicit errors (`missing_webhook_url`, `invalid_webhook_url`, `webhook_http_<code>`, `webhook_delivery_failed`) and flow into retry/dead-letter policy.

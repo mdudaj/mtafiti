@@ -57,6 +57,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 51. **Scalability follow-through**: added high-volume index coverage for list/filter hot paths and expanded baseline latency checks for notification queue listing (see `docs/performance-baseline.md`).
 52. **CI/test throughput optimization**: increased shard parallelism, split performance baseline into a dedicated CI lane, and documented faster local feedback commands (see `README.md` and `docs/performance-baseline.md`).
 53. **Self-reflective delivery workflow**: added concrete issue/PR execution templates and wired workflow docs to enforce issue/handoff contract and shared acceptance checks (see `docs/self-reflective-implementation.md` and `.github/ISSUE_TEMPLATE/delivery-work-item.md`).
+54. **Notification provider integration**: added webhook HTTP delivery execution with timeout/error mapping and provider-focused dispatch regression coverage (see `docs/notification-delivery.md`).
 
 ## Near-term (next)
 
