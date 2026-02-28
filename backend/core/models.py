@@ -702,6 +702,56 @@ class WorkflowTask(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
 
 
+class OrchestrationWorkflow(models.Model):
+    class TriggerType(models.TextChoices):
+        SCHEDULE = "schedule"
+        EVENT = "event"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active"
+        PAUSED = "paused"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    trigger_type = models.CharField(
+        max_length=16, choices=TriggerType.choices, default=TriggerType.EVENT
+    )
+    trigger_value = models.CharField(max_length=200, blank=True, default="")
+    steps = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="uniq_orchestration_workflow_name")
+        ]
+
+
+class OrchestrationRun(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued"
+        RUNNING = "running"
+        SUCCEEDED = "succeeded"
+        FAILED = "failed"
+        CANCELLED = "cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow = models.ForeignKey(
+        OrchestrationWorkflow, on_delete=models.CASCADE, related_name="runs"
+    )
+    trigger_context = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED
+    )
+    step_results = models.JSONField(default=list, blank=True)
+    error_message = models.CharField(max_length=512, blank=True, default="")
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class GovernancePolicy(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft"

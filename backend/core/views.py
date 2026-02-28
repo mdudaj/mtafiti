@@ -40,6 +40,8 @@ from .models import (
     NotebookExecution,
     NotebookSession,
     NotebookWorkspace,
+    OrchestrationRun,
+    OrchestrationWorkflow,
     PrivacyAction,
     PrivacyProfile,
     PrintJob,
@@ -151,6 +153,44 @@ def _parse_uuid_string_list(value: Any) -> list[str] | None:
             normalized.append(str(uuid.UUID(item)))
         except ValueError:
             return None
+    return normalized
+
+
+def _parse_orchestration_steps(value: Any) -> list[dict[str, Any]] | None:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return None
+    normalized = []
+    known_step_ids = set()
+    for raw_step in value:
+        if not isinstance(raw_step, dict):
+            return None
+        step_id = (raw_step.get('step_id') or '').strip()
+        ingestion_id = raw_step.get('ingestion_id')
+        depends_on = raw_step.get('depends_on') or []
+        if not step_id or not ingestion_id:
+            return None
+        if step_id in known_step_ids:
+            return None
+        if not isinstance(depends_on, list) or not all(
+            isinstance(dep, str) and dep for dep in depends_on
+        ):
+            return None
+        if any(dep not in known_step_ids for dep in depends_on):
+            return None
+        try:
+            normalized_ingestion_id = str(uuid.UUID(str(ingestion_id)))
+        except ValueError:
+            return None
+        known_step_ids.add(step_id)
+        normalized.append(
+            {
+                'step_id': step_id,
+                'ingestion_id': normalized_ingestion_id,
+                'depends_on': depends_on,
+            }
+        )
     return normalized
 
 
@@ -600,6 +640,34 @@ def _workflow_task_to_dict(task: WorkflowTask) -> dict[str, Any]:
         'status': task.status,
         'created_at': task.created_at.isoformat(),
         'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+    }
+
+
+def _orchestration_workflow_to_dict(workflow: OrchestrationWorkflow) -> dict[str, Any]:
+    return {
+        'id': str(workflow.id),
+        'name': workflow.name,
+        'trigger_type': workflow.trigger_type,
+        'trigger_value': workflow.trigger_value or None,
+        'steps': workflow.steps,
+        'status': workflow.status,
+        'created_at': workflow.created_at.isoformat(),
+        'updated_at': workflow.updated_at.isoformat(),
+    }
+
+
+def _orchestration_run_to_dict(run: OrchestrationRun) -> dict[str, Any]:
+    return {
+        'id': str(run.id),
+        'workflow_id': str(run.workflow_id),
+        'trigger_context': run.trigger_context,
+        'status': run.status,
+        'step_results': run.step_results,
+        'error_message': run.error_message or None,
+        'started_at': run.started_at.isoformat() if run.started_at else None,
+        'finished_at': run.finished_at.isoformat() if run.finished_at else None,
+        'created_at': run.created_at.isoformat(),
+        'updated_at': run.updated_at.isoformat(),
     }
 
 
@@ -4838,6 +4906,294 @@ def workflow_run_tasks(request, run_id: str):
         return forbidden
     tasks = WorkflowTask.objects.filter(run_id=run_id).order_by('-created_at')
     return JsonResponse({'items': [_workflow_task_to_dict(item) for item in tasks]})
+
+
+@csrf_exempt
+def orchestration_workflows(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = OrchestrationWorkflow.objects.order_by('-created_at')
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        trigger_type = request.GET.get('trigger_type')
+        if trigger_type:
+            qs = qs.filter(trigger_type=trigger_type)
+        return JsonResponse(
+            {'items': [_orchestration_workflow_to_dict(item) for item in qs]}
+        )
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'name is required'}, status=400)
+        trigger_type = payload.get('trigger_type') or OrchestrationWorkflow.TriggerType.EVENT
+        if trigger_type not in OrchestrationWorkflow.TriggerType.values:
+            return JsonResponse({'error': 'invalid_trigger_type'}, status=400)
+        workflow_status = payload.get('status') or OrchestrationWorkflow.Status.ACTIVE
+        if workflow_status not in OrchestrationWorkflow.Status.values:
+            return JsonResponse({'error': 'invalid_status'}, status=400)
+        steps = _parse_orchestration_steps(payload.get('steps'))
+        if steps is None:
+            return JsonResponse({'error': 'invalid_steps'}, status=400)
+        workflow = OrchestrationWorkflow.objects.create(
+            name=name,
+            trigger_type=trigger_type,
+            trigger_value=(payload.get('trigger_value') or '').strip(),
+            steps=steps,
+            status=workflow_status,
+        )
+        tenant_schema = _tenant_schema(request)
+        payload_data = _orchestration_workflow_to_dict(workflow)
+        maybe_publish_event(
+            event_type='orchestration.workflow.created',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.orchestration.workflow.created',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='orchestration.workflow.created',
+            resource_type='orchestration_workflow',
+            resource_id=str(workflow.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(payload_data, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def orchestration_runs(request):
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        qs = OrchestrationRun.objects.order_by('-created_at')
+        workflow_id = request.GET.get('workflow_id')
+        if workflow_id:
+            qs = qs.filter(workflow_id=workflow_id)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return JsonResponse({'items': [_orchestration_run_to_dict(item) for item in qs]})
+
+    if request.method == 'POST':
+        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({'error': 'invalid_json'}, status=400)
+        workflow_id = payload.get('workflow_id')
+        if not workflow_id:
+            return JsonResponse({'error': 'workflow_id is required'}, status=400)
+        try:
+            workflow = OrchestrationWorkflow.objects.get(id=workflow_id)
+        except (ValidationError, OrchestrationWorkflow.DoesNotExist):
+            return JsonResponse({'error': 'workflow_not_found'}, status=404)
+        if workflow.status != OrchestrationWorkflow.Status.ACTIVE:
+            return JsonResponse({'error': 'workflow_not_active'}, status=400)
+        run = OrchestrationRun.objects.create(
+            workflow=workflow,
+            trigger_context=payload.get('trigger_context')
+            if isinstance(payload.get('trigger_context'), dict)
+            else {},
+            status=OrchestrationRun.Status.QUEUED,
+            step_results=[],
+        )
+        tenant_schema = _tenant_schema(request)
+        payload_data = _orchestration_run_to_dict(run)
+        maybe_publish_event(
+            event_type='orchestration.run.queued',
+            tenant_id=tenant_schema,
+            routing_key=f'{tenant_schema}.orchestration.run.queued',
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        maybe_publish_audit_event(
+            tenant_id=tenant_schema,
+            action='orchestration.run.queued',
+            resource_type='orchestration_run',
+            resource_id=str(run.id),
+            correlation_id=getattr(request, 'correlation_id', None)
+            or request.headers.get('X-Correlation-Id'),
+            user_id=request.headers.get('X-User-Id'),
+            data=payload_data,
+            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        )
+        return JsonResponse(payload_data, status=201)
+
+    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+
+
+@csrf_exempt
+def orchestration_run_transition(request, run_id: str):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    try:
+        run = OrchestrationRun.objects.select_related('workflow').get(id=run_id)
+    except (ValidationError, OrchestrationRun.DoesNotExist):
+        return JsonResponse({'error': 'not_found'}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    action = payload.get('action')
+    if action not in {'start', 'cancel'}:
+        return JsonResponse({'error': 'invalid_action'}, status=400)
+    if action == 'cancel':
+        if run.status in {
+            OrchestrationRun.Status.SUCCEEDED,
+            OrchestrationRun.Status.FAILED,
+            OrchestrationRun.Status.CANCELLED,
+        }:
+            return JsonResponse({'error': 'run_not_cancellable'}, status=400)
+        run.status = OrchestrationRun.Status.CANCELLED
+        run.finished_at = timezone.now()
+        run.error_message = 'cancelled by user'
+        run.save(update_fields=['status', 'finished_at', 'error_message', 'updated_at'])
+        event_type = 'orchestration.run.cancelled'
+    else:
+        if run.status != OrchestrationRun.Status.QUEUED:
+            return JsonResponse({'error': 'invalid_transition'}, status=400)
+        run.status = OrchestrationRun.Status.RUNNING
+        run.started_at = timezone.now()
+        run.save(update_fields=['status', 'started_at', 'updated_at'])
+        event_type = 'orchestration.run.started'
+        step_results: list[dict[str, Any]] = []
+        tenant_schema = _tenant_schema(request)
+        for step in run.workflow.steps:
+            ingestion_id = step.get('ingestion_id')
+            try:
+                ingestion = IngestionRequest.objects.get(id=ingestion_id)
+            except (ValidationError, IngestionRequest.DoesNotExist):
+                run.status = OrchestrationRun.Status.FAILED
+                run.error_message = f"ingestion_not_found:{ingestion_id}"
+                run.finished_at = timezone.now()
+                run.step_results = step_results
+                run.save(
+                    update_fields=[
+                        'status',
+                        'error_message',
+                        'finished_at',
+                        'step_results',
+                        'updated_at',
+                    ]
+                )
+                event_type = 'orchestration.run.failed'
+                break
+            connector_run = ConnectorRun.objects.create(
+                ingestion=ingestion,
+                execution_path=ConnectorRun.ExecutionPath.WORKER,
+                status=ConnectorRun.Status.QUEUED,
+                retry_count=0,
+                progress={},
+            )
+            execute_connector_run.apply(
+                kwargs={
+                    'tenant_schema': tenant_schema,
+                    'run_id': str(connector_run.id),
+                    'correlation_id': getattr(request, 'correlation_id', None)
+                    or request.headers.get('X-Correlation-Id'),
+                    'user_id': request.headers.get('X-User-Id'),
+                    'request_id': request.headers.get('X-Request-Id')
+                    or request.headers.get('X-Request-ID'),
+                }
+            ).get(propagate=True)
+            refreshed_connector_run = ConnectorRun.objects.get(id=connector_run.id)
+            step_result = {
+                'step_id': step.get('step_id'),
+                'ingestion_id': str(ingestion.id),
+                'connector_run_id': str(refreshed_connector_run.id),
+                'status': refreshed_connector_run.status,
+            }
+            step_results.append(step_result)
+            if refreshed_connector_run.status != ConnectorRun.Status.SUCCEEDED:
+                run.status = OrchestrationRun.Status.FAILED
+                run.error_message = (
+                    refreshed_connector_run.error_message or 'connector_run_failed'
+                )
+                run.finished_at = timezone.now()
+                run.step_results = step_results
+                run.save(
+                    update_fields=[
+                        'status',
+                        'error_message',
+                        'finished_at',
+                        'step_results',
+                        'updated_at',
+                    ]
+                )
+                event_type = 'orchestration.run.failed'
+                break
+        else:
+            run.status = OrchestrationRun.Status.SUCCEEDED
+            run.error_message = ''
+            run.finished_at = timezone.now()
+            run.step_results = step_results
+            run.save(
+                update_fields=[
+                    'status',
+                    'error_message',
+                    'finished_at',
+                    'step_results',
+                    'updated_at',
+                ]
+            )
+            event_type = 'orchestration.run.succeeded'
+
+    tenant_schema = _tenant_schema(request)
+    payload_data = _orchestration_run_to_dict(run)
+    maybe_publish_event(
+        event_type=event_type,
+        tenant_id=tenant_schema,
+        routing_key=f'{tenant_schema}.{event_type}',
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=payload_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    maybe_publish_audit_event(
+        tenant_id=tenant_schema,
+        action=event_type,
+        resource_type='orchestration_run',
+        resource_id=str(run.id),
+        correlation_id=getattr(request, 'correlation_id', None)
+        or request.headers.get('X-Correlation-Id'),
+        user_id=request.headers.get('X-User-Id'),
+        data=payload_data,
+        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+    )
+    return JsonResponse(payload_data)
 
 
 @csrf_exempt

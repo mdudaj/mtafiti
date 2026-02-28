@@ -74,6 +74,9 @@ from core.views import (
     notebook_sessions,
     notebook_workspace_sessions,
     notebook_workspaces,
+    orchestration_run_transition,
+    orchestration_runs,
+    orchestration_workflows,
     print_job_detail,
     print_job_status,
     print_jobs,
@@ -301,6 +304,13 @@ urlpatterns = [
     path('api/v1/quality/rules', quality_rules, name='quality_rules'),
     path('api/v1/quality/rules/<uuid:rule_id>/evaluate', quality_rule_evaluate, name='quality_rule_evaluate'),
     path('api/v1/quality/results', quality_results, name='quality_results'),
+    path('api/v1/orchestration/workflows', orchestration_workflows, name='orchestration_workflows'),
+    path('api/v1/orchestration/runs', orchestration_runs, name='orchestration_runs'),
+    path(
+        'api/v1/orchestration/runs/<uuid:run_id>/transition',
+        orchestration_run_transition,
+        name='orchestration_run_transition',
+    ),
     path('api/v1/stewardship/items', stewardship_items, name='stewardship_items'),
     path(
         'api/v1/stewardship/items/<uuid:item_id>/transition',

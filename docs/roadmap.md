@@ -31,6 +31,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 25. **Data privacy management**: tenant-scoped privacy profile, consent, and privacy-action lifecycle APIs with policy/retention/stewardship integration hooks (see `docs/privacy.md`).
 26. **Agentic AI execution**: tenant-scoped agent run lifecycle APIs with tool allowlisting, timeout/cancel controls, and execution audit/event conventions (see `docs/agentic-ai.md`).
 27. **Data stewardship operations**: tenant-scoped stewardship queue item APIs with assignment/triage/resolution lifecycle and stewardship event/audit conventions (see `docs/stewardship.md`).
+28. **Workflow orchestration**: lightweight tenant-scoped orchestration workflow/run APIs with schedule/event triggers, connector-backed step execution, and orchestration event/audit conventions (see `docs/orchestration.md`).
 
 ## Near-term (next)
 
@@ -46,7 +47,6 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 ## Mid-term
 
 * **Self-reflective delivery workflow**: define implementation-agent roles, handoff contracts, retry budgets, and quality gates for faster feature delivery (see `docs/self-reflective-implementation.md`).
-* **Workflow orchestration**: define lightweight scheduled/event-driven workflow runs built on connector executions (see `docs/orchestration.md`).
 
 ## Out of scope for this scaffold (yet)
 

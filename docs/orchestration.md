@@ -41,3 +41,24 @@ Trigger evaluation should enqueue workflow runs; workers remain responsible for 
 * Cross-tenant workflow dependencies.
 * Full DAG optimization and parallel fan-out planning.
 * External workflow engine lock-in (Airflow/Argo) before interfaces stabilize.
+
+## Implemented scaffold slice
+
+* API surface:
+  * `POST/GET /api/v1/orchestration/workflows`
+  * `POST/GET /api/v1/orchestration/runs`
+  * `POST /api/v1/orchestration/runs/{run_id}/transition`
+* Trigger model:
+  * workflow supports `schedule` and `event` trigger types with `trigger_value`.
+* Run lifecycle statuses:
+  * `queued | running | succeeded | failed | cancelled`
+* Execution semantics:
+  * run steps reference ingestion requests and execute via existing connector-run worker path.
+  * each step captures connector run id + terminal status in `step_results`.
+* Event and audit conventions:
+  * `orchestration.workflow.created`
+  * `orchestration.run.queued`
+  * `orchestration.run.started`
+  * `orchestration.run.succeeded`
+  * `orchestration.run.failed`
+  * `orchestration.run.cancelled`
