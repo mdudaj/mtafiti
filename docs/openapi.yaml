@@ -928,6 +928,437 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/users:
+    get:
+      tags: [projects]
+      summary: List user profiles (tenant-scoped)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, invited, disabled]
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserProfile'
+                required: [items]
+    post:
+      tags: [projects]
+      summary: Create user profile (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserProfileRequest'
+      responses:
+        '201':
+          description: User profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/users/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [projects]
+      summary: Get user profile (tenant-scoped)
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [projects]
+      summary: Update user profile (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserProfileRequest'
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/notifications:
+    get:
+      tags: [ui-operations]
+      summary: List notifications (tenant-scoped)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, sent, failed, dead_letter]
+        - name: channel
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [in_app, email, webhook]
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserNotification'
+                required: [items]
+    post:
+      tags: [ui-operations]
+      summary: Create notification (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserNotificationRequest'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserNotification'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/notifications/dispatch:
+    post:
+      tags: [ui-operations]
+      summary: Dispatch pending notifications (tenant-scoped)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 500
+      responses:
+        '200':
+          description: Dispatch summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDispatchSummary'
+  /api/v1/notifications/{notification_id}/retry:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [ui-operations]
+      summary: Retry failed/dead-letter notification
+      responses:
+        '200':
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserNotification'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/{project_id}/members:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [projects]
+      summary: List project memberships (tenant-scoped)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        '200':
+          description: Project memberships
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectMembership'
+                required: [items]
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/{project_id}/members/invite:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [projects]
+      summary: Invite project member (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteProjectMemberRequest'
+      responses:
+        '201':
+          description: Invitation or direct membership created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delivery:
+                    type: string
+                  notification_id:
+                    type: string
+                    format: uuid
+                  invite_link:
+                    type: string
+                    nullable: true
+                  membership:
+                    $ref: '#/components/schemas/ProjectMembership'
+                  invitation:
+                    $ref: '#/components/schemas/ProjectInvitation'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/{project_id}/members/{membership_id}/lifecycle:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: membership_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [projects]
+      summary: Update project membership lifecycle (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMembershipLifecycleRequest'
+      responses:
+        '200':
+          description: Updated membership state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  membership:
+                    $ref: '#/components/schemas/ProjectMembership'
+                  history:
+                    $ref: '#/components/schemas/ProjectMembershipRoleHistory'
+                required: [membership, history]
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Membership not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/invitations/accept:
+    post:
+      tags: [projects]
+      summary: Accept project invitation token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptProjectInvitationRequest'
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  membership:
+                    $ref: '#/components/schemas/ProjectMembership'
+                  invitation:
+                    $ref: '#/components/schemas/ProjectInvitation'
+                required: [membership, invitation]
+        '400':
+          description: Validation or state error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/invitations/{invitation_id}/revoke:
+    parameters:
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [projects]
+      summary: Revoke project invitation
+      responses:
+        '200':
+          description: Invitation revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invitation:
+                    $ref: '#/components/schemas/ProjectInvitation'
+                required: [invitation]
+        '404':
+          description: Invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/projects/invitations/{invitation_id}/resend:
+    parameters:
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [projects]
+      summary: Resend project invitation with rotated token
+      responses:
+        '200':
+          description: Invitation resent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invite_link:
+                    type: string
+                  invitation:
+                    $ref: '#/components/schemas/ProjectInvitation'
+                required: [invite_link, invitation]
+        '404':
+          description: Invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/ui/operations/dashboard:
     get:
       tags: [ui-operations]
@@ -1297,6 +1728,259 @@ paths:
           type: object
           additionalProperties: true
       required: [name]
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, invited, disabled]
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, email, status, created_at, updated_at]
+    CreateUserProfileRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, invited, disabled]
+      required: [email]
+    UpdateUserProfileRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, invited, disabled]
+    ProjectMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: integer
+        user_email:
+          type: string
+        role:
+          type: string
+          enum: [principal_investigator, researcher, data_manager]
+        status:
+          type: string
+          enum: [active, inactive]
+        invited_by:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, project_id, user_email, role, status, created_at, updated_at]
+    ProjectMembershipRoleHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        membership_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        previous_role:
+          type: string
+          nullable: true
+        new_role:
+          type: string
+          nullable: true
+        previous_status:
+          type: string
+          nullable: true
+        new_status:
+          type: string
+          nullable: true
+        actor_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, membership_id, action, created_at]
+    ProjectInvitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: integer
+        email:
+          type: string
+        role:
+          type: string
+          enum: [principal_investigator, researcher, data_manager]
+        status:
+          type: string
+          enum: [pending, accepted, expired, revoked]
+        token_attempts:
+          type: integer
+        max_token_attempts:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        resent_at:
+          type: string
+          format: date-time
+          nullable: true
+        invited_by:
+          type: string
+          nullable: true
+        accepted_by:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, project_id, email, role, status, token_attempts, max_token_attempts, expires_at, created_at, updated_at]
+    InviteProjectMemberRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [principal_investigator, researcher, data_manager]
+      required: [email, role]
+    ProjectMembershipLifecycleRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [change_role, revoke, reactivate]
+        role:
+          type: string
+          enum: [principal_investigator, researcher, data_manager]
+      required: [action]
+    AcceptProjectInvitationRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        user_id:
+          type: string
+      required: [token]
+    UserNotification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_email:
+          type: string
+        notification_type:
+          type: string
+        channel:
+          type: string
+          enum: [in_app, email, webhook]
+        provider:
+          type: string
+        delivery_status:
+          type: string
+          enum: [pending, sent, failed, dead_letter]
+        attempts:
+          type: integer
+        max_attempts:
+          type: integer
+        next_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        dead_lettered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, user_email, notification_type, channel, provider, delivery_status, attempts, max_attempts, payload, created_at]
+    CreateUserNotificationRequest:
+      type: object
+      properties:
+        user_email:
+          type: string
+        notification_type:
+          type: string
+        channel:
+          type: string
+          enum: [in_app, email, webhook]
+        provider:
+          type: string
+        max_attempts:
+          type: integer
+        payload:
+          type: object
+          additionalProperties: true
+      required: [user_email, notification_type, channel]
+    NotificationDispatchSummary:
+      type: object
+      properties:
+        processed:
+          type: integer
+        sent:
+          type: integer
+        failed:
+          type: integer
+        dead_letter:
+          type: integer
+      required: [processed, sent, failed, dead_letter]
     StewardshipItem:
       type: object
       properties:
