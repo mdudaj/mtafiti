@@ -438,3 +438,48 @@ def test_membership_and_invitation_contract_fields_are_stable():
     )
     assert revoke_resp.status_code == 200
     _assert_contract_keys(revoke_resp.json()['invitation'], {'id', 'project_id', 'email', 'role', 'status', 'created_at', 'updated_at'})
+
+
+@pytest.mark.django_db(transaction=True)
+def test_role_enforcement_contracts_for_user_notification_and_member_list(monkeypatch):
+    host = _create_tenant_host()
+    client = Client()
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', '1')
+
+    users_forbidden = client.get('/api/v1/users', HTTP_HOST=host, HTTP_X_API_VERSION='v1')
+    _assert_error_response(users_forbidden, 403, 'forbidden')
+
+    users_allowed = client.get(
+        '/api/v1/users',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+        HTTP_X_USER_ROLES='catalog.reader',
+    )
+    assert users_allowed.status_code == 200
+    _assert_contract_keys(users_allowed.json(), {'items', 'page', 'page_size', 'total'})
+
+    dispatch_forbidden = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 1}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+        HTTP_X_USER_ROLES='catalog.reader',
+    )
+    _assert_error_response(dispatch_forbidden, 403, 'forbidden')
+
+    project_resp = client.post(
+        '/api/v1/projects',
+        data=json.dumps({'name': 'Authz Contract Project'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert project_resp.status_code == 201
+    members_forbidden = client.get(
+        f"/api/v1/projects/{project_resp.json()['id']}/members",
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+    )
+    _assert_error_response(members_forbidden, 403, 'forbidden')

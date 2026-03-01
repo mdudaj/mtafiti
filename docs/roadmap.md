@@ -64,6 +64,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 58. **Pagination envelope parity for list endpoints**: aligned OpenAPI and contract tests so user, notification, and project-membership list APIs consistently declare and verify `items`, `page`, `page_size`, and `total` response fields (see `docs/openapi.yaml`, `.github/scripts/check_openapi_contract.py`, and `backend/tests/test_api_versioning_contracts.py`).
 59. **Contract regression coverage for invitation accept and notification retry**: extended API versioning contract tests to assert stable response fields for invitation token acceptance and notification retry responses, including failure/retry path coverage (see `backend/tests/test_api_versioning_contracts.py`).
 60. **Error envelope contract coverage for invitation/notification failures**: expanded API versioning contract tests to assert stable `{ "error": ... }` payload shape and version header behavior for invitation accept and notification retry failure responses (see `backend/tests/test_api_versioning_contracts.py`).
+61. **Role-enforcement contract coverage for identity/notification/member APIs**: expanded API versioning contract tests with `EDMP_ENFORCE_ROLES` enabled to verify stable forbidden error envelopes and allowed list response contracts for user directory, notification dispatch, and project member listing endpoints (see `backend/tests/test_api_versioning_contracts.py`).
 
 ## Near-term (next)
 
