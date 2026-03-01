@@ -212,3 +212,129 @@ def test_oidc_required_and_role_enforced_for_users_notifications_and_members(mon
         HTTP_AUTHORIZATION=f'Bearer {reader_token}',
     )
     assert members_with_reader.status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_oidc_required_for_invitation_accept_and_role_gated_notification_retry(monkeypatch):
+    monkeypatch.setenv('EDMP_OIDC_REQUIRED', 'true')
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    monkeypatch.setenv('EDMP_OIDC_JWT_SECRET', 'secret-a')
+    host, schema = _create_tenant_host_and_schema()
+    client = Client()
+
+    editor_token = _make_hs256_jwt(
+        {
+            'sub': 'editor@example.com',
+            'roles': ['catalog.editor'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    reader_token = _make_hs256_jwt(
+        {
+            'sub': 'reader@example.com',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    member_token = _make_hs256_jwt(
+        {
+            'sub': 'member-new@example.com',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+
+    project_resp = client.post(
+        '/api/v1/projects',
+        data=json.dumps({'name': 'OIDC Invite Retry Project'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert project_resp.status_code == 201
+
+    invite_resp = client.post(
+        f"/api/v1/projects/{project_resp.json()['id']}/members/invite",
+        data=json.dumps({'email': 'member-new@example.com', 'role': 'researcher'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert invite_resp.status_code == 201
+    invite_token = invite_resp.json()['invite_link'].split('token=')[-1]
+
+    accept_without_token = client.post(
+        '/api/v1/projects/invitations/accept',
+        data=json.dumps({'token': invite_token}),
+        content_type='application/json',
+        HTTP_HOST=host,
+    )
+    assert accept_without_token.status_code == 401
+    assert accept_without_token.json()['error'] == 'missing_bearer_token'
+
+    accept_with_token = client.post(
+        '/api/v1/projects/invitations/accept',
+        data=json.dumps({'token': invite_token}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {member_token}',
+    )
+    assert accept_with_token.status_code == 200
+
+    created_notification = client.post(
+        '/api/v1/notifications',
+        data=json.dumps(
+            {
+                'user_email': 'member-new@example.com',
+                'notification_type': 'ops_alert',
+                'channel': 'webhook',
+                'payload': {'webhook_url': 'ftp://invalid.example.com'},
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert created_notification.status_code == 201
+
+    dispatch_resp = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 10}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert dispatch_resp.status_code == 200
+
+    failed_list = client.get(
+        '/api/v1/notifications?status=failed',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {reader_token}',
+    )
+    assert failed_list.status_code == 200
+    notification_id = failed_list.json()['items'][0]['id']
+
+    retry_with_reader = client.post(
+        f'/api/v1/notifications/{notification_id}/retry',
+        data=json.dumps({}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {reader_token}',
+    )
+    assert retry_with_reader.status_code == 403
+    assert retry_with_reader.json()['error'] == 'forbidden'
+
+    retry_with_editor = client.post(
+        f'/api/v1/notifications/{notification_id}/retry',
+        data=json.dumps({}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert retry_with_editor.status_code == 200
