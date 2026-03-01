@@ -225,6 +225,55 @@ def test_user_and_notification_contract_fields_are_stable():
     assert notifications_list_resp.status_code == 200
     _assert_contract_keys(notifications_list_resp.json(), {'items', 'page', 'page_size', 'total'})
 
+    failed_notification_resp = client.post(
+        '/api/v1/notifications',
+        data=json.dumps(
+            {
+                'user_email': 'contract-user@example.com',
+                'notification_type': 'invite',
+                'channel': 'webhook',
+                'payload': {'webhook_url': 'ftp://invalid.example.com'},
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+    )
+    assert failed_notification_resp.status_code == 201
+    redispatch_resp = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 10}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+    )
+    assert redispatch_resp.status_code == 200
+    failed_list_resp = client.get('/api/v1/notifications?status=failed', HTTP_HOST=host, HTTP_X_API_VERSION='v1')
+    assert failed_list_resp.status_code == 200
+    retry_resp = client.post(
+        f"/api/v1/notifications/{failed_list_resp.json()['items'][0]['id']}/retry",
+        data=json.dumps({}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+    )
+    assert retry_resp.status_code == 200
+    _assert_contract_keys(
+        retry_resp.json(),
+        {
+            'id',
+            'user_email',
+            'notification_type',
+            'channel',
+            'provider',
+            'delivery_status',
+            'attempts',
+            'max_attempts',
+            'payload',
+            'created_at',
+        },
+    )
+
 
 @pytest.mark.django_db(transaction=True)
 def test_membership_and_invitation_contract_fields_are_stable():
@@ -291,6 +340,44 @@ def test_membership_and_invitation_contract_fields_are_stable():
     assert new_invite.status_code == 201
     _assert_contract_keys(
         new_invite.json()['invitation'],
+        {
+            'id',
+            'project_id',
+            'email',
+            'role',
+            'status',
+            'token_attempts',
+            'max_token_attempts',
+            'expires_at',
+            'created_at',
+            'updated_at',
+        },
+    )
+    accept_invite = client.post(
+        f'/api/v1/projects/{project_id}/members/invite',
+        data=json.dumps({'email': 'member-accept@example.com', 'role': 'researcher'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+        HTTP_X_USER_ID='owner@example.com',
+    )
+    assert accept_invite.status_code == 201
+    accept_token = accept_invite.json()['invite_link'].split('token=')[-1]
+    accept_resp = client.post(
+        '/api/v1/projects/invitations/accept',
+        data=json.dumps({'token': accept_token}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_API_VERSION='v1',
+        HTTP_X_USER_ID='member-accept@example.com',
+    )
+    assert accept_resp.status_code == 200
+    _assert_contract_keys(
+        accept_resp.json()['membership'],
+        {'id', 'project_id', 'user_email', 'role', 'status', 'created_at', 'updated_at'},
+    )
+    _assert_contract_keys(
+        accept_resp.json()['invitation'],
         {
             'id',
             'project_id',
