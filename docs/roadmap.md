@@ -71,6 +71,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 65. **OIDC tenant-claim mismatch coverage for new endpoints**: expanded OIDC auth tests to verify `token_tenant_mismatch` enforcement (and version header behavior) on user directory and invitation accept endpoints when bearer token tenant claim does not match the active tenant schema (see `backend/tests/test_oidc_jwt_auth.py`).
 66. **OIDC claim-validation coverage for new endpoints**: expanded OIDC auth tests to verify expired-token, invalid-audience, and invalid-issuer failures (with version header behavior) across user directory, notification dispatch, and invitation accept endpoints (see `backend/tests/test_oidc_jwt_auth.py`).
 67. **OIDC bearer/role enforcement coverage for invitation admin endpoints**: expanded OIDC auth tests to verify revoke/resend invitation endpoints enforce bearer authentication, reject insufficient roles, and allow editor-authorized control flow under `EDMP_OIDC_REQUIRED` + `EDMP_ENFORCE_ROLES` (see `backend/tests/test_oidc_jwt_auth.py`).
+68. **OIDC subject/nbf validation coverage for new endpoints**: expanded OIDC auth tests to verify invalid subject and not-yet-valid token failures (with version header behavior) on user directory and notification dispatch endpoints (see `backend/tests/test_oidc_jwt_auth.py`).
 
 ## Near-term (next)
 

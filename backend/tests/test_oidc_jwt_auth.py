@@ -612,3 +612,51 @@ def test_oidc_bearer_and_role_enforcement_for_invitation_revoke_and_resend(monke
     )
     assert resend_editor.status_code == 200
     assert 'invite_link' in resend_editor.json()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_oidc_subject_and_nbf_validation_on_new_endpoints(monkeypatch):
+    monkeypatch.setenv('EDMP_OIDC_REQUIRED', 'true')
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    monkeypatch.setenv('EDMP_OIDC_JWT_SECRET', 'secret-a')
+    host, schema = _create_tenant_host_and_schema()
+    client = Client()
+
+    invalid_subject_token = _make_hs256_jwt(
+        {
+            'sub': '   ',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    invalid_subject_resp = client.get(
+        '/api/v1/users',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {invalid_subject_token}',
+    )
+    assert invalid_subject_resp.status_code == 401
+    assert invalid_subject_resp.json()['error'] == 'invalid_token_subject'
+    assert invalid_subject_resp.headers['X-API-Version'] == 'v1'
+
+    not_yet_valid_token = _make_hs256_jwt(
+        {
+            'sub': 'nbf@example.com',
+            'roles': ['catalog.editor'],
+            'tid': schema,
+            'nbf': int(time.time()) + 600,
+            'exp': int(time.time()) + 1200,
+        },
+        'secret-a',
+    )
+    not_yet_valid_resp = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 1}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {not_yet_valid_token}',
+    )
+    assert not_yet_valid_resp.status_code == 401
+    assert not_yet_valid_resp.json()['error'] == 'token_not_yet_valid'
+    assert not_yet_valid_resp.headers['X-API-Version'] == 'v1'
