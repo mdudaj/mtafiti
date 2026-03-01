@@ -440,3 +440,78 @@ def test_oidc_tenant_claim_mismatch_on_users_and_invitation_accept(monkeypatch):
     assert accept_resp.status_code == 403
     assert accept_resp.json()['error'] == 'token_tenant_mismatch'
     assert accept_resp.headers['X-API-Version'] == 'v1'
+
+
+@pytest.mark.django_db(transaction=True)
+def test_oidc_claim_validation_errors_on_new_endpoints(monkeypatch):
+    monkeypatch.setenv('EDMP_OIDC_REQUIRED', 'true')
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    monkeypatch.setenv('EDMP_OIDC_JWT_SECRET', 'secret-a')
+    monkeypatch.setenv('EDMP_OIDC_ISSUER', 'https://issuer.example')
+    monkeypatch.setenv('EDMP_OIDC_AUDIENCE', 'edmp-api')
+    host, schema = _create_tenant_host_and_schema()
+    client = Client()
+
+    expired_token = _make_hs256_jwt(
+        {
+            'sub': 'expired@example.com',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'iss': 'https://issuer.example',
+            'aud': 'edmp-api',
+            'exp': int(time.time()) - 60,
+        },
+        'secret-a',
+    )
+    expired_users = client.get(
+        '/api/v1/users',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {expired_token}',
+    )
+    assert expired_users.status_code == 401
+    assert expired_users.json()['error'] == 'token_expired'
+    assert expired_users.headers['X-API-Version'] == 'v1'
+
+    invalid_audience_token = _make_hs256_jwt(
+        {
+            'sub': 'audience@example.com',
+            'roles': ['catalog.editor'],
+            'tid': schema,
+            'iss': 'https://issuer.example',
+            'aud': 'other-api',
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    invalid_audience_dispatch = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 1}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {invalid_audience_token}',
+    )
+    assert invalid_audience_dispatch.status_code == 401
+    assert invalid_audience_dispatch.json()['error'] == 'invalid_token_audience'
+    assert invalid_audience_dispatch.headers['X-API-Version'] == 'v1'
+
+    invalid_issuer_token = _make_hs256_jwt(
+        {
+            'sub': 'issuer@example.com',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'iss': 'https://other.example',
+            'aud': 'edmp-api',
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    invalid_issuer_accept = client.post(
+        '/api/v1/projects/invitations/accept',
+        data=json.dumps({'token': 'placeholder'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {invalid_issuer_token}',
+    )
+    assert invalid_issuer_accept.status_code == 401
+    assert invalid_issuer_accept.json()['error'] == 'invalid_token_issuer'
+    assert invalid_issuer_accept.headers['X-API-Version'] == 'v1'
