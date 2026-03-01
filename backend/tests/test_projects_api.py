@@ -9,6 +9,7 @@ from core.models import (
     ProjectInvitation,
     ProjectMembership,
     ProjectMembershipRoleHistory,
+    ProjectWorkspace,
     UserNotification,
     UserProfile,
 )
@@ -411,3 +412,48 @@ def test_user_directory_and_membership_lifecycle_endpoints():
         ).count()
         == 3
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_project_workspace_get_and_update():
+    host, _ = _create_tenants()
+    client = Client()
+    project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Workspace Study"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    assert project.status_code == 201
+    project_id = project.json()["id"]
+
+    workspace = client.get(f"/api/v1/projects/{project_id}/workspace", HTTP_HOST=host)
+    assert workspace.status_code == 200
+    assert workspace.json()["collaboration_enabled"] is True
+    assert workspace.json()["data_management_enabled"] is True
+    assert workspace.json()["document_management_enabled"] is True
+    assert workspace.json()["collaboration_tools"] == []
+    assert workspace.json()["data_resources"] == []
+    assert workspace.json()["documents"] == []
+
+    updated = client.patch(
+        f"/api/v1/projects/{project_id}/workspace",
+        data=json.dumps(
+            {
+                "collaboration_enabled": False,
+                "data_management_enabled": True,
+                "document_management_enabled": True,
+                "collaboration_tools": ["shared-editor", "chat"],
+                "data_resources": [{"kind": "dataset", "name": "raw-intake"}],
+                "documents": [{"type": "protocol", "title": "Study Protocol v1"}],
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["collaboration_enabled"] is False
+    assert updated.json()["collaboration_tools"] == ["shared-editor", "chat"]
+    assert updated.json()["documents"][0]["type"] == "protocol"
+    stored = ProjectWorkspace.objects.get(project_id=project_id)
+    assert stored.collaboration_enabled is False

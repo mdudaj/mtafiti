@@ -85,6 +85,7 @@ from core.views import (
     print_jobs,
     project_member_lifecycle,
     project_members,
+    project_workspace,
     project_invitation_accept,
     project_invitation_resend,
     project_invitation_revoke,
@@ -330,6 +331,11 @@ urlpatterns = [
         'api/v1/projects/<int:project_id>/members',
         project_members,
         name='project_members',
+    ),
+    path(
+        'api/v1/projects/<int:project_id>/workspace',
+        project_workspace,
+        name='project_workspace',
     ),
     path(
         'api/v1/projects/<int:project_id>/members/invite',

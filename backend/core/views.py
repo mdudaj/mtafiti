@@ -50,6 +50,7 @@ from .models import (
     ProjectInvitation,
     ProjectMembership,
     ProjectMembershipRoleHistory,
+    ProjectWorkspace,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
@@ -774,6 +775,21 @@ def _project_membership_to_dict(membership: ProjectMembership) -> dict[str, Any]
         'invited_by': membership.invited_by or None,
         'created_at': membership.created_at.isoformat(),
         'updated_at': membership.updated_at.isoformat(),
+    }
+
+
+def _project_workspace_to_dict(workspace: ProjectWorkspace) -> dict[str, Any]:
+    return {
+        'id': str(workspace.id),
+        'project_id': str(workspace.project_id),
+        'collaboration_enabled': workspace.collaboration_enabled,
+        'data_management_enabled': workspace.data_management_enabled,
+        'document_management_enabled': workspace.document_management_enabled,
+        'collaboration_tools': workspace.collaboration_tools,
+        'data_resources': workspace.data_resources,
+        'documents': workspace.documents,
+        'created_at': workspace.created_at.isoformat(),
+        'updated_at': workspace.updated_at.isoformat(),
     }
 
 
@@ -5121,6 +5137,7 @@ def projects(request):
             if isinstance(payload.get('sync_config'), dict)
             else {},
         )
+        ProjectWorkspace.objects.create(project=project)
         return JsonResponse(_project_to_dict(project), status=201)
 
     return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -5320,6 +5337,55 @@ def project_members(request, project_id: str):
     if status_filter:
         qs = qs.filter(status=status_filter)
     return _paginated_response(request, qs, _project_membership_to_dict)
+
+
+@csrf_exempt
+def project_workspace(request, project_id: str):
+    try:
+        project = Project.objects.get(id=project_id)
+    except (ValidationError, Project.DoesNotExist):
+        return JsonResponse({'error': 'project_not_found'}, status=404)
+
+    if request.method == 'GET':
+        forbidden = require_any_role(
+            request,
+            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        )
+        if forbidden:
+            return forbidden
+        workspace, _ = ProjectWorkspace.objects.get_or_create(project=project)
+        return JsonResponse(_project_workspace_to_dict(workspace))
+
+    if request.method not in {'PUT', 'PATCH'}:
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+
+    workspace, _ = ProjectWorkspace.objects.get_or_create(project=project)
+    update_fields = []
+    for field in ('collaboration_enabled', 'data_management_enabled', 'document_management_enabled'):
+        if field in payload:
+            value = payload.get(field)
+            if not isinstance(value, bool):
+                return JsonResponse({'error': f'invalid_{field}'}, status=400)
+            setattr(workspace, field, value)
+            update_fields.append(field)
+    for field in ('collaboration_tools', 'data_resources', 'documents'):
+        if field in payload:
+            value = payload.get(field)
+            if not isinstance(value, list):
+                return JsonResponse({'error': f'invalid_{field}'}, status=400)
+            setattr(workspace, field, value)
+            update_fields.append(field)
+    if not update_fields:
+        return JsonResponse({'error': 'no_changes_requested'}, status=400)
+    update_fields.append('updated_at')
+    workspace.save(update_fields=update_fields)
+    return JsonResponse(_project_workspace_to_dict(workspace))
 
 
 @csrf_exempt

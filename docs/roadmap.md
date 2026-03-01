@@ -72,6 +72,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 66. **OIDC claim-validation coverage for new endpoints**: expanded OIDC auth tests to verify expired-token, invalid-audience, and invalid-issuer failures (with version header behavior) across user directory, notification dispatch, and invitation accept endpoints (see `backend/tests/test_oidc_jwt_auth.py`).
 67. **OIDC bearer/role enforcement coverage for invitation admin endpoints**: expanded OIDC auth tests to verify revoke/resend invitation endpoints enforce bearer authentication, reject insufficient roles, and allow editor-authorized control flow under `EDMP_OIDC_REQUIRED` + `EDMP_ENFORCE_ROLES` (see `backend/tests/test_oidc_jwt_auth.py`).
 68. **OIDC subject/nbf validation coverage for new endpoints**: expanded OIDC auth tests to verify invalid subject and not-yet-valid token failures (with version header behavior) on user directory and notification dispatch endpoints (see `backend/tests/test_oidc_jwt_auth.py`).
+69. **Project workspace baseline for tool/resource loading**: added tenant-scoped project workspace API to load collaboration, data-management, and document-management resources (including protocol/DMP/SOP-style document metadata), with OpenAPI and regression test coverage (see `backend/core/views.py`, `backend/tests/test_projects_api.py`, and `docs/openapi.yaml`).
 
 ## Near-term (next)
 

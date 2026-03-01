@@ -21,6 +21,21 @@ class Project(models.Model):
         return self.name
 
 
+class ProjectWorkspace(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.OneToOneField(
+        Project, on_delete=models.CASCADE, related_name="workspace"
+    )
+    collaboration_enabled = models.BooleanField(default=True)
+    data_management_enabled = models.BooleanField(default=True)
+    document_management_enabled = models.BooleanField(default=True)
+    collaboration_tools = models.JSONField(default=list, blank=True)
+    data_resources = models.JSONField(default=list, blank=True)
+    documents = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class ProjectMembership(models.Model):
     class Role(models.TextChoices):
         PRINCIPAL_INVESTIGATOR = "principal_investigator"

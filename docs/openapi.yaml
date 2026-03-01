@@ -1153,6 +1153,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/projects/{project_id}/workspace:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [projects]
+      summary: Get project workspace configuration (tenant-scoped)
+      responses:
+        '200':
+          description: Project workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWorkspace'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [projects]
+      summary: Update project workspace configuration (tenant-scoped)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectWorkspaceRequest'
+      responses:
+        '200':
+          description: Updated project workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWorkspace'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/projects/{project_id}/members/invite:
     parameters:
       - name: project_id
@@ -1794,6 +1845,82 @@ paths:
           type: string
           format: date-time
       required: [id, project_id, user_email, role, status, created_at, updated_at]
+    ProjectWorkspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: integer
+        collaboration_enabled:
+          type: boolean
+        data_management_enabled:
+          type: boolean
+        document_management_enabled:
+          type: boolean
+        collaboration_tools:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                additionalProperties: true
+        data_resources:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          project_id,
+          collaboration_enabled,
+          data_management_enabled,
+          document_management_enabled,
+          collaboration_tools,
+          data_resources,
+          documents,
+          created_at,
+          updated_at,
+        ]
+    UpdateProjectWorkspaceRequest:
+      type: object
+      properties:
+        collaboration_enabled:
+          type: boolean
+        data_management_enabled:
+          type: boolean
+        document_management_enabled:
+          type: boolean
+        collaboration_tools:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                additionalProperties: true
+        data_resources:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
     ProjectMembershipListResponse:
       type: object
       properties:
