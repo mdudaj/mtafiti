@@ -68,6 +68,7 @@ This repository is an intentionally small scaffold. This roadmap lists the next 
 62. **OIDC/JWT coverage for new identity/notification/member APIs**: expanded OIDC auth tests to verify required-bearer behavior and role-gated access across user directory, notification dispatch, and project member list endpoints under `EDMP_OIDC_REQUIRED` + `EDMP_ENFORCE_ROLES` (see `backend/tests/test_oidc_jwt_auth.py`).
 63. **OIDC/JWT coverage for invitation accept and notification retry**: expanded OIDC auth tests to verify invitation accept requires bearer authentication and notification retry remains role-gated under `EDMP_OIDC_REQUIRED` + `EDMP_ENFORCE_ROLES` (see `backend/tests/test_oidc_jwt_auth.py`).
 64. **OIDC auth response version-header coverage**: expanded OIDC auth tests to verify `X-API-Version: v1` is consistently returned on auth failures and role-gated errors across user directory, invitation accept, and notification dispatch/retry endpoints (see `backend/tests/test_oidc_jwt_auth.py`).
+65. **OIDC tenant-claim mismatch coverage for new endpoints**: expanded OIDC auth tests to verify `token_tenant_mismatch` enforcement (and version header behavior) on user directory and invitation accept endpoints when bearer token tenant claim does not match the active tenant schema (see `backend/tests/test_oidc_jwt_auth.py`).
 
 ## Near-term (next)
 
