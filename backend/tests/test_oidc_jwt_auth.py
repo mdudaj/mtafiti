@@ -149,3 +149,66 @@ def test_oidc_enforces_tenant_claim_and_header_fallback_when_not_required(monkey
         HTTP_X_USER_ID='header-user',
     )
     assert fallback.status_code == 201
+
+
+@pytest.mark.django_db(transaction=True)
+def test_oidc_required_and_role_enforced_for_users_notifications_and_members(monkeypatch):
+    monkeypatch.setenv('EDMP_OIDC_REQUIRED', 'true')
+    monkeypatch.setenv('EDMP_ENFORCE_ROLES', 'true')
+    monkeypatch.setenv('EDMP_OIDC_JWT_SECRET', 'secret-a')
+    host, schema = _create_tenant_host_and_schema()
+    client = Client()
+
+    users_without_token = client.get('/api/v1/users', HTTP_HOST=host)
+    assert users_without_token.status_code == 401
+    assert users_without_token.json()['error'] == 'missing_bearer_token'
+
+    reader_token = _make_hs256_jwt(
+        {
+            'sub': 'reader@example.com',
+            'roles': ['catalog.reader'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    users_with_reader = client.get(
+        '/api/v1/users',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {reader_token}',
+    )
+    assert users_with_reader.status_code == 200
+
+    dispatch_with_reader = client.post(
+        '/api/v1/notifications/dispatch',
+        data=json.dumps({'limit': 1}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {reader_token}',
+    )
+    assert dispatch_with_reader.status_code == 403
+    assert dispatch_with_reader.json()['error'] == 'forbidden'
+
+    editor_token = _make_hs256_jwt(
+        {
+            'sub': 'editor@example.com',
+            'roles': ['catalog.editor'],
+            'tid': schema,
+            'exp': int(time.time()) + 600,
+        },
+        'secret-a',
+    )
+    project_resp = client.post(
+        '/api/v1/projects',
+        data=json.dumps({'name': 'OIDC Scoped Project'}),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {editor_token}',
+    )
+    assert project_resp.status_code == 201
+    members_with_reader = client.get(
+        f"/api/v1/projects/{project_resp.json()['id']}/members",
+        HTTP_HOST=host,
+        HTTP_AUTHORIZATION=f'Bearer {reader_token}',
+    )
+    assert members_with_reader.status_code == 200
