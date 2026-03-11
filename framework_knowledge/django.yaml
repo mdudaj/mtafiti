@@ -60,34 +60,60 @@ context_hub:
   search_results:
     -
       query: django
-      total: 1
+      total: 3
       matches:
         -
           id: knowledge-src/django-material
           source: maintainer
           description: "Local knowledge source generated from the django-material repository README."
+        -
+          id: knowledge-src/cookbook-django-admin
+          source: community
+          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+        -
+          id: knowledge-src/django-material-theme-customization
+          source: community
+          description: "Local theming skill generated from django-material design token sources."
       status: matched
     -
       query: "django forms"
-      total: 1
+      total: 3
       matches:
         -
           id: knowledge-src/django-material
           source: maintainer
           description: "Local knowledge source generated from the django-material repository README."
+        -
+          id: knowledge-src/cookbook-django-admin
+          source: community
+          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+        -
+          id: knowledge-src/django-material-theme-customization
+          source: community
+          description: "Local theming skill generated from django-material design token sources."
       status: matched
     -
       query: "django urls"
-      total: 1
+      total: 3
       matches:
         -
           id: knowledge-src/django-material
           source: maintainer
           description: "Local knowledge source generated from the django-material repository README."
+        -
+          id: knowledge-src/cookbook-django-admin
+          source: community
+          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+        -
+          id: knowledge-src/django-material-theme-customization
+          source: community
+          description: "Local theming skill generated from django-material design token sources."
       status: matched
   search_status: matched
   candidate_registry_ids:
     - knowledge-src/django-material
+    - knowledge-src/cookbook-django-admin
+    - knowledge-src/django-material-theme-customization
 repository_fit:
   status: installed
   evidence:

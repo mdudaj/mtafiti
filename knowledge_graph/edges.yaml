@@ -249,7 +249,15 @@ edges:
     to: module:core_views
   -
     relationship: calls
+    from: api:api_v1_printing_jobs_job_id_preview_pdf
+    to: module:core_views
+  -
+    relationship: calls
     from: api:api_v1_printing_jobs_job_id_status
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_templates
     to: module:core_views
   -
     relationship: calls
@@ -386,6 +394,10 @@ edges:
   -
     relationship: calls
     from: api:api_v1_tenants
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_tenants_services
     to: module:core_views
   -
     relationship: calls
@@ -642,6 +654,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:printtemplate
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:privacyaction
   -
     relationship: implements
@@ -707,6 +723,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:tenant
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tenantserviceroute
   -
     relationship: implements
     from: module:core_models
@@ -870,6 +890,10 @@ edges:
   -
     relationship: uses
     from: module:core_views
+    to: module:core_printing_renderers
+  -
+    relationship: uses
+    from: module:core_views
     to: module:core_tasks
   -
     relationship: uses
@@ -892,6 +916,10 @@ edges:
     from: module:tenants_middleware
     to: framework:django-tenants
   -
+    relationship: uses
+    from: module:tenants_middleware
+    to: module:tenants_models
+  -
     relationship: implements
     from: module:tenants_models
     to: skill:implement_schema_per_tenant_api
@@ -907,6 +935,10 @@ edges:
     relationship: uses
     from: module:tenants_tests
     to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_tests
+    to: module:tenants_models
   -
     relationship: uses
     from: module:tenants_views
@@ -1182,7 +1214,15 @@ edges:
   -
     relationship: produces
     from: service:backend
+    to: api:api_v1_printing_jobs_job_id_preview_pdf
+  -
+    relationship: produces
+    from: service:backend
     to: api:api_v1_printing_jobs_job_id_status
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_templates
   -
     relationship: produces
     from: service:backend
@@ -1319,6 +1359,10 @@ edges:
     relationship: produces
     from: service:backend
     to: api:api_v1_tenants
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_tenants_services
   -
     relationship: produces
     from: service:backend

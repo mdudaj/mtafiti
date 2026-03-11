@@ -131,6 +131,8 @@ python .github/scripts/configure_knowledge_sources.py \
 
 chub update
 chub search viewflow
+chub search cookbook-crud101
+chub search theme
 ```
 
 ### Faster local feedback loop

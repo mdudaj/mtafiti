@@ -117,6 +117,148 @@ def build_skill(repo_name: str, readme_text: str) -> str:
     return frontmatter + readme_text.strip() + "\n"
 
 
+def read_if_exists(path: Path) -> str:
+    return read_text(path) if path.exists() else ""
+
+
+def build_composite_skill(name: str, description: str, sections: list[tuple[str, str]], tags: list[str]) -> str:
+    today = date.today().isoformat()
+    frontmatter = "\n".join(
+        [
+            "---",
+            f"name: {name}",
+            f"description: {yaml_quote(description)}",
+            "metadata:",
+            "  revision: 1",
+            f'  updated-on: "{today}"',
+            "  source: community",
+            f'  tags: "{",".join(tags)}"',
+            "---",
+            "",
+        ]
+    )
+    body_parts = []
+    for title, content in sections:
+        cleaned = content.strip()
+        if not cleaned:
+            continue
+        body_parts.append(f"## {title}\n\n{cleaned}")
+    return frontmatter + "\n\n".join(body_parts).strip() + "\n"
+
+
+def generate_cookbook_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+    generated: list[dict[str, str]] = []
+    cookbook_root = source_root / "cookbook"
+    if not cookbook_root.exists():
+        return generated
+
+    entries_root = content_root / "knowledge-src" / "skills"
+    ignored = {".git", "__pycache__", "locale"}
+    for sample_dir in sorted(
+        path
+        for path in cookbook_root.iterdir()
+        if path.is_dir() and path.name not in ignored and not path.name.startswith(".")
+    ):
+        sections: list[tuple[str, str]] = []
+        readme = sample_dir / "README.md"
+        if readme.exists():
+            sections.append(("Overview", read_text(readme)))
+        sampled_files = collect_representative_files(sample_dir)
+        for file_path in sampled_files:
+            title = str(file_path.relative_to(sample_dir))
+            sections.append((title, read_text(file_path)))
+        if not sections:
+            continue
+        target = entries_root / f"cookbook-{slugify(sample_dir.name)}" / "SKILL.md"
+        write_text(
+            target,
+            build_composite_skill(
+                name=f"cookbook-{slugify(sample_dir.name)}",
+                description=f"Local cookbook sample for {sample_dir.name} generated from the Viewflow cookbook repository.",
+                sections=sections,
+                tags=["cookbook", sample_dir.name, "local", "knowledge-src", "viewflow"],
+            ),
+        )
+        generated.append(
+            {
+                "repo": f"cookbook/{sample_dir.name}",
+                "entry_type": "skill",
+                "entry_id": f"knowledge-src/cookbook-{slugify(sample_dir.name)}",
+            }
+        )
+    return generated
+
+
+def collect_representative_files(sample_dir: Path) -> list[Path]:
+    priority_names = [
+        "config/urls.py",
+        "config/settings.py",
+        "manage.py",
+        "atlas/viewset.py",
+        "atlas/viewsets.py",
+    ]
+    collected: list[Path] = []
+    for relative in priority_names:
+        path = sample_dir / relative
+        if path.exists():
+            collected.append(path)
+
+    patterns = [
+        "**/urls.py",
+        "**/viewset.py",
+        "**/viewsets.py",
+        "**/views.py",
+        "**/forms.py",
+        "**/models.py",
+        "**/*.css",
+        "**/README.md",
+    ]
+    for pattern in patterns:
+        for path in sorted(sample_dir.glob(pattern)):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(sample_dir)
+            if any(part.startswith(".") for part in rel.parts):
+                continue
+            if "migrations" in rel.parts or "__pycache__" in rel.parts or path in collected:
+                continue
+            collected.append(path)
+            if len(collected) >= 12:
+                return collected
+    return collected[:12]
+
+
+def generate_django_material_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+    generated: list[dict[str, str]] = []
+    material_root = source_root / "django-material"
+    if not material_root.exists():
+        return generated
+
+    colors = material_root / "material" / "assets" / "colors.css"
+    if colors.exists():
+        target = content_root / "knowledge-src" / "skills" / "django-material-theme-customization" / "SKILL.md"
+        write_text(
+            target,
+            build_composite_skill(
+                name="django-material-theme-customization",
+                description="Local theming skill generated from django-material design token sources.",
+                sections=[
+                    ("Theme customization guidance", read_text(material_root / "README.md")),
+                    ("Color token file", read_text(colors)),
+                ],
+                tags=["django-material", "theme", "colors", "design-tokens", "local", "knowledge-src"],
+            ),
+        )
+        generated.append(
+            {
+                "repo": "django-material/theme",
+                "entry_type": "skill",
+                "entry_id": "knowledge-src/django-material-theme-customization",
+            }
+        )
+    return generated
+
+
 def iter_repo_dirs(source_root: Path) -> list[Path]:
     return sorted(
         path
@@ -144,6 +286,8 @@ def generate_content(source_root: Path, content_root: Path) -> list[dict[str, st
             target = author_root / "skills" / repo_name / "SKILL.md"
             write_text(target, build_skill(repo_name, readme_text))
             generated.append({"repo": repo_dir.name, "entry_type": "skill", "entry_id": f"knowledge-src/{repo_name}"})
+    generated.extend(generate_cookbook_entries(source_root, content_root))
+    generated.extend(generate_django_material_entries(source_root, content_root))
     return generated
 
 

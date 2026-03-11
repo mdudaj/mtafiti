@@ -55,25 +55,34 @@ context_hub:
   search_results:
     -
       query: django-material
-      total: 1
+      total: 2
       matches:
         -
           id: knowledge-src/django-material
           source: maintainer
           description: "Local knowledge source generated from the django-material repository README."
+        -
+          id: knowledge-src/django-material-theme-customization
+          source: community
+          description: "Local theming skill generated from django-material design token sources."
       status: matched
     -
       query: "django material"
-      total: 1
+      total: 2
       matches:
         -
           id: knowledge-src/django-material
           source: maintainer
           description: "Local knowledge source generated from the django-material repository README."
+        -
+          id: knowledge-src/django-material-theme-customization
+          source: community
+          description: "Local theming skill generated from django-material design token sources."
       status: matched
   search_status: matched
   candidate_registry_ids:
     - knowledge-src/django-material
+    - knowledge-src/django-material-theme-customization
 repository_fit:
   status: documented_target
   evidence:

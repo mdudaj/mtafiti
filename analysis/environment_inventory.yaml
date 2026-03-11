@@ -2,16 +2,16 @@ EnvironmentInventory:
   programming_languages:
     -
       name: Python
-      file_count: 2725
+      file_count: 2728
     -
       name: YAML
       file_count: 28
     -
       name: Shell
-      file_count: 2
+      file_count: 3
     -
       name: Markdown
-      file_count: 63
+      file_count: 65
   frameworks:
     -
       name: Django
@@ -391,10 +391,20 @@ EnvironmentInventory:
       domain: printing
       handler: print_job_detail
     -
+      name: print_job_preview_pdf
+      path: /api/v1/printing/jobs/{job_id}/preview.pdf
+      domain: printing
+      handler: print_job_preview_pdf
+    -
       name: print_job_status
       path: /api/v1/printing/jobs/{job_id}/status
       domain: printing
       handler: print_job_status
+    -
+      name: print_templates
+      path: /api/v1/printing/templates
+      domain: printing
+      handler: print_templates
     -
       name: privacy_actions
       path: /api/v1/privacy/actions
@@ -566,6 +576,11 @@ EnvironmentInventory:
       domain: tenants
       handler: tenants
     -
+      name: tenant_services
+      path: /api/v1/tenants/services
+      domain: tenants
+      handler: tenant_services
+    -
       name: ui_operations_agent_monitor
       path: /api/v1/ui/operations/agent-monitor
       domain: ui
@@ -669,6 +684,7 @@ EnvironmentInventory:
       name: config.settings
       path: backend/config/settings.py
       imports:
+        - importlib.util
         - os
         - pathlib
     -
@@ -779,6 +795,15 @@ EnvironmentInventory:
         - hmac
         - json
     -
+      name: core.printing_renderers
+      path: backend/core/printing_renderers.py
+      imports:
+        - __future__
+        - base64
+        - io
+        - re
+        - typing
+    -
       name: core.tasks
       path: backend/core/tasks.py
       imports:
@@ -799,14 +824,14 @@ EnvironmentInventory:
       name: core.views
       path: backend/core/views.py
       imports:
+        - base64
+        - binascii
         - core.events
         - core.identity
         - core.metrics
         - core.models
         - core.notifications
-        - core.tasks
-        - datetime
-        - django.core.exceptions
+        - core.printing_renderers
     -
       name: tenants.__init__
       path: backend/tenants/__init__.py
@@ -828,20 +853,25 @@ EnvironmentInventory:
       path: backend/tenants/middleware.py
       imports:
         - django.db
+        - django.db.models
         - django.http
         - django_tenants.middleware.main
+        - os
+        - tenants.models
     -
       name: tenants.models
       path: backend/tenants/models.py
       imports:
         - django.db
         - django_tenants.models
+        - re
         - urllib.parse
     -
       name: tenants.tests
       path: backend/tenants/tests.py
       imports:
         - django.test
+        - tenants.models
     -
       name: tenants.views
       path: backend/tenants/views.py
@@ -880,34 +910,60 @@ EnvironmentInventory:
         search_results:
           -
             query: django
-            total: 1
+            total: 3
             matches:
               -
                 id: knowledge-src/django-material
                 source: maintainer
                 description: "Local knowledge source generated from the django-material repository README."
+              -
+                id: knowledge-src/cookbook-django-admin
+                source: community
+                description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+              -
+                id: knowledge-src/django-material-theme-customization
+                source: community
+                description: "Local theming skill generated from django-material design token sources."
             status: matched
           -
             query: "django forms"
-            total: 1
+            total: 3
             matches:
               -
                 id: knowledge-src/django-material
                 source: maintainer
                 description: "Local knowledge source generated from the django-material repository README."
+              -
+                id: knowledge-src/cookbook-django-admin
+                source: community
+                description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+              -
+                id: knowledge-src/django-material-theme-customization
+                source: community
+                description: "Local theming skill generated from django-material design token sources."
             status: matched
           -
             query: "django urls"
-            total: 1
+            total: 3
             matches:
               -
                 id: knowledge-src/django-material
                 source: maintainer
                 description: "Local knowledge source generated from the django-material repository README."
+              -
+                id: knowledge-src/cookbook-django-admin
+                source: community
+                description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+              -
+                id: knowledge-src/django-material-theme-customization
+                source: community
+                description: "Local theming skill generated from django-material design token sources."
             status: matched
         search_status: matched
         candidate_registry_ids:
           - knowledge-src/django-material
+          - knowledge-src/cookbook-django-admin
+          - knowledge-src/django-material-theme-customization
       django-tenants:
         available: true
         install_command: "npm install -g @aisuite/chub"
@@ -1255,7 +1311,7 @@ EnvironmentInventory:
         search_status: no_registry_match
     local_source_note: "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml."
   code_analysis_summary:
-    modules_scanned: 29
-    models_detected: 49
-    views_detected: 112
+    modules_scanned: 30
+    models_detected: 51
+    views_detected: 120
     tasks_detected: 5

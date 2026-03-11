@@ -27,34 +27,60 @@ nodes:
       search_results:
         -
           query: django
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
           status: matched
         -
           query: "django forms"
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
           status: matched
         -
           query: "django urls"
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
           status: matched
       search_status: matched
       candidate_registry_ids:
         - knowledge-src/django-material
+        - knowledge-src/cookbook-django-admin
+        - knowledge-src/django-material-theme-customization
     repository_fit:
       status: installed
       evidence:
@@ -65,58 +91,6 @@ nodes:
         - "Function-based JsonResponse APIs in core.views"
         - "Django model layer in core.models"
         - "Middleware-driven request instrumentation and auth"
-  -
-    id: framework:django_material
-    type: Framework
-    name: django-material
-    description: "Server-rendered Material Design 3 component library for Django."
-    context_hub:
-      available: true
-      install_command: "npm install -g @aisuite/chub"
-      update_command: "chub update"
-      help_command: "chub help"
-      search_queries:
-        - django-material
-        - "django material"
-      get_commands:
-        []
-      status: ready
-      local_source_workflow:
-        supports_git_url_directly: false
-        clone_and_build_steps:
-          - "git clone <repo-url> <local-dir>"
-          - "chub build <content-dir> -o <content-dir>/dist"
-          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
-          - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: django-material
-          total: 1
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-          status: matched
-        -
-          query: "django material"
-          total: 1
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-          status: matched
-      search_status: matched
-      candidate_registry_ids:
-        - knowledge-src/django-material
-    repository_fit:
-      status: documented_target
-      evidence:
-        - docs/workflow-ui.md
-      repository_patterns:
-        - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
-        - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
   -
     id: tool:pytest-django
     type: Tool
@@ -144,25 +118,104 @@ nodes:
       search_results:
         -
           query: "pytest django"
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
           status: matched
         -
           query: pytest-django
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
           status: matched
       search_status: matched
       candidate_registry_ids:
         - knowledge-src/django-material
+        - knowledge-src/cookbook-django-admin
+        - knowledge-src/django-material-theme-customization
+  -
+    id: framework:django_material
+    type: Framework
+    name: django-material
+    description: "Server-rendered Material Design 3 component library for Django."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - django-material
+        - "django material"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: django-material
+          total: 2
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
+          status: matched
+        -
+          query: "django material"
+          total: 2
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+            -
+              id: knowledge-src/django-material-theme-customization
+              source: community
+              description: "Local theming skill generated from django-material design token sources."
+          status: matched
+      search_status: matched
+      candidate_registry_ids:
+        - knowledge-src/django-material
+        - knowledge-src/django-material-theme-customization
+    repository_fit:
+      status: documented_target
+      evidence:
+        - docs/workflow-ui.md
+      repository_patterns:
+        - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
+        - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
   -
     id: framework:viewflow
     type: Framework
@@ -189,22 +242,36 @@ nodes:
       search_results:
         -
           query: viewflow
-          total: 1
+          total: 3
           matches:
             -
               id: knowledge-src/viewflow
               source: maintainer
               description: "Local knowledge source generated from the viewflow repository README."
+            -
+              id: knowledge-src/cookbook-articles
+              source: community
+              description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
+            -
+              id: knowledge-src/cookbook-crud101
+              source: community
+              description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
           status: matched
         -
           query: "django workflow"
-          total: 0
+          total: 1
           matches:
-            []
-          status: no_registry_match
+            -
+              id: knowledge-src/cookbook-django-admin
+              source: community
+              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+          status: matched
       search_status: matched
       candidate_registry_ids:
         - knowledge-src/viewflow
+        - knowledge-src/cookbook-articles
+        - knowledge-src/cookbook-crud101
+        - knowledge-src/cookbook-django-admin
     repository_fit:
       status: documented_target
       evidence:
@@ -1228,6 +1295,15 @@ nodes:
     methods:
       - GET
   -
+    id: api:api_v1_printing_jobs_job_id_preview_pdf
+    type: API
+    name: /api/v1/printing/jobs/{job_id}/preview.pdf
+    description: "API route handled by print_job_preview_pdf."
+    handler: print_job_preview_pdf
+    route_name: print_job_preview_pdf
+    methods:
+      - GET
+  -
     id: api:api_v1_printing_jobs_job_id_status
     type: API
     name: /api/v1/printing/jobs/{job_id}/status
@@ -1243,6 +1319,16 @@ nodes:
     description: "API route handled by print_jobs."
     handler: print_jobs
     route_name: print_jobs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_printing_templates
+    type: API
+    name: /api/v1/printing/templates
+    description: "API route handled by print_templates."
+    handler: print_templates
+    route_name: print_templates
     methods:
       - GET
       - POST
@@ -1558,6 +1644,15 @@ nodes:
       - GET
       - POST
   -
+    id: api:api_v1_tenants_services
+    type: API
+    name: /api/v1/tenants/services
+    description: "API route handled by tenant_services."
+    handler: tenant_services
+    route_name: tenant_services
+    methods:
+      []
+  -
     id: api:api_v1_tenants
     type: API
     name: /api/v1/tenants
@@ -1802,7 +1897,7 @@ nodes:
       - policy
       - reason
       - to_status
-    source: backend/core/models.py:996
+    source: backend/core/models.py:1012
   -
     id: datamodel:projectmembershiprolehistory
     type: DataModel
@@ -1917,7 +2012,7 @@ nodes:
       - status
       - updated_at
       - version
-    source: backend/core/models.py:962
+    source: backend/core/models.py:978
   -
     id: datamodel:residencyprofile
     type: DataModel
@@ -1950,7 +2045,7 @@ nodes:
       - purpose
       - status
       - updated_at
-    source: backend/core/models.py:1054
+    source: backend/core/models.py:1070
   -
     id: datamodel:mastermergecandidate
     type: DataModel
@@ -2029,7 +2124,7 @@ nodes:
       - sla
       - status
       - updated_at
-    source: backend/core/models.py:1032
+    source: backend/core/models.py:1048
   -
     id: datamodel:dataasset
     type: DataModel
@@ -2061,7 +2156,7 @@ nodes:
       - run
       - status
       - task_type
-    source: backend/core/models.py:885
+    source: backend/core/models.py:901
   -
     id: datamodel:usernotification
     type: DataModel
@@ -2132,7 +2227,7 @@ nodes:
       - requested_at
       - session
       - status
-    source: backend/core/models.py:792
+    source: backend/core/models.py:808
   -
     id: datamodel:glossaryterm
     type: DataModel
@@ -2149,7 +2244,7 @@ nodes:
       - status
       - stewards
       - updated_at
-    source: backend/core/models.py:1009
+    source: backend/core/models.py:1025
   -
     id: datamodel:project
     type: DataModel
@@ -2238,6 +2333,21 @@ nodes:
       - reason
     source: backend/core/models.py:390
   -
+    id: datamodel:printtemplate
+    type: DataModel
+    name: PrintTemplate
+    description: "Django model defined in core.models."
+    fields:
+      - content
+      - created_at
+      - id
+      - name
+      - output_format
+      - sample_payload
+      - template_ref
+      - updated_at
+    source: backend/core/models.py:715
+  -
     id: datamodel:collaborationdocument
     type: DataModel
     name: CollaborationDocument
@@ -2251,7 +2361,7 @@ nodes:
       - status
       - title
       - updated_at
-    source: backend/core/models.py:715
+    source: backend/core/models.py:731
   -
     id: datamodel:notebookworkspace
     type: DataModel
@@ -2268,7 +2378,7 @@ nodes:
       - status
       - storage_mounts
       - updated_at
-    source: backend/core/models.py:752
+    source: backend/core/models.py:768
   -
     id: datamodel:referencedatasetversion
     type: DataModel
@@ -2298,7 +2408,7 @@ nodes:
       - subject_ref
       - submitted_by
       - updated_at
-    source: backend/core/models.py:862
+    source: backend/core/models.py:878
   -
     id: datamodel:workflowdefinition
     type: DataModel
@@ -2311,7 +2421,7 @@ nodes:
       - id
       - name
       - updated_at
-    source: backend/core/models.py:848
+    source: backend/core/models.py:864
   -
     id: datamodel:classification
     type: DataModel
@@ -2384,7 +2494,7 @@ nodes:
       - object_key
       - summary
       - version
-    source: backend/core/models.py:733
+    source: backend/core/models.py:749
   -
     id: datamodel:referencedataset
     type: DataModel
@@ -2429,7 +2539,7 @@ nodes:
       - started_at
       - status
       - updated_at
-    source: backend/core/models.py:811
+    source: backend/core/models.py:827
   -
     id: datamodel:orchestrationrun
     type: DataModel
@@ -2447,7 +2557,7 @@ nodes:
       - trigger_context
       - updated_at
       - workflow
-    source: backend/core/models.py:929
+    source: backend/core/models.py:945
   -
     id: datamodel:projectmembership
     type: DataModel
@@ -2478,7 +2588,7 @@ nodes:
       - trigger_type
       - trigger_value
       - updated_at
-    source: backend/core/models.py:900
+    source: backend/core/models.py:916
   -
     id: datamodel:notebooksession
     type: DataModel
@@ -2493,7 +2603,23 @@ nodes:
       - status
       - user_id
       - workspace
-    source: backend/core/models.py:772
+    source: backend/core/models.py:788
+  -
+    id: datamodel:tenantserviceroute
+    type: DataModel
+    name: TenantServiceRoute
+    description: "Django model defined in tenants.models."
+    fields:
+      - base_domain
+      - created_at
+      - domain
+      - is_enabled
+      - service_key
+      - tenant
+      - tenant_slug
+      - updated_at
+      - workspace_path
+    source: backend/tenants/models.py:95
   -
     id: datamodel:tenant
     type: DataModel
@@ -2502,7 +2628,7 @@ nodes:
     fields:
       - created_on
       - name
-    source: backend/tenants/models.py:7
+    source: backend/tenants/models.py:8
   -
     id: datamodel:domain
     type: DataModel
@@ -2510,7 +2636,7 @@ nodes:
     description: "Django model defined in tenants.models."
     fields:
       []
-    source: backend/tenants/models.py:41
+    source: backend/tenants/models.py:77
   -
     id: workflow:governance_policy_lifecycle
     type: Workflow
@@ -2666,6 +2792,12 @@ nodes:
     name: core.notifications
     description: "Python module at backend/core/notifications.py."
     path: backend/core/notifications.py
+  -
+    id: module:core_printing_renderers
+    type: Module
+    name: core.printing_renderers
+    description: "Python module at backend/core/printing_renderers.py."
+    path: backend/core/printing_renderers.py
   -
     id: module:core_tasks
     type: Module

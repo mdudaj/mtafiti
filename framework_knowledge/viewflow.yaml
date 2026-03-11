@@ -56,22 +56,36 @@ context_hub:
   search_results:
     -
       query: viewflow
-      total: 1
+      total: 3
       matches:
         -
           id: knowledge-src/viewflow
           source: maintainer
           description: "Local knowledge source generated from the viewflow repository README."
+        -
+          id: knowledge-src/cookbook-articles
+          source: community
+          description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
+        -
+          id: knowledge-src/cookbook-crud101
+          source: community
+          description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
       status: matched
     -
       query: "django workflow"
-      total: 0
+      total: 1
       matches:
-        []
-      status: no_registry_match
+        -
+          id: knowledge-src/cookbook-django-admin
+          source: community
+          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
+      status: matched
   search_status: matched
   candidate_registry_ids:
     - knowledge-src/viewflow
+    - knowledge-src/cookbook-articles
+    - knowledge-src/cookbook-crud101
+    - knowledge-src/cookbook-django-admin
 repository_fit:
   status: documented_target
   evidence:
