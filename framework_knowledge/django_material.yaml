@@ -1,0 +1,84 @@
+name: django-material
+type: Framework
+installed: false
+source_urls:
+  - https://github.com/viewflow/django-material
+concepts:
+  - "Material Design 3"
+  - Card
+  - Form
+  - Table
+  - Navigation
+  - "CRUD Views"
+  - "Responsive Layout"
+components:
+  - material/base.html
+  - c-button
+  - c-card
+  - "CRUD/admin templates"
+  - "TailwindCSS-backed design tokens"
+configuration_patterns:
+  - "Install django-material and add material to INSTALLED_APPS."
+  - "Extend material/base.html in server-rendered templates."
+  - "Compose UI with django-cotton component tags such as c-button and c-card."
+api_surfaces:
+  - "Material templates"
+  - "Component tags"
+  - "CRUD and admin page shells"
+  - "Responsive navigation and form widgets"
+architecture:
+  - "Server-rendered Material Design 3 component library for Django."
+  - "Combines low-level components with CRUD/admin scaffolds without a SPA dependency."
+  - "Optimized for predictable UI composition and AI-assisted code generation."
+best_practices:
+  - "Use built-in components and layout primitives before creating custom widgets."
+  - "Prefer responsive, accessible component composition over custom JavaScript-heavy screens."
+  - "Keep template inheritance centered on material/base.html for consistency."
+context_hub:
+  available: true
+  install_command: "npm install -g @aisuite/chub"
+  update_command: "chub update"
+  help_command: "chub help"
+  search_queries:
+    - django-material
+    - "django material"
+  get_commands:
+    []
+  status: ready
+  local_source_workflow:
+    supports_git_url_directly: false
+    clone_and_build_steps:
+      - "git clone <repo-url> <local-dir>"
+      - "chub build <content-dir> -o <content-dir>/dist"
+      - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+      - "Run `chub update` to refresh configured sources"
+  search_results:
+    -
+      query: django-material
+      total: 1
+      matches:
+        -
+          id: knowledge-src/django-material
+          source: maintainer
+          description: "Local knowledge source generated from the django-material repository README."
+      status: matched
+    -
+      query: "django material"
+      total: 1
+      matches:
+        -
+          id: knowledge-src/django-material
+          source: maintainer
+          description: "Local knowledge source generated from the django-material repository README."
+      status: matched
+  search_status: matched
+  candidate_registry_ids:
+    - knowledge-src/django-material
+repository_fit:
+  status: documented_target
+  evidence:
+    - docs/workflow-ui.md
+  repository_patterns:
+    - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
+    - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
+installed_app_present: false

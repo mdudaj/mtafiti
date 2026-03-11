@@ -1,0 +1,2809 @@
+nodes:
+  -
+    id: framework:django
+    type: Framework
+    name: Django
+    description: "Model-driven server-side web framework."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - django
+        - "django forms"
+        - "django urls"
+      get_commands:
+        - "chub get django/forms"
+        - "chub get django/urls"
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: django
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+        -
+          query: "django forms"
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+        -
+          query: "django urls"
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+      search_status: matched
+      candidate_registry_ids:
+        - knowledge-src/django-material
+    repository_fit:
+      status: installed
+      evidence:
+        - backend/requirements.txt
+        - backend/config/settings.py
+        - backend/config/urls.py
+      repository_patterns:
+        - "Function-based JsonResponse APIs in core.views"
+        - "Django model layer in core.models"
+        - "Middleware-driven request instrumentation and auth"
+  -
+    id: framework:django_material
+    type: Framework
+    name: django-material
+    description: "Server-rendered Material Design 3 component library for Django."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - django-material
+        - "django material"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: django-material
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+        -
+          query: "django material"
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+      search_status: matched
+      candidate_registry_ids:
+        - knowledge-src/django-material
+    repository_fit:
+      status: documented_target
+      evidence:
+        - docs/workflow-ui.md
+      repository_patterns:
+        - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
+        - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
+  -
+    id: tool:pytest-django
+    type: Tool
+    name: pytest-django
+    description: "Django integration plugin for pytest."
+    version: 4.8.0
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "pytest django"
+        - pytest-django
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: "pytest django"
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+        -
+          query: pytest-django
+          total: 1
+          matches:
+            -
+              id: knowledge-src/django-material
+              source: maintainer
+              description: "Local knowledge source generated from the django-material repository README."
+          status: matched
+      search_status: matched
+      candidate_registry_ids:
+        - knowledge-src/django-material
+  -
+    id: framework:viewflow
+    type: Framework
+    name: Viewflow
+    description: "Django-native low-code framework for workflows and business apps."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - viewflow
+        - "django workflow"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: viewflow
+          total: 1
+          matches:
+            -
+              id: knowledge-src/viewflow
+              source: maintainer
+              description: "Local knowledge source generated from the viewflow repository README."
+          status: matched
+        -
+          query: "django workflow"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: matched
+      candidate_registry_ids:
+        - knowledge-src/viewflow
+    repository_fit:
+      status: documented_target
+      evidence:
+        - docs/workflow-ui.md
+      repository_patterns:
+        - "Workflow UI notes describe Viewflow as the target workflow engine."
+        - "Current code uses custom workflow models instead of installed Viewflow packages."
+  -
+    id: framework:celery
+    type: Framework
+    name: celery
+    description: "Distributed task queue used for tenant-aware background processing."
+    version: 5.3.6
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - celery
+        - "celery python"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: celery
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "celery python"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: framework:django-tenants
+    type: Framework
+    name: django-tenants
+    description: "Schema-per-tenant extension for Django."
+    version: 3.10.0
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - django-tenants
+        - "django tenants"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: django-tenants
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "django tenants"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: tool:docker_compose
+    type: Tool
+    name: "Docker Compose"
+    description: "Local service orchestration for PostgreSQL and RabbitMQ."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "docker compose"
+        - docker-compose
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: "docker compose"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: docker-compose
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: tool:github_actions
+    type: Tool
+    name: "GitHub Actions"
+    description: "Repository CI/CD automation and drift gates."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "github actions"
+        - "github workflow"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: "github actions"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "github workflow"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: tool:helm
+    type: Tool
+    name: Helm
+    description: "Release packaging for the edmp-platform chart."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - helm
+        - "helm kubernetes"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: helm
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "helm kubernetes"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: tool:kubernetes
+    type: Tool
+    name: Kubernetes
+    description: "Deployment manifests for backend, worker, ingress, and supporting services."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - kubernetes
+        - k8s
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: kubernetes
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: k8s
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: library:pika
+    type: Library
+    name: pika
+    description: "RabbitMQ/AMQP client used for event publishing."
+    version: 1.3.2
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "pika rabbitmq python"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: "pika rabbitmq python"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: service:postgres
+    type: Service
+    name: postgres
+    description: "PostgreSQL persistence service."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - postgres
+        - postgresql
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: postgres
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: postgresql
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: library:prometheus-client
+    type: Library
+    name: prometheus-client
+    description: "Prometheus instrumentation library for metrics exposure."
+    version: 0.20.0
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "prometheus python client"
+        - prometheus
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: "prometheus python client"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: prometheus
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: library:psycopg
+    type: Library
+    name: psycopg
+    description: "PostgreSQL driver used by Django and operational scripts."
+    version: 3.1.18
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - psycopg
+        - "postgres python driver"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: psycopg
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "postgres python driver"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: tool:pytest
+    type: Tool
+    name: pytest
+    description: "Python test runner used by repository validation."
+    version: 8.0.2
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - pytest
+        - "pytest python"
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: pytest
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: "pytest python"
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: service:rabbitmq
+    type: Service
+    name: rabbitmq
+    description: "RabbitMQ broker service."
+    context_hub:
+      available: true
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - rabbitmq
+        - amqp
+      get_commands:
+        []
+      status: ready
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+      search_results:
+        -
+          query: rabbitmq
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+        -
+          query: amqp
+          total: 0
+          matches:
+            []
+          status: no_registry_match
+      search_status: no_registry_match
+  -
+    id: api:api_v1_access_requests_request_id_decision
+    type: API
+    name: /api/v1/access-requests/{request_id}/decision
+    description: "API route handled by access_request_decision."
+    handler: access_request_decision
+    route_name: access_request_decision
+    methods:
+      - POST
+  -
+    id: api:api_v1_access_requests
+    type: API
+    name: /api/v1/access-requests
+    description: "API route handled by access_requests."
+    handler: access_requests
+    route_name: access_requests
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_agent_runs_run_id_transition
+    type: API
+    name: /api/v1/agent/runs/{run_id}/transition
+    description: "API route handled by agent_run_transition."
+    handler: agent_run_transition
+    route_name: agent_run_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_agent_runs
+    type: API
+    name: /api/v1/agent/runs
+    description: "API route handled by agent_runs."
+    handler: agent_runs
+    route_name: agent_runs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_assets_asset_id_classifications
+    type: API
+    name: /api/v1/assets/{asset_id}/classifications
+    description: "API route handled by asset_classifications."
+    handler: asset_classifications
+    route_name: asset_classifications
+    methods:
+      - POST
+  -
+    id: api:api_v1_assets_asset_id_contracts
+    type: API
+    name: /api/v1/assets/{asset_id}/contracts
+    description: "API route handled by asset_contracts."
+    handler: asset_contracts
+    route_name: asset_contracts
+    methods:
+      - GET
+  -
+    id: api:api_v1_assets_asset_id
+    type: API
+    name: /api/v1/assets/{asset_id}
+    description: "API route handled by asset_detail."
+    handler: asset_detail
+    route_name: asset_detail
+    methods:
+      - GET
+      - PUT
+  -
+    id: api:api_v1_assets_asset_id_terms_term_id
+    type: API
+    name: /api/v1/assets/{asset_id}/terms/{term_id}
+    description: "API route handled by asset_glossary_term_link."
+    handler: asset_glossary_term_link
+    route_name: asset_glossary_term_link
+    methods:
+      - POST
+  -
+    id: api:api_v1_assets_asset_id_versions_version_id_publish
+    type: API
+    name: /api/v1/assets/{asset_id}/versions/{version_id}/publish
+    description: "API route handled by asset_version_publish."
+    handler: asset_version_publish
+    route_name: asset_version_publish
+    methods:
+      - POST
+  -
+    id: api:api_v1_assets_asset_id_versions
+    type: API
+    name: /api/v1/assets/{asset_id}/versions
+    description: "API route handled by asset_versions."
+    handler: asset_versions
+    route_name: asset_versions
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_assets
+    type: API
+    name: /api/v1/assets
+    description: "API route handled by assets."
+    handler: assets
+    route_name: assets
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_classifications_classification_id_activate
+    type: API
+    name: /api/v1/classifications/{classification_id}/activate
+    description: "API route handled by classification_activate."
+    handler: classification_activate
+    route_name: classification_activate
+    methods:
+      - POST
+  -
+    id: api:api_v1_classifications_classification_id_deprecate
+    type: API
+    name: /api/v1/classifications/{classification_id}/deprecate
+    description: "API route handled by classification_deprecate."
+    handler: classification_deprecate
+    route_name: classification_deprecate
+    methods:
+      - POST
+  -
+    id: api:api_v1_classifications_classification_id
+    type: API
+    name: /api/v1/classifications/{classification_id}
+    description: "API route handled by classification_detail."
+    handler: classification_detail
+    route_name: classification_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_classifications
+    type: API
+    name: /api/v1/classifications
+    description: "API route handled by classifications."
+    handler: classifications
+    route_name: classifications
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_collaboration_documents_document_id
+    type: API
+    name: /api/v1/collaboration/documents/{document_id}
+    description: "API route handled by collaboration_document_detail."
+    handler: collaboration_document_detail
+    route_name: collaboration_document_detail
+    methods:
+      - GET
+      - PATCH
+  -
+    id: api:api_v1_collaboration_documents_document_id_session
+    type: API
+    name: /api/v1/collaboration/documents/{document_id}/session
+    description: "API route handled by collaboration_document_session."
+    handler: collaboration_document_session
+    route_name: collaboration_document_session
+    methods:
+      - POST
+  -
+    id: api:api_v1_collaboration_documents_document_id_versions
+    type: API
+    name: /api/v1/collaboration/documents/{document_id}/versions
+    description: "API route handled by collaboration_document_versions."
+    handler: collaboration_document_versions
+    route_name: collaboration_document_versions
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_collaboration_documents
+    type: API
+    name: /api/v1/collaboration/documents
+    description: "API route handled by collaboration_documents."
+    handler: collaboration_documents
+    route_name: collaboration_documents
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_connectors_runs_run_id_cancel
+    type: API
+    name: /api/v1/connectors/runs/{run_id}/cancel
+    description: "API route handled by connector_run_cancel."
+    handler: connector_run_cancel
+    route_name: connector_run_cancel
+    methods:
+      - POST
+  -
+    id: api:api_v1_connectors_runs
+    type: API
+    name: /api/v1/connectors/runs
+    description: "API route handled by connector_runs."
+    handler: connector_runs
+    route_name: connector_runs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_contracts_contract_id_activate
+    type: API
+    name: /api/v1/contracts/{contract_id}/activate
+    description: "API route handled by contract_activate."
+    handler: contract_activate
+    route_name: contract_activate
+    methods:
+      - POST
+  -
+    id: api:api_v1_contracts_contract_id_deprecate
+    type: API
+    name: /api/v1/contracts/{contract_id}/deprecate
+    description: "API route handled by contract_deprecate."
+    handler: contract_deprecate
+    route_name: contract_deprecate
+    methods:
+      - POST
+  -
+    id: api:api_v1_contracts_contract_id
+    type: API
+    name: /api/v1/contracts/{contract_id}
+    description: "API route handled by contract_detail."
+    handler: contract_detail
+    route_name: contract_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_contracts
+    type: API
+    name: /api/v1/contracts
+    description: "API route handled by contracts."
+    handler: contracts
+    route_name: contracts
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_data_products_product_id_activate
+    type: API
+    name: /api/v1/data-products/{product_id}/activate
+    description: "API route handled by data_product_activate."
+    handler: data_product_activate
+    route_name: data_product_activate
+    methods:
+      - POST
+  -
+    id: api:api_v1_data_products_product_id
+    type: API
+    name: /api/v1/data-products/{product_id}
+    description: "API route handled by data_product_detail."
+    handler: data_product_detail
+    route_name: data_product_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_data_products_product_id_retire
+    type: API
+    name: /api/v1/data-products/{product_id}/retire
+    description: "API route handled by data_product_retire."
+    handler: data_product_retire
+    route_name: data_product_retire
+    methods:
+      - POST
+  -
+    id: api:api_v1_data_products
+    type: API
+    name: /api/v1/data-products
+    description: "API route handled by data_products."
+    handler: data_products
+    route_name: data_products
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_data_shares_share_id
+    type: API
+    name: /api/v1/data-shares/{share_id}
+    description: "API route handled by data_share_detail."
+    handler: data_share_detail
+    route_name: data_share_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_data_shares_share_id_transition
+    type: API
+    name: /api/v1/data-shares/{share_id}/transition
+    description: "API route handled by data_share_transition."
+    handler: data_share_transition
+    route_name: data_share_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_data_shares
+    type: API
+    name: /api/v1/data-shares
+    description: "API route handled by data_shares."
+    handler: data_shares
+    route_name: data_shares
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_glossary_terms_term_id_approve
+    type: API
+    name: /api/v1/glossary/terms/{term_id}/approve
+    description: "API route handled by glossary_term_approve."
+    handler: glossary_term_approve
+    route_name: glossary_term_approve
+    methods:
+      - POST
+  -
+    id: api:api_v1_glossary_terms_term_id_deprecate
+    type: API
+    name: /api/v1/glossary/terms/{term_id}/deprecate
+    description: "API route handled by glossary_term_deprecate."
+    handler: glossary_term_deprecate
+    route_name: glossary_term_deprecate
+    methods:
+      - POST
+  -
+    id: api:api_v1_glossary_terms_term_id
+    type: API
+    name: /api/v1/glossary/terms/{term_id}
+    description: "API route handled by glossary_term_detail."
+    handler: glossary_term_detail
+    route_name: glossary_term_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_glossary_terms
+    type: API
+    name: /api/v1/glossary/terms
+    description: "API route handled by glossary_terms."
+    handler: glossary_terms
+    route_name: glossary_terms
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_governance_policies
+    type: API
+    name: /api/v1/governance/policies
+    description: "API route handled by governance_policies."
+    handler: governance_policies
+    route_name: governance_policies
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_governance_policies_policy_id
+    type: API
+    name: /api/v1/governance/policies/{policy_id}
+    description: "API route handled by governance_policy_detail."
+    handler: governance_policy_detail
+    route_name: governance_policy_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_governance_policies_policy_id_transition
+    type: API
+    name: /api/v1/governance/policies/{policy_id}/transition
+    description: "API route handled by governance_policy_transition."
+    handler: governance_policy_transition
+    route_name: governance_policy_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_ingestions_ingestion_id
+    type: API
+    name: /api/v1/ingestions/{ingestion_id}
+    description: "API route handled by ingestion_detail."
+    handler: ingestion_detail
+    route_name: ingestion_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_ingestions
+    type: API
+    name: /api/v1/ingestions
+    description: "API route handled by ingestions."
+    handler: ingestions
+    route_name: ingestions
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_lineage_edges
+    type: API
+    name: /api/v1/lineage/edges
+    description: "API route handled by lineage_edges."
+    handler: lineage_edges
+    route_name: lineage_edges
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_master_data_entity_type_merge_candidates_candidate_id_approve
+    type: API
+    name: /api/v1/master-data/{entity_type}/merge-candidates/{candidate_id}/approve
+    description: "API route handled by master_merge_candidate_approve."
+    handler: master_merge_candidate_approve
+    route_name: master_merge_candidate_approve
+    methods:
+      - POST
+  -
+    id: api:api_v1_master_data_entity_type_merge_candidates
+    type: API
+    name: /api/v1/master-data/{entity_type}/merge-candidates
+    description: "API route handled by master_merge_candidates."
+    handler: master_merge_candidates
+    route_name: master_merge_candidates
+    methods:
+      - POST
+  -
+    id: api:api_v1_master_data_entity_type_records_master_id
+    type: API
+    name: /api/v1/master-data/{entity_type}/records/{master_id}
+    description: "API route handled by master_record_detail."
+    handler: master_record_detail
+    route_name: master_record_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_master_data_entity_type_records
+    type: API
+    name: /api/v1/master-data/{entity_type}/records
+    description: "API route handled by master_records."
+    handler: master_records
+    route_name: master_records
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_notebooks_executions_execution_id_complete
+    type: API
+    name: /api/v1/notebooks/executions/{execution_id}/complete
+    description: "API route handled by notebook_execution_complete."
+    handler: notebook_execution_complete
+    route_name: notebook_execution_complete
+    methods:
+      - POST
+  -
+    id: api:api_v1_notebooks_sessions_session_id_executions
+    type: API
+    name: /api/v1/notebooks/sessions/{session_id}/executions
+    description: "API route handled by notebook_session_executions."
+    handler: notebook_session_executions
+    route_name: notebook_session_executions
+    methods:
+      - POST
+  -
+    id: api:api_v1_notebooks_sessions_session_id_terminate
+    type: API
+    name: /api/v1/notebooks/sessions/{session_id}/terminate
+    description: "API route handled by notebook_session_terminate."
+    handler: notebook_session_terminate
+    route_name: notebook_session_terminate
+    methods:
+      - POST
+  -
+    id: api:api_v1_notebooks_sessions
+    type: API
+    name: /api/v1/notebooks/sessions
+    description: "API route handled by notebook_sessions."
+    handler: notebook_sessions
+    route_name: notebook_sessions
+    methods:
+      - GET
+  -
+    id: api:api_v1_notebooks_workspaces_workspace_id_sessions
+    type: API
+    name: /api/v1/notebooks/workspaces/{workspace_id}/sessions
+    description: "API route handled by notebook_workspace_sessions."
+    handler: notebook_workspace_sessions
+    route_name: notebook_workspace_sessions
+    methods:
+      - POST
+  -
+    id: api:api_v1_notebooks_workspaces
+    type: API
+    name: /api/v1/notebooks/workspaces
+    description: "API route handled by notebook_workspaces."
+    handler: notebook_workspaces
+    route_name: notebook_workspaces
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_notifications_dispatch
+    type: API
+    name: /api/v1/notifications/dispatch
+    description: "API route handled by notification_dispatch."
+    handler: notification_dispatch
+    route_name: notification_dispatch
+    methods:
+      - POST
+  -
+    id: api:api_v1_notifications_notification_id_retry
+    type: API
+    name: /api/v1/notifications/{notification_id}/retry
+    description: "API route handled by notification_retry."
+    handler: notification_retry
+    route_name: notification_retry
+    methods:
+      - POST
+  -
+    id: api:api_v1_notifications
+    type: API
+    name: /api/v1/notifications
+    description: "API route handled by notifications."
+    handler: notifications
+    route_name: notifications
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_orchestration_runs_run_id_transition
+    type: API
+    name: /api/v1/orchestration/runs/{run_id}/transition
+    description: "API route handled by orchestration_run_transition."
+    handler: orchestration_run_transition
+    route_name: orchestration_run_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_orchestration_runs
+    type: API
+    name: /api/v1/orchestration/runs
+    description: "API route handled by orchestration_runs."
+    handler: orchestration_runs
+    route_name: orchestration_runs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_orchestration_workflows
+    type: API
+    name: /api/v1/orchestration/workflows
+    description: "API route handled by orchestration_workflows."
+    handler: orchestration_workflows
+    route_name: orchestration_workflows
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_printing_gateways_gateway_id_heartbeat
+    type: API
+    name: /api/v1/printing/gateways/{gateway_id}/heartbeat
+    description: "API route handled by print_gateway_heartbeat."
+    handler: print_gateway_heartbeat
+    route_name: print_gateway_heartbeat
+    methods:
+      - POST
+  -
+    id: api:api_v1_printing_gateways
+    type: API
+    name: /api/v1/printing/gateways
+    description: "API route handled by print_gateways."
+    handler: print_gateways
+    route_name: print_gateways
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_printing_jobs_job_id
+    type: API
+    name: /api/v1/printing/jobs/{job_id}
+    description: "API route handled by print_job_detail."
+    handler: print_job_detail
+    route_name: print_job_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_printing_jobs_job_id_status
+    type: API
+    name: /api/v1/printing/jobs/{job_id}/status
+    description: "API route handled by print_job_status."
+    handler: print_job_status
+    route_name: print_job_status
+    methods:
+      - POST
+  -
+    id: api:api_v1_printing_jobs
+    type: API
+    name: /api/v1/printing/jobs
+    description: "API route handled by print_jobs."
+    handler: print_jobs
+    route_name: print_jobs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_privacy_actions_action_id_decision
+    type: API
+    name: /api/v1/privacy/actions/{action_id}/decision
+    description: "API route handled by privacy_action_decision."
+    handler: privacy_action_decision
+    route_name: privacy_action_decision
+    methods:
+      - POST
+  -
+    id: api:api_v1_privacy_actions_action_id_execute
+    type: API
+    name: /api/v1/privacy/actions/{action_id}/execute
+    description: "API route handled by privacy_action_execute."
+    handler: privacy_action_execute
+    route_name: privacy_action_execute
+    methods:
+      - POST
+  -
+    id: api:api_v1_privacy_actions
+    type: API
+    name: /api/v1/privacy/actions
+    description: "API route handled by privacy_actions."
+    handler: privacy_actions
+    route_name: privacy_actions
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_privacy_consent_events
+    type: API
+    name: /api/v1/privacy/consent-events
+    description: "API route handled by privacy_consent_events."
+    handler: privacy_consent_events
+    route_name: privacy_consent_events
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_privacy_profiles_profile_id
+    type: API
+    name: /api/v1/privacy/profiles/{profile_id}
+    description: "API route handled by privacy_profile_detail."
+    handler: privacy_profile_detail
+    route_name: privacy_profile_detail
+    methods:
+      - GET
+      - PATCH
+  -
+    id: api:api_v1_privacy_profiles
+    type: API
+    name: /api/v1/privacy/profiles
+    description: "API route handled by privacy_profiles."
+    handler: privacy_profiles
+    route_name: privacy_profiles
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_projects_invitations_accept
+    type: API
+    name: /api/v1/projects/invitations/accept
+    description: "API route handled by project_invitation_accept."
+    handler: project_invitation_accept
+    route_name: project_invitation_accept
+    methods:
+      - POST
+  -
+    id: api:api_v1_projects_invitations_invitation_id_resend
+    type: API
+    name: /api/v1/projects/invitations/{invitation_id}/resend
+    description: "API route handled by project_invitation_resend."
+    handler: project_invitation_resend
+    route_name: project_invitation_resend
+    methods:
+      - POST
+  -
+    id: api:api_v1_projects_invitations_invitation_id_revoke
+    type: API
+    name: /api/v1/projects/invitations/{invitation_id}/revoke
+    description: "API route handled by project_invitation_revoke."
+    handler: project_invitation_revoke
+    route_name: project_invitation_revoke
+    methods:
+      - POST
+  -
+    id: api:api_v1_projects_project_id_members_invite
+    type: API
+    name: /api/v1/projects/{project_id}/members/invite
+    description: "API route handled by project_member_invites."
+    handler: project_member_invites
+    route_name: project_member_invites
+    methods:
+      - POST
+  -
+    id: api:api_v1_projects_project_id_members_membership_id_lifecycle
+    type: API
+    name: /api/v1/projects/{project_id}/members/{membership_id}/lifecycle
+    description: "API route handled by project_member_lifecycle."
+    handler: project_member_lifecycle
+    route_name: project_member_lifecycle
+    methods:
+      - POST
+  -
+    id: api:api_v1_projects_project_id_members
+    type: API
+    name: /api/v1/projects/{project_id}/members
+    description: "API route handled by project_members."
+    handler: project_members
+    route_name: project_members
+    methods:
+      - GET
+  -
+    id: api:api_v1_projects_project_id_workspace
+    type: API
+    name: /api/v1/projects/{project_id}/workspace
+    description: "API route handled by project_workspace."
+    handler: project_workspace
+    route_name: project_workspace
+    methods:
+      - GET
+      - PATCH
+      - PUT
+  -
+    id: api:api_v1_projects
+    type: API
+    name: /api/v1/projects
+    description: "API route handled by projects."
+    handler: projects
+    route_name: projects
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_quality_results
+    type: API
+    name: /api/v1/quality/results
+    description: "API route handled by quality_results."
+    handler: quality_results
+    route_name: quality_results
+    methods:
+      - GET
+  -
+    id: api:api_v1_quality_rules_rule_id_evaluate
+    type: API
+    name: /api/v1/quality/rules/{rule_id}/evaluate
+    description: "API route handled by quality_rule_evaluate."
+    handler: quality_rule_evaluate
+    route_name: quality_rule_evaluate
+    methods:
+      - POST
+  -
+    id: api:api_v1_quality_rules
+    type: API
+    name: /api/v1/quality/rules
+    description: "API route handled by quality_rules."
+    handler: quality_rules
+    route_name: quality_rules
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_reference_data_datasets_dataset_id_versions_version_activate
+    type: API
+    name: /api/v1/reference-data/datasets/{dataset_id}/versions/{version}/activate
+    description: "API route handled by reference_dataset_activate."
+    handler: reference_dataset_activate
+    route_name: reference_dataset_activate
+    methods:
+      - POST
+  -
+    id: api:api_v1_reference_data_datasets_dataset_id_versions_version_values
+    type: API
+    name: /api/v1/reference-data/datasets/{dataset_id}/versions/{version}/values
+    description: "API route handled by reference_dataset_version_values."
+    handler: reference_dataset_version_values
+    route_name: reference_dataset_version_values
+    methods:
+      - GET
+  -
+    id: api:api_v1_reference_data_datasets_dataset_id_versions
+    type: API
+    name: /api/v1/reference-data/datasets/{dataset_id}/versions
+    description: "API route handled by reference_dataset_versions."
+    handler: reference_dataset_versions
+    route_name: reference_dataset_versions
+    methods:
+      - POST
+  -
+    id: api:api_v1_reference_data_datasets
+    type: API
+    name: /api/v1/reference-data/datasets
+    description: "API route handled by reference_datasets."
+    handler: reference_datasets
+    route_name: reference_datasets
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_residency_check
+    type: API
+    name: /api/v1/residency/check
+    description: "API route handled by residency_check."
+    handler: residency_check
+    route_name: residency_check
+    methods:
+      - POST
+  -
+    id: api:api_v1_residency_profiles_profile_id_activate
+    type: API
+    name: /api/v1/residency/profiles/{profile_id}/activate
+    description: "API route handled by residency_profile_activate."
+    handler: residency_profile_activate
+    route_name: residency_profile_activate
+    methods:
+      - POST
+  -
+    id: api:api_v1_residency_profiles_profile_id_deprecate
+    type: API
+    name: /api/v1/residency/profiles/{profile_id}/deprecate
+    description: "API route handled by residency_profile_deprecate."
+    handler: residency_profile_deprecate
+    route_name: residency_profile_deprecate
+    methods:
+      - POST
+  -
+    id: api:api_v1_residency_profiles_profile_id
+    type: API
+    name: /api/v1/residency/profiles/{profile_id}
+    description: "API route handled by residency_profile_detail."
+    handler: residency_profile_detail
+    route_name: residency_profile_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_residency_profiles
+    type: API
+    name: /api/v1/residency/profiles
+    description: "API route handled by residency_profiles."
+    handler: residency_profiles
+    route_name: residency_profiles
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_retention_holds_hold_id_release
+    type: API
+    name: /api/v1/retention/holds/{hold_id}/release
+    description: "API route handled by retention_hold_release."
+    handler: retention_hold_release
+    route_name: retention_hold_release
+    methods:
+      - POST
+  -
+    id: api:api_v1_retention_holds
+    type: API
+    name: /api/v1/retention/holds
+    description: "API route handled by retention_holds."
+    handler: retention_holds
+    route_name: retention_holds
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_retention_rules
+    type: API
+    name: /api/v1/retention/rules
+    description: "API route handled by retention_rules."
+    handler: retention_rules
+    route_name: retention_rules
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_retention_runs
+    type: API
+    name: /api/v1/retention/runs
+    description: "API route handled by retention_runs."
+    handler: retention_runs
+    route_name: retention_runs
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_search_assets
+    type: API
+    name: /api/v1/search/assets
+    description: "API route handled by search_assets."
+    handler: search_assets
+    route_name: search_assets
+    methods:
+      - GET
+  -
+    id: api:api_v1_stewardship_items_item_id_transition
+    type: API
+    name: /api/v1/stewardship/items/{item_id}/transition
+    description: "API route handled by stewardship_item_transition."
+    handler: stewardship_item_transition
+    route_name: stewardship_item_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_stewardship_items
+    type: API
+    name: /api/v1/stewardship/items
+    description: "API route handled by stewardship_items."
+    handler: stewardship_items
+    route_name: stewardship_items
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_tenants
+    type: API
+    name: /api/v1/tenants
+    description: "API route handled by tenants."
+    handler: tenants
+    route_name: tenants
+    methods:
+      []
+  -
+    id: api:api_v1_ui_operations_agent_monitor
+    type: API
+    name: /api/v1/ui/operations/agent-monitor
+    description: "API route handled by ui_operations_agent_monitor."
+    handler: ui_operations_agent_monitor
+    route_name: ui_operations_agent_monitor
+    methods:
+      - GET
+  -
+    id: api:api_v1_ui_operations_dashboard
+    type: API
+    name: /api/v1/ui/operations/dashboard
+    description: "API route handled by ui_operations_dashboard."
+    handler: ui_operations_dashboard
+    route_name: ui_operations_dashboard
+    methods:
+      - GET
+  -
+    id: api:api_v1_ui_operations_orchestration_monitor
+    type: API
+    name: /api/v1/ui/operations/orchestration-monitor
+    description: "API route handled by ui_operations_orchestration_monitor."
+    handler: ui_operations_orchestration_monitor
+    route_name: ui_operations_orchestration_monitor
+    methods:
+      - GET
+  -
+    id: api:api_v1_ui_operations_stewardship_workbench
+    type: API
+    name: /api/v1/ui/operations/stewardship-workbench
+    description: "API route handled by ui_operations_stewardship_workbench."
+    handler: ui_operations_stewardship_workbench
+    route_name: ui_operations_stewardship_workbench
+    methods:
+      - GET
+  -
+    id: api:api_v1_users_user_id
+    type: API
+    name: /api/v1/users/{user_id}
+    description: "API route handled by user_detail."
+    handler: user_detail
+    route_name: user_detail
+    methods:
+      - GET
+      - PATCH
+      - PUT
+  -
+    id: api:api_v1_users
+    type: API
+    name: /api/v1/users
+    description: "API route handled by users."
+    handler: users
+    route_name: users
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_workflows_definitions_definition_id
+    type: API
+    name: /api/v1/workflows/definitions/{definition_id}
+    description: "API route handled by workflow_definition_detail."
+    handler: workflow_definition_detail
+    route_name: workflow_definition_detail
+    methods:
+      - GET
+  -
+    id: api:api_v1_workflows_definitions
+    type: API
+    name: /api/v1/workflows/definitions
+    description: "API route handled by workflow_definitions."
+    handler: workflow_definitions
+    route_name: workflow_definitions
+    methods:
+      - GET
+      - POST
+  -
+    id: api:api_v1_workflows_runs_run_id_tasks
+    type: API
+    name: /api/v1/workflows/runs/{run_id}/tasks
+    description: "API route handled by workflow_run_tasks."
+    handler: workflow_run_tasks
+    route_name: workflow_run_tasks
+    methods:
+      - GET
+  -
+    id: api:api_v1_workflows_runs_run_id_transition
+    type: API
+    name: /api/v1/workflows/runs/{run_id}/transition
+    description: "API route handled by workflow_run_transition."
+    handler: workflow_run_transition
+    route_name: workflow_run_transition
+    methods:
+      - POST
+  -
+    id: api:api_v1_workflows_runs
+    type: API
+    name: /api/v1/workflows/runs
+    description: "API route handled by workflow_runs."
+    handler: workflow_runs
+    route_name: workflow_runs
+    methods:
+      - GET
+      - POST
+  -
+    id: skill:compose_operations_dashboard_contract
+    type: Skill
+    name: "Compose Operations Dashboard Contract"
+    description: "Aggregate operational summary cards and workbench payloads for dashboard-style UI surfaces."
+    inputs:
+      - dashboard_panels
+      - tenant_scope
+      - project_filter
+    tools:
+      - Django
+      - django-material
+    steps:
+      - "Create API-focused UI endpoints under /api/v1/ui/operations."
+      - "Return summary widgets and allowed actions for each workbench item."
+      - "Preserve tenant scoping so future server-rendered dashboards stay isolated."
+    evidence:
+      - docs/workflow-ui.md
+      - backend/core/views.py
+  -
+    id: service:worker
+    type: Service
+    name: worker
+    description: "Celery worker service."
+  -
+    id: skill:implement_tenant_aware_background_task
+    type: Skill
+    name: "Implement Tenant-aware Background Task"
+    description: "Create a Celery shared_task that runs inside a tenant schema and emits audit or domain events."
+    inputs:
+      - tenant_schema
+      - task_payload
+      - event_metadata
+    tools:
+      - Celery
+      - Django
+    steps:
+      - "Declare the task with shared_task(base=TenantTask)."
+      - "Load tenant-scoped models and perform the state transition."
+      - "Publish completion and audit events with correlation metadata."
+    evidence:
+      - backend/core/tasks.py
+      - backend/core/celery.py
+      - backend/core/events.py
+  -
+    id: skill:define_django_json_api_endpoint
+    type: Skill
+    name: "Define Django JSON API Endpoint"
+    description: "Create a versioned Django function-based endpoint backed by explicit URLconf routing and JsonResponse payloads."
+    inputs:
+      - url_path
+      - request_methods
+      - serializer_logic
+    tools:
+      - Django
+    steps:
+      - "Add a path() entry in backend/config/urls.py."
+      - "Implement request parsing and response shaping in core.views."
+      - "Enforce versioning, tenancy, and role checks consistently."
+    evidence:
+      - backend/config/urls.py
+      - backend/core/views.py
+  -
+    id: uicomponent:operations_dashboard
+    type: UIComponent
+    name: "Operations Dashboard"
+    description: "Dashboard summary cards for workflow, stewardship, orchestration, and agent operations."
+    path: /api/v1/ui/operations/dashboard
+  -
+    id: workflow:workflow_lifecycle
+    type: Workflow
+    name: "Workflow lifecycle"
+    description: "Definition, run, task, and transition flow implemented with Django models and APIs."
+  -
+    id: service:backend
+    type: Service
+    name: backend
+    description: "Django API service."
+  -
+    id: datamodel:projectinvitation
+    type: DataModel
+    name: ProjectInvitation
+    description: "Django model defined in core.models."
+    fields:
+      - accepted_at
+      - accepted_by
+      - created_at
+      - email
+      - expires_at
+      - id
+      - invited_by
+      - max_token_attempts
+      - project
+      - resent_at
+      - revoked_at
+      - role
+      - status
+      - token
+      - token_attempts
+      - updated_at
+    source: backend/core/models.py:73
+  -
+    id: datamodel:accessrequest
+    type: DataModel
+    name: AccessRequest
+    description: "Django model defined in core.models."
+    fields:
+      - access_type
+      - approver
+      - created_at
+      - expires_at
+      - id
+      - justification
+      - requester
+      - status
+      - subject_ref
+      - updated_at
+    source: backend/core/models.py:515
+  -
+    id: datamodel:governancepolicytransition
+    type: DataModel
+    name: GovernancePolicyTransition
+    description: "Django model defined in core.models."
+    fields:
+      - action
+      - actor_id
+      - created_at
+      - from_status
+      - id
+      - policy
+      - reason
+      - to_status
+    source: backend/core/models.py:996
+  -
+    id: datamodel:projectmembershiprolehistory
+    type: DataModel
+    name: ProjectMembershipRoleHistory
+    description: "Django model defined in core.models."
+    fields:
+      - action
+      - actor_id
+      - created_at
+      - id
+      - membership
+      - new_role
+      - new_status
+      - previous_role
+      - previous_status
+    source: backend/core/models.py:157
+  -
+    id: datamodel:retentionrule
+    type: DataModel
+    name: RetentionRule
+    description: "Django model defined in core.models."
+    fields:
+      - action
+      - created_at
+      - grace_period
+      - id
+      - retention_period
+      - scope
+      - updated_at
+    source: backend/core/models.py:325
+  -
+    id: datamodel:privacyaction
+    type: DataModel
+    name: PrivacyAction
+    description: "Django model defined in core.models."
+    fields:
+      - action_type
+      - actor_id
+      - decided_at
+      - evidence
+      - executed_at
+      - id
+      - profile
+      - reason
+      - requested_at
+      - status
+    source: backend/core/models.py:406
+  -
+    id: datamodel:retentionhold
+    type: DataModel
+    name: RetentionHold
+    description: "Django model defined in core.models."
+    fields:
+      - active
+      - asset
+      - created_at
+      - id
+      - reason
+      - released_at
+    source: backend/core/models.py:339
+  -
+    id: datamodel:agentrun
+    type: DataModel
+    name: AgentRun
+    description: "Django model defined in core.models."
+    fields:
+      - actor_id
+      - allowed_tools
+      - created_at
+      - error_message
+      - finished_at
+      - id
+      - output
+      - prompt
+      - started_at
+      - status
+      - timeout_seconds
+      - updated_at
+    source: backend/core/models.py:429
+  -
+    id: datamodel:stewardshipitem
+    type: DataModel
+    name: StewardshipItem
+    description: "Django model defined in core.models."
+    fields:
+      - actor_id
+      - assignee
+      - created_at
+      - due_at
+      - id
+      - item_type
+      - resolution
+      - resolved_at
+      - severity
+      - status
+      - subject_ref
+      - updated_at
+    source: backend/core/models.py:454
+  -
+    id: datamodel:governancepolicy
+    type: DataModel
+    name: GovernancePolicy
+    description: "Django model defined in core.models."
+    fields:
+      - actor_id
+      - created_at
+      - id
+      - name
+      - reason
+      - rollback_target
+      - rules
+      - status
+      - updated_at
+      - version
+    source: backend/core/models.py:962
+  -
+    id: datamodel:residencyprofile
+    type: DataModel
+    name: ResidencyProfile
+    description: "Django model defined in core.models."
+    fields:
+      - allowed_regions
+      - blocked_regions
+      - created_at
+      - enforcement_mode
+      - id
+      - name
+      - status
+      - updated_at
+    source: backend/core/models.py:491
+  -
+    id: datamodel:datashare
+    type: DataModel
+    name: DataShare
+    description: "Django model defined in core.models."
+    fields:
+      - approved_by
+      - asset
+      - constraints
+      - consumer_ref
+      - created_at
+      - expires_at
+      - id
+      - linked_access_request_ids
+      - purpose
+      - status
+      - updated_at
+    source: backend/core/models.py:1054
+  -
+    id: datamodel:mastermergecandidate
+    type: DataModel
+    name: MasterMergeCandidate
+    description: "Django model defined in core.models."
+    fields:
+      - approved_by
+      - confidence
+      - created_at
+      - entity_type
+      - id
+      - proposed_attributes
+      - source_master_refs
+      - status
+      - target_master_id
+      - updated_at
+    source: backend/core/models.py:616
+  -
+    id: datamodel:assetversion
+    type: DataModel
+    name: AssetVersion
+    description: "Django model defined in core.models."
+    fields:
+      - asset
+      - change_set
+      - change_summary
+      - created_at
+      - created_by
+      - id
+      - status
+      - updated_at
+      - version_number
+    source: backend/core/models.py:297
+  -
+    id: datamodel:datacontract
+    type: DataModel
+    name: DataContract
+    description: "Django model defined in core.models."
+    fields:
+      - asset
+      - created_at
+      - expectations
+      - id
+      - owners
+      - schema
+      - status
+      - updated_at
+      - version
+    source: backend/core/models.py:269
+  -
+    id: datamodel:qualityrule
+    type: DataModel
+    name: QualityRule
+    description: "Django model defined in core.models."
+    fields:
+      - asset
+      - created_at
+      - id
+      - params
+      - rule_type
+      - severity
+      - updated_at
+    source: backend/core/models.py:235
+  -
+    id: datamodel:dataproduct
+    type: DataModel
+    name: DataProduct
+    description: "Django model defined in core.models."
+    fields:
+      - asset_ids
+      - created_at
+      - domain
+      - id
+      - name
+      - owner
+      - sla
+      - status
+      - updated_at
+    source: backend/core/models.py:1032
+  -
+    id: datamodel:dataasset
+    type: DataModel
+    name: DataAsset
+    description: "Django model defined in core.models."
+    fields:
+      - asset_type
+      - classifications
+      - created_at
+      - description
+      - display_name
+      - id
+      - owner
+      - properties
+      - qualified_name
+      - tags
+      - updated_at
+    source: backend/core/models.py:171
+  -
+    id: datamodel:workflowtask
+    type: DataModel
+    name: WorkflowTask
+    description: "Django model defined in core.models."
+    fields:
+      - assignee
+      - completed_at
+      - created_at
+      - id
+      - run
+      - status
+      - task_type
+    source: backend/core/models.py:885
+  -
+    id: datamodel:usernotification
+    type: DataModel
+    name: UserNotification
+    description: "Django model defined in core.models."
+    fields:
+      - attempts
+      - channel
+      - created_at
+      - dead_lettered_at
+      - delivered_at
+      - delivery_status
+      - id
+      - last_error
+      - max_attempts
+      - next_attempt_at
+      - notification_type
+      - payload
+      - provider
+      - read_at
+      - user_email
+    source: backend/core/models.py:102
+  -
+    id: datamodel:masterrecord
+    type: DataModel
+    name: MasterRecord
+    description: "Django model defined in core.models."
+    fields:
+      - attributes
+      - confidence
+      - created_at
+      - entity_type
+      - id
+      - master_id
+      - status
+      - survivorship_policy
+      - updated_at
+      - version
+    source: backend/core/models.py:587
+  -
+    id: datamodel:printgateway
+    type: DataModel
+    name: PrintGateway
+    description: "Django model defined in core.models."
+    fields:
+      - capabilities
+      - created_at
+      - display_name
+      - gateway_ref
+      - id
+      - last_heartbeat_at
+      - last_seen_version
+      - metadata
+      - site_ref
+      - status
+      - updated_at
+    source: backend/core/models.py:691
+  -
+    id: datamodel:notebookexecution
+    type: DataModel
+    name: NotebookExecution
+    description: "Django model defined in core.models."
+    fields:
+      - cell_ref
+      - completed_at
+      - id
+      - metadata
+      - requested_at
+      - session
+      - status
+    source: backend/core/models.py:792
+  -
+    id: datamodel:glossaryterm
+    type: DataModel
+    name: GlossaryTerm
+    description: "Django model defined in core.models."
+    fields:
+      - classifications
+      - created_at
+      - definition
+      - id
+      - name
+      - owners
+      - related_asset_ids
+      - status
+      - stewards
+      - updated_at
+    source: backend/core/models.py:1009
+  -
+    id: datamodel:project
+    type: DataModel
+    name: Project
+    description: "Django model defined in core.models."
+    fields:
+      - code
+      - created_at
+      - institution_ref
+      - name
+      - status
+      - sync_config
+      - updated_at
+    source: backend/core/models.py:6
+  -
+    id: datamodel:projectworkspace
+    type: DataModel
+    name: ProjectWorkspace
+    description: "Django model defined in core.models."
+    fields:
+      - collaboration_enabled
+      - collaboration_tools
+      - created_at
+      - data_management_enabled
+      - data_resources
+      - document_management_enabled
+      - documents
+      - id
+      - project
+      - updated_at
+    source: backend/core/models.py:24
+  -
+    id: datamodel:retentionrun
+    type: DataModel
+    name: RetentionRun
+    description: "Django model defined in core.models."
+    fields:
+      - completed_at
+      - created_at
+      - id
+      - mode
+      - rule
+      - status
+      - summary
+    source: backend/core/models.py:350
+  -
+    id: datamodel:ingestionrequest
+    type: DataModel
+    name: IngestionRequest
+    description: "Django model defined in core.models."
+    fields:
+      - connector
+      - created_at
+      - id
+      - mode
+      - project
+      - source
+      - status
+      - updated_at
+    source: backend/core/models.py:188
+  -
+    id: datamodel:privacyprofile
+    type: DataModel
+    name: PrivacyProfile
+    description: "Django model defined in core.models."
+    fields:
+      - consent_required
+      - consent_state
+      - created_at
+      - id
+      - lawful_basis
+      - name
+      - privacy_flags
+      - updated_at
+    source: backend/core/models.py:373
+  -
+    id: datamodel:consentevent
+    type: DataModel
+    name: ConsentEvent
+    description: "Django model defined in core.models."
+    fields:
+      - consent_state
+      - created_at
+      - id
+      - profile
+      - reason
+    source: backend/core/models.py:390
+  -
+    id: datamodel:collaborationdocument
+    type: DataModel
+    name: CollaborationDocument
+    description: "Django model defined in core.models."
+    fields:
+      - content_type
+      - created_at
+      - id
+      - object_key
+      - owner
+      - status
+      - title
+      - updated_at
+    source: backend/core/models.py:715
+  -
+    id: datamodel:notebookworkspace
+    type: DataModel
+    name: NotebookWorkspace
+    description: "Django model defined in core.models."
+    fields:
+      - cpu_limit
+      - created_at
+      - id
+      - image
+      - memory_limit
+      - name
+      - owner
+      - status
+      - storage_mounts
+      - updated_at
+    source: backend/core/models.py:752
+  -
+    id: datamodel:referencedatasetversion
+    type: DataModel
+    name: ReferenceDatasetVersion
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - dataset
+      - id
+      - status
+      - updated_at
+      - values
+      - version
+    source: backend/core/models.py:560
+  -
+    id: datamodel:workflowrun
+    type: DataModel
+    name: WorkflowRun
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - definition
+      - id
+      - payload
+      - reviewed_by
+      - status
+      - subject_ref
+      - submitted_by
+      - updated_at
+    source: backend/core/models.py:862
+  -
+    id: datamodel:workflowdefinition
+    type: DataModel
+    name: WorkflowDefinition
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - description
+      - domain_ref
+      - id
+      - name
+      - updated_at
+    source: backend/core/models.py:848
+  -
+    id: datamodel:classification
+    type: DataModel
+    name: Classification
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - description
+      - id
+      - level
+      - name
+      - status
+      - tags
+      - updated_at
+    source: backend/core/models.py:636
+  -
+    id: datamodel:printjob
+    type: DataModel
+    name: PrintJob
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - destination
+      - error_message
+      - gateway_metadata
+      - id
+      - output_format
+      - payload
+      - retry_count
+      - status
+      - template_ref
+      - updated_at
+    source: backend/core/models.py:665
+  -
+    id: datamodel:qualitycheckresult
+    type: DataModel
+    name: QualityCheckResult
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - details
+      - id
+      - rule
+      - status
+    source: backend/core/models.py:253
+  -
+    id: datamodel:userprofile
+    type: DataModel
+    name: UserProfile
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - display_name
+      - email
+      - id
+      - last_login_at
+      - status
+      - updated_at
+    source: backend/core/models.py:142
+  -
+    id: datamodel:collaborationdocumentversion
+    type: DataModel
+    name: CollaborationDocumentVersion
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - document
+      - editor
+      - id
+      - object_key
+      - summary
+      - version
+    source: backend/core/models.py:733
+  -
+    id: datamodel:referencedataset
+    type: DataModel
+    name: ReferenceDataset
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - domain
+      - id
+      - name
+      - owner
+      - updated_at
+    source: backend/core/models.py:544
+  -
+    id: datamodel:lineageedge
+    type: DataModel
+    name: LineageEdge
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - edge_type
+      - from_asset
+      - id
+      - properties
+      - to_asset
+      - updated_at
+    source: backend/core/models.py:214
+  -
+    id: datamodel:connectorrun
+    type: DataModel
+    name: ConnectorRun
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - error_message
+      - execution_path
+      - finished_at
+      - id
+      - ingestion
+      - progress
+      - retry_count
+      - started_at
+      - status
+      - updated_at
+    source: backend/core/models.py:811
+  -
+    id: datamodel:orchestrationrun
+    type: DataModel
+    name: OrchestrationRun
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - error_message
+      - finished_at
+      - id
+      - project
+      - started_at
+      - status
+      - step_results
+      - trigger_context
+      - updated_at
+      - workflow
+    source: backend/core/models.py:929
+  -
+    id: datamodel:projectmembership
+    type: DataModel
+    name: ProjectMembership
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - id
+      - invited_by
+      - project
+      - role
+      - status
+      - updated_at
+      - user_email
+    source: backend/core/models.py:39
+  -
+    id: datamodel:orchestrationworkflow
+    type: DataModel
+    name: OrchestrationWorkflow
+    description: "Django model defined in core.models."
+    fields:
+      - created_at
+      - id
+      - name
+      - project
+      - status
+      - steps
+      - trigger_type
+      - trigger_value
+      - updated_at
+    source: backend/core/models.py:900
+  -
+    id: datamodel:notebooksession
+    type: DataModel
+    name: NotebookSession
+    description: "Django model defined in core.models."
+    fields:
+      - ended_at
+      - id
+      - metadata
+      - pod_name
+      - started_at
+      - status
+      - user_id
+      - workspace
+    source: backend/core/models.py:772
+  -
+    id: datamodel:tenant
+    type: DataModel
+    name: Tenant
+    description: "Django model defined in tenants.models."
+    fields:
+      - created_on
+      - name
+    source: backend/tenants/models.py:7
+  -
+    id: datamodel:domain
+    type: DataModel
+    name: Domain
+    description: "Django model defined in tenants.models."
+    fields:
+      []
+    source: backend/tenants/models.py:41
+  -
+    id: workflow:governance_policy_lifecycle
+    type: Workflow
+    name: "Governance policy lifecycle"
+    description: "Draft-to-active governance policy transitions with audit tracking."
+  -
+    id: tool:context_hub
+    type: Tool
+    name: "Context Hub"
+    description: "External API documentation retrieval for coding agents via chub search/get."
+  -
+    id: skill:manage_project_membership_lifecycle
+    type: Skill
+    name: "Manage Project Membership Lifecycle"
+    description: "Handle invitations, membership transitions, and workspace configuration for tenant-local projects."
+    inputs:
+      - project
+      - member_identity
+      - lifecycle_action
+    tools:
+      - Django
+    steps:
+      - "Persist membership and invitation state in project models."
+      - "Expose invitation and lifecycle APIs for member operations."
+      - "Emit notification and audit data for role or status changes."
+    evidence:
+      - backend/core/models.py
+      - backend/core/views.py
+  -
+    id: skill:implement_workflow_lifecycle
+    type: Skill
+    name: "Implement Workflow Lifecycle"
+    description: "Model explicit workflow definition, run, task, and transition lifecycles using Django models and JSON APIs."
+    inputs:
+      - workflow_definition
+      - run_payload
+      - transition_action
+    tools:
+      - Django
+    steps:
+      - "Model definitions, runs, and tasks as persistent Django models."
+      - "Expose create/list/detail/transition endpoints under /api/v1/workflows."
+      - "Apply role checks and tenant-scoped task visibility rules."
+    evidence:
+      - backend/core/models.py
+      - backend/core/views.py
+      - backend/tests/test_workflow_ui_api.py
+  -
+    id: module:config_init
+    type: Module
+    name: config.__init__
+    description: "Python module at backend/config/__init__.py."
+    path: backend/config/__init__.py
+  -
+    id: module:config_asgi
+    type: Module
+    name: config.asgi
+    description: "Python module at backend/config/asgi.py."
+    path: backend/config/asgi.py
+  -
+    id: module:config_celery
+    type: Module
+    name: config.celery
+    description: "Python module at backend/config/celery.py."
+    path: backend/config/celery.py
+  -
+    id: module:config_settings
+    type: Module
+    name: config.settings
+    description: "Python module at backend/config/settings.py."
+    path: backend/config/settings.py
+  -
+    id: module:config_settings_test
+    type: Module
+    name: config.settings_test
+    description: "Python module at backend/config/settings_test.py."
+    path: backend/config/settings_test.py
+  -
+    id: module:config_urls
+    type: Module
+    name: config.urls
+    description: "Python module at backend/config/urls.py."
+    path: backend/config/urls.py
+  -
+    id: module:config_wsgi
+    type: Module
+    name: config.wsgi
+    description: "Python module at backend/config/wsgi.py."
+    path: backend/config/wsgi.py
+  -
+    id: module:core_init
+    type: Module
+    name: core.__init__
+    description: "Python module at backend/core/__init__.py."
+    path: backend/core/__init__.py
+  -
+    id: module:core_admin
+    type: Module
+    name: core.admin
+    description: "Python module at backend/core/admin.py."
+    path: backend/core/admin.py
+  -
+    id: module:core_apps
+    type: Module
+    name: core.apps
+    description: "Python module at backend/core/apps.py."
+    path: backend/core/apps.py
+  -
+    id: module:core_celery
+    type: Module
+    name: core.celery
+    description: "Python module at backend/core/celery.py."
+    path: backend/core/celery.py
+  -
+    id: module:core_events
+    type: Module
+    name: core.events
+    description: "Python module at backend/core/events.py."
+    path: backend/core/events.py
+  -
+    id: module:core_identity
+    type: Module
+    name: core.identity
+    description: "Python module at backend/core/identity.py."
+    path: backend/core/identity.py
+  -
+    id: module:core_logging
+    type: Module
+    name: core.logging
+    description: "Python module at backend/core/logging.py."
+    path: backend/core/logging.py
+  -
+    id: module:core_metrics
+    type: Module
+    name: core.metrics
+    description: "Python module at backend/core/metrics.py."
+    path: backend/core/metrics.py
+  -
+    id: module:core_middleware
+    type: Module
+    name: core.middleware
+    description: "Python module at backend/core/middleware.py."
+    path: backend/core/middleware.py
+  -
+    id: module:core_models
+    type: Module
+    name: core.models
+    description: "Python module at backend/core/models.py."
+    path: backend/core/models.py
+  -
+    id: module:core_notifications
+    type: Module
+    name: core.notifications
+    description: "Python module at backend/core/notifications.py."
+    path: backend/core/notifications.py
+  -
+    id: module:core_tasks
+    type: Module
+    name: core.tasks
+    description: "Python module at backend/core/tasks.py."
+    path: backend/core/tasks.py
+  -
+    id: module:core_tests
+    type: Module
+    name: core.tests
+    description: "Python module at backend/core/tests.py."
+    path: backend/core/tests.py
+  -
+    id: module:core_views
+    type: Module
+    name: core.views
+    description: "Python module at backend/core/views.py."
+    path: backend/core/views.py
+  -
+    id: module:tenants_init
+    type: Module
+    name: tenants.__init__
+    description: "Python module at backend/tenants/__init__.py."
+    path: backend/tenants/__init__.py
+  -
+    id: module:tenants_admin
+    type: Module
+    name: tenants.admin
+    description: "Python module at backend/tenants/admin.py."
+    path: backend/tenants/admin.py
+  -
+    id: module:tenants_apps
+    type: Module
+    name: tenants.apps
+    description: "Python module at backend/tenants/apps.py."
+    path: backend/tenants/apps.py
+  -
+    id: module:tenants_middleware
+    type: Module
+    name: tenants.middleware
+    description: "Python module at backend/tenants/middleware.py."
+    path: backend/tenants/middleware.py
+  -
+    id: module:tenants_models
+    type: Module
+    name: tenants.models
+    description: "Python module at backend/tenants/models.py."
+    path: backend/tenants/models.py
+  -
+    id: module:tenants_tests
+    type: Module
+    name: tenants.tests
+    description: "Python module at backend/tenants/tests.py."
+    path: backend/tenants/tests.py
+  -
+    id: module:tenants_views
+    type: Module
+    name: tenants.views
+    description: "Python module at backend/tenants/views.py."
+    path: backend/tenants/views.py
+  -
+    id: skill:model_lineage_graph_edges
+    type: Skill
+    name: "Model Lineage Graph Edges"
+    description: "Represent asset-to-asset lineage as directed graph edges backed by Django models and APIs."
+    inputs:
+      - from_asset
+      - to_asset
+      - edge_type
+    tools:
+      - Django
+    steps:
+      - "Store lineage relationships in a dedicated edge model."
+      - "Expose query and mutation APIs for lineage traversal."
+      - "Attach properties and metadata needed for downstream reasoning."
+    evidence:
+      - backend/core/models.py
+      - docs/lineage.md
+  -
+    id: workflow:retention_execution
+    type: Workflow
+    name: "Retention execution"
+    description: "Retention evaluation and archive/delete execution through Celery tasks."
+  -
+    id: skill:implement_schema_per_tenant_api
+    type: Skill
+    name: "Implement Schema-per-Tenant API"
+    description: "Scope models, requests, and background execution to tenant schemas using django-tenants."
+    inputs:
+      - tenant_domain
+      - tenant_scoped_model
+      - request_context
+    tools:
+      - Django
+      - django-tenants
+    steps:
+      - "Register tenant and domain models in tenants.models."
+      - "Resolve tenants from the Host header with EDMPTenantMiddleware."
+      - "Execute ORM access inside tenant schemas and reject cross-tenant access."
+    evidence:
+      - backend/tenants/models.py
+      - backend/config/settings.py
+      - backend/core/views.py
+  -
+    id: skill:plan_viewflow_material_workflow_ui
+    type: Skill
+    name: "Plan Viewflow + Material Workflow UI"
+    description: "Translate workflow UI design notes into a future Viewflow and django-material implementation plan."
+    inputs:
+      - workflow_nodes
+      - material_components
+      - role_matrix
+    tools:
+      - Viewflow
+      - django-material
+    steps:
+      - "Map workflow states and actions to Viewflow Flow nodes."
+      - "Map dashboards, cards, and menus to django-material components."
+      - "Keep server-side role enforcement and tenant isolation aligned with backend APIs."
+    evidence:
+      - docs/workflow-ui.md
+      - https://github.com/viewflow/viewflow
+      - https://github.com/viewflow/django-material
+  -
+    id: uicomponent:agent_monitor
+    type: UIComponent
+    name: "Agent Monitor"
+    description: "UI-ready payload for agent run history and control visibility."
+    path: /api/v1/ui/operations/agent-monitor
+  -
+    id: uicomponent:orchestration_monitor
+    type: UIComponent
+    name: "Orchestration Monitor"
+    description: "UI-ready payload for orchestration workflow and run monitoring."
+    path: /api/v1/ui/operations/orchestration-monitor
+  -
+    id: uicomponent:stewardship_workbench
+    type: UIComponent
+    name: "Stewardship Workbench"
+    description: "Workbench payload for stewardship queues, status, and allowed actions."
+    path: /api/v1/ui/operations/stewardship-workbench

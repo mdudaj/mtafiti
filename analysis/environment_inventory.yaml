@@ -1,0 +1,1261 @@
+EnvironmentInventory:
+  programming_languages:
+    -
+      name: Python
+      file_count: 2725
+    -
+      name: YAML
+      file_count: 28
+    -
+      name: Shell
+      file_count: 2
+    -
+      name: Markdown
+      file_count: 63
+  frameworks:
+    -
+      name: Django
+      version: 5.1.14
+      status: installed
+    -
+      name: django-tenants
+      version: 3.10.0
+      status: installed
+    -
+      name: celery
+      version: 5.3.6
+      status: installed
+    -
+      name: Viewflow
+      version: documentation-profile
+      status: documented_target
+      evidence: docs/workflow-ui.md
+    -
+      name: django-material
+      version: documentation-profile
+      status: documented_target
+      evidence: docs/workflow-ui.md
+  libraries:
+    -
+      name: pika
+      version: 1.3.2
+      status: installed
+    -
+      name: prometheus-client
+      version: 0.20.0
+      status: installed
+    -
+      name: psycopg
+      version: 3.1.18
+      status: installed
+  frontend_libraries:
+    -
+      name: django-material
+      status: documented_target
+      note: "Referenced in workflow UI design notes but not installed in backend requirements."
+  database_layers:
+    -
+      name: PostgreSQL
+      status: service
+      evidence: docker-compose.yml
+    -
+      name: django_tenants.postgresql_backend
+      status: configured_engine
+      evidence: backend/config/settings.py
+    -
+      name: psycopg
+      status: driver
+      evidence: backend/requirements.txt
+  services:
+    -
+      name: backend
+      status: application
+    -
+      name: postgres
+      status: configured
+    -
+      name: rabbitmq
+      status: configured
+    -
+      name: worker
+      status: application
+  APIs:
+    -
+      name: access_requests
+      path: /api/v1/access-requests
+      domain: access-requests
+      handler: access_requests
+    -
+      name: access_request_decision
+      path: /api/v1/access-requests/{request_id}/decision
+      domain: access-requests
+      handler: access_request_decision
+    -
+      name: agent_runs
+      path: /api/v1/agent/runs
+      domain: agent
+      handler: agent_runs
+    -
+      name: agent_run_transition
+      path: /api/v1/agent/runs/{run_id}/transition
+      domain: agent
+      handler: agent_run_transition
+    -
+      name: assets
+      path: /api/v1/assets
+      domain: assets
+      handler: assets
+    -
+      name: asset_detail
+      path: /api/v1/assets/{asset_id}
+      domain: assets
+      handler: asset_detail
+    -
+      name: asset_classifications
+      path: /api/v1/assets/{asset_id}/classifications
+      domain: assets
+      handler: asset_classifications
+    -
+      name: asset_contracts
+      path: /api/v1/assets/{asset_id}/contracts
+      domain: assets
+      handler: asset_contracts
+    -
+      name: asset_glossary_term_link
+      path: /api/v1/assets/{asset_id}/terms/{term_id}
+      domain: assets
+      handler: asset_glossary_term_link
+    -
+      name: asset_versions
+      path: /api/v1/assets/{asset_id}/versions
+      domain: assets
+      handler: asset_versions
+    -
+      name: asset_version_publish
+      path: /api/v1/assets/{asset_id}/versions/{version_id}/publish
+      domain: assets
+      handler: asset_version_publish
+    -
+      name: classifications
+      path: /api/v1/classifications
+      domain: classifications
+      handler: classifications
+    -
+      name: classification_detail
+      path: /api/v1/classifications/{classification_id}
+      domain: classifications
+      handler: classification_detail
+    -
+      name: classification_activate
+      path: /api/v1/classifications/{classification_id}/activate
+      domain: classifications
+      handler: classification_activate
+    -
+      name: classification_deprecate
+      path: /api/v1/classifications/{classification_id}/deprecate
+      domain: classifications
+      handler: classification_deprecate
+    -
+      name: collaboration_documents
+      path: /api/v1/collaboration/documents
+      domain: collaboration
+      handler: collaboration_documents
+    -
+      name: collaboration_document_detail
+      path: /api/v1/collaboration/documents/{document_id}
+      domain: collaboration
+      handler: collaboration_document_detail
+    -
+      name: collaboration_document_session
+      path: /api/v1/collaboration/documents/{document_id}/session
+      domain: collaboration
+      handler: collaboration_document_session
+    -
+      name: collaboration_document_versions
+      path: /api/v1/collaboration/documents/{document_id}/versions
+      domain: collaboration
+      handler: collaboration_document_versions
+    -
+      name: connector_runs
+      path: /api/v1/connectors/runs
+      domain: connectors
+      handler: connector_runs
+    -
+      name: connector_run_cancel
+      path: /api/v1/connectors/runs/{run_id}/cancel
+      domain: connectors
+      handler: connector_run_cancel
+    -
+      name: contracts
+      path: /api/v1/contracts
+      domain: contracts
+      handler: contracts
+    -
+      name: contract_detail
+      path: /api/v1/contracts/{contract_id}
+      domain: contracts
+      handler: contract_detail
+    -
+      name: contract_activate
+      path: /api/v1/contracts/{contract_id}/activate
+      domain: contracts
+      handler: contract_activate
+    -
+      name: contract_deprecate
+      path: /api/v1/contracts/{contract_id}/deprecate
+      domain: contracts
+      handler: contract_deprecate
+    -
+      name: data_products
+      path: /api/v1/data-products
+      domain: data-products
+      handler: data_products
+    -
+      name: data_product_detail
+      path: /api/v1/data-products/{product_id}
+      domain: data-products
+      handler: data_product_detail
+    -
+      name: data_product_activate
+      path: /api/v1/data-products/{product_id}/activate
+      domain: data-products
+      handler: data_product_activate
+    -
+      name: data_product_retire
+      path: /api/v1/data-products/{product_id}/retire
+      domain: data-products
+      handler: data_product_retire
+    -
+      name: data_shares
+      path: /api/v1/data-shares
+      domain: data-shares
+      handler: data_shares
+    -
+      name: data_share_detail
+      path: /api/v1/data-shares/{share_id}
+      domain: data-shares
+      handler: data_share_detail
+    -
+      name: data_share_transition
+      path: /api/v1/data-shares/{share_id}/transition
+      domain: data-shares
+      handler: data_share_transition
+    -
+      name: glossary_terms
+      path: /api/v1/glossary/terms
+      domain: glossary
+      handler: glossary_terms
+    -
+      name: glossary_term_detail
+      path: /api/v1/glossary/terms/{term_id}
+      domain: glossary
+      handler: glossary_term_detail
+    -
+      name: glossary_term_approve
+      path: /api/v1/glossary/terms/{term_id}/approve
+      domain: glossary
+      handler: glossary_term_approve
+    -
+      name: glossary_term_deprecate
+      path: /api/v1/glossary/terms/{term_id}/deprecate
+      domain: glossary
+      handler: glossary_term_deprecate
+    -
+      name: governance_policies
+      path: /api/v1/governance/policies
+      domain: governance
+      handler: governance_policies
+    -
+      name: governance_policy_detail
+      path: /api/v1/governance/policies/{policy_id}
+      domain: governance
+      handler: governance_policy_detail
+    -
+      name: governance_policy_transition
+      path: /api/v1/governance/policies/{policy_id}/transition
+      domain: governance
+      handler: governance_policy_transition
+    -
+      name: ingestions
+      path: /api/v1/ingestions
+      domain: ingestions
+      handler: ingestions
+    -
+      name: ingestion_detail
+      path: /api/v1/ingestions/{ingestion_id}
+      domain: ingestions
+      handler: ingestion_detail
+    -
+      name: lineage_edges
+      path: /api/v1/lineage/edges
+      domain: lineage
+      handler: lineage_edges
+    -
+      name: master_merge_candidates
+      path: /api/v1/master-data/{entity_type}/merge-candidates
+      domain: master-data
+      handler: master_merge_candidates
+    -
+      name: master_merge_candidate_approve
+      path: /api/v1/master-data/{entity_type}/merge-candidates/{candidate_id}/approve
+      domain: master-data
+      handler: master_merge_candidate_approve
+    -
+      name: master_records
+      path: /api/v1/master-data/{entity_type}/records
+      domain: master-data
+      handler: master_records
+    -
+      name: master_record_detail
+      path: /api/v1/master-data/{entity_type}/records/{master_id}
+      domain: master-data
+      handler: master_record_detail
+    -
+      name: notebook_execution_complete
+      path: /api/v1/notebooks/executions/{execution_id}/complete
+      domain: notebooks
+      handler: notebook_execution_complete
+    -
+      name: notebook_sessions
+      path: /api/v1/notebooks/sessions
+      domain: notebooks
+      handler: notebook_sessions
+    -
+      name: notebook_session_executions
+      path: /api/v1/notebooks/sessions/{session_id}/executions
+      domain: notebooks
+      handler: notebook_session_executions
+    -
+      name: notebook_session_terminate
+      path: /api/v1/notebooks/sessions/{session_id}/terminate
+      domain: notebooks
+      handler: notebook_session_terminate
+    -
+      name: notebook_workspaces
+      path: /api/v1/notebooks/workspaces
+      domain: notebooks
+      handler: notebook_workspaces
+    -
+      name: notebook_workspace_sessions
+      path: /api/v1/notebooks/workspaces/{workspace_id}/sessions
+      domain: notebooks
+      handler: notebook_workspace_sessions
+    -
+      name: notifications
+      path: /api/v1/notifications
+      domain: notifications
+      handler: notifications
+    -
+      name: notification_dispatch
+      path: /api/v1/notifications/dispatch
+      domain: notifications
+      handler: notification_dispatch
+    -
+      name: notification_retry
+      path: /api/v1/notifications/{notification_id}/retry
+      domain: notifications
+      handler: notification_retry
+    -
+      name: orchestration_runs
+      path: /api/v1/orchestration/runs
+      domain: orchestration
+      handler: orchestration_runs
+    -
+      name: orchestration_run_transition
+      path: /api/v1/orchestration/runs/{run_id}/transition
+      domain: orchestration
+      handler: orchestration_run_transition
+    -
+      name: orchestration_workflows
+      path: /api/v1/orchestration/workflows
+      domain: orchestration
+      handler: orchestration_workflows
+    -
+      name: print_gateways
+      path: /api/v1/printing/gateways
+      domain: printing
+      handler: print_gateways
+    -
+      name: print_gateway_heartbeat
+      path: /api/v1/printing/gateways/{gateway_id}/heartbeat
+      domain: printing
+      handler: print_gateway_heartbeat
+    -
+      name: print_jobs
+      path: /api/v1/printing/jobs
+      domain: printing
+      handler: print_jobs
+    -
+      name: print_job_detail
+      path: /api/v1/printing/jobs/{job_id}
+      domain: printing
+      handler: print_job_detail
+    -
+      name: print_job_status
+      path: /api/v1/printing/jobs/{job_id}/status
+      domain: printing
+      handler: print_job_status
+    -
+      name: privacy_actions
+      path: /api/v1/privacy/actions
+      domain: privacy
+      handler: privacy_actions
+    -
+      name: privacy_action_decision
+      path: /api/v1/privacy/actions/{action_id}/decision
+      domain: privacy
+      handler: privacy_action_decision
+    -
+      name: privacy_action_execute
+      path: /api/v1/privacy/actions/{action_id}/execute
+      domain: privacy
+      handler: privacy_action_execute
+    -
+      name: privacy_consent_events
+      path: /api/v1/privacy/consent-events
+      domain: privacy
+      handler: privacy_consent_events
+    -
+      name: privacy_profiles
+      path: /api/v1/privacy/profiles
+      domain: privacy
+      handler: privacy_profiles
+    -
+      name: privacy_profile_detail
+      path: /api/v1/privacy/profiles/{profile_id}
+      domain: privacy
+      handler: privacy_profile_detail
+    -
+      name: projects
+      path: /api/v1/projects
+      domain: projects
+      handler: projects
+    -
+      name: project_invitation_accept
+      path: /api/v1/projects/invitations/accept
+      domain: projects
+      handler: project_invitation_accept
+    -
+      name: project_invitation_resend
+      path: /api/v1/projects/invitations/{invitation_id}/resend
+      domain: projects
+      handler: project_invitation_resend
+    -
+      name: project_invitation_revoke
+      path: /api/v1/projects/invitations/{invitation_id}/revoke
+      domain: projects
+      handler: project_invitation_revoke
+    -
+      name: project_members
+      path: /api/v1/projects/{project_id}/members
+      domain: projects
+      handler: project_members
+    -
+      name: project_member_invites
+      path: /api/v1/projects/{project_id}/members/invite
+      domain: projects
+      handler: project_member_invites
+    -
+      name: project_member_lifecycle
+      path: /api/v1/projects/{project_id}/members/{membership_id}/lifecycle
+      domain: projects
+      handler: project_member_lifecycle
+    -
+      name: project_workspace
+      path: /api/v1/projects/{project_id}/workspace
+      domain: projects
+      handler: project_workspace
+    -
+      name: quality_results
+      path: /api/v1/quality/results
+      domain: quality
+      handler: quality_results
+    -
+      name: quality_rules
+      path: /api/v1/quality/rules
+      domain: quality
+      handler: quality_rules
+    -
+      name: quality_rule_evaluate
+      path: /api/v1/quality/rules/{rule_id}/evaluate
+      domain: quality
+      handler: quality_rule_evaluate
+    -
+      name: reference_datasets
+      path: /api/v1/reference-data/datasets
+      domain: reference-data
+      handler: reference_datasets
+    -
+      name: reference_dataset_versions
+      path: /api/v1/reference-data/datasets/{dataset_id}/versions
+      domain: reference-data
+      handler: reference_dataset_versions
+    -
+      name: reference_dataset_activate
+      path: /api/v1/reference-data/datasets/{dataset_id}/versions/{version}/activate
+      domain: reference-data
+      handler: reference_dataset_activate
+    -
+      name: reference_dataset_version_values
+      path: /api/v1/reference-data/datasets/{dataset_id}/versions/{version}/values
+      domain: reference-data
+      handler: reference_dataset_version_values
+    -
+      name: residency_check
+      path: /api/v1/residency/check
+      domain: residency
+      handler: residency_check
+    -
+      name: residency_profiles
+      path: /api/v1/residency/profiles
+      domain: residency
+      handler: residency_profiles
+    -
+      name: residency_profile_detail
+      path: /api/v1/residency/profiles/{profile_id}
+      domain: residency
+      handler: residency_profile_detail
+    -
+      name: residency_profile_activate
+      path: /api/v1/residency/profiles/{profile_id}/activate
+      domain: residency
+      handler: residency_profile_activate
+    -
+      name: residency_profile_deprecate
+      path: /api/v1/residency/profiles/{profile_id}/deprecate
+      domain: residency
+      handler: residency_profile_deprecate
+    -
+      name: retention_holds
+      path: /api/v1/retention/holds
+      domain: retention
+      handler: retention_holds
+    -
+      name: retention_hold_release
+      path: /api/v1/retention/holds/{hold_id}/release
+      domain: retention
+      handler: retention_hold_release
+    -
+      name: retention_rules
+      path: /api/v1/retention/rules
+      domain: retention
+      handler: retention_rules
+    -
+      name: retention_runs
+      path: /api/v1/retention/runs
+      domain: retention
+      handler: retention_runs
+    -
+      name: search_assets
+      path: /api/v1/search/assets
+      domain: search
+      handler: search_assets
+    -
+      name: stewardship_items
+      path: /api/v1/stewardship/items
+      domain: stewardship
+      handler: stewardship_items
+    -
+      name: stewardship_item_transition
+      path: /api/v1/stewardship/items/{item_id}/transition
+      domain: stewardship
+      handler: stewardship_item_transition
+    -
+      name: tenants
+      path: /api/v1/tenants
+      domain: tenants
+      handler: tenants
+    -
+      name: ui_operations_agent_monitor
+      path: /api/v1/ui/operations/agent-monitor
+      domain: ui
+      handler: ui_operations_agent_monitor
+    -
+      name: ui_operations_dashboard
+      path: /api/v1/ui/operations/dashboard
+      domain: ui
+      handler: ui_operations_dashboard
+    -
+      name: ui_operations_orchestration_monitor
+      path: /api/v1/ui/operations/orchestration-monitor
+      domain: ui
+      handler: ui_operations_orchestration_monitor
+    -
+      name: ui_operations_stewardship_workbench
+      path: /api/v1/ui/operations/stewardship-workbench
+      domain: ui
+      handler: ui_operations_stewardship_workbench
+    -
+      name: users
+      path: /api/v1/users
+      domain: users
+      handler: users
+    -
+      name: user_detail
+      path: /api/v1/users/{user_id}
+      domain: users
+      handler: user_detail
+    -
+      name: workflow_definitions
+      path: /api/v1/workflows/definitions
+      domain: workflows
+      handler: workflow_definitions
+    -
+      name: workflow_definition_detail
+      path: /api/v1/workflows/definitions/{definition_id}
+      domain: workflows
+      handler: workflow_definition_detail
+    -
+      name: workflow_runs
+      path: /api/v1/workflows/runs
+      domain: workflows
+      handler: workflow_runs
+    -
+      name: workflow_run_tasks
+      path: /api/v1/workflows/runs/{run_id}/tasks
+      domain: workflows
+      handler: workflow_run_tasks
+    -
+      name: workflow_run_transition
+      path: /api/v1/workflows/runs/{run_id}/transition
+      domain: workflows
+      handler: workflow_run_transition
+  infrastructure:
+    -
+      name: "Docker Compose"
+      status: configured
+      evidence: docker-compose.yml
+    -
+      name: "Kubernetes manifests"
+      status: configured
+      evidence: deploy/k8s
+    -
+      name: "Helm chart"
+      status: configured
+      evidence: deploy/helm/edmp-platform
+    -
+      name: "GitHub Actions"
+      status: configured
+      evidence: .github/workflows/ci.yml
+  ci_cd_tools:
+    -
+      name: docs-gate
+      status: configured
+    -
+      name: backend-tests
+      status: configured
+    -
+      name: performance-baseline-tests
+      status: configured
+  internal_modules:
+    -
+      name: config.__init__
+      path: backend/config/__init__.py
+      imports:
+        - config.celery
+    -
+      name: config.asgi
+      path: backend/config/asgi.py
+      imports:
+        - django.core.asgi
+        - os
+    -
+      name: config.celery
+      path: backend/config/celery.py
+      imports:
+        - celery
+        - os
+    -
+      name: config.settings
+      path: backend/config/settings.py
+      imports:
+        - os
+        - pathlib
+    -
+      name: config.settings_test
+      path: backend/config/settings_test.py
+      imports:
+        - config.settings
+    -
+      name: config.urls
+      path: backend/config/urls.py
+      imports:
+        - core.views
+        - django.contrib
+        - django.urls
+        - tenants.views
+    -
+      name: config.wsgi
+      path: backend/config/wsgi.py
+      imports:
+        - django.core.wsgi
+        - os
+    -
+      name: core.__init__
+      path: backend/core/__init__.py
+      imports:
+        []
+    -
+      name: core.admin
+      path: backend/core/admin.py
+      imports:
+        - django.contrib
+    -
+      name: core.apps
+      path: backend/core/apps.py
+      imports:
+        - django.apps
+    -
+      name: core.celery
+      path: backend/core/celery.py
+      imports:
+        - __future__
+        - celery
+        - core.logging
+        - core.metrics
+        - django_tenants.utils
+        - time
+    -
+      name: core.events
+      path: backend/core/events.py
+      imports:
+        - core.logging
+        - datetime
+        - json
+        - logging
+        - os
+        - pika
+        - typing
+        - uuid
+    -
+      name: core.identity
+      path: backend/core/identity.py
+      imports:
+        - base64
+        - django.http
+        - hashlib
+        - hmac
+        - json
+        - os
+        - time
+    -
+      name: core.logging
+      path: backend/core/logging.py
+      imports:
+        - contextvars
+        - datetime
+        - json
+        - logging
+    -
+      name: core.metrics
+      path: backend/core/metrics.py
+      imports:
+        - prometheus_client
+        - time
+    -
+      name: core.middleware
+      path: backend/core/middleware.py
+      imports:
+        - core.identity
+        - core.logging
+        - django.http
+        - uuid
+    -
+      name: core.models
+      path: backend/core/models.py
+      imports:
+        - django.db
+        - uuid
+    -
+      name: core.notifications
+      path: backend/core/notifications.py
+      imports:
+        - __future__
+        - core.models
+        - datetime
+        - django.db.models
+        - django.utils
+        - hashlib
+        - hmac
+        - json
+    -
+      name: core.tasks
+      path: backend/core/tasks.py
+      imports:
+        - celery
+        - core.celery
+        - core.events
+        - core.logging
+        - core.models
+        - datetime
+        - django.utils
+        - re
+    -
+      name: core.tests
+      path: backend/core/tests.py
+      imports:
+        - django.test
+    -
+      name: core.views
+      path: backend/core/views.py
+      imports:
+        - core.events
+        - core.identity
+        - core.metrics
+        - core.models
+        - core.notifications
+        - core.tasks
+        - datetime
+        - django.core.exceptions
+    -
+      name: tenants.__init__
+      path: backend/tenants/__init__.py
+      imports:
+        []
+    -
+      name: tenants.admin
+      path: backend/tenants/admin.py
+      imports:
+        - django.contrib
+        - tenants.models
+    -
+      name: tenants.apps
+      path: backend/tenants/apps.py
+      imports:
+        - django.apps
+    -
+      name: tenants.middleware
+      path: backend/tenants/middleware.py
+      imports:
+        - django.db
+        - django.http
+        - django_tenants.middleware.main
+    -
+      name: tenants.models
+      path: backend/tenants/models.py
+      imports:
+        - django.db
+        - django_tenants.models
+        - urllib.parse
+    -
+      name: tenants.tests
+      path: backend/tenants/tests.py
+      imports:
+        - django.test
+    -
+      name: tenants.views
+      path: backend/tenants/views.py
+      imports:
+        - core.events
+        - core.identity
+        - django.core.exceptions
+        - django.db
+        - django.http
+        - django.views.decorators.csrf
+        - django_tenants.utils
+        - json
+  context_hub_registry:
+    available: true
+    profiles:
+      django:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - django
+          - "django forms"
+          - "django urls"
+        get_commands:
+          - "chub get django/forms"
+          - "chub get django/urls"
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: django
+            total: 1
+            matches:
+              -
+                id: knowledge-src/django-material
+                source: maintainer
+                description: "Local knowledge source generated from the django-material repository README."
+            status: matched
+          -
+            query: "django forms"
+            total: 1
+            matches:
+              -
+                id: knowledge-src/django-material
+                source: maintainer
+                description: "Local knowledge source generated from the django-material repository README."
+            status: matched
+          -
+            query: "django urls"
+            total: 1
+            matches:
+              -
+                id: knowledge-src/django-material
+                source: maintainer
+                description: "Local knowledge source generated from the django-material repository README."
+            status: matched
+        search_status: matched
+        candidate_registry_ids:
+          - knowledge-src/django-material
+      django-tenants:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - django-tenants
+          - "django tenants"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: django-tenants
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "django tenants"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      celery:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - celery
+          - "celery python"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: celery
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "celery python"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      psycopg:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - psycopg
+          - "postgres python driver"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: psycopg
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "postgres python driver"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      pika:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - "pika rabbitmq python"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: "pika rabbitmq python"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      prometheus-client:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - "prometheus python client"
+          - prometheus
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: "prometheus python client"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: prometheus
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      pytest:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - pytest
+          - "pytest python"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: pytest
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "pytest python"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      postgres:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - postgres
+          - postgresql
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: postgres
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: postgresql
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      rabbitmq:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - rabbitmq
+          - amqp
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: rabbitmq
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: amqp
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      kubernetes:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - kubernetes
+          - k8s
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: kubernetes
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: k8s
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      helm:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - helm
+          - "helm kubernetes"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: helm
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "helm kubernetes"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+      github-actions:
+        available: true
+        install_command: "npm install -g @aisuite/chub"
+        update_command: "chub update"
+        help_command: "chub help"
+        search_queries:
+          - "github actions"
+          - "github workflow"
+        get_commands:
+          []
+        status: ready
+        local_source_workflow:
+          supports_git_url_directly: false
+          clone_and_build_steps:
+            - "git clone <repo-url> <local-dir>"
+            - "chub build <content-dir> -o <content-dir>/dist"
+            - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+            - "Run `chub update` to refresh configured sources"
+        search_results:
+          -
+            query: "github actions"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+          -
+            query: "github workflow"
+            total: 0
+            matches:
+              []
+            status: no_registry_match
+        search_status: no_registry_match
+    local_source_note: "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml."
+  code_analysis_summary:
+    modules_scanned: 29
+    models_detected: 49
+    views_detected: 112
+    tasks_detected: 5

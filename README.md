@@ -98,6 +98,41 @@ docker compose down
 
 Note: Django creates a separate test database (e.g. `test_edmp_test`) during `pytest`, so the configured `POSTGRES_USER` must have the `CREATEDB` privilege (or be a superuser).
 
+### Generate the knowledge graph
+
+```bash
+python .github/scripts/generate_knowledge_graph.py
+python .github/scripts/query_knowledge_graph.py --type Skill --text dashboard
+```
+
+Generated artifacts are committed under:
+
+* `analysis/environment_inventory.yaml`
+* `knowledge_graph/{ontology,nodes,edges}.yaml`
+* `skills/generated_skills.yaml`
+* `framework_knowledge/{django,viewflow,django_material}.yaml`
+
+For external API documentation retrieval, install Context Hub and use the commands embedded in the framework nodes:
+
+```bash
+npm install -g @aisuite/chub
+chub update
+chub search django
+chub get django/forms
+```
+
+`chub update` refreshes configured registry sources; it does not pull directly from a git URL. To use docs from a git repository, clone the repo locally, structure or extract the docs as a Context Hub content directory, run `chub build <content-dir> -o <content-dir>/dist`, add that `dist` path under `sources[].path` in `~/.chub/config.yaml`, and then run `chub update`.
+
+To turn a local repository collection into the designated Context Hub source, use:
+
+```bash
+python .github/scripts/configure_knowledge_sources.py \
+  --source-root /home/jmduda/KodeX.2026/knowledge-src
+
+chub update
+chub search viewflow
+```
+
 ### Faster local feedback loop
 
 ```bash

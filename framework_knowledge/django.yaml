@@ -1,0 +1,100 @@
+name: Django
+type: Framework
+installed: true
+source_urls:
+  - https://docs.djangoproject.com/en/5.1/intro/overview/
+  - https://docs.djangoproject.com/en/5.1/topics/http/urls/
+  - https://docs.djangoproject.com/en/5.1/topics/forms/
+concepts:
+  - Model
+  - View
+  - URLconf
+  - Form
+  - Middleware
+  - Admin
+  - Migration
+components:
+  - django.db.models
+  - django.urls.path
+  - django.http.JsonResponse
+  - django.views.decorators.csrf.csrf_exempt
+  - django.contrib.admin
+configuration_patterns:
+  - "Configure apps through INSTALLED_APPS."
+  - "Register request processing through MIDDLEWARE."
+  - "Declare routes with path() in URLconf modules."
+  - "Manage schema evolution with makemigrations and migrate."
+api_surfaces:
+  - "ORM model fields and queryset APIs"
+  - "Function-based or class-based view dispatch"
+  - "Forms and widgets"
+  - "Admin site registration"
+architecture:
+  - "Model-driven server-side web framework."
+  - "URL dispatch maps request paths to Python callables."
+  - "Views coordinate request parsing, persistence, and response rendering."
+best_practices:
+  - "Keep URL configuration explicit and versioned for stable API contracts."
+  - "Use models and migrations as the source of truth for persistence."
+  - "Use POST for mutating form/API requests and pair it with CSRF or equivalent protections."
+context_hub:
+  available: true
+  install_command: "npm install -g @aisuite/chub"
+  update_command: "chub update"
+  help_command: "chub help"
+  search_queries:
+    - django
+    - "django forms"
+    - "django urls"
+  get_commands:
+    - "chub get django/forms"
+    - "chub get django/urls"
+  status: ready
+  local_source_workflow:
+    supports_git_url_directly: false
+    clone_and_build_steps:
+      - "git clone <repo-url> <local-dir>"
+      - "chub build <content-dir> -o <content-dir>/dist"
+      - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+      - "Run `chub update` to refresh configured sources"
+  search_results:
+    -
+      query: django
+      total: 1
+      matches:
+        -
+          id: knowledge-src/django-material
+          source: maintainer
+          description: "Local knowledge source generated from the django-material repository README."
+      status: matched
+    -
+      query: "django forms"
+      total: 1
+      matches:
+        -
+          id: knowledge-src/django-material
+          source: maintainer
+          description: "Local knowledge source generated from the django-material repository README."
+      status: matched
+    -
+      query: "django urls"
+      total: 1
+      matches:
+        -
+          id: knowledge-src/django-material
+          source: maintainer
+          description: "Local knowledge source generated from the django-material repository README."
+      status: matched
+  search_status: matched
+  candidate_registry_ids:
+    - knowledge-src/django-material
+repository_fit:
+  status: installed
+  evidence:
+    - backend/requirements.txt
+    - backend/config/settings.py
+    - backend/config/urls.py
+  repository_patterns:
+    - "Function-based JsonResponse APIs in core.views"
+    - "Django model layer in core.models"
+    - "Middleware-driven request instrumentation and auth"

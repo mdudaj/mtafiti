@@ -1,0 +1,81 @@
+name: Viewflow
+type: Framework
+installed: false
+source_urls:
+  - https://github.com/viewflow/viewflow
+  - https://github.com/viewflow/cookbook
+concepts:
+  - Flow
+  - Process
+  - Start
+  - View
+  - End
+  - FlowAppViewset
+  - Site
+components:
+  - viewflow.workflow.flow.Flow
+  - viewflow.workflow.flow.Start
+  - viewflow.workflow.flow.View
+  - viewflow.workflow.flow.End
+  - viewflow.workflow.models.Process
+configuration_patterns:
+  - "Install django-viewflow and add viewflow apps to INSTALLED_APPS."
+  - "Create Process models for workflow state and data."
+  - "Register Flow classes through FlowAppViewset and Site URLs."
+api_surfaces:
+  - "Flow classes with Start/View/End nodes"
+  - "Process model integration"
+  - "AuthViewset and FlowAppViewset URL registration"
+  - "Cookbook samples for workflow, CRUD, and dashboards"
+architecture:
+  - "Django-native low-code framework for workflows and business apps."
+  - "Workflows are modeled as Flow classes that advance Process instances through nodes."
+  - "The framework ships integrated routing and UI viewsets for workflow-driven applications."
+best_practices:
+  - "Keep process data in explicit Process models."
+  - "Model workflow steps as composable Flow nodes with clear assignee/transition boundaries."
+  - "Use cookbook examples to validate dashboard and workflow interaction patterns before customization."
+context_hub:
+  available: true
+  install_command: "npm install -g @aisuite/chub"
+  update_command: "chub update"
+  help_command: "chub help"
+  search_queries:
+    - viewflow
+    - "django workflow"
+  get_commands:
+    []
+  status: ready
+  local_source_workflow:
+    supports_git_url_directly: false
+    clone_and_build_steps:
+      - "git clone <repo-url> <local-dir>"
+      - "chub build <content-dir> -o <content-dir>/dist"
+      - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+      - "Run `chub update` to refresh configured sources"
+  search_results:
+    -
+      query: viewflow
+      total: 1
+      matches:
+        -
+          id: knowledge-src/viewflow
+          source: maintainer
+          description: "Local knowledge source generated from the viewflow repository README."
+      status: matched
+    -
+      query: "django workflow"
+      total: 0
+      matches:
+        []
+      status: no_registry_match
+  search_status: matched
+  candidate_registry_ids:
+    - knowledge-src/viewflow
+repository_fit:
+  status: documented_target
+  evidence:
+    - docs/workflow-ui.md
+  repository_patterns:
+    - "Workflow UI notes describe Viewflow as the target workflow engine."
+    - "Current code uses custom workflow models instead of installed Viewflow packages."

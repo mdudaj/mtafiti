@@ -21,6 +21,8 @@ jobs:
         run: python .github/scripts/check_docs_workflow.py --base-ref "${{ github.base_ref }}"
       - name: Validate OpenAPI contract drift gate
         run: python .github/scripts/check_openapi_contract.py
+      - name: Validate knowledge graph artifacts
+        run: python .github/scripts/generate_knowledge_graph.py --check
 
   backend-tests:
     needs: docs-gate

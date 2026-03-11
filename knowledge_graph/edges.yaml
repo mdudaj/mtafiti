@@ -1,0 +1,1517 @@
+edges:
+  -
+    relationship: calls
+    from: api:api_v1_access_requests
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_access_requests_request_id_decision
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_agent_runs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_agent_runs_run_id_transition
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id_classifications
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id_contracts
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id_terms_term_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id_versions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_assets_asset_id_versions_version_id_publish
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_classifications
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_classifications_classification_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_classifications_classification_id_activate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_classifications_classification_id_deprecate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_collaboration_documents
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_collaboration_documents_document_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_collaboration_documents_document_id_session
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_collaboration_documents_document_id_versions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_connectors_runs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_connectors_runs_run_id_cancel
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_contracts
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_contracts_contract_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_contracts_contract_id_activate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_contracts_contract_id_deprecate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_products
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_products_product_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_products_product_id_activate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_products_product_id_retire
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_shares
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_shares_share_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_data_shares_share_id_transition
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_glossary_terms
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_glossary_terms_term_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_glossary_terms_term_id_approve
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_glossary_terms_term_id_deprecate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_governance_policies
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_governance_policies_policy_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_governance_policies_policy_id_transition
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ingestions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ingestions_ingestion_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_lineage_edges
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_master_data_entity_type_merge_candidates
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_master_data_entity_type_merge_candidates_candidate_id_approve
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_master_data_entity_type_records
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_master_data_entity_type_records_master_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_executions_execution_id_complete
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_sessions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_sessions_session_id_executions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_sessions_session_id_terminate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_workspaces
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notebooks_workspaces_workspace_id_sessions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notifications
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notifications_dispatch
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_notifications_notification_id_retry
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_orchestration_runs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_orchestration_runs_run_id_transition
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_orchestration_workflows
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_gateways
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_gateways_gateway_id_heartbeat
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_jobs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_jobs_job_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_printing_jobs_job_id_status
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_actions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_actions_action_id_decision
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_actions_action_id_execute
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_consent_events
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_profiles
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_privacy_profiles_profile_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_invitations_accept
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_invitations_invitation_id_resend
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_invitations_invitation_id_revoke
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_project_id_members
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_project_id_members_invite
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_project_id_members_membership_id_lifecycle
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_projects_project_id_workspace
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_quality_results
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_quality_rules
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_quality_rules_rule_id_evaluate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_reference_data_datasets
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_reference_data_datasets_dataset_id_versions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_reference_data_datasets_dataset_id_versions_version_activate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_reference_data_datasets_dataset_id_versions_version_values
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_residency_check
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_residency_profiles
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_residency_profiles_profile_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_residency_profiles_profile_id_activate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_residency_profiles_profile_id_deprecate
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_retention_holds
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_retention_holds_hold_id_release
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_retention_rules
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_retention_runs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_search_assets
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_stewardship_items
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_stewardship_items_item_id_transition
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_tenants
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ui_operations_agent_monitor
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ui_operations_dashboard
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ui_operations_orchestration_monitor
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ui_operations_stewardship_workbench
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_users
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_users_user_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_workflows_definitions
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_workflows_definitions_definition_id
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_workflows_runs
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_workflows_runs_run_id_tasks
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_workflows_runs_run_id_transition
+    to: module:core_views
+  -
+    relationship: depends_on
+    from: framework:celery
+    to: service:postgres
+  -
+    relationship: depends_on
+    from: framework:celery
+    to: service:rabbitmq
+  -
+    relationship: depends_on
+    from: framework:django
+    to: service:postgres
+  -
+    relationship: depends_on
+    from: framework:django-tenants
+    to: service:postgres
+  -
+    relationship: uses
+    from: module:config_asgi
+    to: framework:django
+  -
+    relationship: uses
+    from: module:config_celery
+    to: framework:celery
+  -
+    relationship: uses
+    from: module:config_init
+    to: module:config_celery
+  -
+    relationship: uses
+    from: module:config_settings_test
+    to: module:config_settings
+  -
+    relationship: uses
+    from: module:config_urls
+    to: framework:django
+  -
+    relationship: uses
+    from: module:config_urls
+    to: module:core_views
+  -
+    relationship: uses
+    from: module:config_urls
+    to: module:tenants_views
+  -
+    relationship: uses
+    from: module:config_wsgi
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_admin
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_apps
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_celery
+    to: framework:celery
+  -
+    relationship: uses
+    from: module:core_celery
+    to: framework:django-tenants
+  -
+    relationship: uses
+    from: module:core_celery
+    to: module:core_logging
+  -
+    relationship: uses
+    from: module:core_celery
+    to: module:core_metrics
+  -
+    relationship: uses
+    from: module:core_events
+    to: library:pika
+  -
+    relationship: uses
+    from: module:core_events
+    to: module:core_logging
+  -
+    relationship: uses
+    from: module:core_identity
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_metrics
+    to: library:prometheus-client
+  -
+    relationship: uses
+    from: module:core_middleware
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_middleware
+    to: module:core_identity
+  -
+    relationship: uses
+    from: module:core_middleware
+    to: module:core_logging
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:accessrequest
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:agentrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:assetversion
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:classification
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:collaborationdocument
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:collaborationdocumentversion
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:connectorrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:consentevent
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:dataasset
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:datacontract
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:dataproduct
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:datashare
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:domain
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:glossaryterm
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:governancepolicy
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:governancepolicytransition
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:ingestionrequest
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:lineageedge
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:mastermergecandidate
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:masterrecord
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:notebookexecution
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:notebooksession
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:notebookworkspace
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:orchestrationrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:orchestrationworkflow
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:printgateway
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:printjob
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:privacyaction
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:privacyprofile
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:project
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:projectinvitation
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:projectmembership
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:projectmembershiprolehistory
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:projectworkspace
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:qualitycheckresult
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:qualityrule
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:referencedataset
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:referencedatasetversion
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:residencyprofile
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:retentionhold
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:retentionrule
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:retentionrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:stewardshipitem
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tenant
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:usernotification
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:userprofile
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflowdefinition
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflowrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflowtask
+  -
+    relationship: implements
+    from: module:core_models
+    to: skill:implement_workflow_lifecycle
+  -
+    relationship: implements
+    from: module:core_models
+    to: skill:manage_project_membership_lifecycle
+  -
+    relationship: implements
+    from: module:core_models
+    to: skill:model_lineage_graph_edges
+  -
+    relationship: implements
+    from: module:core_models
+    to: workflow:governance_policy_lifecycle
+  -
+    relationship: implements
+    from: module:core_models
+    to: workflow:retention_execution
+  -
+    relationship: implements
+    from: module:core_models
+    to: workflow:workflow_lifecycle
+  -
+    relationship: uses
+    from: module:core_models
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_notifications
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_notifications
+    to: module:core_models
+  -
+    relationship: implements
+    from: module:core_tasks
+    to: skill:implement_tenant_aware_background_task
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: framework:celery
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: module:core_celery
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: module:core_events
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: module:core_logging
+  -
+    relationship: uses
+    from: module:core_tasks
+    to: module:core_models
+  -
+    relationship: uses
+    from: module:core_tests
+    to: framework:django
+  -
+    relationship: implements
+    from: module:core_views
+    to: skill:compose_operations_dashboard_contract
+  -
+    relationship: implements
+    from: module:core_views
+    to: skill:define_django_json_api_endpoint
+  -
+    relationship: implements
+    from: module:core_views
+    to: skill:implement_schema_per_tenant_api
+  -
+    relationship: implements
+    from: module:core_views
+    to: skill:implement_workflow_lifecycle
+  -
+    relationship: implements
+    from: module:core_views
+    to: skill:manage_project_membership_lifecycle
+  -
+    relationship: implements
+    from: module:core_views
+    to: uicomponent:agent_monitor
+  -
+    relationship: implements
+    from: module:core_views
+    to: uicomponent:operations_dashboard
+  -
+    relationship: implements
+    from: module:core_views
+    to: uicomponent:orchestration_monitor
+  -
+    relationship: implements
+    from: module:core_views
+    to: uicomponent:stewardship_workbench
+  -
+    relationship: implements
+    from: module:core_views
+    to: workflow:governance_policy_lifecycle
+  -
+    relationship: implements
+    from: module:core_views
+    to: workflow:retention_execution
+  -
+    relationship: implements
+    from: module:core_views
+    to: workflow:workflow_lifecycle
+  -
+    relationship: uses
+    from: module:core_views
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_events
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_identity
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_metrics
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_models
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_notifications
+  -
+    relationship: uses
+    from: module:core_views
+    to: module:core_tasks
+  -
+    relationship: uses
+    from: module:tenants_admin
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_admin
+    to: module:tenants_models
+  -
+    relationship: uses
+    from: module:tenants_apps
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_middleware
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_middleware
+    to: framework:django-tenants
+  -
+    relationship: implements
+    from: module:tenants_models
+    to: skill:implement_schema_per_tenant_api
+  -
+    relationship: uses
+    from: module:tenants_models
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_models
+    to: framework:django-tenants
+  -
+    relationship: uses
+    from: module:tenants_tests
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_views
+    to: framework:django
+  -
+    relationship: uses
+    from: module:tenants_views
+    to: framework:django-tenants
+  -
+    relationship: uses
+    from: module:tenants_views
+    to: module:core_events
+  -
+    relationship: uses
+    from: module:tenants_views
+    to: module:core_identity
+  -
+    relationship: uses
+    from: module:tenants_views
+    to: module:tenants_models
+  -
+    relationship: depends_on
+    from: service:backend
+    to: service:postgres
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_access_requests
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_access_requests_request_id_decision
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_agent_runs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_agent_runs_run_id_transition
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id_classifications
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id_contracts
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id_terms_term_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id_versions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_assets_asset_id_versions_version_id_publish
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_classifications
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_classifications_classification_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_classifications_classification_id_activate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_classifications_classification_id_deprecate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_collaboration_documents
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_collaboration_documents_document_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_collaboration_documents_document_id_session
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_collaboration_documents_document_id_versions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_connectors_runs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_connectors_runs_run_id_cancel
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_contracts
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_contracts_contract_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_contracts_contract_id_activate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_contracts_contract_id_deprecate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_products
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_products_product_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_products_product_id_activate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_products_product_id_retire
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_shares
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_shares_share_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_data_shares_share_id_transition
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_glossary_terms
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_glossary_terms_term_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_glossary_terms_term_id_approve
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_glossary_terms_term_id_deprecate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_governance_policies
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_governance_policies_policy_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_governance_policies_policy_id_transition
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ingestions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ingestions_ingestion_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_lineage_edges
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_master_data_entity_type_merge_candidates
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_master_data_entity_type_merge_candidates_candidate_id_approve
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_master_data_entity_type_records
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_master_data_entity_type_records_master_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_executions_execution_id_complete
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_sessions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_sessions_session_id_executions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_sessions_session_id_terminate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_workspaces
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notebooks_workspaces_workspace_id_sessions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notifications
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notifications_dispatch
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_notifications_notification_id_retry
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_orchestration_runs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_orchestration_runs_run_id_transition
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_orchestration_workflows
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_gateways
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_gateways_gateway_id_heartbeat
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_jobs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_jobs_job_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_printing_jobs_job_id_status
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_actions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_actions_action_id_decision
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_actions_action_id_execute
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_consent_events
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_profiles
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_privacy_profiles_profile_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_invitations_accept
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_invitations_invitation_id_resend
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_invitations_invitation_id_revoke
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_project_id_members
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_project_id_members_invite
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_project_id_members_membership_id_lifecycle
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_projects_project_id_workspace
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_quality_results
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_quality_rules
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_quality_rules_rule_id_evaluate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_reference_data_datasets
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_reference_data_datasets_dataset_id_versions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_reference_data_datasets_dataset_id_versions_version_activate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_reference_data_datasets_dataset_id_versions_version_values
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_residency_check
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_residency_profiles
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_residency_profiles_profile_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_residency_profiles_profile_id_activate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_residency_profiles_profile_id_deprecate
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_retention_holds
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_retention_holds_hold_id_release
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_retention_rules
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_retention_runs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_search_assets
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_stewardship_items
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_stewardship_items_item_id_transition
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_tenants
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ui_operations_agent_monitor
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ui_operations_dashboard
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ui_operations_orchestration_monitor
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ui_operations_stewardship_workbench
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_users
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_users_user_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_workflows_definitions
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_workflows_definitions_definition_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_workflows_runs
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_workflows_runs_run_id_tasks
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_workflows_runs_run_id_transition
+  -
+    relationship: depends_on
+    from: service:worker
+    to: service:postgres
+  -
+    relationship: depends_on
+    from: service:worker
+    to: service:rabbitmq
+  -
+    relationship: uses
+    from: skill:compose_operations_dashboard_contract
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:compose_operations_dashboard_contract
+    to: framework:django_material
+  -
+    relationship: uses
+    from: skill:define_django_json_api_endpoint
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:implement_schema_per_tenant_api
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:implement_schema_per_tenant_api
+    to: framework:django-tenants
+  -
+    relationship: uses
+    from: skill:implement_tenant_aware_background_task
+    to: framework:celery
+  -
+    relationship: uses
+    from: skill:implement_tenant_aware_background_task
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:implement_workflow_lifecycle
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:manage_project_membership_lifecycle
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:model_lineage_graph_edges
+    to: framework:django
+  -
+    relationship: uses
+    from: skill:plan_viewflow_material_workflow_ui
+    to: framework:django_material
+  -
+    relationship: uses
+    from: skill:plan_viewflow_material_workflow_ui
+    to: framework:viewflow
+  -
+    relationship: configures
+    from: tool:context_hub
+    to: framework:django
+  -
+    relationship: configures
+    from: tool:context_hub
+    to: framework:django_material
+  -
+    relationship: configures
+    from: tool:context_hub
+    to: framework:viewflow
+  -
+    relationship: configures
+    from: tool:github_actions
+    to: skill:define_django_json_api_endpoint
+  -
+    relationship: renders
+    from: uicomponent:agent_monitor
+    to: datamodel:agentrun
+  -
+    relationship: uses
+    from: uicomponent:agent_monitor
+    to: framework:django
+  -
+    relationship: uses
+    from: uicomponent:agent_monitor
+    to: framework:django_material
+  -
+    relationship: renders
+    from: uicomponent:operations_dashboard
+    to: datamodel:agentrun
+  -
+    relationship: renders
+    from: uicomponent:operations_dashboard
+    to: datamodel:orchestrationrun
+  -
+    relationship: renders
+    from: uicomponent:operations_dashboard
+    to: datamodel:stewardshipitem
+  -
+    relationship: renders
+    from: uicomponent:operations_dashboard
+    to: datamodel:workflowrun
+  -
+    relationship: uses
+    from: uicomponent:operations_dashboard
+    to: framework:django
+  -
+    relationship: uses
+    from: uicomponent:operations_dashboard
+    to: framework:django_material
+  -
+    relationship: renders
+    from: uicomponent:orchestration_monitor
+    to: datamodel:orchestrationrun
+  -
+    relationship: renders
+    from: uicomponent:orchestration_monitor
+    to: datamodel:orchestrationworkflow
+  -
+    relationship: uses
+    from: uicomponent:orchestration_monitor
+    to: framework:django
+  -
+    relationship: uses
+    from: uicomponent:orchestration_monitor
+    to: framework:django_material
+  -
+    relationship: renders
+    from: uicomponent:stewardship_workbench
+    to: datamodel:stewardshipitem
+  -
+    relationship: uses
+    from: uicomponent:stewardship_workbench
+    to: framework:django
+  -
+    relationship: uses
+    from: uicomponent:stewardship_workbench
+    to: framework:django_material
+  -
+    relationship: uses
+    from: workflow:governance_policy_lifecycle
+    to: framework:django
+  -
+    relationship: uses
+    from: workflow:retention_execution
+    to: framework:celery
+  -
+    relationship: uses
+    from: workflow:retention_execution
+    to: framework:django
+  -
+    relationship: uses
+    from: workflow:workflow_lifecycle
+    to: framework:django

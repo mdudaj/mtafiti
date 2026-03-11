@@ -1,0 +1,73 @@
+ontology:
+  node_types:
+    -
+      name: Skill
+      description: "Reusable engineering capability extracted from repository patterns or framework knowledge."
+    -
+      name: Tool
+      description: "External or repository tool used to build, test, deploy, or document the system."
+    -
+      name: Framework
+      description: "Opinionated platform or runtime framework shaping repository architecture."
+    -
+      name: Library
+      description: "Dependency used inside modules without owning overall application structure."
+    -
+      name: API
+      description: "HTTP or external integration surface."
+    -
+      name: Module
+      description: "Internal Python module or package implementing domain logic."
+    -
+      name: UIComponent
+      description: "UI-facing contract or server-rendered component surface."
+    -
+      name: Workflow
+      description: "Lifecycle or orchestrated process node grouping."
+    -
+      name: DataModel
+      description: "Persistent domain entity or data structure."
+    -
+      name: Service
+      description: "Deployable runtime or backing service."
+  relationship_types:
+    -
+      name: implements
+      description: "An internal module or service realizes a capability, workflow, API, or skill."
+    -
+      name: uses
+      description: "A node directly relies on another framework, tool, module, or component."
+    -
+      name: depends_on
+      description: "A node requires another node to operate correctly."
+    -
+      name: calls
+      description: "A node invokes another node at runtime or through dispatch."
+    -
+      name: produces
+      description: "A service or tool emits an output, contract, or artifact."
+    -
+      name: consumes
+      description: "A node accepts or reads another node as input."
+    -
+      name: renders
+      description: "A UI component or API presents a model or aggregated data shape."
+    -
+      name: extends
+      description: "A framework or module builds on the contract of another node."
+    -
+      name: configures
+      description: "A tool or module configures or enriches another node."
+  query_examples:
+    -
+      question: "Find skills related to dashboards"
+      command: "python .github/scripts/query_knowledge_graph.py --type Skill --text dashboard"
+    -
+      question: "Find UI components compatible with django-material"
+      command: "python .github/scripts/query_knowledge_graph.py --type UIComponent --relationship uses --target framework:django_material"
+    -
+      question: "Find workflow nodes supported by Viewflow"
+      command: "python .github/scripts/query_knowledge_graph.py --type Workflow --relationship uses --target framework:viewflow"
+    -
+      question: "Find modules implementing workflows"
+      command: "python .github/scripts/query_knowledge_graph.py --type Module --relationship implements --target workflow:workflow_lifecycle"
