@@ -71,6 +71,7 @@
         flex: 0 0 auto;
       }
       .account-name { margin: 0 0 2px; font-weight: 700; color: #fff; }
+      .account-caption { margin: 0 0 2px; color: #dbeafe; font-size: 12px; font-weight: 700; }
       .account-meta { margin: 0; color: #bfdbfe; font-size: 12px; }
       .brand-lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
       .brand-mark { width: 40px; height: 40px; border-radius: 14px; background: rgba(219, 234, 254, 0.14); border: 1px solid rgba(191, 219, 254, 0.35); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
@@ -316,6 +317,7 @@
         <div class="sidebar-account">
           <div class="avatar">{{ payload.user_context.user_id|slice:":2"|upper }}</div>
           <div class="sidebar-account-copy">
+            <p class="account-caption">Signed in as:</p>
             <p class="account-name">{{ payload.user_context.user_id }}</p>
             <p class="account-meta">{{ payload.user_context.tenant_schema }}{% if payload.user_context.roles %} · {{ payload.user_context.roles|join:", " }}{% endif %}</p>
           </div>
