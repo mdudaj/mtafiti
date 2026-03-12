@@ -613,6 +613,17 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
 """.strip(),
                 },
                 {
+                    "title": "Rapid agentic UI metadata",
+                    "body": """
+- CRUD page recipe: register a `ModelViewset`, configure `list_columns` and `form_layout`, mount it into an `Application`, and let `Site(...)` supply navigation and shell chrome.
+- Workflow page recipe: keep workflow-specific forms in `StartView`/`UpdateView` classes or workflow task views and reuse `viewflow/workflow/start.html` or `viewflow/workflow/task.html` rather than inventing a new shell.
+- Field recipe: prefer outlined text/select patterns with floating labels, placeholder-free inputs, help text, and explicit error state wiring.
+- Primary action recipe: use filled buttons for main submit actions and icon FABs for context-specific creation/launch actions.
+- Card recipe: use elevated cards with title, subtitle, content slot, and footer slot to package forms and table sections.
+- Theme recipe: prefer blue `primary` tokens, `surface`/`surface-container-*` backgrounds, and `on-surface-variant` text for supporting labels and hints.
+""".strip(),
+                },
+                {
                     "title": "Component and base-template primitives",
                     "sources": [
                         {"path": "django-material/README.md", "start_line": 23, "end_line": 62, "label": "README usage and base template"},
@@ -637,6 +648,41 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                     ],
                 },
                 {
+                    "title": "Component recipes",
+                    "sources": [
+                        {
+                            "path": "django-material/material/templates/cotton/forms/text/outlined.html",
+                            "start_line": 1,
+                            "end_line": 85,
+                            "label": "Outlined text field component",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/forms/select/outlined.html",
+                            "start_line": 1,
+                            "end_line": 97,
+                            "label": "Outlined select component",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/button/filled.html",
+                            "start_line": 1,
+                            "end_line": 18,
+                            "label": "Filled primary button component",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/button/fab.html",
+                            "start_line": 1,
+                            "end_line": 43,
+                            "label": "Floating action button component",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/card/elevated.html",
+                            "start_line": 1,
+                            "end_line": 35,
+                            "label": "Elevated card component",
+                        },
+                    ],
+                },
+                {
                     "title": "Layout API",
                     "sources": [
                         {
@@ -655,6 +701,23 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                             "start_line": 10,
                             "end_line": 259,
                             "label": "CreateModelView form-class, widgets, template, and success-url behavior",
+                        },
+                    ],
+                },
+                {
+                    "title": "Cookbook page examples",
+                    "sources": [
+                        {
+                            "path": "cookbook/crud101/atlas/viewset.py",
+                            "start_line": 17,
+                            "end_line": 101,
+                            "label": "CRUD viewset configuration with icons and layouts",
+                        },
+                        {
+                            "path": "cookbook/workflow101/shipment/views.py",
+                            "start_line": 1,
+                            "end_line": 50,
+                            "label": "Workflow task views using built-in workflow templates",
                         },
                     ],
                 },

@@ -9,7 +9,10 @@
 <div class="toolbar">
   <div class="muted">Use the project filter to scope cards and jump directly into the relevant application area.</div>
   <form method="get" class="right" aria-label="Project filter">
-    <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    <label class="field-group">
+      <span class="field-label">Project ID</span>
+      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    </label>
     <button class="button" type="submit">Filter</button>
     <a class="button secondary" href="/ui/operations/dashboard">Clear</a>
   </form>

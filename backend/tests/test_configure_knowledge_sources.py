@@ -86,6 +86,7 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     workflow_dir = source_root / "cookbook" / "workflow101" / "shipment"
     workflow_dir.mkdir(parents=True)
     (workflow_dir / "flows.py").write_text("class ShipmentFlow(flow.Flow): ...", encoding="utf-8")
+    (workflow_dir / "views.py").write_text("class StartView: ...\nclass ShipmentView: ...", encoding="utf-8")
 
     fsm_dir = source_root / "cookbook" / "fsm101" / "review"
     fsm_dir.mkdir(parents=True)
@@ -120,6 +121,15 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     (material_dir / "demo" / "templates" / "demo" / "widgets.html").write_text("{% extends 'material/base_page.html' %}", encoding="utf-8")
     (material_dir / "material" / "templates" / "cotton").mkdir(parents=True)
     (material_dir / "material" / "templates" / "cotton" / "CLAUDE.md").write_text("# Cotton component guide", encoding="utf-8")
+    (material_dir / "material" / "templates" / "cotton" / "forms" / "text").mkdir(parents=True)
+    (material_dir / "material" / "templates" / "cotton" / "forms" / "text" / "outlined.html").write_text("<input placeholder=' ' data-input />", encoding="utf-8")
+    (material_dir / "material" / "templates" / "cotton" / "forms" / "select").mkdir(parents=True)
+    (material_dir / "material" / "templates" / "cotton" / "forms" / "select" / "outlined.html").write_text("<input up-select-trigger />", encoding="utf-8")
+    (material_dir / "material" / "templates" / "cotton" / "button").mkdir(parents=True)
+    (material_dir / "material" / "templates" / "cotton" / "button" / "filled.html").write_text("<button up-ripple>{{ slot }}</button>", encoding="utf-8")
+    (material_dir / "material" / "templates" / "cotton" / "button" / "fab.html").write_text("<button class='rounded-full'>+</button>", encoding="utf-8")
+    (material_dir / "material" / "templates" / "cotton" / "card").mkdir(parents=True)
+    (material_dir / "material" / "templates" / "cotton" / "card" / "elevated.html").write_text("<div class='bg-surface'>{{ slot }}</div>", encoding="utf-8")
 
     generated = module.generate_content(source_root, content_root)
     entry_ids = {item["entry_id"] for item in generated}
@@ -156,6 +166,9 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     assert frontend_skill.exists()
     assert "cotton components" in frontend_skill.read_text(encoding="utf-8")
     assert "base_page.html" in frontend_skill.read_text(encoding="utf-8")
+    assert "Rapid agentic UI metadata" in frontend_skill.read_text(encoding="utf-8")
+    assert "Outlined text field component" in frontend_skill.read_text(encoding="utf-8")
+    assert "Workflow task views using built-in workflow templates" in frontend_skill.read_text(encoding="utf-8")
 
     forms_skill = content_root / "knowledge-src" / "skills" / "viewflow-forms-layout-composition" / "SKILL.md"
     assert forms_skill.exists()

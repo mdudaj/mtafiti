@@ -9,18 +9,24 @@
 <div class="toolbar">
   <div class="muted">Filter the workbench, review severities, and execute lifecycle actions from one screen.</div>
   <form method="get" class="right" aria-label="Stewardship filters">
-    <select class="select" name="status">
-      <option value="">All statuses</option>
-      {% for option in status_options %}
-      <option value="{{ option }}" {% if status_filter == option %}selected{% endif %}>{{ option }}</option>
-      {% endfor %}
-    </select>
-    <select class="select" name="severity">
-      <option value="">All severities</option>
-      {% for option in severity_options %}
-      <option value="{{ option }}" {% if severity_filter == option %}selected{% endif %}>{{ option }}</option>
-      {% endfor %}
-    </select>
+    <label class="field-group">
+      <span class="field-label">Status</span>
+      <select class="select" name="status">
+        <option value="">All statuses</option>
+        {% for option in status_options %}
+        <option value="{{ option }}" {% if status_filter == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field-group">
+      <span class="field-label">Severity</span>
+      <select class="select" name="severity">
+        <option value="">All severities</option>
+        {% for option in severity_options %}
+        <option value="{{ option }}" {% if severity_filter == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <button class="button" type="submit">Apply</button>
     <a class="button secondary" href="/ui/operations/stewardship">Clear</a>
   </form>
@@ -56,21 +62,28 @@
       </td>
       <td>
         {% if payload.capabilities.can_manage_stewardship and item.allowed_actions %}
-          <div data-ui-action-form="stewardship" class="actions">
-            <select class="select" data-field="action" aria-label="Action">
-              {% for action in item.allowed_actions %}
-              <option value="{{ action }}">{{ action }}</option>
-              {% endfor %}
-            </select>
-            <input class="input" data-field="assignee" placeholder="assignee (for assign)" aria-label="Assignee">
-            <input class="input" data-field="resolution" placeholder='resolution JSON (for resolve)' aria-label="Resolution JSON">
-            <button
-              class="button secondary"
-              data-ui-action="stewardship"
-              onclick="submitStewardshipAction(this, '{{ item.id }}')"
-            >
-              run
-            </button>
+          <div data-ui-action-form="stewardship" class="section-stack">
+            <label class="field-group">
+              <span class="field-label">Action</span>
+              <select class="select" data-field="action" aria-label="Action">
+                {% for action in item.allowed_actions %}
+                <option value="{{ action }}">{{ action }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="field-grid field-grid--wide">
+              <label class="field-group"><span class="field-label">Assignee</span><input class="input" data-field="assignee" placeholder="assignee (for assign)" aria-label="Assignee"></label>
+              <label class="field-group"><span class="field-label">Resolution JSON</span><input class="input" data-field="resolution" placeholder='resolution JSON (for resolve)' aria-label="Resolution JSON"></label>
+            </div>
+            <div class="button-row">
+              <button
+                class="button secondary"
+                data-ui-action="stewardship"
+                onclick="submitStewardshipAction(this, '{{ item.id }}')"
+              >
+                Run
+              </button>
+            </div>
           </div>
         {% else %}
           <span class="muted">No actions</span>

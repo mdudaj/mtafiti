@@ -7,17 +7,21 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" />
     <style>
       :root {
-        --color-primary: #3949ab;
-        --color-primary-strong: #283593;
-        --color-primary-soft: #e8eaf6;
-        --color-primary-soft-2: #f3f4ff;
+        --color-primary: #0277bd;
+        --color-primary-strong: #01579b;
+        --color-primary-soft: #e1f5fe;
+        --color-primary-soft-2: #f0f8ff;
         --color-surface: #ffffff;
-        --color-surface-muted: #f8f9ff;
-        --color-surface-border: #d7dcf5;
-        --color-text: #18233f;
-        --color-text-muted: #5c6887;
-        --color-sidebar: #283593;
-        --color-secondary: #5c6bc0;
+        --color-surface-muted: #f8fbff;
+        --color-surface-border: #cfd8dc;
+        --color-text: #263238;
+        --color-text-muted: #546e7a;
+        --color-sidebar: #01579b;
+        --color-secondary: #26a69a;
+        --color-outline: #90a4ae;
+        --color-outline-strong: rgba(0, 0, 0, 0.87);
+        --color-surface-container-low: #e1f5fe;
+        --color-surface-container-high: #f1f8e9;
         --sidebar-width: 250px;
         --sidebar-collapsed-width: 92px;
       }
@@ -38,6 +42,8 @@
         -webkit-font-smoothing: antialiased;
         font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
       }
+      .skip-link { position: absolute; left: -9999px; top: 0; z-index: 1000; background: var(--color-primary); color: #fff; padding: 8px 12px; border-radius: 8px; }
+      .skip-link:focus { left: 16px; top: 12px; }
       .layout { display: grid; grid-template-columns: var(--sidebar-width) 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
       .layout[data-sidebar-collapsed="true"] { grid-template-columns: var(--sidebar-collapsed-width) 1fr; }
       .sidebar { background: linear-gradient(180deg, var(--color-sidebar) 0%, #14365e 100%); color: #dbeafe; padding: 22px 16px; }
@@ -167,10 +173,70 @@
       .panel-title { margin: 0; font-size: 1.05rem; }
       .panel-description { margin: 4px 0 0; color: var(--color-text-muted); font-size: 14px; }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .section-stack { display: grid; gap: 14px; }
+      .field-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .field-grid--wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .field-group {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0;
+        min-height: 56px;
+      }
+      .field-label {
+        position: absolute;
+        z-index: 2;
+        left: 16px;
+        top: 0;
+        padding: 0 4px;
+        background: var(--color-surface);
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .01em;
+        color: var(--color-text-muted);
+        transition: color .18s ease;
+      }
+      .field-group:focus-within .field-label { color: var(--color-primary-strong); }
+      .form-hint { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+      .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
       .form-rows { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
       .form-row { display: block; }
       .form-row .input, .form-row .select, .form-row .button { width: 100%; box-sizing: border-box; }
-      .input, .select, textarea.input { border: 1px solid #bfd3f2; border-radius: 12px; padding: 9px 12px; font-size: 14px; background: #fff; color: var(--color-text); }
+      .input, .select, textarea.input {
+        width: 100%;
+        min-height: 56px;
+        border: 1px solid var(--color-outline);
+        border-radius: 8px;
+        padding: 18px 16px 12px;
+        font-size: 14px;
+        line-height: 1.35;
+        background: var(--color-surface);
+        color: var(--color-text);
+        transition: border-color .18s ease, box-shadow .18s ease;
+      }
+      .field-group textarea.input { min-height: 112px; }
+      .select {
+        appearance: none;
+        background-image:
+          linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+          linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+        background-position:
+          calc(100% - 22px) calc(50% - 2px),
+          calc(100% - 16px) calc(50% - 2px);
+        background-size: 6px 6px, 6px 6px;
+        background-repeat: no-repeat;
+        padding-right: 38px;
+      }
+      textarea.input { min-height: 120px; resize: vertical; }
+      .input::placeholder, textarea.input::placeholder { color: #7c89aa; }
+      .input:hover, .select:hover, textarea.input:hover { border-color: var(--color-outline-strong); }
+      .input:focus, .select:focus, textarea.input:focus {
+        border-color: var(--color-primary);
+        box-shadow: none;
+        outline: none;
+      }
       .button { border: 1px solid var(--color-primary); color: #fff; background: linear-gradient(180deg, #1370c8 0%, var(--color-primary) 100%); border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; text-decoration: none; }
       .chip { display: inline-block; border-radius: 999px; background: #e0efff; color: var(--color-primary-strong); padding: 3px 9px; font-size: 12px; font-weight: 600; }
       .muted { color: var(--color-text-muted); }
@@ -223,6 +289,7 @@
         transform: translateY(0);
       }
       .fab:hover, .fab:focus, .fab:active { text-decoration: none; }
+      a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
       .layout[data-sidebar-collapsed="true"] .brand-copy,
       .layout[data-sidebar-collapsed="true"] .brand-subtitle,
       .layout[data-sidebar-collapsed="true"] .nav-section-label,
@@ -243,6 +310,7 @@
     </style>
   </head>
   <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
     <div class="layout" data-sidebar-collapsed="false" data-ui-shell="workspace">
       <aside class="sidebar">
         <div class="sidebar-account">
@@ -267,7 +335,7 @@
           {% endif %}
         </nav>
       </aside>
-        <main class="content">
+        <main class="content" id="main-content">
           <div class="page-shell {% block topbar_variant %}page-shell--flush{% endblock %}">
             <header class="topbar {% block topbar_variant_class %}topbar--flush{% endblock %}">
               <div class="topbar-left">

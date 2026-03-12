@@ -8,18 +8,22 @@
     <style>
       :root {
         color-scheme: light;
-        --color-primary: #3949ab;
-        --color-primary-strong: #283593;
-        --color-primary-soft: #e8eaf6;
-        --color-primary-soft-2: #f3f4ff;
+        --color-primary: #0277bd;
+        --color-primary-strong: #01579b;
+        --color-primary-soft: #e1f5fe;
+        --color-primary-soft-2: #f0f8ff;
         --color-surface: #ffffff;
-        --color-surface-muted: #f8f9ff;
-        --color-surface-border: #d7dcf5;
-        --color-text: #18233f;
-        --color-text-muted: #5c6887;
-        --color-sidebar: #283593;
-        --color-sidebar-2: #3949ab;
-        --color-secondary: #5c6bc0;
+        --color-surface-muted: #f8fbff;
+        --color-surface-border: #cfd8dc;
+        --color-text: #263238;
+        --color-text-muted: #546e7a;
+        --color-sidebar: #01579b;
+        --color-sidebar-2: #0277bd;
+        --color-secondary: #26a69a;
+        --color-outline: #90a4ae;
+        --color-outline-strong: rgba(0, 0, 0, 0.87);
+        --color-surface-container-low: #e1f5fe;
+        --color-surface-container-high: #f1f8e9;
         --sidebar-width: 280px;
         --sidebar-collapsed-width: 96px;
       }
@@ -174,7 +178,67 @@
       .stat-card h3 { margin: 0 0 12px; font-size: 1rem; }
       .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
       .toolbar .right { display: flex; flex-wrap: wrap; gap: 8px; }
-      .input, .select, textarea.input { border: 1px solid #bfd3f2; background: #fff; border-radius: 12px; padding: 9px 12px; font-size: 14px; color: var(--color-text); }
+      .section-stack { display: grid; gap: 14px; }
+      .field-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .field-grid--wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .field-group {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0;
+        min-height: 56px;
+      }
+      .field-label {
+        position: absolute;
+        z-index: 2;
+        left: 16px;
+        top: 0;
+        padding: 0 4px;
+        background: var(--color-surface);
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .01em;
+        color: var(--color-text-muted);
+        transition: color .18s ease;
+      }
+      .field-group:focus-within .field-label { color: var(--color-primary-strong); }
+      .form-hint { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+      .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+      .input, .select, textarea.input {
+        width: 100%;
+        min-height: 56px;
+        border: 1px solid var(--color-outline);
+        background: var(--color-surface);
+        border-radius: 8px;
+        padding: 18px 16px 12px;
+        font-size: 14px;
+        line-height: 1.35;
+        color: var(--color-text);
+        transition: border-color .18s ease, box-shadow .18s ease;
+      }
+      .field-group textarea.input { min-height: 112px; }
+      .select {
+        appearance: none;
+        background-image:
+          linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+          linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+        background-position:
+          calc(100% - 22px) calc(50% - 2px),
+          calc(100% - 16px) calc(50% - 2px);
+        background-size: 6px 6px, 6px 6px;
+        background-repeat: no-repeat;
+        padding-right: 38px;
+      }
+      textarea.input { min-height: 120px; resize: vertical; }
+      .input::placeholder, textarea.input::placeholder { color: #7c89aa; }
+      .input:hover, .select:hover, textarea.input:hover { border-color: var(--color-outline-strong); }
+      .input:focus, .select:focus, textarea.input:focus {
+        border-color: var(--color-primary);
+        box-shadow: none;
+        outline: none;
+      }
       .button { border: 1px solid var(--color-primary); color: #fff; background: linear-gradient(180deg, #1370c8 0%, var(--color-primary) 100%); border-radius: 12px; padding: 8px 12px; text-decoration: none; font-size: 14px; display: inline-block; font-weight: 600; }
       .button.secondary { background: #fff; color: var(--color-primary); }
       .chip { display: inline-block; border-radius: 999px; background: #e0efff; color: var(--color-primary-strong); padding: 3px 9px; font-size: 12px; margin-right: 4px; font-weight: 600; }

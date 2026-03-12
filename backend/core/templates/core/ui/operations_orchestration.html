@@ -9,7 +9,10 @@
 <div class="toolbar">
   <div class="muted">Filter by project and act on runs directly from the monitor.</div>
   <form method="get" class="right" aria-label="Project filter">
-    <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    <label class="field-group">
+      <span class="field-label">Project ID</span>
+      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    </label>
     <button class="button" type="submit">Filter</button>
     <a class="button secondary" href="/ui/operations/orchestration">Clear</a>
   </form>
@@ -41,19 +44,24 @@
       <div>
         {{ item.id }} <span class="chip">{{ item.status }}</span>
         {% if item.allowed_actions %}
-        <div class="actions" data-ui-action-form="orchestration">
-          <select class="select" data-field="action" aria-label="Orchestration action">
-            {% for action in item.allowed_actions %}
-            <option value="{{ action }}">{{ action }}</option>
-            {% endfor %}
-          </select>
-          <button
-            class="button secondary"
-            data-ui-action="orchestration"
-            onclick="submitOrchestrationAction(this, '{{ item.id }}')"
-          >
-            run
-          </button>
+        <div class="section-stack" data-ui-action-form="orchestration" style="margin-top: 8px;">
+          <label class="field-group">
+            <span class="field-label">Action</span>
+            <select class="select" data-field="action" aria-label="Orchestration action">
+              {% for action in item.allowed_actions %}
+              <option value="{{ action }}">{{ action }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="button-row">
+            <button
+              class="button secondary"
+              data-ui-action="orchestration"
+              onclick="submitOrchestrationAction(this, '{{ item.id }}')"
+            >
+              Run
+            </button>
+          </div>
         </div>
         {% endif %}
       </div>

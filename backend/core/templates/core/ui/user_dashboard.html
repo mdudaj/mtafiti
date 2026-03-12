@@ -20,39 +20,44 @@
       <p class="panel-description">Submit a print job with template-driven defaults and printer selection.</p>
     </div>
   </div>
-  <h3>Test print</h3>
   {% if payload.capabilities.can_submit_print_jobs %}
   {{ payload.templates|json_script:"user-print-templates-data" }}
-  <div class="form-rows" data-user-action-form="test-print">
-    <div class="form-row"><select class="select" data-field="template_id" aria-label="Template">
-      <option value="">Select template</option>
-      {% for template in payload.templates %}
-      <option value="{{ template.id }}">{{ template.name }} ({{ template.output_format }})</option>
-      {% endfor %}
-    </select></div>
-    <div class="form-row"><select class="select" data-field="destination" aria-label="Printer destination">
-      <option value="">Select printer</option>
-      {% for gateway in payload.gateways %}
-      <option value="{{ gateway.gateway_ref }}">{{ gateway.display_name }} ({{ gateway.gateway_ref }})</option>
-      {% endfor %}
-    </select></div>
-    <div class="form-row"><input class="input" data-field="participant_prefix" placeholder="participant prefix (e.g. MLTP2-MBY-KWJ-)" aria-label="Participant prefix"></div>
-    <div class="form-row"><input class="input" data-field="range_start" placeholder="range start (e.g. 001)" aria-label="Range start"></div>
-    <div class="form-row"><input class="input" data-field="range_end" placeholder="range end (e.g. 100)" aria-label="Range end"></div>
-    <div class="form-row"><select class="select" data-field="serial_position" aria-label="Serial position">
-      <option value="after_prefix">Serial after prefix (default)</option>
-      <option value="at_end">Serial at end</option>
-    </select></div>
-    <div class="form-row"><input class="input" data-field="label_suffixes" placeholder="label variants (comma-separated, use base for root)" aria-label="Label variants"></div>
-    <div class="form-row"><select class="select" data-field="pdf_sheet_preset" aria-label="PDF sheet preset">
-      <option value="a4-38x21.2">A4 38x21.2mm labels</option>
-    </select></div>
-    <div class="form-row"><input class="input" data-field="batch_count" placeholder="PDF row batch count (e.g. 5)" aria-label="PDF row batch count"></div>
-    <div class="form-row"><textarea class="input" data-field="labels_input" placeholder="labels (optional, one per line)" aria-label="Labels list" style="min-height:96px;"></textarea></div>
-    <div class="form-row"><input class="input" data-field="payload" placeholder='payload JSON (optional)' aria-label="Payload JSON"></div>
-    <div class="form-row"><button class="button" data-user-action="test-print" onclick="submitUserTestPrint(this)">Print</button></div>
+  <div class="section-stack" data-user-action-form="test-print">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Template</span><select class="select" data-field="template_id" aria-label="Template">
+        <option value="">Select template</option>
+        {% for template in payload.templates %}
+        <option value="{{ template.id }}">{{ template.name }} ({{ template.output_format }})</option>
+        {% endfor %}
+      </select></label>
+      <label class="field-group"><span class="field-label">Printer destination</span><select class="select" data-field="destination" aria-label="Printer destination">
+        <option value="">Select printer</option>
+        {% for gateway in payload.gateways %}
+        <option value="{{ gateway.gateway_ref }}">{{ gateway.display_name }} ({{ gateway.gateway_ref }})</option>
+        {% endfor %}
+      </select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Participant prefix</span><input class="input" data-field="participant_prefix" placeholder="participant prefix (e.g. MLTP2-MBY-KWJ-)" aria-label="Participant prefix"></label>
+      <label class="field-group"><span class="field-label">Range start</span><input class="input" data-field="range_start" placeholder="range start (e.g. 001)" aria-label="Range start"></label>
+      <label class="field-group"><span class="field-label">Range end</span><input class="input" data-field="range_end" placeholder="range end (e.g. 100)" aria-label="Range end"></label>
+      <label class="field-group"><span class="field-label">Serial position</span><select class="select" data-field="serial_position" aria-label="Serial position">
+        <option value="after_prefix">Serial after prefix (default)</option>
+        <option value="at_end">Serial at end</option>
+      </select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Label variants</span><input class="input" data-field="label_suffixes" placeholder="label variants (comma-separated, use base for root)" aria-label="Label variants"></label>
+      <label class="field-group"><span class="field-label">PDF sheet preset</span><select class="select" data-field="pdf_sheet_preset" aria-label="PDF sheet preset">
+        <option value="a4-38x21.2">A4 38x21.2mm labels</option>
+      </select></label>
+      <label class="field-group"><span class="field-label">PDF row batch count</span><input class="input" data-field="batch_count" placeholder="PDF row batch count (e.g. 5)" aria-label="PDF row batch count"></label>
+    </div>
+    <label class="field-group"><span class="field-label">Labels list</span><textarea class="input" data-field="labels_input" placeholder="labels (optional, one per line)" aria-label="Labels list" style="min-height:96px;"></textarea></label>
+    <label class="field-group"><span class="field-label">Payload JSON</span><input class="input" data-field="payload" placeholder='payload JSON (optional)' aria-label="Payload JSON"></label>
+    <div class="button-row"><button class="button" data-user-action="test-print" onclick="submitUserTestPrint(this)">Print</button></div>
   </div>
-  <div class="muted" style="margin-top:6px;">Default batch: 9 Zebra labels per participant. For A4 PDF, set row batch count (e.g. 5) to repeat each label across a full row.</div>
+  <p class="form-hint">Default batch: 9 Zebra labels per participant. For A4 PDF, set row batch count (e.g. 5) to repeat each label across a full row.</p>
   {% else %}
   <div class="muted">No print permissions for this account.</div>
   {% endif %}
@@ -60,23 +65,32 @@
 
 {% if payload.capabilities.can_manage_templates %}
 <section class="panel" id="user-template-panel">
-  <h3>Template designer</h3>
-  <div class="form-rows" data-user-action-form="create-template">
-    <div class="form-row"><select class="select" data-field="preset" aria-label="Template preset">
-      <option value="">Preset (optional)</option>
-      <option value="zebra-qr">Zebra QR label</option>
-      <option value="a4-qr-38x21-2">A4 QR sheet 38x21.2mm</option>
-    </select></div>
-    <div class="form-row"><input class="input" data-field="name" placeholder="Template name" aria-label="Template name"></div>
-    <div class="form-row"><input class="input" data-field="template_ref" placeholder="template_ref" aria-label="Template ref"></div>
-    <div class="form-row"><select class="select" data-field="output_format" aria-label="Template format">
-      <option value="pdf">pdf</option>
-      <option value="zpl">zpl</option>
-    </select></div>
-    <div class="form-row"><input class="input" data-field="content" placeholder="Template content (supports [[variable]])" aria-label="Template content"></div>
-    <div class="form-row"><input class="input" data-field="sample_payload" placeholder='sample payload JSON (optional)' aria-label="Sample payload JSON"></div>
-    <div class="form-row"><button class="button" data-user-action="template-preview" onclick="previewUserTemplate(this)">Preview</button></div>
-    <div class="form-row"><button class="button" data-user-action="create-template" onclick="createUserTemplate(this)">Create</button></div>
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">Template designer</h2>
+      <p class="panel-description">Build or preview template content using presets, output format, and example payloads.</p>
+    </div>
+  </div>
+  <div class="section-stack" data-user-action-form="create-template">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Preset</span><select class="select" data-field="preset" aria-label="Template preset">
+        <option value="">Preset (optional)</option>
+        <option value="zebra-qr">Zebra QR label</option>
+        <option value="a4-qr-38x21-2">A4 QR sheet 38x21.2mm</option>
+      </select></label>
+      <label class="field-group"><span class="field-label">Template name</span><input class="input" data-field="name" placeholder="Template name" aria-label="Template name"></label>
+      <label class="field-group"><span class="field-label">Template ref</span><input class="input" data-field="template_ref" placeholder="template_ref" aria-label="Template ref"></label>
+      <label class="field-group"><span class="field-label">Output format</span><select class="select" data-field="output_format" aria-label="Template format">
+        <option value="pdf">pdf</option>
+        <option value="zpl">zpl</option>
+      </select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Template content</span><input class="input" data-field="content" placeholder="Template content (supports [[variable]])" aria-label="Template content"></label>
+    <label class="field-group"><span class="field-label">Sample payload JSON</span><input class="input" data-field="sample_payload" placeholder='sample payload JSON (optional)' aria-label="Sample payload JSON"></label>
+    <div class="button-row">
+      <button class="button" data-user-action="template-preview" onclick="previewUserTemplate(this)">Preview</button>
+      <button class="button" data-user-action="create-template" onclick="createUserTemplate(this)">Create</button>
+    </div>
   </div>
   <pre class="muted" data-field="preview-output" style="margin-top:8px;white-space:pre-wrap"></pre>
 </section>
@@ -84,17 +98,24 @@
 
 {% if payload.capabilities.can_manage_printers %}
 <section class="panel">
-  <h3>Printer profiles</h3>
-  <div class="form-rows" data-user-action-form="create-printer">
-    <div class="form-row"><input class="input" data-field="display_name" placeholder="Printer name" aria-label="Printer name"></div>
-    <div class="form-row"><input class="input" data-field="gateway_ref" placeholder="printer_ref" aria-label="Printer ref"></div>
-    <div class="form-row"><input class="input" data-field="site_ref" placeholder="Site (optional)" aria-label="Site"></div>
-    <div class="form-row"><select class="select" data-field="status" aria-label="Printer status">
-      <option value="online">online</option>
-      <option value="offline">offline</option>
-      <option value="degraded">degraded</option>
-    </select></div>
-    <div class="form-row"><button class="button" data-user-action="create-printer" onclick="createUserPrinter(this)">Add</button></div>
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">Printer profiles</h2>
+      <p class="panel-description">Register printer gateways and keep their runtime status aligned with portal usage.</p>
+    </div>
+  </div>
+  <div class="section-stack" data-user-action-form="create-printer">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Printer name</span><input class="input" data-field="display_name" placeholder="Printer name" aria-label="Printer name"></label>
+      <label class="field-group"><span class="field-label">Printer ref</span><input class="input" data-field="gateway_ref" placeholder="printer_ref" aria-label="Printer ref"></label>
+      <label class="field-group"><span class="field-label">Site</span><input class="input" data-field="site_ref" placeholder="Site (optional)" aria-label="Site"></label>
+      <label class="field-group"><span class="field-label">Printer status</span><select class="select" data-field="status" aria-label="Printer status">
+        <option value="online">online</option>
+        <option value="offline">offline</option>
+        <option value="degraded">degraded</option>
+      </select></label>
+    </div>
+    <div class="button-row"><button class="button" data-user-action="create-printer" onclick="createUserPrinter(this)">Add printer</button></div>
   </div>
   <div class="table-wrap"><table style="margin-top: 10px;">
     <thead>
@@ -112,13 +133,13 @@
         <td>{{ gateway.gateway_ref }}</td>
         <td><span class="chip">{{ gateway.status }}</span></td>
         <td>
-          <div class="form-rows" data-user-action-form="update-printer-status">
-            <div class="form-row"><select class="select" data-field="status" aria-label="Printer status action">
+          <div class="section-stack" data-user-action-form="update-printer-status">
+            <label class="field-group"><span class="field-label">Status</span><select class="select" data-field="status" aria-label="Printer status action">
               <option value="online" {% if gateway.status == 'online' %}selected{% endif %}>online</option>
               <option value="offline" {% if gateway.status == 'offline' %}selected{% endif %}>offline</option>
               <option value="degraded" {% if gateway.status == 'degraded' %}selected{% endif %}>degraded</option>
-            </select></div>
-            <div class="form-row"><button class="button" data-user-action="printer-status-update" onclick="updateUserPrinterStatus(this, '{{ gateway.id }}')">Save</button></div>
+            </select></label>
+            <div class="button-row"><button class="button" data-user-action="printer-status-update" onclick="updateUserPrinterStatus(this, '{{ gateway.id }}')">Save</button></div>
           </div>
         </td>
       </tr>
@@ -131,7 +152,12 @@
 {% endif %}
 
 <section class="panel">
-<h3 style="margin-top: 0;">Recent print jobs</h3>
+<div class="panel-header">
+  <div>
+    <h2 class="panel-title">Recent print jobs</h2>
+    <p class="panel-description">Review the latest submitted jobs and download PDF previews when available.</p>
+  </div>
+</div>
 <div class="table-wrap"><table>
   <thead>
     <tr>

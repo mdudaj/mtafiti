@@ -9,7 +9,10 @@
 <div class="toolbar">
   <div class="muted">Use the project filter to narrow the monitor before applying complete/fail actions.</div>
   <form method="get" class="right" aria-label="Project filter">
-    <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    <label class="field-group">
+      <span class="field-label">Project ID</span>
+      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
+    </label>
     <button class="button" type="submit">Filter</button>
     <a class="button secondary" href="/ui/operations/agent">Clear</a>
   </form>
@@ -41,21 +44,28 @@
       <td>{{ run.updated_at }}</td>
       <td>
         {% if run.allowed_actions %}
-        <div class="actions" data-ui-action-form="agent">
-          <select class="select" data-field="action" aria-label="Agent action">
-            {% for action in run.allowed_actions %}
-            <option value="{{ action }}">{{ action }}</option>
-            {% endfor %}
-          </select>
-          <input class="input" data-field="error_message" placeholder="error message (for fail)" aria-label="Error message">
-          <input class="input" data-field="output" placeholder='output JSON (for complete)' aria-label="Output JSON">
-          <button
-            class="button secondary"
-            data-ui-action="agent"
-            onclick="submitAgentAction(this, '{{ run.id }}')"
-          >
-            run
-          </button>
+        <div class="section-stack" data-ui-action-form="agent">
+          <label class="field-group">
+            <span class="field-label">Action</span>
+            <select class="select" data-field="action" aria-label="Agent action">
+              {% for action in run.allowed_actions %}
+              <option value="{{ action }}">{{ action }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field-grid field-grid--wide">
+            <label class="field-group"><span class="field-label">Error message</span><input class="input" data-field="error_message" placeholder="error message (for fail)" aria-label="Error message"></label>
+            <label class="field-group"><span class="field-label">Output JSON</span><input class="input" data-field="output" placeholder='output JSON (for complete)' aria-label="Output JSON"></label>
+          </div>
+          <div class="button-row">
+            <button
+              class="button secondary"
+              data-ui-action="agent"
+              onclick="submitAgentAction(this, '{{ run.id }}')"
+            >
+              Run
+            </button>
+          </div>
         </div>
         {% else %}
         <span class="muted">No actions</span>
