@@ -1,11 +1,13 @@
 {% extends base_template %}
 {% block title %}Stewardship Workbench{% endblock %}
 {% block content %}
+<section class="hero">
+  <div class="hero-kicker">Application</div>
+  <h1>Stewardship Workbench</h1>
+  <p>Queue-oriented CRUD workbench with action controls driven by API capabilities and allowed actions.</p>
+</section>
 <div class="toolbar">
-  <div>
-    <h1>Stewardship Workbench</h1>
-    <p class="muted">Queue view with action affordances from API `allowed_actions`.</p>
-  </div>
+  <div class="muted">Filter the workbench, review severities, and execute lifecycle actions from one screen.</div>
   <form method="get" class="right" aria-label="Stewardship filters">
     <select class="select" name="status">
       <option value="">All statuses</option>
@@ -23,6 +25,14 @@
     <a class="button secondary" href="/ui/operations/stewardship">Clear</a>
   </form>
 </div>
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">Queue items</h2>
+      <p class="panel-description">Action-ready list view inspired by admin-style CRUD patterns.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
 <table>
   <thead>
     <tr>
@@ -72,4 +82,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
+</section>
 {% endblock %}

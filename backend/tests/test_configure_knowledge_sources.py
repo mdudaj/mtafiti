@@ -70,8 +70,18 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
 
     assert "knowledge-src/cookbook-crud101" in entry_ids
     assert "knowledge-src/django-material-theme-customization" in entry_ids
+    assert "knowledge-src/crud-admin-shell-layout" in entry_ids
     assert (content_root / "knowledge-src" / "skills" / "cookbook-crud101" / "SKILL.md").exists()
     assert (content_root / "knowledge-src" / "skills" / "django-material-theme-customization" / "SKILL.md").exists()
+    admin_shell = content_root / "knowledge-src" / "skills" / "crud-admin-shell-layout" / "SKILL.md"
+    assert admin_shell.exists()
+    assert "Sidebar navigation" in admin_shell.read_text(encoding="utf-8")
+    assert "hover/focus tooltip" in admin_shell.read_text(encoding="utf-8")
+    assert "Implementation lessons" in admin_shell.read_text(encoding="utf-8")
+    assert "Google Material icons" in admin_shell.read_text(encoding="utf-8")
+    assert "two topbar variants" in admin_shell.read_text(encoding="utf-8")
+    assert "preserving a visible gap between the sidebar and the content column" in admin_shell.read_text(encoding="utf-8")
+    assert "Choose a Material icon that matches the action context" in admin_shell.read_text(encoding="utf-8")
 
 
 def test_generate_content_includes_cookbook_directory_without_readme(tmp_path):

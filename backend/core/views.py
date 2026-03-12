@@ -6899,6 +6899,14 @@ def _ui_feedback_context(request) -> dict[str, Any]:
     }
 
 
+def _ui_user_context(request) -> dict[str, Any]:
+    return {
+        'user_id': (request.headers.get('X-User-Id') or 'anonymous').strip(),
+        'roles': sorted(_request_roles(request)),
+        'tenant_schema': _tenant_schema(request),
+    }
+
+
 @csrf_exempt
 def ui_operations_dashboard_page(request):
     if request.method != 'GET':
@@ -6916,6 +6924,7 @@ def ui_operations_dashboard_page(request):
             'base_template': _ui_base_template(),
             'active_nav': 'dashboard',
             'payload': _ui_operations_dashboard_payload(request),
+            'user_context': _ui_user_context(request),
             'project_id': request.GET.get('project_id', ''),
             **_ui_feedback_context(request),
         },
@@ -6939,6 +6948,7 @@ def ui_operations_stewardship_page(request):
             'base_template': _ui_base_template(),
             'active_nav': 'stewardship',
             'payload': _ui_operations_stewardship_payload(request),
+            'user_context': _ui_user_context(request),
             'status_filter': request.GET.get('status', ''),
             'severity_filter': request.GET.get('severity', ''),
             'status_options': StewardshipItem.Status.values,
@@ -6965,6 +6975,7 @@ def ui_operations_orchestration_page(request):
             'base_template': _ui_base_template(),
             'active_nav': 'orchestration',
             'payload': _ui_operations_orchestration_payload(request),
+            'user_context': _ui_user_context(request),
             'project_id': request.GET.get('project_id', ''),
             **_ui_feedback_context(request),
         },
@@ -6988,6 +6999,7 @@ def ui_operations_agent_page(request):
             'base_template': _ui_base_template(),
             'active_nav': 'agent',
             'payload': _ui_operations_agent_payload(request),
+            'user_context': _ui_user_context(request),
             'project_id': request.GET.get('project_id', ''),
             **_ui_feedback_context(request),
         },
@@ -7011,6 +7023,7 @@ def ui_operations_printing_page(request):
             'base_template': _ui_base_template(),
             'active_nav': 'printing',
             'payload': _ui_operations_printing_payload(request),
+            'user_context': _ui_user_context(request),
             'job_status_filter': request.GET.get('job_status', ''),
             'gateway_status_filter': request.GET.get('gateway_status', ''),
             'job_status_options': PrintJob.Status.values,

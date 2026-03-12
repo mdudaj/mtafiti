@@ -1,11 +1,13 @@
 {% extends base_template %}
 {% block title %}Orchestration Monitor{% endblock %}
 {% block content %}
+<section class="hero">
+  <div class="hero-kicker">Application</div>
+  <h1>Orchestration Monitor</h1>
+  <p>Track workflow catalog entries and runs in a compact admin-style monitor with blue-themed controls.</p>
+</section>
 <div class="toolbar">
-  <div>
-    <h1>Orchestration Monitor</h1>
-    <p class="muted">Workflow catalog and run history.</p>
-  </div>
+  <div class="muted">Filter by project and act on runs directly from the monitor.</div>
   <form method="get" class="right" aria-label="Project filter">
     <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
     <button class="button" type="submit">Filter</button>
@@ -13,15 +15,27 @@
   </form>
 </div>
 <div class="cards">
-  <div class="card">
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Workflow catalog</h2>
+        <p class="panel-description">Configured orchestration workflows for the current scope.</p>
+      </div>
+    </div>
     <h3>Workflows ({{ payload.workflows|length }})</h3>
     {% for item in payload.workflows %}
       <div>{{ item.name }} <span class="chip">{{ item.status }}</span></div>
     {% empty %}
       <div class="muted">No workflows</div>
     {% endfor %}
-  </div>
-  <div class="card">
+  </section>
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Run history</h2>
+        <p class="panel-description">Current and recent runs with quick lifecycle controls.</p>
+      </div>
+    </div>
     <h3>Runs ({{ payload.runs|length }})</h3>
     {% for item in payload.runs %}
       <div>
@@ -46,6 +60,6 @@
     {% empty %}
       <div class="muted">No runs</div>
     {% endfor %}
-  </div>
+  </section>
 </div>
 {% endblock %}

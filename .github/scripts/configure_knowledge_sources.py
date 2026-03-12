@@ -259,6 +259,87 @@ def generate_django_material_entries(source_root: Path, content_root: Path) -> l
     return generated
 
 
+def generate_admin_shell_skill_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+    generated: list[dict[str, str]] = []
+    cookbook_root = source_root / "cookbook" / "crud101"
+    material_root = source_root / "django-material"
+    if not cookbook_root.exists():
+        return generated
+
+    layout_contract = """
+Use an admin-style CRUD shell with four core regions:
+
+1. Sidebar navigation for application sections.
+2. Top navigation bar above the content area.
+3. Main content region for dashboards, tables, and forms.
+4. Optional floating action button anchored at the bottom-right of the content viewport for primary actions such as add, create, or start.
+
+Place the top navigation as the first visible row in the main content shell, not below summary cards or page-specific sections. Support two topbar variants: an inset variant that sits inside padded content, and a flush variant that touches only the top edge of the content area while preserving a visible gap between the sidebar and the content column. Add a compact user/account component near the top of the sidebar with avatar, user identity, tenant, and role context. Sidebar behavior should minimize to a compact rail instead of disappearing completely. Keep application access visible with compact icons or short labels even when collapsed. The top bar should include the sidebar toggle on the left and utility actions such as notifications, quick links, or activity on the far right.
+
+Use icon-first utility actions in the top bar, including the sidebar toggle and notifications, with text fallback labels when needed. The sidebar toggle should render as a single Material hamburger menu icon rather than exposing open/collapse state text in the visible UI. Include an account action dropdown on the far right for actions such as profile, password change, and logout.
+
+When a floating action button is present, prefer an icon-first circular button. Choose a Material icon that matches the action context (for example `print` for printing, `note_add` for templates/documents, or another domain-specific action icon). Add a hover/focus tooltip that names the action, and provide an accessible text fallback through the label if an icon is unavailable or cannot be rendered.
+""".strip()
+
+    implementation_lessons = """
+- Put global shell controls in the top bar before page-specific panels so they read as application chrome.
+- Treat sidebar identity as part of navigation chrome rather than body content.
+- Prefer Google Material icons because cookbook CRUD and dashboard samples consistently use Material icon names such as `location_city`, `terrain`, `group_work`, `timeline`, and `notifications`.
+- Pair cookbook-style colors like `primary_color="#3949ab"` and `secondary_color="#5c6bc0"` with lighter surface containers for admin shells.
+- Use icon-first Material controls plus text fallback for shell controls and utility actions.
+- Keep the sidebar toggle visually icon-only and reserve text fallback for accessibility rather than visible state labels.
+- Reserve the far-right top-bar area for account and session actions via a dropdown menu.
+- Make the floating primary action context-sensitive by matching its Material icon to the domain action instead of always using a generic add icon.
+""".strip()
+
+    icon_and_color_guidance = """
+- Follow cookbook CRUD and dashboard icon naming patterns by using Google Material icon identifiers directly.
+- Reuse strong indigo/blue shell colors from cookbook `Site(...)` examples (`#3949ab`, `#5c6bc0`) and lighter blue container tones from django-material theme tokens.
+- Navigation items, notifications, account actions, and floating action buttons should all prefer Material icons with accessible text fallback labels.
+- Choose between inset and flush topbar variants based on whether the shell should float within content padding or only connect to the top edge while keeping sidebar/content spacing intact.
+- For floating primary actions, prefer semantic icons such as `print`, `note_add`, or other task-specific Material icons instead of a single generic plus icon.
+""".strip()
+
+    sections: list[tuple[str, str]] = [
+        ("Admin shell layout contract", layout_contract),
+        ("Implementation lessons", implementation_lessons),
+        ("Icon and color guidance", icon_and_color_guidance),
+    ]
+
+    crud_readme = cookbook_root / "README.md"
+    if crud_readme.exists():
+        sections.append(("CRUD 101 overview", read_text(crud_readme)))
+    crud_urls = cookbook_root / "config" / "urls.py"
+    if crud_urls.exists():
+        sections.append(("Site and application shell example", read_text(crud_urls)))
+    crud_viewset = cookbook_root / "atlas" / "viewset.py"
+    if crud_viewset.exists():
+        sections.append(("Application viewset example", read_text(crud_viewset)))
+
+    colors = material_root / "material" / "assets" / "colors.css"
+    if colors.exists():
+        sections.append(("Blue theme token reference", read_text(colors)))
+
+    target = content_root / "knowledge-src" / "skills" / "crud-admin-shell-layout" / "SKILL.md"
+    write_text(
+        target,
+        build_composite_skill(
+            name="crud-admin-shell-layout",
+            description="Opinionated admin CRUD shell guidance derived from cookbook CRUD samples and django-material theme tokens.",
+            sections=sections,
+            tags=["crud", "admin", "shell", "sidebar", "topbar", "fab", "local", "knowledge-src", "viewflow"],
+        ),
+    )
+    generated.append(
+        {
+            "repo": "cookbook/crud101-admin-shell",
+            "entry_type": "skill",
+            "entry_id": "knowledge-src/crud-admin-shell-layout",
+        }
+    )
+    return generated
+
+
 def iter_repo_dirs(source_root: Path) -> list[Path]:
     return sorted(
         path
@@ -288,6 +369,7 @@ def generate_content(source_root: Path, content_root: Path) -> list[dict[str, st
             generated.append({"repo": repo_dir.name, "entry_type": "skill", "entry_id": f"knowledge-src/{repo_name}"})
     generated.extend(generate_cookbook_entries(source_root, content_root))
     generated.extend(generate_django_material_entries(source_root, content_root))
+    generated.extend(generate_admin_shell_skill_entries(source_root, content_root))
     return generated
 
 

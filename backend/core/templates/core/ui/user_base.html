@@ -4,66 +4,323 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}EDMP Workspace{% endblock %}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" />
     <style>
-      body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f6f8fb; color: #111827; }
-      .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
-      .sidebar { background: #0f172a; color: #e2e8f0; padding: 20px 14px; }
-      .brand { font-weight: 700; margin-bottom: 18px; }
-      .nav a { display: block; color: #cbd5e1; text-decoration: none; padding: 10px 12px; border-radius: 10px; margin-bottom: 6px; }
-      .nav a.active, .nav a:hover { background: #1e293b; color: #fff; }
-      .content { padding: 24px; }
-      .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 12px; }
-      .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); padding: 14px; }
+      :root {
+        --color-primary: #3949ab;
+        --color-primary-strong: #283593;
+        --color-primary-soft: #e8eaf6;
+        --color-primary-soft-2: #f3f4ff;
+        --color-surface: #ffffff;
+        --color-surface-muted: #f8f9ff;
+        --color-surface-border: #d7dcf5;
+        --color-text: #18233f;
+        --color-text-muted: #5c6887;
+        --color-sidebar: #283593;
+        --color-secondary: #5c6bc0;
+        --sidebar-width: 250px;
+        --sidebar-collapsed-width: 92px;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: linear-gradient(180deg, #eef1ff 0%, #f8f9ff 100%); color: var(--color-text); }
+      .material-symbols-outlined {
+        font-family: "Material Symbols Outlined";
+        font-weight: normal;
+        font-style: normal;
+        font-size: 20px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-smoothing: antialiased;
+        font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
+      }
+      .layout { display: grid; grid-template-columns: var(--sidebar-width) 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
+      .layout[data-sidebar-collapsed="true"] { grid-template-columns: var(--sidebar-collapsed-width) 1fr; }
+      .sidebar { background: linear-gradient(180deg, var(--color-sidebar) 0%, #14365e 100%); color: #dbeafe; padding: 22px 16px; }
+      .sidebar-account {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(219, 234, 254, 0.12);
+        border: 1px solid rgba(191, 219, 254, 0.22);
+      }
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dbeafe;
+        color: var(--color-primary-strong);
+        font-size: 14px;
+        font-weight: 800;
+        flex: 0 0 auto;
+      }
+      .account-name { margin: 0 0 2px; font-weight: 700; color: #fff; }
+      .account-meta { margin: 0; color: #bfdbfe; font-size: 12px; }
+      .brand-lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+      .brand-mark { width: 40px; height: 40px; border-radius: 14px; background: rgba(219, 234, 254, 0.14); border: 1px solid rgba(191, 219, 254, 0.35); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
+      .brand { font-weight: 800; margin-bottom: 6px; font-size: 1.1rem; }
+      .brand-subtitle { color: #bfdbfe; font-size: .92rem; margin-bottom: 18px; }
+      .nav-section-label { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: #93c5fd; margin: 14px 10px 10px; }
+      .nav a { display: flex; align-items: center; gap: 10px; color: #dbeafe; text-decoration: none; padding: 10px 12px; border-radius: 12px; margin-bottom: 6px; border: 1px solid transparent; }
+      .nav-icon { width: 28px; height: 28px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.12); color: #fff; flex: 0 0 auto; }
+      .nav a.active, .nav a:hover { background: rgba(219, 234, 254, 0.14); border-color: rgba(191, 219, 254, 0.3); color: #fff; }
+      .content { padding: 28px; }
+      .page-shell { display: flex; flex-direction: column; gap: 18px; }
+      .page-shell--flush {
+        margin: -28px 0 0;
+      }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-radius: 18px; border: 1px solid var(--color-surface-border); background: rgba(255, 255, 255, 0.88); box-shadow: 0 8px 24px rgba(14, 73, 142, 0.05); }
+      .topbar--flush {
+        border-radius: 0 0 22px 22px;
+        border-top: 0;
+        border-left: 0;
+        margin-bottom: 10px;
+      }
+      .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .topbar-title { margin: 0; font-size: 1.05rem; }
+      .topbar-subtitle { margin: 2px 0 0; font-size: 13px; color: var(--color-text-muted); }
+      .sidebar-toggle {
+        min-width: 42px;
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .icon-button-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .icon-badge {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--color-primary-soft);
+        color: var(--color-primary-strong);
+        flex: 0 0 auto;
+      }
+      .utility-button, .utility-chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; border: 1px solid var(--color-surface-border); background: #fff; color: var(--color-primary-strong); padding: 8px 12px; font-size: 13px; font-weight: 700; }
+      .utility-count { min-width: 20px; height: 20px; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; padding: 0 6px; }
+      .account-menu {
+        position: relative;
+      }
+      .account-menu summary {
+        list-style: none;
+        cursor: pointer;
+      }
+      .account-menu summary::-webkit-details-marker { display: none; }
+      .account-dropdown {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 8px);
+        min-width: 220px;
+        padding: 10px;
+        border-radius: 16px;
+        border: 1px solid var(--color-surface-border);
+        background: #fff;
+        box-shadow: 0 18px 36px rgba(14, 73, 142, 0.14);
+      }
+      .account-dropdown a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: var(--color-text);
+        text-decoration: none;
+      }
+      .account-dropdown a:hover { background: var(--color-primary-soft-2); }
+      .hero {
+        background: linear-gradient(135deg, var(--color-primary-soft) 0%, #ffffff 55%, var(--color-primary-soft-2) 100%);
+        border: 1px solid var(--color-surface-border);
+        border-radius: 22px;
+        padding: 22px 24px;
+        box-shadow: 0 12px 30px rgba(14, 73, 142, 0.08);
+      }
+      .hero h1 { margin: 0 0 8px; font-size: 1.9rem; line-height: 1.1; }
+      .hero p { margin: 0; color: var(--color-text-muted); }
+      .hero-kicker { display: inline-block; margin-bottom: 10px; padding: 4px 10px; border-radius: 999px; background: #dbeafe; color: var(--color-primary-strong); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+      .cards, .stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 12px; }
+      .card, .panel { background: var(--color-surface); border: 1px solid var(--color-surface-border); border-radius: 18px; box-shadow: 0 8px 24px rgba(14, 73, 142, 0.06); padding: 16px; }
+      .panel-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+      .panel-title { margin: 0; font-size: 1.05rem; }
+      .panel-description { margin: 4px 0 0; color: var(--color-text-muted); font-size: 14px; }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; }
       .form-rows { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
       .form-row { display: block; }
       .form-row .input, .form-row .select, .form-row .button { width: 100%; box-sizing: border-box; }
-      .input, .select { border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 10px; font-size: 14px; background: #fff; }
-      .button { border: 1px solid #2563eb; color: #fff; background: #2563eb; border-radius: 10px; padding: 8px 12px; font-size: 14px; }
-      .chip { display: inline-block; border-radius: 999px; background: #e2e8f0; color: #334155; padding: 2px 8px; font-size: 12px; }
-      .muted { color: #64748b; }
-      table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; }
-      th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; }
-      th { background: #f8fafc; font-weight: 600; }
-      .banner { border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 14px; }
+      .input, .select, textarea.input { border: 1px solid #bfd3f2; border-radius: 12px; padding: 9px 12px; font-size: 14px; background: #fff; color: var(--color-text); }
+      .button { border: 1px solid var(--color-primary); color: #fff; background: linear-gradient(180deg, #1370c8 0%, var(--color-primary) 100%); border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; text-decoration: none; }
+      .chip { display: inline-block; border-radius: 999px; background: #e0efff; color: var(--color-primary-strong); padding: 3px 9px; font-size: 12px; font-weight: 600; }
+      .muted { color: var(--color-text-muted); }
+      .table-wrap { overflow-x: auto; border-radius: 18px; border: 1px solid var(--color-surface-border); background: #fff; }
+      table { width: 100%; border-collapse: collapse; background: #fff; }
+      th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; vertical-align: top; }
+      th { background: #eff6ff; font-weight: 700; color: var(--color-primary-strong); }
+      .banner { border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; font-size: 14px; }
       .banner.ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
       .banner.err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-      @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+      .fab {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 40;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 56px;
+        min-height: 56px;
+        padding: 14px 16px;
+        border-radius: 999px;
+        box-shadow: 0 16px 32px rgba(11, 92, 171, 0.26);
+        text-decoration: none;
+      }
+      .fab-icon { font-size: 22px; line-height: 1; }
+      .fab-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+      .fab[data-tooltip] { position: fixed; }
+      .fab[data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 10px);
+        background: rgba(16, 40, 72, 0.96);
+        color: #fff;
+        padding: 8px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(4px);
+        transition: opacity .16s ease, transform .16s ease;
+      }
+      .fab[data-tooltip]:hover::after,
+      .fab[data-tooltip]:focus-visible::after {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .fab:hover, .fab:focus, .fab:active { text-decoration: none; }
+      .layout[data-sidebar-collapsed="true"] .brand-copy,
+      .layout[data-sidebar-collapsed="true"] .brand-subtitle,
+      .layout[data-sidebar-collapsed="true"] .nav-section-label,
+      .layout[data-sidebar-collapsed="true"] .nav-label,
+      .layout[data-sidebar-collapsed="true"] .sidebar-account-copy { display: none; }
+      .layout[data-sidebar-collapsed="true"] .sidebar { padding-inline: 10px; }
+      .layout[data-sidebar-collapsed="true"] .brand-lockup { justify-content: center; }
+      .layout[data-sidebar-collapsed="true"] .nav a { justify-content: center; padding-inline: 8px; }
+      .layout[data-sidebar-collapsed="true"] .sidebar-account { justify-content: center; }
+      @media (max-width: 920px) {
+        .layout { grid-template-columns: 1fr; }
+        .layout[data-sidebar-collapsed="true"] { grid-template-columns: 1fr; }
+        .topbar { flex-direction: column; align-items: stretch; }
+        .content { padding: 16px; }
+        .page-shell--flush { margin: -16px 0 0; }
+        .fab { right: 16px; bottom: 16px; }
+      }
     </style>
   </head>
   <body>
-    <div class="layout">
+    <div class="layout" data-sidebar-collapsed="false" data-ui-shell="workspace">
       <aside class="sidebar">
-        <div class="brand">EDMP Workspace</div>
+        <div class="sidebar-account">
+          <div class="avatar">{{ payload.user_context.user_id|slice:":2"|upper }}</div>
+          <div class="sidebar-account-copy">
+            <p class="account-name">{{ payload.user_context.user_id }}</p>
+            <p class="account-meta">{{ payload.user_context.tenant_schema }}{% if payload.user_context.roles %} · {{ payload.user_context.roles|join:", " }}{% endif %}</p>
+          </div>
+        </div>
+        <div class="brand-lockup">
+          <div class="brand-mark">ED</div>
+          <div class="brand-copy">
+            <div class="brand">EDMP Workspace</div>
+            <div class="brand-subtitle">Portal patterns tuned for admin-style workflows and blue-tinted theme tokens.</div>
+          </div>
+        </div>
         <nav class="nav" aria-label="Workspace navigation">
-          <a href="/app" class="{% if active_nav == 'home' %}active{% endif %}">Home</a>
+          <div class="nav-section-label">Applications</div>
+          <a href="/app" class="{% if active_nav == 'home' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">home</span><span class="nav-label">Home</span></a>
           {% if payload.navigation.can_view_operations %}
-          <a href="/ui/operations/printing">Operations printing</a>
+          <a href="/ui/operations/printing"><span class="nav-icon material-symbols-outlined" aria-hidden="true">print</span><span class="nav-label">Operations printing</span></a>
           {% endif %}
         </nav>
       </aside>
-      <main class="content">
-        <div class="card" style="margin-bottom: 12px;">
-          <div><strong>Signed in as:</strong> {{ payload.user_context.user_id }}</div>
-          <div><strong>Tenant:</strong> {{ payload.user_context.tenant_schema }}</div>
-          <div>
-            <strong>Roles:</strong>
-            {% if payload.user_context.roles %}
-              {% for role in payload.user_context.roles %}
-              <span class="chip">{{ role }}</span>
-              {% endfor %}
-            {% else %}
-              <span class="muted">none</span>
+        <main class="content">
+          <div class="page-shell {% block topbar_variant %}page-shell--flush{% endblock %}">
+            <header class="topbar {% block topbar_variant_class %}topbar--flush{% endblock %}">
+              <div class="topbar-left">
+                <button class="button sidebar-toggle" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Toggle sidebar"><span class="material-symbols-outlined" aria-hidden="true">menu</span><span class="icon-button-label">Toggle sidebar</span></button>
+                <div>
+                  <h2 class="topbar-title">{% block topbar_title %}Workspace portal{% endblock %}</h2>
+                  <p class="topbar-subtitle">{% block topbar_subtitle %}CRUD-style workspace shell with a sidebar, top nav, and action-ready content area.{% endblock %}</p>
+                </div>
+              </div>
+              <div class="topbar-right">
+                {% block topbar_actions %}
+                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">notifications</span><span>Notifications</span> <span class="utility-count">2</span></span>
+                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">description</span><span>Templates</span> <span class="utility-count">{{ payload.cards.templates }}</span></span>
+                <details class="account-menu">
+                  <summary class="utility-button"><span class="icon-badge material-symbols-outlined" aria-hidden="true">manage_accounts</span><span>Account</span></summary>
+                  <div class="account-dropdown">
+                    <a href="/admin/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">person</span><span>Profile / admin</span></a>
+                    <a href="/admin/password_change/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">password</span><span>Change password</span></a>
+                    <a href="/admin/logout/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">logout</span><span>Logout</span></a>
+                  </div>
+                </details>
+                {% endblock %}
+              </div>
+            </header>
+            {% if ui_message %}
+              <div class="banner {% if ui_error %}err{% else %}ok{% endif %}">{{ ui_message }}</div>
             {% endif %}
+            {% block content %}{% endblock %}
           </div>
-        </div>
-        {% if ui_message %}
-          <div class="banner {% if ui_error %}err{% else %}ok{% endif %}">{{ ui_message }}</div>
-        {% endif %}
-        {% block content %}{% endblock %}
-      </main>
-    </div>
+          {% block floating_action %}{% endblock %}
+        </main>
+      </div>
     <script>
+      (function initializeUiShell() {
+        const layout = document.querySelector('[data-ui-shell="workspace"]');
+        const toggle = document.querySelector('[data-sidebar-toggle]');
+        if (!layout || !toggle) return;
+        const storageKey = 'edmp-workspace-sidebar-collapsed';
+        const setCollapsed = (collapsed) => {
+          layout.dataset.sidebarCollapsed = collapsed ? 'true' : 'false';
+          toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          toggle.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">menu</span><span class="icon-button-label">Toggle sidebar</span>';
+          toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Minimize sidebar');
+        };
+        const stored = window.localStorage.getItem(storageKey);
+        setCollapsed(stored === 'true');
+        toggle.addEventListener('click', () => {
+          const collapsed = layout.dataset.sidebarCollapsed !== 'true';
+          setCollapsed(collapsed);
+          window.localStorage.setItem(storageKey, collapsed ? 'true' : 'false');
+        });
+      }());
+
       async function edmpPortalAction(url, payload) {
         const response = await fetch(url, {
           method: "POST",

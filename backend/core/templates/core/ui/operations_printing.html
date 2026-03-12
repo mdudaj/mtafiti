@@ -1,11 +1,13 @@
 {% extends base_template %}
 {% block title %}Printing Operations{% endblock %}
 {% block content %}
+<section class="hero">
+  <div class="hero-kicker">Application</div>
+  <h1>Printing Operations</h1>
+  <p>Admin-style printing workspace for templates, jobs, and gateways with blue-shaded emphasis on operational actions.</p>
+</section>
 <div class="toolbar">
-  <div>
-    <h1>Printing Operations</h1>
-    <p class="muted">Configure printers, define templates, and run test prints.</p>
-  </div>
+  <div class="muted">Manage templates, run test prints, and keep gateway heartbeats current from one workspace.</div>
   <form method="get" class="right" aria-label="Printing filters">
     <select class="select" name="job_status">
       <option value="">All job statuses</option>
@@ -26,26 +28,26 @@
 {{ payload.templates|json_script:"printing-templates-data" }}
 
 <div class="cards">
-  <div class="card">
+  <section class="stat-card card">
     <h3>Jobs</h3>
-    {% for status, count in payload.cards.jobs.items %}
-      <div><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}
-  </div>
-  <div class="card">
+    <div class="metric-list">{% for status, count in payload.cards.jobs.items %}
+      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
+    {% endfor %}</div>
+  </section>
+  <section class="stat-card card">
     <h3>Gateways</h3>
-    {% for status, count in payload.cards.gateways.items %}
-      <div><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}
-  </div>
-  <div class="card">
+    <div class="metric-list">{% for status, count in payload.cards.gateways.items %}
+      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
+    {% endfor %}</div>
+  </section>
+  <section class="stat-card card">
     <h3>Templates</h3>
-    <div><span class="chip">count</span><strong>{{ payload.cards.templates }}</strong></div>
-  </div>
+    <div class="metric-list"><div class="metric-row"><span class="chip">count</span><strong>{{ payload.cards.templates }}</strong></div></div>
+  </section>
 </div>
 
 {% if payload.capabilities.can_manage_templates %}
-<div class="card" style="margin-top: 12px;">
+<div class="card" id="template-create-panel" style="margin-top: 12px;">
   <h3>Define print template</h3>
   <div class="actions" data-ui-action-form="print-template-create">
     <input class="input" data-field="name" placeholder="template name" aria-label="Template name">
@@ -63,7 +65,7 @@
 {% endif %}
 
 {% if payload.capabilities.can_create_jobs %}
-<div class="card" style="margin-top: 12px;">
+<div class="card" id="test-print-panel" style="margin-top: 12px;">
   <h3>Run test print</h3>
   <div class="actions" data-ui-action-form="print-job-test">
     <select class="select" data-field="template_id" aria-label="Template">
@@ -80,7 +82,7 @@
 {% endif %}
 
 {% if payload.capabilities.can_manage_gateways %}
-<div class="card" style="margin-top: 12px;">
+<div class="card" id="gateway-create-panel" style="margin-top: 12px;">
   <h3>Configure printer</h3>
   <div class="actions" data-ui-action-form="print-gateway-create">
     <input class="input" data-field="gateway_ref" placeholder="printer_ref" aria-label="Printer ref">
@@ -97,8 +99,9 @@
 </div>
 {% endif %}
 
-<h3 style="margin-top: 16px;">Templates</h3>
-<table>
+<section class="panel">
+<h3 style="margin-top: 0;">Templates</h3>
+<div class="table-wrap"><table>
   <thead>
     <tr>
       <th>Name</th>
@@ -119,10 +122,12 @@
     <tr><td colspan="4" class="muted">No print templates</td></tr>
     {% endfor %}
   </tbody>
-</table>
+</table></div>
+</section>
 
-<h3 style="margin-top: 16px;">Jobs</h3>
-<table>
+<section class="panel">
+<h3 style="margin-top: 0;">Jobs</h3>
+<div class="table-wrap"><table>
   <thead>
     <tr>
       <th>Template</th>
@@ -169,10 +174,12 @@
     <tr><td colspan="6" class="muted">No print jobs</td></tr>
     {% endfor %}
   </tbody>
-</table>
+</table></div>
+</section>
 
-<h3 style="margin-top: 16px;">Gateways</h3>
-<table>
+<section class="panel">
+<h3 style="margin-top: 0;">Gateways</h3>
+<div class="table-wrap"><table>
   <thead>
     <tr>
       <th>Gateway</th>
@@ -219,7 +226,8 @@
     <tr><td colspan="6" class="muted">No gateways</td></tr>
     {% endfor %}
   </tbody>
-</table>
+</table></div>
+</section>
 
 <script>
   function parseJsonOrError(raw, fallback, errorMessage) {
@@ -330,4 +338,19 @@
     edmpUiAction('/api/v1/printing/gateways', payload);
   }
 </script>
+{% endblock %}
+{% block floating_action %}
+  {% if payload.capabilities.can_manage_templates %}
+  <a class="button fab" href="#template-create-panel" aria-label="New template" title="New template" data-tooltip="New template">
+    <span class="fab-icon material-symbols-outlined" aria-hidden="true">note_add</span><span class="fab-label">New template</span>
+  </a>
+  {% elif payload.capabilities.can_create_jobs %}
+  <a class="button fab" href="#test-print-panel" aria-label="Test print" title="Test print" data-tooltip="Test print">
+    <span class="fab-icon material-symbols-outlined" aria-hidden="true">print</span><span class="fab-label">Test print</span>
+  </a>
+  {% elif payload.capabilities.can_manage_gateways %}
+  <a class="button fab" href="#gateway-create-panel" aria-label="Add printer" title="Add printer" data-tooltip="Add printer">
+    <span class="fab-icon material-symbols-outlined" aria-hidden="true">print_add</span><span class="fab-label">Add printer</span>
+  </a>
+  {% endif %}
 {% endblock %}

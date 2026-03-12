@@ -1,16 +1,25 @@
 {% extends "core/ui/user_base.html" %}
 {% block title %}User Workspace{% endblock %}
 {% block content %}
-<h1>User Workspace</h1>
-<p class="muted">Use templates and configured printers to submit a test print.</p>
+<section class="hero">
+  <div class="hero-kicker">Workspace application</div>
+  <h1>User Workspace</h1>
+  <p>Portal-style printing workspace with blue theme tokens and admin-inspired forms for templates, printers, and test jobs.</p>
+</section>
 
-<div class="cards">
+<div class="stat-grid">
   <div class="card"><span class="chip">Templates</span> <strong>{{ payload.cards.templates }}</strong></div>
   <div class="card"><span class="chip">Printers</span> <strong>{{ payload.cards.printers }}</strong></div>
   <div class="card"><span class="chip">Recent jobs</span> <strong>{{ payload.cards.recent_jobs }}</strong></div>
 </div>
 
-<div class="card">
+<section class="panel" id="user-test-print-panel">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">Test print</h2>
+      <p class="panel-description">Submit a print job with template-driven defaults and printer selection.</p>
+    </div>
+  </div>
   <h3>Test print</h3>
   {% if payload.capabilities.can_submit_print_jobs %}
   {{ payload.templates|json_script:"user-print-templates-data" }}
@@ -47,10 +56,10 @@
   {% else %}
   <div class="muted">No print permissions for this account.</div>
   {% endif %}
-</div>
+</section>
 
 {% if payload.capabilities.can_manage_templates %}
-<div class="card" style="margin-top: 12px;">
+<section class="panel" id="user-template-panel">
   <h3>Template designer</h3>
   <div class="form-rows" data-user-action-form="create-template">
     <div class="form-row"><select class="select" data-field="preset" aria-label="Template preset">
@@ -70,11 +79,11 @@
     <div class="form-row"><button class="button" data-user-action="create-template" onclick="createUserTemplate(this)">Create</button></div>
   </div>
   <pre class="muted" data-field="preview-output" style="margin-top:8px;white-space:pre-wrap"></pre>
-</div>
+</section>
 {% endif %}
 
 {% if payload.capabilities.can_manage_printers %}
-<div class="card" style="margin-top: 12px;">
+<section class="panel">
   <h3>Printer profiles</h3>
   <div class="form-rows" data-user-action-form="create-printer">
     <div class="form-row"><input class="input" data-field="display_name" placeholder="Printer name" aria-label="Printer name"></div>
@@ -87,7 +96,7 @@
     </select></div>
     <div class="form-row"><button class="button" data-user-action="create-printer" onclick="createUserPrinter(this)">Add</button></div>
   </div>
-  <table style="margin-top: 10px;">
+  <div class="table-wrap"><table style="margin-top: 10px;">
     <thead>
       <tr>
         <th>Name</th>
@@ -117,12 +126,13 @@
       <tr><td colspan="4" class="muted">No printers configured</td></tr>
       {% endfor %}
     </tbody>
-  </table>
-</div>
+  </table></div>
+</section>
 {% endif %}
 
-<h3 style="margin-top: 16px;">Recent print jobs</h3>
-<table>
+<section class="panel">
+<h3 style="margin-top: 0;">Recent print jobs</h3>
+<div class="table-wrap"><table>
   <thead>
     <tr>
       <th>Template</th>
@@ -151,7 +161,8 @@
     <tr><td colspan="5" class="muted">No print jobs yet</td></tr>
     {% endfor %}
   </tbody>
-</table>
+</table></div>
+</section>
 
 <script>
   function userUiError(message) {
@@ -335,4 +346,15 @@
     item.addEventListener("change", () => applySelectedPrintTemplate(item));
   });
 </script>
+{% endblock %}
+{% block floating_action %}
+  {% if payload.capabilities.can_submit_print_jobs %}
+  <a class="button fab" href="#user-test-print-panel" aria-label="Test print" title="Test print" data-tooltip="Test print">
+    <span class="fab-icon material-symbols-outlined" aria-hidden="true">print</span><span class="fab-label">Test print</span>
+  </a>
+  {% elif payload.capabilities.can_manage_templates %}
+  <a class="button fab" href="#user-template-panel" aria-label="Add template" title="Add template" data-tooltip="Add template">
+    <span class="fab-icon material-symbols-outlined" aria-hidden="true">note_add</span><span class="fab-label">Add template</span>
+  </a>
+  {% endif %}
 {% endblock %}

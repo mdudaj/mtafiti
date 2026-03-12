@@ -1,17 +1,27 @@
 {% extends base_template %}
 {% block title %}Agent Monitor{% endblock %}
 {% block content %}
+<section class="hero">
+  <div class="hero-kicker">Application</div>
+  <h1>Agent Monitor</h1>
+  <p>Review recent agent runs, inspect status, and apply lifecycle actions from a table-first operations surface.</p>
+</section>
 <div class="toolbar">
-  <div>
-    <h1>Agent Monitor</h1>
-    <p class="muted">Recent agent runs and statuses.</p>
-  </div>
+  <div class="muted">Use the project filter to narrow the monitor before applying complete/fail actions.</div>
   <form method="get" class="right" aria-label="Project filter">
     <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
     <button class="button" type="submit">Filter</button>
     <a class="button secondary" href="/ui/operations/agent">Clear</a>
   </form>
 </div>
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title">Recent agent runs</h2>
+      <p class="panel-description">Operational list view with inline controls for permitted actions.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
 <table>
   <thead>
     <tr>
@@ -57,4 +67,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
+</section>
 {% endblock %}
