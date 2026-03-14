@@ -84,7 +84,7 @@ DEFAULT_PRINT_TEMPLATE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         'name': 'Zebra QR Label (9-pack ready)',
         'template_ref': 'zebra/participant-batch',
         'output_format': PrintJob.Format.ZPL,
-        'content': '^XA^FO40,40^BQN,2,6^FDQA,[[label]]^FS^FO40,200^A0N,28,28^FD[[label]]^FS^XZ',
+        'content': '^XA^PW200^LL200^LH0,0^FO44,76^BQN,2,4^FDQA,[[content]]^FS^FO10,194^A0N,15,15^FB180,1,0,C,0^FD[[line1]]^FS^FO10,210^A0N,15,15^FB180,1,0,C,0^FD[[line2]]^FS^XZ',
         'sample_payload': {
             'participant_prefix': 'MLTP2-MBY-KWJ-',
             'range_start': 1,

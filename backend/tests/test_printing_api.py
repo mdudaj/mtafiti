@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 
@@ -404,8 +405,148 @@ def test_zebra_batch_labels_render_preview():
     assert created.status_code == 201
     preview = created.json()['gateway_metadata']['render_preview']
     assert preview['engine'] == 'zpl-inline'
+    assert preview['batch_count'] == 1
     assert preview['label_count'] == 9
     assert 'MLTP2-MBY-KWJ-001-BLD-RNA' in preview['rendered']
+
+
+@pytest.mark.django_db(transaction=True)
+def test_zebra_batch_count_repeats_each_label():
+    host, _ = _create_tenants()
+    client = Client()
+    template = client.post(
+        '/api/v1/printing/templates',
+        data=json.dumps(
+            {
+                'name': 'Zebra Energy Batch',
+                'template_ref': 'zebra/energy-batch',
+                'output_format': 'zpl',
+                'content': '^XA^FO40,40^BQN,2,6^FDQA,[[label]]^FS^FO40,200^A0N,28,28^FD[[label]]^FS^XZ',
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert template.status_code == 201
+
+    created = client.post(
+        '/api/v1/printing/jobs',
+        data=json.dumps(
+            {
+                'template_ref': 'zebra/energy-batch',
+                'output_format': 'zpl',
+                'destination': 'zebra-printer-1',
+                'payload': {
+                    'labels': ['ED-10101-01', 'ED-10101-02'],
+                    'batch_count': 5,
+                },
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created.status_code == 201
+    preview = created.json()['gateway_metadata']['render_preview']
+    assert preview['engine'] == 'zpl-inline'
+    assert preview['batch_count'] == 5
+    assert preview['label_count'] == 10
+    assert preview['rendered'].count('ED-10101-01') == 10
+    assert preview['rendered'].count('ED-10101-02') == 10
+
+
+@pytest.mark.django_db(transaction=True)
+def test_zebra_labels_accept_title_and_text_metadata():
+    host, _ = _create_tenants()
+    client = Client()
+    template = client.post(
+        '/api/v1/printing/templates',
+        data=json.dumps(
+            {
+                'name': 'Zebra District Labels',
+                'template_ref': 'zebra/district-labels',
+                'output_format': 'zpl',
+                'content': '^XA^PW200^LL200^LH0,0^FO34,76^BQN,2,4^FDQA,[[content]]^FS^FO10,178^A0N,14,14^FB180,1,0,C,0^FD[[text]]^FS^FO10,194^A0N,10,10^FB180,1,0,C,0^FD[[title]]^FS^XZ',
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert template.status_code == 201
+
+    created = client.post(
+        '/api/v1/printing/jobs',
+        data=json.dumps(
+            {
+                'template_ref': 'zebra/district-labels',
+                'output_format': 'zpl',
+                'destination': 'zebra-printer-1',
+                'payload': {
+                    'labels': [
+                        {
+                            'content': 'ED-50509-01',
+                            'text': 'ED-50509-01',
+                            'title': 'Nanyumbu DC',
+                        }
+                    ],
+                },
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created.status_code == 201
+    preview = created.json()['gateway_metadata']['render_preview']
+    assert preview['engine'] == 'zpl-inline'
+    assert preview['batch_count'] == 1
+    assert preview['label_count'] == 1
+    assert 'ED-50509-01' in preview['rendered']
+    assert 'Nanyumbu DC' in preview['rendered']
+
+
+@pytest.mark.django_db(transaction=True)
+def test_zebra_labels_expose_split_line_tokens():
+    host, _ = _create_tenants()
+    client = Client()
+    template = client.post(
+        '/api/v1/printing/templates',
+        data=json.dumps(
+            {
+                'name': 'Zebra Split Labels',
+                'template_ref': 'zebra/split-labels',
+                'output_format': 'zpl',
+                'content': '^XA^FO10,10^FD[[line1]]^FS^FO10,30^FD[[line2]]^FS^XZ',
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert template.status_code == 201
+
+    created = client.post(
+        '/api/v1/printing/jobs',
+        data=json.dumps(
+            {
+                'template_ref': 'zebra/split-labels',
+                'output_format': 'zpl',
+                'destination': 'zebra-printer-1',
+                'payload': {
+                    'labels': ['MLTP2-MBY-KWJ-001-BLD-6mls'],
+                },
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created.status_code == 201
+    preview = created.json()['gateway_metadata']['render_preview']
+    assert 'MLTP2-MBY-KWJ-001' in preview['rendered']
+    assert 'BLD-6mls' in preview['rendered']
 
 
 @pytest.mark.django_db(transaction=True)
@@ -540,7 +681,8 @@ def test_pdf_sheet_preview_with_labels_and_preset():
     assert preview['sheet_preset'] == 'a4-38x21.2'
     assert preview['label_count'] == 3
     assert preview['layout']['grid'] == [5, 13]
-    assert preview['layout']['label_size_mm'] == [38.1, 21.2]
+    assert preview['layout']['label_size_mm'] == [38.0, 21.0]
+    assert preview['layout']['margin_mm'] == [10.0, 12.0, 10.0, 12.0]
     assert 'pdf_base64' in preview or 'render_error' in preview
 
 
@@ -640,3 +782,56 @@ def test_pdf_sheet_batch_count_repeats_labels_per_row():
     preview = created.json()['gateway_metadata']['render_preview']
     assert preview['batch_count'] == 5
     assert preview['label_count'] == 5
+
+
+@pytest.mark.django_db(transaction=True)
+def test_pdf_sheet_labels_accept_title_metadata():
+    host, _ = _create_tenants()
+    client = Client()
+    template = client.post(
+        '/api/v1/printing/templates',
+        data=json.dumps(
+            {
+                'name': 'A4 District Labels',
+                'template_ref': 'a4/district-labels',
+                'output_format': 'pdf',
+                'content': 'QR [[content]]',
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert template.status_code == 201
+
+    created = client.post(
+        '/api/v1/printing/jobs',
+        data=json.dumps(
+            {
+                'template_ref': 'a4/district-labels',
+                'output_format': 'pdf',
+                'destination': 'office-printer-1',
+                'payload': {
+                    'labels': [
+                        {
+                            'content': 'ED-10101-01',
+                            'title': 'Uyui DC',
+                            'text': 'ED-10101-01',
+                        }
+                    ],
+                    'pdf_sheet_preset': 'a4-38x21.2',
+                },
+            }
+        ),
+        content_type='application/json',
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES='catalog.editor',
+    )
+    assert created.status_code == 201
+    preview = created.json()['gateway_metadata']['render_preview']
+    assert preview['label_count'] == 1
+    assert 'pdf_base64' in preview or 'render_error' in preview
+    if 'pdf_base64' not in preview:
+        return
+    pdf_bytes = base64.b64decode(preview['pdf_base64'])
+    assert pdf_bytes[:4] == b'%PDF'
