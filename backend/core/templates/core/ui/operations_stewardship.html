@@ -1,43 +1,59 @@
 {% extends base_template %}
 {% block title %}Stewardship Workbench{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Application</div>
-  <h1>Stewardship Workbench</h1>
-  <p>Queue-oriented CRUD workbench with action controls driven by API capabilities and allowed actions.</p>
-</section>
-<div class="toolbar">
-  <div class="muted">Filter the workbench, review severities, and execute lifecycle actions from one screen.</div>
-  <form method="get" class="right" aria-label="Stewardship filters">
-    <label class="field-group">
-      <span class="field-label">Status</span>
-      <select class="select" name="status">
-        <option value="">All statuses</option>
-        {% for option in status_options %}
-        <option value="{{ option }}" {% if status_filter == option %}selected{% endif %}>{{ option }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field-group">
-      <span class="field-label">Severity</span>
-      <select class="select" name="severity">
-        <option value="">All severities</option>
-        {% for option in severity_options %}
-        <option value="{{ option }}" {% if severity_filter == option %}selected{% endif %}>{{ option }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>Apply</span></button>
-    <a class="button secondary" href="/ui/operations/stewardship">Clear</a>
-  </form>
-</div>
-<section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Queue items</h2>
-      <p class="panel-description">Action-ready list view inspired by admin-style CRUD patterns.</p>
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Stewardship Workbench" page_summary="Queue-oriented CRUD workbench with action controls driven by API capabilities and allowed actions." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Stewardship" %}
+{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Filter the workbench, review severities, and execute lifecycle actions from one screen." form_aria_label="Stewardship filters" clear_url="/ui/operations/stewardship" first_name="status" first_label="Status" first_options=status_options first_value=status_filter first_empty_label="All statuses" second_name="severity" second_label="Severity" second_options=severity_options second_value=severity_filter second_empty_label="All severities" submit_label="Apply" %}
+{% if payload.capabilities.can_create_stewardship %}
+<section class="panel" id="stewardship-create-panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Create stewardship item" panel_description="Search catalog assets for the subject and create a review item without relying on manual raw identifiers." %}
+  <div class="section-stack" data-ui-action-form="stewardship-create">
+    <div class="field-grid field-grid--wide">
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+      <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>
     </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Item type</span><select class="select" data-field="item_type" aria-label="Stewardship item type">
+        {% for option in item_type_options %}
+        <option value="{{ option }}">{{ option }}</option>
+        {% endfor %}
+      </select></label>
+      <label class="field-group"><span class="field-label">Severity</span><select class="select" data-field="severity" aria-label="Stewardship severity">
+        {% for option in severity_options %}
+        <option value="{{ option }}">{{ option }}</option>
+        {% endfor %}
+      </select></label>
+      <label class="field-group"><span class="field-label">Assignee</span><input class="input" data-field="assignee" placeholder="assignee (optional)" aria-label="Assignee"></label>
+      <label class="field-group"><span class="field-label">Due at</span><input class="input" data-field="due_at" placeholder="ISO datetime (optional)" aria-label="Due at"></label>
+    </div>
+    <p class="form-hint">If an asset is selected and manual subject ref is blank, the item will use <code>asset:&lt;id&gt;</code> automatically.</p>
+    <div class="button-row"><button class="button" data-ui-action="stewardship-create" onclick="createStewardshipItem(this)"><span class="material-symbols-outlined button-icon" aria-hidden="true">playlist_add_check</span><span>Create item</span></button></div>
   </div>
+</section>
+{% endif %}
+{% if payload.capabilities.can_create_access_requests %}
+<section class="panel" id="access-request-create-panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Submit access request" panel_description="Search the governed asset catalog and submit a scoped access request without relying on raw subject identifiers." %}
+  <div class="section-stack" data-ui-action-form="access-request-create">
+    <div class="field-grid field-grid--wide">
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="access_request_asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+      <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Requester</span><input class="input" data-field="requester" value="{% if user_context.user_id != 'anonymous' %}{{ user_context.user_id }}{% endif %}" placeholder="requester identifier" aria-label="Requester"></label>
+      <label class="field-group"><span class="field-label">Access type</span><select class="select" data-field="access_type" aria-label="Access type">
+        {% for option in access_type_options %}
+        <option value="{{ option }}">{{ option }}</option>
+        {% endfor %}
+      </select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Justification</span><textarea class="input" data-field="justification" placeholder="Explain why this access is required" aria-label="Justification" style="min-height:96px;"></textarea></label>
+    <p class="form-hint">If an asset is selected and manual subject ref is blank, the request will use <code>asset:&lt;id&gt;</code> automatically.</p>
+    <div class="button-row"><button class="button" data-ui-action="access-request-create" onclick="createAccessRequest(this)"><span class="material-symbols-outlined button-icon" aria-hidden="true">lock_open_right</span><span>Submit request</span></button></div>
+  </div>
+</section>
+{% endif %}
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Queue items" panel_description="Action-ready list view inspired by admin-style CRUD patterns." %}
   <div class="table-wrap">
 <table>
   <thead>
@@ -62,40 +78,68 @@
       </td>
       <td>
         {% if payload.capabilities.can_manage_stewardship and item.allowed_actions %}
-          <div data-ui-action-form="stewardship" class="section-stack">
-            <label class="field-group">
-              <span class="field-label">Action</span>
-              <select class="select" data-field="action" aria-label="Action">
-                {% for action in item.allowed_actions %}
-                <option value="{{ action }}">{{ action }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <div class="field-grid field-grid--wide">
-              <label class="field-group"><span class="field-label">Assignee</span><input class="input" data-field="assignee" placeholder="assignee (for assign)" aria-label="Assignee"></label>
-              <label class="field-group"><span class="field-label">Resolution JSON</span><input class="input" data-field="resolution" placeholder='resolution JSON (for resolve)' aria-label="Resolution JSON"></label>
-            </div>
-            <div class="button-row">
-              <button
-                class="button"
-                data-ui-action="stewardship"
-                onclick="submitStewardshipAction(this, '{{ item.id }}')"
-              >
-                <span class="material-symbols-outlined button-icon" aria-hidden="true">fact_check</span>
-                <span>Run</span>
-              </button>
-            </div>
-          </div>
+          {% include "core/ui/includes/action_form_shell.html" with form_attr="ui-action-form" form_name="stewardship" select_label="Action" select_field="action" select_aria_label="Action" select_options=item.allowed_actions fields_include="core/ui/includes/action_fields_stewardship.html" action_attr="ui-action" action_name="stewardship" onclick_handler="submitStewardshipAction(this, '"|add:item.id|add:"')" button_icon="fact_check" button_label="Run" %}
         {% else %}
           <span class="muted">No actions</span>
         {% endif %}
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="muted">No stewardship items</td></tr>
+    <tr><td colspan="5">{% include "core/ui/includes/empty_state.html" with empty_icon="fact_check" empty_title="No stewardship items" empty_description="New stewardship work items will appear here when exceptions or review queues are created." %}</td></tr>
     {% endfor %}
   </tbody>
 </table>
 </div>
 </section>
+<script>
+  function setStewardshipUiError(message) {
+    const current = new URL(window.location.href);
+    current.searchParams.set("ui_message", message);
+    current.searchParams.set("ui_error", "1");
+    window.location.assign(current.toString());
+  }
+
+  function createStewardshipItem(button) {
+    const root = button.closest('[data-ui-action-form="stewardship-create"]');
+    const assetId = root.querySelector('[data-field="asset_id"]').value;
+    const subjectRefRaw = root.querySelector('[data-field="subject_ref"]').value.trim();
+    const itemType = root.querySelector('[data-field="item_type"]').value;
+    const severity = root.querySelector('[data-field="severity"]').value;
+    const assignee = root.querySelector('[data-field="assignee"]').value.trim();
+    const dueAt = root.querySelector('[data-field="due_at"]').value.trim();
+    const subjectRef = subjectRefRaw || (assetId ? `asset:${assetId}` : "");
+    if (!subjectRef) {
+      setStewardshipUiError("asset subject or manual subject ref is required");
+      return;
+    }
+    const payload = {
+      item_type: itemType,
+      subject_ref: subjectRef,
+      severity: severity,
+    };
+    if (assignee) payload.assignee = assignee;
+    if (dueAt) payload.due_at = dueAt;
+    edmpUiAction("/api/v1/stewardship/items", payload);
+  }
+
+  function createAccessRequest(button) {
+    const root = button.closest('[data-ui-action-form="access-request-create"]');
+    const assetId = root.querySelector('[data-field="asset_id"]').value;
+    const subjectRefRaw = root.querySelector('[data-field="subject_ref"]').value.trim();
+    const requester = root.querySelector('[data-field="requester"]').value.trim();
+    const accessType = root.querySelector('[data-field="access_type"]').value;
+    const justification = root.querySelector('[data-field="justification"]').value.trim();
+    const subjectRef = subjectRefRaw || (assetId ? `asset:${assetId}` : "");
+    if (!subjectRef || !requester || !accessType) {
+      setStewardshipUiError("asset subject or manual subject ref, requester, and access type are required");
+      return;
+    }
+    edmpUiAction("/api/v1/access-requests", {
+      subject_ref: subjectRef,
+      requester: requester,
+      access_type: accessType,
+      justification: justification,
+    });
+  }
+</script>
 {% endblock %}

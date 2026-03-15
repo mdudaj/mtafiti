@@ -872,6 +872,298 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
             ],
         },
         {
+            "entry_id": "knowledge-src/viewflow-crud-page-templates",
+            "name": "viewflow-crud-page-templates",
+            "description": "Stock Viewflow page templates for list, detail, form, delete confirmation, and transition pages, including the card and breadcrumb contract they share.",
+            "tags": [
+                "viewflow",
+                "templates",
+                "crud",
+                "detail",
+                "delete",
+                "transition",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/viewflow/templates/viewflow/views/list.html"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Reuse the stock `viewflow/views/*.html` templates first; they already encode the standard card header, breadcrumbs, action menu, and footer-button structure.
+- Keep page identity in the header (`vf-card__title`, `vf-card__breadcrumbs`, `vf-card__menu`) and put row/object actions into `view.get_page_actions()` or `view.get_object_actions()` instead of hard-coding loose buttons in page bodies.
+- Let forms provide `form.media`, `form.layout`, and `view.layout` so templates stay thin and layout decisions remain in view or form code.
+- Treat delete and transition pages as detail-plus-confirm patterns: show object context first, then render the confirmation form with an explicit destructive or transition-specific button label.
+""".strip(),
+                },
+                {
+                    "title": "List page contract",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/list.html",
+                            "start_line": 1,
+                            "end_line": 108,
+                            "label": "List page shell with header, filter trigger, bulk actions, table, and pagination",
+                        },
+                    ],
+                },
+                {
+                    "title": "Detail and object card contract",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/detail.html",
+                            "start_line": 1,
+                            "end_line": 12,
+                            "label": "Detail page delegating to object_detail_card",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/object_detail_card.html",
+                            "start_line": 1,
+                            "end_line": 46,
+                            "label": "Object detail card header, breadcrumbs, data table, and actions",
+                        },
+                    ],
+                },
+                {
+                    "title": "Form page contract",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/form.html",
+                            "start_line": 1,
+                            "end_line": 72,
+                            "label": "Create/update form card with breadcrumbs, form.media, layout rendering, and footer actions",
+                        },
+                    ],
+                },
+                {
+                    "title": "Delete and transition confirmation contracts",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/confirm_delete.html",
+                            "start_line": 1,
+                            "end_line": 53,
+                            "label": "Delete confirmation page with related-object summary and destructive action footer",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/transition.html",
+                            "start_line": 1,
+                            "end_line": 38,
+                            "label": "Transition page layering object data over the shared form template",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-navigation-feedback-includes",
+            "name": "viewflow-navigation-feedback-includes",
+            "description": "Reusable Viewflow include templates for menus, list filters, bulk actions, pagination, page actions, and snackbar feedback.",
+            "tags": [
+                "viewflow",
+                "templates",
+                "navigation",
+                "feedback",
+                "snackbar",
+                "pagination",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/viewflow/templates/viewflow/includes/app_menu.html"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Drive site and application navigation from `site.menu_template_name`, `app.menu_template_name`, menu items, and permission checks instead of copying sidebars into each page.
+- Use include templates for list interactions (`list_filter`, `list_bulk_actions`, `list_pagination`) so selection state, sort order, filters, and paging remain coordinated.
+- Expose page-level actions through `view.get_page_actions()` and render them with the shared action-menu include for consistent iconography and menu behavior.
+- Surface feedback through the shared snackbar include so only the latest message is rendered and message placement stays stable across all pages.
+""".strip(),
+                },
+                {
+                    "title": "Menu includes",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/app_menu.html",
+                            "start_line": 1,
+                            "end_line": 28,
+                            "label": "Application menu with back links, permission-aware viewset entries, and icon fallbacks",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/site_menu.html",
+                            "start_line": 1,
+                            "end_line": 30,
+                            "label": "Site menu with parent navigation and application entries",
+                        },
+                    ],
+                },
+                {
+                    "title": "List interaction includes",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/list_filter.html",
+                            "start_line": 1,
+                            "end_line": 15,
+                            "label": "Dismissible filter drawer preserving list sort order",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/list_bulk_actions.html",
+                            "start_line": 1,
+                            "end_line": 62,
+                            "label": "Bulk action chooser with select-all affordance and GO submit button",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/list_pagination.html",
+                            "start_line": 1,
+                            "end_line": 29,
+                            "label": "Previous/next pagination summary and disabled-state navigation",
+                        },
+                    ],
+                },
+                {
+                    "title": "Action menu and feedback includes",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/view_action_menu.html",
+                            "start_line": 1,
+                            "end_line": 17,
+                            "label": "Page action menu rendering get_page_actions() into a shared menu surface",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/includes/snackbar.html",
+                            "start_line": 1,
+                            "end_line": 5,
+                            "label": "Snackbar rendering the latest framework message",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-base-template-composition",
+            "name": "viewflow-base-template-composition",
+            "description": "Base template, page shell, block override, and application menu guidance for Viewflow-powered UIs.",
+            "tags": [
+                "viewflow",
+                "templates",
+                "base",
+                "shell",
+                "navigation",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/viewflow/templates/viewflow/base_page.html"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Extend `viewflow/base_page.html` or the app-specific `base_template_name` first so page chrome, menus, and toolbar behavior stay consistent.
+- Override `page-menu`, `page-menu-app`, `page-toolbar`, `page-toolbar-actions`, and `content` blocks before copying the whole shell into app-local templates.
+- Let `Application(...)`, `Site(...)`, `site.menu_template_name`, and `app.menu_template_name` drive navigation instead of hard-coding sidebars inside every page.
+- Prefer template fallback chains from the view classes (`<app>/<model>_form.html`, `<app>/<model>_list.html`, then `viewflow/views/*.html`) before introducing bespoke shells.
+""".strip(),
+                },
+                {
+                    "title": "Base template hierarchy",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/base.html",
+                            "start_line": 1,
+                            "end_line": 32,
+                            "label": "Global base template with CSS/JS includes and theme variables",
+                        },
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/base_page.html",
+                            "start_line": 1,
+                            "end_line": 115,
+                            "label": "Page shell with menu, toolbar, content, and navigation blocks",
+                        },
+                    ],
+                },
+                {
+                    "title": "Page-level extension examples",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/templates/viewflow/views/list.html",
+                            "start_line": 1,
+                            "end_line": 108,
+                            "label": "List page extending base_page with toolbar search and action menu blocks",
+                        },
+                        {
+                            "path": "viewflow/viewflow/views/create.py",
+                            "start_line": 93,
+                            "end_line": 109,
+                            "label": "Create view template fallback chain",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-custom-field-renderers",
+            "name": "viewflow-custom-field-renderers",
+            "description": "Custom field, widget renderer, and Ajax autocomplete patterns for Viewflow forms and CRUD views.",
+            "tags": [
+                "viewflow",
+                "forms",
+                "widgets",
+                "autocomplete",
+                "renderers",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/viewflow/forms/renderers.py"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Build custom field behavior by subclassing `WidgetRenderer` or `InputRenderer`, overriding `create_root(...)`, and registering the widget-to-renderer mapping in `VIEWFLOW['WIDGET_RENDERERS']`.
+- Keep submitted values and human-readable labels separate for async selectors; Viewflow's autocomplete renderers use hidden values plus a `value-label` or `initial` payload for display state.
+- Pass custom widgets through `form_widgets`, `create_form_widgets`, or `update_form_widgets` on the view/viewset rather than hand-writing field HTML in templates.
+- Reuse `FormAjaxCompleteMixin` and `FormDependentSelectMixin` when a form needs async completion or dependent select behavior, then provide the endpoint logic in application code.
+""".strip(),
+                },
+                {
+                    "title": "Renderer registry and base classes",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/forms/renderers.py",
+                            "start_line": 31,
+                            "end_line": 92,
+                            "label": "WidgetRenderer registry, InputRenderer, and field metadata propagation",
+                        },
+                    ],
+                },
+                {
+                    "title": "Autocomplete renderer patterns",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/forms/renderers.py",
+                            "start_line": 467,
+                            "end_line": 504,
+                            "label": "AjaxModelSelectRenderer and AjaxMultipleModelSelectRenderer",
+                        },
+                    ],
+                },
+                {
+                    "title": "View and viewset wiring",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/views/create.py",
+                            "start_line": 25,
+                            "end_line": 109,
+                            "label": "CreateModelView with FormAjaxCompleteMixin, FormDependentSelectMixin, and form_widgets propagation",
+                        },
+                        {
+                            "path": "viewflow/viewflow/urls/model.py",
+                            "start_line": 116,
+                            "end_line": 189,
+                            "label": "CreateViewMixin and UpdateViewMixin passing layout and form_widgets into view classes",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             "entry_id": "knowledge-src/viewflow-forms-layout-composition",
             "name": "viewflow-forms-layout-composition",
             "description": "Layout-driven form composition with Viewflow forms and cookbook examples.",

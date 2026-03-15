@@ -62,6 +62,28 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     (viewflow_dir / "viewflow" / "workflow" / "flow" / "nodes.py").write_text("class Start: ...\nclass View: ...\nclass Split: ...\nclass Join: ...", encoding="utf-8")
     (viewflow_dir / "viewflow" / "forms").mkdir(parents=True)
     (viewflow_dir / "viewflow" / "forms" / "renderers.py").write_text("class WidgetRenderer: ...", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow").mkdir(parents=True)
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "base.html").write_text("{% block body %}{% endblock %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "base_page.html").write_text("{% block page-menu %}{% endblock %}{% block page-toolbar %}{% endblock %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views").mkdir(parents=True)
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views" / "list.html").write_text("{% extends 'viewflow/base_page.html' %}{% block page-toolbar-actions %}<vf-page-search></vf-page-search>{% endblock %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views" / "detail.html").write_text("{% include 'viewflow/includes/object_detail_card.html' %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views" / "form.html").write_text("{% block extrahead %}{{ form.media }}{% endblock %}{% render form form.layout %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views" / "confirm_delete.html").write_text("{% trans 'Delete' %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "views" / "transition.html").write_text("{% extends 'viewflow/views/form.html' %}{% block breadcrumbs_items %}Transition{% endblock %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes").mkdir(parents=True)
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "object_detail_card.html").write_text("<section class='vf-card__header'></section><section class='mdc-card__actions vf-card__actions'></section>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "view_action_menu.html").write_text("{% with actions=view.get_page_actions %}<vf-card-menu></vf-card-menu>{% endwith %}", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "snackbar.html").write_text("<vf-snackbar>{{ message }}</vf-snackbar>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "list_bulk_actions.html").write_text("Select all<button>GO</button>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "app_menu.html").write_text("<vf-page-menu-navigation>{% trans 'Back' %}</vf-page-menu-navigation>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "site_menu.html").write_text("<vf-page-menu-navigation>{% trans 'Applications' %}</vf-page-menu-navigation>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "list_filter.html").write_text("<vf-list-filter><button>Filter</button></vf-list-filter>", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "templates" / "viewflow" / "includes" / "list_pagination.html").write_text("1-10 of 10", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "views").mkdir(parents=True)
+    (viewflow_dir / "viewflow" / "views" / "create.py").write_text("class CreateModelView:\n    def get_template_names(self):\n        return ['app/model_form.html', 'viewflow/views/form.html']\n", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "views" / "detail.py").write_text("class DetailModelView:\n    template_name = 'viewflow/views/detail.html'\n", encoding="utf-8")
+    (viewflow_dir / "viewflow" / "views" / "delete.py").write_text("class DeleteModelView:\n    template_name = 'viewflow/views/confirm_delete.html'\n", encoding="utf-8")
     (viewflow_dir / "viewflow" / "fsm").mkdir(parents=True)
     (viewflow_dir / "viewflow" / "fsm" / "base.py").write_text("class Transition: ...", encoding="utf-8")
     (viewflow_dir / "viewflow" / "fsm" / "viewset.py").write_text("class FlowViewsMixin: ...", encoding="utf-8")
@@ -152,6 +174,10 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     assert "knowledge-src/viewflow-fsm-state-transitions" in entry_ids
     assert "knowledge-src/django-material-frontend-composition" in entry_ids
     assert "knowledge-src/viewflow-view-recipes" in entry_ids
+    assert "knowledge-src/viewflow-crud-page-templates" in entry_ids
+    assert "knowledge-src/viewflow-navigation-feedback-includes" in entry_ids
+    assert "knowledge-src/viewflow-base-template-composition" in entry_ids
+    assert "knowledge-src/viewflow-custom-field-renderers" in entry_ids
     assert "knowledge-src/viewflow-forms-layout-composition" in entry_ids
     assert "knowledge-src/viewflow-crud-scaffolding" in entry_ids
     assert "knowledge-src/viewflow-auth-account-scaffolding" in entry_ids
@@ -196,6 +222,29 @@ def test_generate_content_creates_cookbook_sample_and_theme_skills(tmp_path):
     assert "DeleteViewMixin" in view_recipes_skill.read_text(encoding="utf-8")
     assert "Application-mounted FormView and CreateView routes with titles/buttons" in view_recipes_skill.read_text(encoding="utf-8")
     assert "Shared form template with render form form.layout and action footer" in view_recipes_skill.read_text(encoding="utf-8")
+
+    crud_templates_skill = content_root / "knowledge-src" / "skills" / "viewflow-crud-page-templates" / "SKILL.md"
+    assert crud_templates_skill.exists()
+    assert "object_detail_card" in crud_templates_skill.read_text(encoding="utf-8")
+    assert "Delete and transition confirmation contracts" in crud_templates_skill.read_text(encoding="utf-8")
+    assert "vf-card__breadcrumbs" in crud_templates_skill.read_text(encoding="utf-8")
+
+    includes_skill = content_root / "knowledge-src" / "skills" / "viewflow-navigation-feedback-includes" / "SKILL.md"
+    assert includes_skill.exists()
+    assert "list_bulk_actions" in includes_skill.read_text(encoding="utf-8")
+    assert "view.get_page_actions()" in includes_skill.read_text(encoding="utf-8")
+    assert "vf-snackbar" in includes_skill.read_text(encoding="utf-8")
+
+    base_template_skill = content_root / "knowledge-src" / "skills" / "viewflow-base-template-composition" / "SKILL.md"
+    assert base_template_skill.exists()
+    assert "page-toolbar" in base_template_skill.read_text(encoding="utf-8")
+    assert "viewflow/base_page.html" in base_template_skill.read_text(encoding="utf-8")
+
+    custom_renderer_skill = content_root / "knowledge-src" / "skills" / "viewflow-custom-field-renderers" / "SKILL.md"
+    assert custom_renderer_skill.exists()
+    assert "AjaxModelSelectRenderer" in custom_renderer_skill.read_text(encoding="utf-8")
+    assert "value-label" in custom_renderer_skill.read_text(encoding="utf-8")
+    assert "form_widgets" in custom_renderer_skill.read_text(encoding="utf-8")
 
     auth_skill = content_root / "knowledge-src" / "skills" / "viewflow-auth-account-scaffolding" / "SKILL.md"
     assert auth_skill.exists()

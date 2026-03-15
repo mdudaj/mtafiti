@@ -1,0 +1,20 @@
+<thead>
+  <tr>
+    <th>Name</th>
+    <th>Ref</th>
+    <th>Format</th>
+    <th>Sample payload</th>
+  </tr>
+</thead>
+<tbody>
+  {% for template in payload.templates %}
+  <tr>
+    <td>{{ template.name }}</td>
+    <td>{{ template.template_ref }}</td>
+    <td><span class="chip">{{ template.output_format }}</span></td>
+    <td>{{ template.sample_payload }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4">{% include "core/ui/includes/empty_state.html" with empty_icon="description" empty_title="No print templates" empty_description="Create a template above to make it available for previews and print jobs." %}</td></tr>
+  {% endfor %}
+</tbody>

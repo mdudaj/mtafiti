@@ -170,6 +170,12 @@
       .hero h1 { margin: 0 0 8px; font-size: 2rem; line-height: 1.1; }
       .hero p { margin: 0; color: var(--color-text-muted); max-width: 64ch; }
       .hero-kicker { display: inline-block; margin-bottom: 10px; padding: 4px 10px; border-radius: 999px; background: #dbeafe; color: var(--color-primary-strong); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+      .breadcrumb-trail { margin-bottom: -4px; }
+      .breadcrumb-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .breadcrumb-item { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 13px; }
+      .breadcrumb-item::after { content: "chevron_right"; font-family: "Material Symbols Outlined"; font-size: 16px; color: #94a3b8; }
+      .breadcrumb-item:last-child::after { content: none; }
+      .breadcrumb-item--current { color: var(--color-primary-strong); font-weight: 700; }
       .cards, .stat-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
       .card, .panel { background: var(--color-surface); border: 1px solid var(--color-surface-border); border-radius: 18px; box-shadow: 0 8px 24px rgba(14, 73, 142, 0.06); padding: 16px; }
       .panel-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -207,6 +213,79 @@
       .field-group:focus-within .field-label { color: var(--color-primary-strong); }
       .form-hint { margin: 0; font-size: 13px; color: var(--color-text-muted); }
       .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+      .ajax-model-select {
+        position: relative;
+        min-width: min(360px, 100%);
+      }
+      .ajax-model-select__input {
+        padding-right: 52px;
+      }
+      .ajax-model-select__clear {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--color-text-muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .ajax-model-select__clear:hover {
+        background: var(--color-primary-soft);
+        color: var(--color-primary-strong);
+      }
+      .ajax-model-select__panel {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        z-index: 30;
+        border: 1px solid var(--color-surface-border);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 18px 36px rgba(14, 73, 142, 0.14);
+        overflow: hidden;
+      }
+      .ajax-model-select__status {
+        padding: 12px 14px 0;
+        font-size: 13px;
+      }
+      .ajax-model-select__results {
+        display: grid;
+        gap: 0;
+        max-height: 280px;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      .ajax-model-select__option {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        text-align: left;
+        padding: 10px 12px;
+        cursor: pointer;
+        display: grid;
+        gap: 3px;
+      }
+      .ajax-model-select__option:hover,
+      .ajax-model-select__option:focus-visible {
+        background: var(--color-primary-soft-2);
+      }
+      .ajax-model-select__option-title {
+        font-weight: 700;
+        color: var(--color-text);
+      }
+      .ajax-model-select__option-description {
+        font-size: 12px;
+        color: var(--color-text-muted);
+      }
       .input, .select, textarea.input {
         width: 100%;
         min-height: 56px;
@@ -248,9 +327,51 @@
       .banner { border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; font-size: 14px; border: 1px solid; }
       .banner.ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
       .banner.err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+      .snackbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        box-shadow: 0 18px 36px rgba(14, 73, 142, 0.16);
+      }
+      .snackbar-dismiss {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: inherit;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .snackbar-dismiss:hover { background: rgba(255, 255, 255, 0.24); }
       .muted { color: var(--color-text-muted); }
       .metric-list { display: grid; gap: 8px; }
       .metric-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 12px; background: var(--color-surface-muted); }
+      .empty-state {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 18px;
+        border-radius: 16px;
+        border: 1px dashed var(--color-surface-border);
+        background: var(--color-surface-muted);
+      }
+      .empty-state-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--color-primary-soft);
+        color: var(--color-primary-strong);
+        flex: 0 0 auto;
+      }
+      .empty-state-title { margin: 0 0 4px; font-size: 15px; }
+      .empty-state-description { margin: 0; color: var(--color-text-muted); font-size: 14px; }
       .table-wrap { overflow-x: auto; border-radius: 18px; border: 1px solid var(--color-surface-border); background: #fff; }
       table { width: 100%; border-collapse: collapse; background: #fff; }
       th, td { padding: 11px 12px; border-bottom: 1px solid #e4eefc; text-align: left; font-size: 14px; vertical-align: top; }
@@ -376,7 +497,7 @@
             </div>
           </header>
           {% if ui_message %}
-            <div class="banner {% if ui_error %}err{% else %}ok{% endif %}">{{ ui_message }}</div>
+            {% include "core/ui/includes/snackbar.html" with message=ui_message is_error=ui_error %}
           {% endif %}
           {% block content %}{% endblock %}
         </div>
@@ -402,6 +523,168 @@
           setCollapsed(collapsed);
           window.localStorage.setItem(storageKey, collapsed ? 'true' : 'false');
         });
+      }());
+
+      (function initializeSnackbars() {
+        document.querySelectorAll('[data-snackbar]').forEach((snackbar) => {
+          const dismiss = snackbar.querySelector('.snackbar-dismiss');
+          if (!dismiss) return;
+          dismiss.addEventListener('click', () => snackbar.remove());
+          window.setTimeout(() => {
+            if (document.body.contains(snackbar)) {
+              snackbar.remove();
+            }
+          }, 5000);
+        });
+      }());
+
+      function debounce(callback, delay) {
+        let timeoutId;
+        return (...args) => {
+          window.clearTimeout(timeoutId);
+          timeoutId = window.setTimeout(() => callback(...args), delay);
+        };
+      }
+
+      class AjaxModelSelect {
+        constructor(root) {
+          this.root = root;
+          this.endpoint = root.dataset.endpoint;
+          this.emptyText = root.dataset.emptyText || "No matches found";
+          this.hiddenInput = root.querySelector('input[type="hidden"]');
+          this.textInput = root.querySelector('.ajax-model-select__input');
+          this.clearButton = root.querySelector('.ajax-model-select__clear');
+          this.panel = root.querySelector('.ajax-model-select__panel');
+          this.status = root.querySelector('.ajax-model-select__status');
+          this.results = root.querySelector('.ajax-model-select__results');
+          this.options = [];
+          this.requestToken = 0;
+          this.queueSearch = debounce((query) => this.loadOptions(query), 220);
+          this.handleDocumentClick = this.handleDocumentClick.bind(this);
+          this.bind();
+          this.syncClearButton();
+        }
+
+        bind() {
+          this.textInput.addEventListener('focus', () => {
+            this.open();
+            this.loadOptions(this.textInput.value.trim());
+          });
+          this.textInput.addEventListener('input', () => {
+            this.hiddenInput.value = '';
+            this.syncClearButton();
+            this.open();
+            this.status.textContent = 'Searching...';
+            this.queueSearch(this.textInput.value.trim());
+          });
+          this.textInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+              this.close();
+            }
+            if (event.key === 'Enter' && this.options.length > 0) {
+              event.preventDefault();
+              this.selectOption(this.options[0]);
+            }
+          });
+          this.clearButton.addEventListener('click', () => {
+            this.hiddenInput.value = '';
+            this.textInput.value = '';
+            this.syncClearButton();
+            this.open();
+            this.loadOptions('');
+            this.textInput.focus();
+          });
+          document.addEventListener('click', this.handleDocumentClick);
+        }
+
+        handleDocumentClick(event) {
+          if (!this.root.contains(event.target)) {
+            this.close();
+          }
+        }
+
+        open() {
+          this.panel.hidden = false;
+          this.textInput.setAttribute('aria-expanded', 'true');
+        }
+
+        close() {
+          this.panel.hidden = true;
+          this.textInput.setAttribute('aria-expanded', 'false');
+        }
+
+        syncClearButton() {
+          const visible = Boolean(this.hiddenInput.value || this.textInput.value);
+          this.clearButton.hidden = !visible;
+        }
+
+        renderOptions(items) {
+          this.options = items;
+          this.results.replaceChildren();
+          if (!items.length) {
+            this.status.textContent = this.emptyText;
+            return;
+          }
+          this.status.textContent = `${items.length} option${items.length === 1 ? '' : 's'} available`;
+          items.forEach((item) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ajax-model-select__option';
+            button.setAttribute('role', 'option');
+            button.innerHTML = `
+              <span class="ajax-model-select__option-title"></span>
+              ${item.description ? '<span class="ajax-model-select__option-description"></span>' : ''}
+            `;
+            button.querySelector('.ajax-model-select__option-title').textContent = item.label;
+            const descriptionNode = button.querySelector('.ajax-model-select__option-description');
+            if (descriptionNode) {
+              descriptionNode.textContent = item.description;
+            }
+            button.addEventListener('click', () => this.selectOption(item));
+            this.results.appendChild(button);
+          });
+        }
+
+        async loadOptions(query) {
+          const token = ++this.requestToken;
+          const url = new URL(this.endpoint, window.location.origin);
+          url.searchParams.set('q', query);
+          url.searchParams.set('limit', '12');
+          try {
+            const response = await fetch(url.toString(), {
+              headers: {'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) {
+              throw new Error('request_failed');
+            }
+            const payload = await response.json();
+            if (token !== this.requestToken) {
+              return;
+            }
+            this.renderOptions(payload.results || []);
+          } catch (_error) {
+            if (token !== this.requestToken) {
+              return;
+            }
+            this.options = [];
+            this.results.replaceChildren();
+            this.status.textContent = 'Unable to load options right now.';
+          }
+        }
+
+        selectOption(item) {
+          this.hiddenInput.value = item.value;
+          this.textInput.value = item.label;
+          this.syncClearButton();
+          this.hiddenInput.dispatchEvent(new Event('change', {bubbles: true}));
+          this.close();
+        }
+      }
+
+      (function initializeAjaxModelSelects() {
+        document
+          .querySelectorAll('[data-ajax-model-select]')
+          .forEach((root) => new AjaxModelSelect(root));
       }());
 
       async function edmpUiAction(url, payload) {

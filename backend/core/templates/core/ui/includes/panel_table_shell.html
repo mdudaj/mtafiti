@@ -1,0 +1,4 @@
+<section class="panel"{% if panel_id %} id="{{ panel_id }}"{% endif %}>
+  {% include "core/ui/includes/panel_header.html" with panel_title=panel_title panel_description=panel_description %}
+  {% include "core/ui/includes/table_wrap.html" with table_style=table_style table_template=table_template %}
+</section>

@@ -186,21 +186,80 @@ def test_ui_operations_html_pages_render():
     host, _ = _create_tenants()
     client = Client()
 
+    project = client.post(
+        "/api/v1/projects",
+        data=json.dumps({"name": "Ajax Filter Project", "code": "AJX-01"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+    )
+    assert project.status_code == 201
+    project_id = project.json()["id"]
+
+    template = client.post(
+        "/api/v1/printing/templates",
+        data=json.dumps(
+            {
+                "name": "Searchable Template",
+                "template_ref": "zebra/searchable",
+                "output_format": "zpl",
+                "content": "^XA^XZ",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert template.status_code == 201
+
+    gateway = client.post(
+        "/api/v1/printing/gateways",
+        data=json.dumps(
+            {
+                "gateway_ref": "printer-search-01",
+                "display_name": "Search Printer",
+                "status": "online",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    assert gateway.status_code == 201
+
     dashboard = client.get("/ui/operations/dashboard", HTTP_HOST=host)
-    stewardship = client.get("/ui/operations/stewardship", HTTP_HOST=host)
-    orchestration = client.get("/ui/operations/orchestration", HTTP_HOST=host)
-    printing = client.get("/ui/operations/printing", HTTP_HOST=host)
-    agent = client.get("/ui/operations/agent", HTTP_HOST=host)
+    stewardship = client.get(
+        "/ui/operations/stewardship",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    orchestration = client.get(f"/ui/operations/orchestration?project_id={project_id}", HTTP_HOST=host)
+    printing = client.get(
+        "/ui/operations/printing",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor,tenant.admin",
+    )
+    agent = client.get(f"/ui/operations/agent?project_id={project_id}", HTTP_HOST=host)
+    workspace = client.get("/app", HTTP_HOST=host)
 
     assert dashboard.status_code == 200
     assert stewardship.status_code == 200
     assert orchestration.status_code == 200
     assert printing.status_code == 200
     assert agent.status_code == 200
+    assert workspace.status_code == 200
     assert b"Skip to content" in dashboard.content
     assert b"Operations Dashboard" in dashboard.content
     assert b"Stewardship Workbench" in stewardship.content
     assert b"Printing Operations" in printing.content
+    assert b"data-ajax-model-select" in dashboard.content
+    assert b"/api/v1/ui/model-select-options?source=projects" in dashboard.content
+    assert b"/api/v1/ui/model-select-options?source=assets" in stewardship.content
+    assert b"/api/v1/ui/model-select-options?source=print_templates" in printing.content
+    assert b"/api/v1/ui/model-select-options?source=print_gateways" in printing.content
+    assert b"/api/v1/ui/model-select-options?source=print_templates" in workspace.content
+    assert b"/api/v1/ui/model-select-options?source=print_gateways" in workspace.content
+    assert b"Ajax Filter Project" in orchestration.content
+    assert b"Ajax Filter Project" in agent.content
 
 
 @pytest.mark.django_db(transaction=True)
@@ -316,6 +375,70 @@ def test_stewardship_action_form_fields_render_for_managers(monkeypatch):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_stewardship_create_form_uses_asset_ajax_select():
+    host, _ = _create_tenants()
+    client = Client()
+    asset = client.post(
+        "/api/v1/assets",
+        data=json.dumps(
+            {
+                "qualified_name": "warehouse.patients.curated",
+                "display_name": "Curated Patients",
+                "asset_type": "dataset",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert asset.status_code == 201
+
+    page = client.get(
+        "/ui/operations/stewardship",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert page.status_code == 200
+    assert b'data-ui-action-form="stewardship-create"' in page.content
+    assert b"/api/v1/ui/model-select-options?source=assets" in page.content
+    assert b"Create stewardship item" in page.content
+    assert b"quality_exception" in page.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_access_request_create_form_uses_asset_ajax_select_and_prefills_requester():
+    host, _ = _create_tenants()
+    client = Client()
+    asset = client.post(
+        "/api/v1/assets",
+        data=json.dumps(
+            {
+                "qualified_name": "governance.requests.orders",
+                "display_name": "Orders Requests Asset",
+                "asset_type": "dataset",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert asset.status_code == 201
+
+    page = client.get(
+        "/ui/operations/stewardship",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.reader",
+        HTTP_X_USER_ID="reader@example.com",
+    )
+    assert page.status_code == 200
+    assert b'data-ui-action-form="access-request-create"' in page.content
+    assert b"/api/v1/ui/model-select-options?source=assets" in page.content
+    assert b"Submit access request" in page.content
+    assert b"reader@example.com" in page.content
+    assert b"access_type" in page.content
+
+
+@pytest.mark.django_db(transaction=True)
 def test_orchestration_action_form_renders_for_admin():
     host, _ = _create_tenants()
     client = Client()
@@ -356,6 +479,45 @@ def test_orchestration_action_form_renders_for_admin():
     )
     assert page.status_code == 200
     assert b'data-ui-action-form="orchestration"' in page.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_orchestration_workflow_run_create_form_uses_ajax_selects():
+    host, _ = _create_tenants()
+    client = Client()
+    definition = client.post(
+        "/api/v1/workflows/definitions",
+        data=json.dumps({"name": "Governance Review", "domain_ref": "governance"}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    assert definition.status_code == 201
+    asset = client.post(
+        "/api/v1/assets",
+        data=json.dumps(
+            {
+                "qualified_name": "governance.asset.patient",
+                "display_name": "Patient Registry Asset",
+                "asset_type": "dataset",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert asset.status_code == 201
+
+    page = client.get(
+        "/ui/operations/orchestration",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="catalog.editor",
+    )
+    assert page.status_code == 200
+    assert b'data-ui-action-form="workflow-run-create"' in page.content
+    assert b"/api/v1/ui/model-select-options?source=workflow_definitions" in page.content
+    assert b"/api/v1/ui/model-select-options?source=assets" in page.content
+    assert b"Queue workflow run" in page.content
 
 
 @pytest.mark.django_db(transaction=True)

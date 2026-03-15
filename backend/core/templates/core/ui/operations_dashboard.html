@@ -1,50 +1,13 @@
 {% extends base_template %}
 {% block title %}Operations Dashboard{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Operations site</div>
-  <h1>Operations Dashboard</h1>
-  <p>Summary-first view with quick links into active work queues, aligned to an admin-style dashboard shell.</p>
-</section>
-<div class="toolbar">
-  <div class="muted">Use the project filter to scope cards and jump directly into the relevant application area.</div>
-  <form method="get" class="right" aria-label="Project filter">
-    <label class="field-group">
-      <span class="field-label">Project ID</span>
-      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
-    </label>
-    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>Filter</span></button>
-    <a class="button secondary" href="/ui/operations/dashboard">Clear</a>
-  </form>
-</div>
+{% include "core/ui/includes/page_intro.html" with section_label="Operations site" page_title="Operations Dashboard" page_summary="Summary-first view with quick links into active work queues, aligned to an admin-style dashboard shell." parent_label="Operations" current_label="Dashboard" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to scope cards and jump directly into the relevant application area." form_aria_label="Project filter" clear_url="/ui/operations/dashboard" submit_label="Filter" %}
 <div class="stat-grid">
-  <section class="stat-card card">
-    <h3>Stewardship</h3>
-    <div class="metric-list">{% for status, count in payload.cards.stewardship.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-    <p><a href="/ui/operations/stewardship">Open workbench →</a></p>
-  </section>
-  <section class="stat-card card">
-    <h3>Workflow</h3>
-    <div class="metric-list">{% for status, count in payload.cards.workflow.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-  </section>
-  <section class="stat-card card">
-    <h3>Orchestration</h3>
-    <div class="metric-list">{% for status, count in payload.cards.orchestration.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-    <p><a href="/ui/operations/orchestration">Open monitor →</a></p>
-  </section>
-  <section class="stat-card card">
-    <h3>Agents</h3>
-    <div class="metric-list">{% for status, count in payload.cards.agent.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-    <p><a href="/ui/operations/agent">Open agent monitor →</a></p>
-  </section>
+  {% include "core/ui/includes/stat_card.html" with card_title="Stewardship" metrics=payload.cards.stewardship link_href="/ui/operations/stewardship" link_label="Open workbench" %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Workflow" metrics=payload.cards.workflow %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Orchestration" metrics=payload.cards.orchestration link_href="/ui/operations/orchestration" link_label="Open monitor" %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Agents" metrics=payload.cards.agent link_href="/ui/operations/agent" link_label="Open agent monitor" %}
   <section class="stat-card card">
     <h3>Printing jobs</h3>
     <div class="metric-list">{% for status, count in payload.cards.printing.jobs.items %}

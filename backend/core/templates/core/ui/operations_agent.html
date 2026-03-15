@@ -1,29 +1,10 @@
 {% extends base_template %}
 {% block title %}Agent Monitor{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Application</div>
-  <h1>Agent Monitor</h1>
-  <p>Review recent agent runs, inspect status, and apply lifecycle actions from a table-first operations surface.</p>
-</section>
-<div class="toolbar">
-  <div class="muted">Use the project filter to narrow the monitor before applying complete/fail actions.</div>
-  <form method="get" class="right" aria-label="Project filter">
-    <label class="field-group">
-      <span class="field-label">Project ID</span>
-      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
-    </label>
-    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>Filter</span></button>
-    <a class="button secondary" href="/ui/operations/agent">Clear</a>
-  </form>
-</div>
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Agent Monitor" page_summary="Review recent agent runs, inspect status, and apply lifecycle actions from a table-first operations surface." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Agent monitor" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to narrow the monitor before applying complete/fail actions." form_aria_label="Project filter" clear_url="/ui/operations/agent" submit_label="Filter" %}
 <section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Recent agent runs</h2>
-      <p class="panel-description">Operational list view with inline controls for permitted actions.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent agent runs" panel_description="Operational list view with inline controls for permitted actions." %}
   <div class="table-wrap">
 <table>
   <thead>
@@ -44,37 +25,14 @@
       <td>{{ run.updated_at }}</td>
       <td>
         {% if run.allowed_actions %}
-        <div class="section-stack" data-ui-action-form="agent">
-          <label class="field-group">
-            <span class="field-label">Action</span>
-            <select class="select" data-field="action" aria-label="Agent action">
-              {% for action in run.allowed_actions %}
-              <option value="{{ action }}">{{ action }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <div class="field-grid field-grid--wide">
-            <label class="field-group"><span class="field-label">Error message</span><input class="input" data-field="error_message" placeholder="error message (for fail)" aria-label="Error message"></label>
-            <label class="field-group"><span class="field-label">Output JSON</span><input class="input" data-field="output" placeholder='output JSON (for complete)' aria-label="Output JSON"></label>
-          </div>
-          <div class="button-row">
-            <button
-              class="button"
-              data-ui-action="agent"
-              onclick="submitAgentAction(this, '{{ run.id }}')"
-            >
-              <span class="material-symbols-outlined button-icon" aria-hidden="true">smart_toy</span>
-              <span>Run</span>
-            </button>
-          </div>
-        </div>
+        {% include "core/ui/includes/action_form_shell.html" with form_attr="ui-action-form" form_name="agent" select_label="Action" select_field="action" select_aria_label="Agent action" select_options=run.allowed_actions fields_include="core/ui/includes/action_fields_agent.html" action_attr="ui-action" action_name="agent" onclick_handler="submitAgentAction(this, '"|add:run.id|add:"')" button_icon="smart_toy" button_label="Run" %}
         {% else %}
         <span class="muted">No actions</span>
         {% endif %}
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="muted">No agent runs</td></tr>
+    <tr><td colspan="5">{% include "core/ui/includes/empty_state.html" with empty_icon="smart_toy" empty_title="No agent runs" empty_description="Agent execution history will appear here after prompts are submitted." %}</td></tr>
     {% endfor %}
   </tbody>
 </table>

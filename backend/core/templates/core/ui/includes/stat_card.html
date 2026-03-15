@@ -1,0 +1,11 @@
+<section class="stat-card card">
+  <h3>{{ card_title }}</h3>
+  <div class="metric-list">
+    {% for label, value in metrics.items %}
+    <div class="metric-row"><span class="chip">{{ label }}</span><strong>{{ value }}</strong></div>
+    {% endfor %}
+  </div>
+  {% if link_href %}
+  <p><a href="{{ link_href }}">{{ link_label }} →</a></p>
+  {% endif %}
+</section>

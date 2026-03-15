@@ -1,0 +1,23 @@
+<div class="section-stack" data-{{ form_attr }}="{{ form_name }}"{% if form_style %} style="{{ form_style }}"{% endif %}>
+  <label class="field-group">
+    <span class="field-label">{{ select_label }}</span>
+    <select class="select" data-field="{{ select_field }}" aria-label="{{ select_aria_label }}">
+      {% for option in select_options %}
+      <option value="{{ option }}" {% if selected_value == option %}selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if fields_include %}
+    {% include fields_include %}
+  {% endif %}
+  <div class="button-row">
+    <button
+      class="button"
+      data-{{ action_attr }}="{{ action_name }}"
+      onclick="{{ onclick_handler }}"
+    >
+      <span class="material-symbols-outlined button-icon" aria-hidden="true">{{ button_icon }}</span>
+      <span>{{ button_label }}</span>
+    </button>
+  </div>
+</div>

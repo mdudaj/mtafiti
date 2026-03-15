@@ -1,0 +1,25 @@
+<div class="toolbar">
+  <div class="muted">{{ toolbar_description }}</div>
+  <form method="get" class="right" aria-label="{{ form_aria_label }}">
+    <label class="field-group">
+      <span class="field-label">{{ first_label }}</span>
+      <select class="select" name="{{ first_name }}">
+        <option value="">{{ first_empty_label }}</option>
+        {% for option in first_options %}
+        <option value="{{ option }}" {% if first_value == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field-group">
+      <span class="field-label">{{ second_label }}</span>
+      <select class="select" name="{{ second_name }}">
+        <option value="">{{ second_empty_label }}</option>
+        {% for option in second_options %}
+        <option value="{{ option }}" {% if second_value == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>{{ submit_label|default:"Apply" }}</span></button>
+    <a class="button secondary" href="{{ clear_url }}">Clear</a>
+  </form>
+</div>

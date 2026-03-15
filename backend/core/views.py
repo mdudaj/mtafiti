@@ -937,6 +937,31 @@ def _project_to_dict(project: Project) -> dict[str, Any]:
     }
 
 
+def _project_option_to_dict(project: Project) -> dict[str, Any]:
+    description_parts = []
+    if project.code:
+        description_parts.append(project.code)
+    if project.institution_ref:
+        description_parts.append(project.institution_ref)
+    return {
+        'value': str(project.id),
+        'label': project.name,
+        'description': ' · '.join(description_parts) or None,
+        'meta': {'status': project.status},
+    }
+
+
+def _ui_project_filter_context(request) -> dict[str, str]:
+    project_id = (request.GET.get('project_id') or '').strip()
+    if not project_id:
+        return {'value': '', 'label': ''}
+    try:
+        project = Project.objects.get(id=project_id)
+    except (ValidationError, Project.DoesNotExist):
+        return {'value': project_id, 'label': project_id}
+    return {'value': str(project.id), 'label': project.name}
+
+
 def _project_membership_to_dict(membership: ProjectMembership) -> dict[str, Any]:
     return {
         'id': str(membership.id),
@@ -1143,6 +1168,178 @@ def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_v
     except ValueError:
         return None
     return min(max(parsed, min_value), max_value)
+
+
+def _search_project_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
+    qs = Project.objects.order_by('-updated_at', 'id')
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(code__icontains=query)
+            | Q(institution_ref__icontains=query)
+        )
+    count = qs.count()
+    results = [_project_option_to_dict(project) for project in qs[offset : offset + limit]]
+    return {'count': count, 'results': results}
+
+
+def _search_print_template_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
+    qs = PrintTemplate.objects.order_by('-updated_at', 'id')
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(template_ref__icontains=query)
+            | Q(output_format__icontains=query)
+        )
+    count = qs.count()
+    results = [
+        {
+            'value': str(template.id),
+            'label': template.name,
+            'description': f'{template.template_ref} · {template.output_format}',
+            'meta': {
+                'template_ref': template.template_ref,
+                'output_format': template.output_format,
+            },
+        }
+        for template in qs[offset : offset + limit]
+    ]
+    return {'count': count, 'results': results}
+
+
+def _search_print_gateway_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
+    qs = PrintGateway.objects.order_by('-updated_at', 'id')
+    if query:
+        qs = qs.filter(
+            Q(display_name__icontains=query)
+            | Q(gateway_ref__icontains=query)
+            | Q(site_ref__icontains=query)
+            | Q(status__icontains=query)
+        )
+    count = qs.count()
+    results = [
+        {
+            'value': gateway.gateway_ref,
+            'label': gateway.display_name,
+            'description': ' · '.join(
+                part for part in [gateway.gateway_ref, gateway.site_ref or None, gateway.status] if part
+            ),
+            'meta': {
+                'gateway_id': str(gateway.id),
+                'status': gateway.status,
+            },
+        }
+        for gateway in qs[offset : offset + limit]
+    ]
+    return {'count': count, 'results': results}
+
+
+def _search_asset_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
+    qs = DataAsset.objects.order_by('-updated_at', 'id')
+    if query:
+        query_lower = query.lower()
+        qs = qs.filter(
+            Q(display_name__icontains=query)
+            | Q(qualified_name__icontains=query)
+            | Q(description__icontains=query)
+            | Q(asset_type__iexact=query)
+            | Q(owner__iexact=query)
+            | Q(tags__contains=[query])
+            | Q(tags__contains=[query_lower])
+            | Q(classifications__contains=[query])
+            | Q(classifications__contains=[query_lower])
+        )
+    count = qs.count()
+    results = [
+        {
+            'value': str(asset.id),
+            'label': asset.display_name,
+            'description': ' · '.join(
+                part for part in [asset.qualified_name, asset.asset_type, asset.owner or None] if part
+            ),
+            'meta': {
+                'qualified_name': asset.qualified_name,
+                'asset_type': asset.asset_type,
+                'owner': asset.owner or None,
+            },
+        }
+        for asset in qs[offset : offset + limit]
+    ]
+    return {'count': count, 'results': results}
+
+
+def _search_workflow_definition_options(
+    *,
+    query: str,
+    limit: int,
+    offset: int,
+) -> dict[str, Any]:
+    qs = WorkflowDefinition.objects.order_by('-updated_at', 'id')
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(description__icontains=query)
+            | Q(domain_ref__icontains=query)
+        )
+    count = qs.count()
+    results = [
+        {
+            'value': str(definition.id),
+            'label': definition.name,
+            'description': ' · '.join(
+                part for part in [definition.domain_ref or None, definition.description or None] if part
+            ),
+            'meta': {
+                'domain_ref': definition.domain_ref or None,
+            },
+        }
+        for definition in qs[offset : offset + limit]
+    ]
+    return {'count': count, 'results': results}
+
+
+UI_MODEL_SELECT_SOURCES = {
+    'projects': _search_project_options,
+    'print_templates': _search_print_template_options,
+    'print_gateways': _search_print_gateway_options,
+    'assets': _search_asset_options,
+    'workflow_definitions': _search_workflow_definition_options,
+}
+
+
+@csrf_exempt
+def ui_model_select_options(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_any_role(
+        request,
+        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+    )
+    if forbidden:
+        return forbidden
+
+    source = (request.GET.get('source') or '').strip()
+    if source not in UI_MODEL_SELECT_SOURCES:
+        return JsonResponse({'error': 'unsupported_source'}, status=400)
+
+    limit = _parse_int_clamped(
+        request.GET.get('limit'),
+        default=20,
+        min_value=1,
+        max_value=100,
+    )
+    offset = _parse_int_clamped(
+        request.GET.get('offset'),
+        default=0,
+        min_value=0,
+        max_value=10000,
+    )
+    if limit is None or offset is None:
+        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+
+    query = (request.GET.get('q') or '').strip()
+    payload = UI_MODEL_SELECT_SOURCES[source](query=query, limit=limit, offset=offset)
+    return JsonResponse({'source': source, **payload})
 
 
 @csrf_exempt
@@ -6656,6 +6853,10 @@ def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
 def _ui_operations_stewardship_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
     can_manage = bool(roles & {'policy.admin', 'tenant.admin'})
+    can_create = bool(roles & {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    can_create_access_requests = bool(
+        roles & {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+    )
     qs = StewardshipItem.objects.order_by('-created_at')
     status_filter = request.GET.get('status')
     if status_filter:
@@ -6692,7 +6893,14 @@ def _ui_operations_stewardship_payload(request) -> dict[str, Any]:
                 allowed_actions.append('reopen')
         item_data['allowed_actions'] = sorted(set(allowed_actions))
         items.append(item_data)
-    return {'items': items, 'capabilities': {'can_manage_stewardship': can_manage}}
+    return {
+        'items': items,
+        'capabilities': {
+            'can_manage_stewardship': can_manage,
+            'can_create_stewardship': can_create,
+            'can_create_access_requests': can_create_access_requests,
+        },
+    }
 
 
 def _ui_operations_orchestration_payload(request) -> dict[str, Any]:
@@ -6707,6 +6915,7 @@ def _ui_operations_orchestration_payload(request) -> dict[str, Any]:
         roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
     )
     can_cancel_runs = bool(roles & {'policy.admin', 'tenant.admin'})
+    can_create_workflow_runs = bool(roles & {'catalog.editor', 'tenant.admin'})
     runs = []
     for item in runs_qs[:100]:
         item_data = _orchestration_run_to_dict(item)
@@ -6727,6 +6936,7 @@ def _ui_operations_orchestration_payload(request) -> dict[str, Any]:
         'capabilities': {
             'can_queue_runs': can_queue_runs,
             'can_cancel_runs': can_cancel_runs,
+            'can_create_workflow_runs': can_create_workflow_runs,
         },
     }
 
@@ -6917,6 +7127,7 @@ def ui_operations_dashboard_page(request):
     )
     if forbidden:
         return forbidden
+    project_filter = _ui_project_filter_context(request)
     return render(
         request,
         'core/ui/operations_dashboard.html',
@@ -6925,7 +7136,8 @@ def ui_operations_dashboard_page(request):
             'active_nav': 'dashboard',
             'payload': _ui_operations_dashboard_payload(request),
             'user_context': _ui_user_context(request),
-            'project_id': request.GET.get('project_id', ''),
+            'project_id': project_filter['value'],
+            'project_filter': project_filter,
             **_ui_feedback_context(request),
         },
     )
@@ -6953,6 +7165,8 @@ def ui_operations_stewardship_page(request):
             'severity_filter': request.GET.get('severity', ''),
             'status_options': StewardshipItem.Status.values,
             'severity_options': StewardshipItem.Severity.values,
+            'item_type_options': StewardshipItem.ItemType.values,
+            'access_type_options': AccessRequest.AccessType.values,
             **_ui_feedback_context(request),
         },
     )
@@ -6968,6 +7182,7 @@ def ui_operations_orchestration_page(request):
     )
     if forbidden:
         return forbidden
+    project_filter = _ui_project_filter_context(request)
     return render(
         request,
         'core/ui/operations_orchestration.html',
@@ -6976,7 +7191,8 @@ def ui_operations_orchestration_page(request):
             'active_nav': 'orchestration',
             'payload': _ui_operations_orchestration_payload(request),
             'user_context': _ui_user_context(request),
-            'project_id': request.GET.get('project_id', ''),
+            'project_id': project_filter['value'],
+            'project_filter': project_filter,
             **_ui_feedback_context(request),
         },
     )
@@ -6992,6 +7208,7 @@ def ui_operations_agent_page(request):
     )
     if forbidden:
         return forbidden
+    project_filter = _ui_project_filter_context(request)
     return render(
         request,
         'core/ui/operations_agent.html',
@@ -7000,7 +7217,8 @@ def ui_operations_agent_page(request):
             'active_nav': 'agent',
             'payload': _ui_operations_agent_payload(request),
             'user_context': _ui_user_context(request),
-            'project_id': request.GET.get('project_id', ''),
+            'project_id': project_filter['value'],
+            'project_filter': project_filter,
             **_ui_feedback_context(request),
         },
     )

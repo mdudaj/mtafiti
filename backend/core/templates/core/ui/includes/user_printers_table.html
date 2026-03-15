@@ -1,0 +1,22 @@
+<thead>
+  <tr>
+    <th>Name</th>
+    <th>Ref</th>
+    <th>Status</th>
+    <th>Action</th>
+  </tr>
+</thead>
+<tbody>
+  {% for gateway in payload.gateways %}
+  <tr>
+    <td>{{ gateway.display_name }}</td>
+    <td>{{ gateway.gateway_ref }}</td>
+    <td><span class="chip">{{ gateway.status }}</span></td>
+    <td>
+      {% include "core/ui/includes/action_form_shell.html" with form_attr="user-action-form" form_name="update-printer-status" select_label="Status" select_field="status" select_aria_label="Printer status action" select_options=payload.gateway_status_options selected_value=gateway.status action_attr="user-action" action_name="printer-status-update" onclick_handler="updateUserPrinterStatus(this, '"|add:gateway.id|add:"')" button_icon="sync" button_label="Save" %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4">{% include "core/ui/includes/empty_state.html" with empty_icon="print_connect" empty_title="No printers configured" empty_description="Add a printer profile above to target print jobs from the workspace." %}</td></tr>
+  {% endfor %}
+</tbody>

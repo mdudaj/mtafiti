@@ -1,0 +1,21 @@
+{% if parent_label or current_label %}
+<nav class="breadcrumb-trail" aria-label="Breadcrumb">
+  <ol class="breadcrumb-list">
+    {% if parent_label %}
+    <li class="breadcrumb-item">
+      {% if parent_url %}<a href="{{ parent_url }}">{{ parent_label }}</a>{% else %}<span>{{ parent_label }}</span>{% endif %}
+    </li>
+    {% endif %}
+    {% if current_label %}
+    <li class="breadcrumb-item breadcrumb-item--current" aria-current="page">
+      <span>{{ current_label }}</span>
+    </li>
+    {% endif %}
+  </ol>
+</nav>
+{% endif %}
+<section class="hero">
+  <div class="hero-kicker">{{ section_label }}</div>
+  <h1>{{ page_title }}</h1>
+  <p>{{ page_summary }}</p>
+</section>

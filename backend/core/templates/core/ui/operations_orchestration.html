@@ -1,74 +1,93 @@
 {% extends base_template %}
 {% block title %}Orchestration Monitor{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Application</div>
-  <h1>Orchestration Monitor</h1>
-  <p>Track workflow catalog entries and runs in a compact admin-style monitor with blue-themed controls.</p>
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Orchestration Monitor" page_summary="Track workflow catalog entries and runs in a compact admin-style monitor with blue-themed controls." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Orchestration" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Filter by project and act on runs directly from the monitor." form_aria_label="Project filter" clear_url="/ui/operations/orchestration" submit_label="Filter" %}
+{% if payload.capabilities.can_create_workflow_runs %}
+<section class="panel" id="workflow-run-create-panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Queue workflow run" panel_description="Search governance workflow definitions and optionally bind a catalog asset as the workflow subject before creating a draft run." %}
+  <div class="section-stack" data-ui-action-form="workflow-run-create">
+    <div class="field-grid field-grid--wide">
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="definition_id" hidden_data_field="definition_id" field_label="Workflow definition" endpoint_url="/api/v1/ui/model-select-options?source=workflow_definitions" placeholder="Search definitions by name, domain, or description" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>
+      <label class="field-group"><span class="field-label">Payload JSON</span><input class="input" data-field="payload" placeholder='payload JSON (optional)' aria-label="Payload JSON"></label>
+    </div>
+    <p class="form-hint">If an asset is selected and manual subject ref is blank, the run will use <code>asset:&lt;id&gt;</code> automatically.</p>
+    <div class="button-row">
+      <button class="button" data-ui-action="workflow-run-create" onclick="createWorkflowRun(this)"><span class="material-symbols-outlined button-icon" aria-hidden="true">playlist_add</span><span>Create draft</span></button>
+    </div>
+  </div>
 </section>
-<div class="toolbar">
-  <div class="muted">Filter by project and act on runs directly from the monitor.</div>
-  <form method="get" class="right" aria-label="Project filter">
-    <label class="field-group">
-      <span class="field-label">Project ID</span>
-      <input class="input" type="text" name="project_id" placeholder="Project ID" value="{{ project_id }}">
-    </label>
-    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>Filter</span></button>
-    <a class="button secondary" href="/ui/operations/orchestration">Clear</a>
-  </form>
-</div>
+{% endif %}
 <div class="cards">
   <section class="panel">
-    <div class="panel-header">
-      <div>
-        <h2 class="panel-title">Workflow catalog</h2>
-        <p class="panel-description">Configured orchestration workflows for the current scope.</p>
-      </div>
-    </div>
+    {% include "core/ui/includes/panel_header.html" with panel_title="Workflow catalog" panel_description="Configured orchestration workflows for the current scope." %}
     <h3>Workflows ({{ payload.workflows|length }})</h3>
     {% for item in payload.workflows %}
       <div>{{ item.name }} <span class="chip">{{ item.status }}</span></div>
     {% empty %}
-      <div class="muted">No workflows</div>
+      {% include "core/ui/includes/empty_state.html" with empty_icon="account_tree" empty_title="No workflows" empty_description="Workflow definitions for the selected scope will appear here once they are configured." %}
     {% endfor %}
   </section>
   <section class="panel">
-    <div class="panel-header">
-      <div>
-        <h2 class="panel-title">Run history</h2>
-        <p class="panel-description">Current and recent runs with quick lifecycle controls.</p>
-      </div>
-    </div>
+    {% include "core/ui/includes/panel_header.html" with panel_title="Run history" panel_description="Current and recent runs with quick lifecycle controls." %}
     <h3>Runs ({{ payload.runs|length }})</h3>
     {% for item in payload.runs %}
       <div>
         {{ item.id }} <span class="chip">{{ item.status }}</span>
         {% if item.allowed_actions %}
-        <div class="section-stack" data-ui-action-form="orchestration" style="margin-top: 8px;">
-          <label class="field-group">
-            <span class="field-label">Action</span>
-            <select class="select" data-field="action" aria-label="Orchestration action">
-              {% for action in item.allowed_actions %}
-              <option value="{{ action }}">{{ action }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <div class="button-row">
-            <button
-              class="button"
-              data-ui-action="orchestration"
-              onclick="submitOrchestrationAction(this, '{{ item.id }}')"
-            >
-              <span class="material-symbols-outlined button-icon" aria-hidden="true">play_arrow</span>
-              <span>Run</span>
-            </button>
-          </div>
-        </div>
+        {% include "core/ui/includes/action_form_shell.html" with form_attr="ui-action-form" form_name="orchestration" form_style="margin-top: 8px;" select_label="Action" select_field="action" select_aria_label="Orchestration action" select_options=item.allowed_actions action_attr="ui-action" action_name="orchestration" onclick_handler="submitOrchestrationAction(this, '"|add:item.id|add:"')" button_icon="play_arrow" button_label="Run" %}
         {% endif %}
       </div>
     {% empty %}
-      <div class="muted">No runs</div>
+      {% include "core/ui/includes/empty_state.html" with empty_icon="play_circle" empty_title="No runs" empty_description="Workflow runs will appear here after execution starts." %}
     {% endfor %}
   </section>
 </div>
+<script>
+  function setWorkflowUiError(message) {
+    const current = new URL(window.location.href);
+    current.searchParams.set("ui_message", message);
+    current.searchParams.set("ui_error", "1");
+    window.location.assign(current.toString());
+  }
+
+  function parseWorkflowJson(raw) {
+    if (!raw.trim()) return {};
+    try {
+      return JSON.parse(raw);
+    } catch (_error) {
+      setWorkflowUiError("payload must be valid JSON object");
+      return null;
+    }
+  }
+
+  function createWorkflowRun(button) {
+    const root = button.closest('[data-ui-action-form="workflow-run-create"]');
+    const definitionId = root.querySelector('[data-field="definition_id"]').value;
+    const assetId = root.querySelector('[data-field="asset_id"]').value;
+    const subjectRefRaw = root.querySelector('[data-field="subject_ref"]').value.trim();
+    const payloadRaw = root.querySelector('[data-field="payload"]').value;
+    if (!definitionId) {
+      setWorkflowUiError("workflow definition is required");
+      return;
+    }
+    const parsedPayload = parseWorkflowJson(payloadRaw);
+    if (parsedPayload === null) return;
+
+    const requestPayload = {
+      definition_id: definitionId,
+      payload: parsedPayload,
+    };
+    if (subjectRefRaw) {
+      requestPayload.subject_ref = subjectRefRaw;
+    } else if (assetId) {
+      requestPayload.subject_ref = `asset:${assetId}`;
+    }
+    edmpUiAction("/api/v1/workflows/runs", requestPayload);
+  }
+</script>
 {% endblock %}

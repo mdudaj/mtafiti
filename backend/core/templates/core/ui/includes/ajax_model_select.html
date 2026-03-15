@@ -1,0 +1,33 @@
+<div
+  class="field-group ajax-model-select"
+  data-ajax-model-select
+  data-endpoint="{{ endpoint_url }}"
+  data-empty-text="{{ empty_text|default:'No matches found' }}"
+>
+  <span class="field-label">{{ field_label }}</span>
+  <input type="hidden" name="{{ field_name }}" value="{{ field_value|default:'' }}"{% if hidden_data_field %} data-field="{{ hidden_data_field }}"{% endif %}>
+  <input
+    class="input ajax-model-select__input"
+    type="text"
+    value="{{ field_display_value|default:'' }}"
+    placeholder="{{ placeholder|default:'' }}"
+    autocomplete="off"
+    spellcheck="false"
+    {% if input_data_field %}data-field="{{ input_data_field }}"{% endif %}
+    aria-autocomplete="list"
+    aria-expanded="false"
+    aria-haspopup="listbox"
+    role="combobox"
+  >
+  <button
+    class="ajax-model-select__clear"
+    type="button"
+    aria-label="Clear {{ field_label }}"
+  >
+    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+  </button>
+  <div class="ajax-model-select__panel" hidden>
+    <div class="ajax-model-select__status muted">Type to search.</div>
+    <div class="ajax-model-select__results" role="listbox"></div>
+  </div>
+</div>

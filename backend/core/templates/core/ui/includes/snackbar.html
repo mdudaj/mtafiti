@@ -1,0 +1,11 @@
+<div
+  class="banner {% if is_error %}err{% else %}ok{% endif %} snackbar"
+  data-snackbar
+  role="status"
+  aria-live="polite"
+>
+  <span>{{ message }}</span>
+  <button class="snackbar-dismiss" type="button" aria-label="Dismiss message">
+    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+  </button>
+</div>

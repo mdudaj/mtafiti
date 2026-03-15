@@ -119,6 +119,7 @@ from core.views import (
     reference_datasets,
     readyz,
     search_assets,
+    ui_model_select_options,
     stewardship_item_transition,
     stewardship_items,
     user_detail,
@@ -397,6 +398,7 @@ urlpatterns = [
     path('api/v1/ingestions', ingestions, name='ingestions'),
     path('api/v1/ingestions/<uuid:ingestion_id>', ingestion_detail, name='ingestion_detail'),
     path('api/v1/search/assets', search_assets, name='search_assets'),
+    path('api/v1/ui/model-select-options', ui_model_select_options, name='ui_model_select_options'),
     path('api/v1/ui/operations/dashboard', ui_operations_dashboard, name='ui_operations_dashboard'),
     path(
         'api/v1/ui/operations/stewardship-workbench',

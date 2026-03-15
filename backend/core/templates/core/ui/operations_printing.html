@@ -1,66 +1,20 @@
 {% extends base_template %}
 {% block title %}Printing Operations{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Application</div>
-  <h1>Printing Operations</h1>
-  <p>Admin-style printing workspace for templates, jobs, and gateways with blue-shaded emphasis on operational actions.</p>
-</section>
-<div class="toolbar">
-  <div class="muted">Manage templates, run test prints, and keep gateway heartbeats current from one workspace.</div>
-  <form method="get" class="right" aria-label="Printing filters">
-    <label class="field-group">
-      <span class="field-label">Job status</span>
-      <select class="select" name="job_status">
-        <option value="">All job statuses</option>
-        {% for option in job_status_options %}
-        <option value="{{ option }}" {% if job_status_filter == option %}selected{% endif %}>{{ option }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field-group">
-      <span class="field-label">Gateway status</span>
-      <select class="select" name="gateway_status">
-        <option value="">All gateway statuses</option>
-        {% for option in gateway_status_options %}
-        <option value="{{ option }}" {% if gateway_status_filter == option %}selected{% endif %}>{{ option }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>Apply</span></button>
-    <a class="button secondary" href="/ui/operations/printing">Clear</a>
-  </form>
-</div>
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Printing Operations" page_summary="Admin-style printing workspace for templates, jobs, and gateways with blue-shaded emphasis on operational actions." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Printing" %}
+{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Manage templates, run test prints, and keep gateway heartbeats current from one workspace." form_aria_label="Printing filters" clear_url="/ui/operations/printing" first_name="job_status" first_label="Job status" first_options=job_status_options first_value=job_status_filter first_empty_label="All job statuses" second_name="gateway_status" second_label="Gateway status" second_options=gateway_status_options second_value=gateway_status_filter second_empty_label="All gateway statuses" submit_label="Apply" %}
 {{ payload.templates|json_script:"printing-templates-data" }}
 
 <div class="cards">
-  <section class="stat-card card">
-    <h3>Jobs</h3>
-    <div class="metric-list">{% for status, count in payload.cards.jobs.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-  </section>
-  <section class="stat-card card">
-    <h3>Gateways</h3>
-    <div class="metric-list">{% for status, count in payload.cards.gateways.items %}
-      <div class="metric-row"><span class="chip">{{ status }}</span><strong>{{ count }}</strong></div>
-    {% endfor %}</div>
-  </section>
-  <section class="stat-card card">
-    <h3>Templates</h3>
-    <div class="metric-list"><div class="metric-row"><span class="chip">count</span><strong>{{ payload.cards.templates }}</strong></div></div>
-  </section>
+  {% include "core/ui/includes/stat_card.html" with card_title="Jobs" metrics=payload.cards.jobs %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Gateways" metrics=payload.cards.gateways %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Templates" count_label="count" count_value=payload.cards.templates %}
 </div>
 
 <div class="section-stack">
 {% if payload.capabilities.can_manage_templates %}
 <section class="panel" id="template-create-panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Define print template</h2>
-      <p class="panel-description">Use scaffolded fields for template identity, output format, and sample payload defaults.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Define print template" panel_description="Use scaffolded fields for template identity, output format, and sample payload defaults." %}
   <div class="section-stack" data-ui-action-form="print-template-create">
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Template name</span><input class="input" data-field="name" placeholder="template name" aria-label="Template name"></label>
@@ -84,21 +38,11 @@
 
 {% if payload.capabilities.can_create_jobs %}
 <section class="panel" id="test-print-panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Run test print</h2>
-      <p class="panel-description">Select a template, destination, and optional payload override before submitting a test job.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Run test print" panel_description="Select a template, destination, and optional payload override before submitting a test job." %}
   <div class="section-stack" data-ui-action-form="print-job-test">
     <div class="field-grid field-grid--wide">
-      <label class="field-group"><span class="field-label">Template</span><select class="select" data-field="template_id" aria-label="Template">
-        <option value="">Select template</option>
-        {% for template in payload.templates %}
-        <option value="{{ template.id }}">{{ template.name }} ({{ template.template_ref }})</option>
-        {% endfor %}
-      </select></label>
-      <label class="field-group"><span class="field-label">Destination</span><input class="input" data-field="destination" placeholder="destination" aria-label="Destination"></label>
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url="/api/v1/ui/model-select-options?source=print_templates" placeholder="Search templates by name, ref, or format" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Destination" endpoint_url="/api/v1/ui/model-select-options?source=print_gateways" placeholder="Search printers by name, ref, or site" %}
     </div>
     <label class="field-group"><span class="field-label">Payload JSON</span><input class="input" data-field="payload" placeholder='payload JSON (optional; defaults to template sample)' aria-label="Payload JSON"></label>
     <p class="form-hint">Leave payload blank to reuse the selected template sample payload.</p>
@@ -111,12 +55,7 @@
 
 {% if payload.capabilities.can_manage_gateways %}
 <section class="panel" id="gateway-create-panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Configure printer</h2>
-      <p class="panel-description">Create or register a printing gateway with status and optional capability metadata.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Configure printer" panel_description="Create or register a printing gateway with status and optional capability metadata." %}
   <div class="section-stack" data-ui-action-form="print-gateway-create">
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Printer ref</span><input class="input" data-field="gateway_ref" placeholder="printer_ref" aria-label="Printer ref"></label>
@@ -139,44 +78,10 @@
 {% endif %}
 </div>
 
-<section class="panel">
-<div class="panel-header">
-  <div>
-    <h2 class="panel-title">Templates</h2>
-    <p class="panel-description">Reference templates currently available for test jobs and operational printing.</p>
-  </div>
-</div>
-<div class="table-wrap"><table>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Ref</th>
-      <th>Format</th>
-      <th>Sample payload</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for template in payload.templates %}
-    <tr>
-      <td>{{ template.name }}</td>
-      <td>{{ template.template_ref }}</td>
-      <td><span class="chip">{{ template.output_format }}</span></td>
-      <td>{{ template.sample_payload }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="4" class="muted">No print templates</td></tr>
-    {% endfor %}
-  </tbody>
-</table></div>
-</section>
+{% include "core/ui/includes/panel_table_shell.html" with panel_title="Templates" panel_description="Reference templates currently available for test jobs and operational printing." table_template="core/ui/includes/operations_printing_templates_table.html" %}
 
 <section class="panel">
-<div class="panel-header">
-  <div>
-    <h2 class="panel-title">Jobs</h2>
-    <p class="panel-description">Transition print jobs through allowed actions with retry and gateway metadata controls.</p>
-  </div>
-</div>
+{% include "core/ui/includes/panel_header.html" with panel_title="Jobs" panel_description="Transition print jobs through allowed actions with retry and gateway metadata controls." %}
 <div class="table-wrap"><table>
   <thead>
     <tr>
@@ -198,49 +103,21 @@
       <td>{{ job.retry_count }}</td>
       <td>
         {% if job.allowed_actions %}
-        <div class="section-stack" data-ui-action-form="print-job">
-          <div class="field-grid">
-            <label class="field-group"><span class="field-label">Action</span><select class="select" data-field="status" aria-label="Print job status action">
-              {% for action in job.allowed_actions %}
-              <option value="{{ action }}">{{ action }}</option>
-              {% endfor %}
-            </select></label>
-            <label class="field-group"><span class="field-label">Retry count</span><input class="input" data-field="retry_count" placeholder="retry_count (optional)" aria-label="Retry count"></label>
-          </div>
-          <div class="field-grid field-grid--wide">
-            <label class="field-group"><span class="field-label">Error message</span><input class="input" data-field="error_message" placeholder="error message (for failed)" aria-label="Error message"></label>
-            <label class="field-group"><span class="field-label">Gateway metadata JSON</span><input class="input" data-field="gateway_metadata" placeholder='gateway metadata JSON' aria-label="Gateway metadata JSON"></label>
-          </div>
-          <div class="button-row">
-            <button
-              class="button"
-              data-ui-action="print-job"
-              onclick="submitPrintJobAction(this, '{{ job.id }}')"
-            >
-              <span class="material-symbols-outlined button-icon" aria-hidden="true">print</span>
-              <span>Run</span>
-            </button>
-          </div>
-        </div>
+        {% include "core/ui/includes/action_form_shell.html" with form_attr="ui-action-form" form_name="print-job" select_label="Action" select_field="status" select_aria_label="Print job status action" select_options=job.allowed_actions fields_include="core/ui/includes/action_fields_print_job.html" action_attr="ui-action" action_name="print-job" onclick_handler="submitPrintJobAction(this, '"|add:job.id|add:"')" button_icon="print" button_label="Run" %}
         {% else %}
         <span class="muted">No actions</span>
         {% endif %}
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">No print jobs</td></tr>
+    <tr><td colspan="6">{% include "core/ui/includes/empty_state.html" with empty_icon="print" empty_title="No print jobs" empty_description="Test prints and production jobs will appear here once they are submitted." %}</td></tr>
     {% endfor %}
   </tbody>
 </table></div>
 </section>
 
 <section class="panel">
-<div class="panel-header">
-  <div>
-    <h2 class="panel-title">Gateways</h2>
-    <p class="panel-description">Track gateway heartbeats and update runtime status or capability metadata.</p>
-  </div>
-</div>
+{% include "core/ui/includes/panel_header.html" with panel_title="Gateways" panel_description="Track gateway heartbeats and update runtime status or capability metadata." %}
 <div class="table-wrap"><table>
   <thead>
     <tr>
@@ -262,37 +139,14 @@
       <td>{{ gateway.last_heartbeat_at|default_if_none:"" }}</td>
       <td>
         {% if payload.capabilities.can_manage_gateways %}
-        <div class="section-stack" data-ui-action-form="print-gateway">
-          <div class="field-grid">
-            <label class="field-group"><span class="field-label">Status</span><select class="select" data-field="status" aria-label="Gateway heartbeat status">
-              {% for option in gateway_status_options %}
-              <option value="{{ option }}" {% if gateway.status == option %}selected{% endif %}>{{ option }}</option>
-              {% endfor %}
-            </select></label>
-            <label class="field-group"><span class="field-label">Version</span><input class="input" data-field="version" placeholder="version (optional)" aria-label="Gateway version"></label>
-          </div>
-          <div class="field-grid field-grid--wide">
-            <label class="field-group"><span class="field-label">Capabilities JSON</span><input class="input" data-field="capabilities" placeholder='capabilities JSON array' aria-label="Gateway capabilities JSON"></label>
-            <label class="field-group"><span class="field-label">Metadata JSON</span><input class="input" data-field="metadata" placeholder='metadata JSON object' aria-label="Gateway metadata JSON"></label>
-          </div>
-          <div class="button-row">
-            <button
-              class="button"
-              data-ui-action="print-gateway"
-              onclick="submitPrintGatewayHeartbeat(this, '{{ gateway.id }}')"
-            >
-              <span class="material-symbols-outlined button-icon" aria-hidden="true">sync</span>
-              <span>Heartbeat</span>
-            </button>
-          </div>
-        </div>
+        {% include "core/ui/includes/action_form_shell.html" with form_attr="ui-action-form" form_name="print-gateway" select_label="Status" select_field="status" select_aria_label="Gateway heartbeat status" select_options=gateway_status_options selected_value=gateway.status fields_include="core/ui/includes/action_fields_print_gateway.html" action_attr="ui-action" action_name="print-gateway" onclick_handler="submitPrintGatewayHeartbeat(this, '"|add:gateway.id|add:"')" button_icon="sync" button_label="Heartbeat" %}
         {% else %}
         <span class="muted">No actions</span>
         {% endif %}
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">No gateways</td></tr>
+    <tr><td colspan="6">{% include "core/ui/includes/empty_state.html" with empty_icon="print_connect" empty_title="No gateways" empty_description="Registered printing gateways will appear here for heartbeat and status updates." %}</td></tr>
     {% endfor %}
   </tbody>
 </table></div>
@@ -387,6 +241,15 @@
       payload: parsedPayload,
     });
   }
+
+  document.querySelectorAll('[data-ui-action-form="print-job-test"] [data-field="template_id"]').forEach((item) => {
+    item.addEventListener('change', () => {
+      const template = printTemplates.find((entry) => entry.id === item.value);
+      const root = item.closest('[data-ui-action-form="print-job-test"]');
+      if (!root || !template) return;
+      root.querySelector('[data-field="payload"]').value = JSON.stringify(template.sample_payload || {});
+    });
+  });
 
   function createPrintGateway(button) {
     const root = button.closest('[data-ui-action-form="print-gateway-create"]');

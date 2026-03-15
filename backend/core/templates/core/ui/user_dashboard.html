@@ -1,41 +1,22 @@
 {% extends "core/ui/user_base.html" %}
 {% block title %}User Workspace{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-kicker">Workspace application</div>
-  <h1>User Workspace</h1>
-  <p>Portal-style printing workspace with blue theme tokens and admin-inspired forms for templates, printers, and test jobs.</p>
-</section>
+{% include "core/ui/includes/page_intro.html" with section_label="Workspace application" page_title="User Workspace" page_summary="Portal-style printing workspace with blue theme tokens and admin-inspired forms for templates, printers, and test jobs." parent_label="Workspace" current_label="Home" %}
 
 <div class="stat-grid">
-  <div class="card"><span class="chip">Templates</span> <strong>{{ payload.cards.templates }}</strong></div>
-  <div class="card"><span class="chip">Printers</span> <strong>{{ payload.cards.printers }}</strong></div>
-  <div class="card"><span class="chip">Recent jobs</span> <strong>{{ payload.cards.recent_jobs }}</strong></div>
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Templates" count_label="count" count_value=payload.cards.templates %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Printers" count_label="count" count_value=payload.cards.printers %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Recent jobs" count_label="count" count_value=payload.cards.recent_jobs %}
 </div>
 
 <section class="panel" id="user-test-print-panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Test print</h2>
-      <p class="panel-description">Submit a print job with template-driven defaults and printer selection.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Test print" panel_description="Submit a print job with template-driven defaults and printer selection." %}
   {% if payload.capabilities.can_submit_print_jobs %}
   {{ payload.templates|json_script:"user-print-templates-data" }}
   <div class="section-stack" data-user-action-form="test-print">
     <div class="field-grid field-grid--wide">
-      <label class="field-group"><span class="field-label">Template</span><select class="select" data-field="template_id" aria-label="Template">
-        <option value="">Select template</option>
-        {% for template in payload.templates %}
-        <option value="{{ template.id }}">{{ template.name }} ({{ template.output_format }})</option>
-        {% endfor %}
-      </select></label>
-      <label class="field-group"><span class="field-label">Printer destination</span><select class="select" data-field="destination" aria-label="Printer destination">
-        <option value="">Select printer</option>
-        {% for gateway in payload.gateways %}
-        <option value="{{ gateway.gateway_ref }}">{{ gateway.display_name }} ({{ gateway.gateway_ref }})</option>
-        {% endfor %}
-      </select></label>
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url="/api/v1/ui/model-select-options?source=print_templates" placeholder="Search templates by name, ref, or format" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Printer destination" endpoint_url="/api/v1/ui/model-select-options?source=print_gateways" placeholder="Search printers by name, ref, or site" %}
     </div>
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Participant prefix</span><input class="input" data-field="participant_prefix" placeholder="participant prefix (e.g. MLTP2-MBY-KWJ-)" aria-label="Participant prefix"></label>
@@ -59,18 +40,13 @@
   </div>
   <p class="form-hint">Default batch: 9 Zebra labels per participant. For A4 PDF, set row batch count (e.g. 5) to repeat each label across a full row.</p>
   {% else %}
-  <div class="muted">No print permissions for this account.</div>
+  {% include "core/ui/includes/empty_state.html" with empty_icon="lock" empty_title="No print permissions" empty_description="This workspace account cannot submit print jobs yet." %}
   {% endif %}
 </section>
 
 {% if payload.capabilities.can_manage_templates %}
 <section class="panel" id="user-template-panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Template designer</h2>
-      <p class="panel-description">Build or preview template content using presets, output format, and example payloads.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Template designer" panel_description="Build or preview template content using presets, output format, and example payloads." %}
   <div class="section-stack" data-user-action-form="create-template">
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Preset</span><select class="select" data-field="preset" aria-label="Template preset">
@@ -98,12 +74,7 @@
 
 {% if payload.capabilities.can_manage_printers %}
 <section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2 class="panel-title">Printer profiles</h2>
-      <p class="panel-description">Register printer gateways and keep their runtime status aligned with portal usage.</p>
-    </div>
-  </div>
+  {% include "core/ui/includes/panel_header.html" with panel_title="Printer profiles" panel_description="Register printer gateways and keep their runtime status aligned with portal usage." %}
   <div class="section-stack" data-user-action-form="create-printer">
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Printer name</span><input class="input" data-field="display_name" placeholder="Printer name" aria-label="Printer name"></label>
@@ -117,78 +88,11 @@
     </div>
     <div class="button-row"><button class="button" data-user-action="create-printer" onclick="createUserPrinter(this)"><span class="material-symbols-outlined button-icon" aria-hidden="true">print_connect</span><span>Add printer</span></button></div>
   </div>
-  <div class="table-wrap"><table style="margin-top: 10px;">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Ref</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for gateway in payload.gateways %}
-      <tr>
-        <td>{{ gateway.display_name }}</td>
-        <td>{{ gateway.gateway_ref }}</td>
-        <td><span class="chip">{{ gateway.status }}</span></td>
-        <td>
-          <div class="section-stack" data-user-action-form="update-printer-status">
-            <label class="field-group"><span class="field-label">Status</span><select class="select" data-field="status" aria-label="Printer status action">
-              <option value="online" {% if gateway.status == 'online' %}selected{% endif %}>online</option>
-              <option value="offline" {% if gateway.status == 'offline' %}selected{% endif %}>offline</option>
-              <option value="degraded" {% if gateway.status == 'degraded' %}selected{% endif %}>degraded</option>
-            </select></label>
-            <div class="button-row"><button class="button" data-user-action="printer-status-update" onclick="updateUserPrinterStatus(this, '{{ gateway.id }}')"><span class="material-symbols-outlined button-icon" aria-hidden="true">sync</span><span>Save</span></button></div>
-          </div>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="4" class="muted">No printers configured</td></tr>
-      {% endfor %}
-    </tbody>
-  </table></div>
+  {% include "core/ui/includes/table_wrap.html" with table_style="margin-top: 10px;" table_template="core/ui/includes/user_printers_table.html" %}
 </section>
 {% endif %}
 
-<section class="panel">
-<div class="panel-header">
-  <div>
-    <h2 class="panel-title">Recent print jobs</h2>
-    <p class="panel-description">Review the latest submitted jobs and download PDF previews when available.</p>
-  </div>
-</div>
-<div class="table-wrap"><table>
-  <thead>
-    <tr>
-      <th>Template</th>
-      <th>Destination</th>
-      <th>Status</th>
-      <th>Updated</th>
-      <th>Preview</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in payload.recent_jobs %}
-    <tr>
-      <td>{{ item.template_ref }}</td>
-      <td>{{ item.destination }}</td>
-      <td><span class="chip">{{ item.status }}</span></td>
-      <td>{{ item.updated_at }}</td>
-      <td>
-        {% if item.output_format == "pdf" %}
-        <a href="/api/v1/printing/jobs/{{ item.id }}/preview.pdf">Download PDF</a>
-        {% else %}
-        <span class="muted">n/a</span>
-        {% endif %}
-      </td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="5" class="muted">No print jobs yet</td></tr>
-    {% endfor %}
-  </tbody>
-</table></div>
-</section>
+{% include "core/ui/includes/panel_table_shell.html" with panel_title="Recent print jobs" panel_description="Review the latest submitted jobs and download PDF previews when available." table_template="core/ui/includes/user_recent_jobs_table.html" %}
 
 <script>
   function userUiError(message) {
