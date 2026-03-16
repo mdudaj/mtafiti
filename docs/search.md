@@ -1,6 +1,6 @@
 # Metadata search design notes
 
-This note describes a minimal, tenant-safe search increment for EDMP metadata.
+This note describes a minimal, tenant-safe search increment for Mtafiti metadata.
 
 ## Goals
 

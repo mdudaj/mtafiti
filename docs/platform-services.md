@@ -1,6 +1,6 @@
 # Platform services design notes
 
-This note captures the required shared services baseline for the EDMP platform on Kubernetes.
+This note captures the required shared services baseline for the Mtafiti platform on Kubernetes.
 
 ## Goals
 
@@ -31,9 +31,9 @@ This note captures the required shared services baseline for the EDMP platform o
 
 ## Implemented scaffold baseline
 
-This scaffold now includes a Helm chart at `deploy/helm/edmp-platform` with:
+This scaffold now includes a Helm chart at `deploy/helm/mtafiti-platform` with:
 
-* templated EDMP backend Deployment + Service
+* templated Mtafiti application Deployment + Service
 * templated worker Deployment
 * templated migration Job (`migrate_schemas --noinput`)
 * templated PostgreSQL StatefulSet + Service
@@ -45,7 +45,7 @@ This scaffold now includes a Helm chart at `deploy/helm/edmp-platform` with:
 Use this as the default packaging baseline:
 
 ```bash
-helm upgrade --install edmp-platform deploy/helm/edmp-platform -n edmp --create-namespace
+helm upgrade --install mtafiti-platform deploy/helm/mtafiti-platform -n edmp --create-namespace
 ```
 
 ## Storage and identity conventions

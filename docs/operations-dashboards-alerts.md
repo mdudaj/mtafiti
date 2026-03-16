@@ -1,6 +1,6 @@
 # Operational dashboards and alert rules
 
-This document defines operator-facing dashboard panels and alert thresholds for EDMP runtime health.
+This document defines operator-facing dashboard panels and alert thresholds for Mtafiti runtime health.
 
 ## Dashboard specification
 

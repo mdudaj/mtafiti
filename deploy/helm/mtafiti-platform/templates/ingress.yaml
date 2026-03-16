@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "edmp-platform.fullname" . }}-backend
+  name: {{ include "mtafiti-platform.fullname" . }}-backend
   labels:
-    {{- include "edmp-platform.labels" . | nindent 4 }}
+    {{- include "mtafiti-platform.labels" . | nindent 4 }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
@@ -17,7 +17,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "edmp-platform.fullname" . }}-backend
+                name: {{ include "mtafiti-platform.fullname" . }}-backend
                 port:
                   number: {{ .Values.backend.servicePort }}
     - host: {{ .Values.ingress.tenantWildcardHost | quote }}
@@ -27,7 +27,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "edmp-platform.fullname" . }}-backend
+                name: {{ include "mtafiti-platform.fullname" . }}-backend
                 port:
                   number: {{ .Values.backend.servicePort }}
 {{- end }}

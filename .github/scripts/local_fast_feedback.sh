@@ -22,7 +22,7 @@ if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 fi
 
-cd backend
+cd src
 if [[ $# -gt 0 ]]; then
   "$PYTHON_BIN" -m pytest -q "$@"
 else

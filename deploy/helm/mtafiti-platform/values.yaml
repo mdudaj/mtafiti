@@ -2,20 +2,20 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/mdudaj/edmp-backend
+  repository: ghcr.io/mdudaj/mtafiti-backend
   tag: latest
   pullPolicy: IfNotPresent
 
 secrets:
-  name: edmp-backend-secrets
+  name: mtafiti-backend-secrets
   celeryBrokerUrlKey: CELERY_BROKER_URL
   rabbitmqUrlKey: RABBITMQ_URL
 
 postgres:
   enabled: true
   serviceName: postgres
-  database: edmp
-  user: edmp
+  database: mtafiti
+  user: mtafiti
   port: 5432
   image: postgres:16.11
   storage:
@@ -80,7 +80,7 @@ platformServices:
     endpoint: http://minio:9000
   keycloak:
     enabled: false
-    issuerUrl: http://keycloak:8080/realms/edmp
+    issuerUrl: http://keycloak:8080/realms/mtafiti
   onlyoffice:
     enabled: false
     endpoint: http://onlyoffice:80

@@ -1,6 +1,6 @@
 # Platform security baseline design notes
 
-This note defines mandatory platform security controls for EDMP runtime and integrations.
+This note defines mandatory platform security controls for Mtafiti runtime and integrations.
 
 ## Goals
 
@@ -33,7 +33,7 @@ This note defines mandatory platform security controls for EDMP runtime and inte
 
 ## Implemented scaffold hardening
 
-Current scaffold implementation adds a concrete baseline in `deploy/helm/edmp-platform`:
+Current scaffold implementation adds a concrete baseline in `deploy/helm/mtafiti-platform`:
 
 * broker connection settings sourced from Kubernetes Secret keys (`CELERY_BROKER_URL`, `RABBITMQ_URL`) instead of plaintext chart templates
 * pod and container security context defaults for backend, worker, and migration job

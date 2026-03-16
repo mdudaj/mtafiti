@@ -1,6 +1,6 @@
 # Data sharing (design notes)
 
-This note captures a lightweight tenant-scoped data sharing model for EDMP so teams can publish governed shares to approved internal or external consumers.
+This note captures a lightweight tenant-scoped data sharing model for Mtafiti so teams can publish governed shares to approved internal or external consumers.
 
 ## Goals
 

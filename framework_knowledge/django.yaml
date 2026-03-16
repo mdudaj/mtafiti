@@ -117,9 +117,9 @@ context_hub:
 repository_fit:
   status: installed
   evidence:
-    - backend/requirements.txt
-    - backend/config/settings.py
-    - backend/config/urls.py
+    - src/requirements.txt
+    - src/config/settings.py
+    - src/config/urls.py
   repository_patterns:
     - "Function-based JsonResponse APIs in core.views"
     - "Django model layer in core.models"

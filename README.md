@@ -1,6 +1,6 @@
-# Enterprise Data Management Platform (EDMP)
+# Mtafiti
 
-This repository contains an initial scaffold for a Kubernetes-native, multi-tenant EDMP backend.
+Mtafiti is a Kubernetes-native, multi-tenant enterprise research data management system.
 
 ## Design docs
 
@@ -58,7 +58,7 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 * [OpenAPI (HTTP surface)](docs/openapi.yaml)
 * [Eventing conventions](docs/events.md)
 
-## Backend (Django + schema-per-tenant)
+## Django application (`src/` + schema-per-tenant)
 
 * Framework: Django
 * Multi-tenancy: `django-tenants` (schema-per-tenant)
@@ -78,12 +78,12 @@ This repository contains an initial scaffold for a Kubernetes-native, multi-tena
 ```bash
 docker compose up -d --wait postgres
 
-cd backend
+cd src
 python -m venv ../.venv
 source ../.venv/bin/activate
 pip install -r requirements-dev.txt
 
-export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
+export POSTGRES_DB=mtafiti_test POSTGRES_USER=mtafiti POSTGRES_PASSWORD=mtafiti POSTGRES_HOST=localhost POSTGRES_PORT=5432
 pytest
 
 # faster local feedback (skip dedicated perf baseline lane)
@@ -96,7 +96,7 @@ pytest -q tests/test_performance_baseline.py
 docker compose down
 ```
 
-Note: Django creates a separate test database (e.g. `test_edmp_test`) during `pytest`, so the configured `POSTGRES_USER` must have the `CREATEDB` privilege (or be a superuser).
+Note: Django creates a separate test database (e.g. `test_mtafiti_test`) during `pytest`, so the configured `POSTGRES_USER` must have the `CREATEDB` privilege (or be a superuser).
 
 ### Generate the knowledge graph
 

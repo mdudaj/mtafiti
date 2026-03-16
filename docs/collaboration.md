@@ -12,7 +12,7 @@ This note defines tenant-scoped collaborative document editing using ONLYOFFICE.
 
 * Collaboration engine: **ONLYOFFICE**.
 * Document binaries stored in tenant-scoped object storage paths (MinIO-compatible).
-* Integration secured with signed JWT payloads between EDMP and ONLYOFFICE.
+* Integration secured with signed JWT payloads between Mtafiti and ONLYOFFICE.
 
 ## Document lifecycle conventions
 

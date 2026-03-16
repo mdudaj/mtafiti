@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edmp-backend
+  name: mtafiti-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: edmp-backend
+      app: mtafiti-backend
   template:
     metadata:
       labels:
-        app: edmp-backend
+        app: mtafiti-backend
     spec:
       containers:
         - name: backend
-          image: ghcr.io/mdudaj/edmp-backend:latest
+          image: ghcr.io/mdudaj/mtafiti-backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
@@ -22,16 +22,16 @@ spec:
             - name: DJANGO_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: edmp-backend-secrets
+                  name: mtafiti-backend-secrets
                   key: DJANGO_SECRET_KEY
             - name: POSTGRES_DB
-              value: edmp
+              value: mtafiti
             - name: POSTGRES_USER
-              value: edmp
+              value: mtafiti
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: edmp-backend-secrets
+                  name: mtafiti-backend-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_HOST
               value: postgres
@@ -57,10 +57,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: edmp-backend
+  name: mtafiti-backend
 spec:
   selector:
-    app: edmp-backend
+    app: mtafiti-backend
   ports:
     - name: http
       port: 80

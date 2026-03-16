@@ -1,19 +1,19 @@
-# EDMP architecture (scaffold)
+# Mtafiti architecture (scaffold)
 
-This repository is intentionally small: it provides a starting point for a **cloud-native, multi-tenant** enterprise data management platform (EDMP) and a place to evolve the platform design alongside runnable code.
+This repository is intentionally small: it provides a starting point for a **cloud-native, multi-tenant** enterprise data management platform (Mtafiti) and a place to evolve the platform design alongside runnable code.
 
 ## Goals
 
 * **Kubernetes-native** deployment (stateless app containers; health probes; configuration via env/secrets).
 * **Strong tenant isolation** via schema-per-tenant (`django-tenants`).
 * **Async-first integration** patterns (event publishing + background tasks).
-* A foundation for future EDMP capabilities: ingestion, governance, catalog, lineage, and policy enforcement.
+* A foundation for future Mtafiti capabilities: ingestion, governance, catalog, lineage, and policy enforcement.
 
 ## Current building blocks in this repo
 
 ### Multi-tenancy (schema-per-tenant)
 
-* Tenant + domain models live in `backend/tenants/`.
+* Tenant + domain models live in `src/tenants/`.
 * `EDMPTenantMiddleware` resolves tenants by hostname; requests without a tenant are rejected.
 * Each tenant gets an isolated PostgreSQL schema (`auto_create_schema = True`).
 * Within a tenant (institution boundary), multiple tenant-local projects can be defined to scope ingestion, connector runs, and orchestration workflows.
@@ -28,7 +28,7 @@ Probe endpoints are explicitly treated as public (no tenant required):
 
 ### Eventing (RabbitMQ topic exchange)
 
-`backend/core/events.py` provides:
+`src/core/events.py` provides:
 
 * `build_event_payload(...)` to standardize event metadata (tenant id, correlation id, timestamp, etc.)
 * `publish_event(...)` to publish JSON events to RabbitMQ via `pika`
@@ -37,13 +37,13 @@ Probe endpoints are explicitly treated as public (no tenant required):
 
 ### Background processing (Celery)
 
-Celery is configured in `backend/config/celery.py` and uses `TenantTask` (`backend/core/celery.py`) to enforce that tasks execute inside a tenant schema context.
+Celery is configured in `src/config/celery.py` and uses `TenantTask` (`src/core/celery.py`) to enforce that tasks execute inside a tenant schema context.
 
 In Kubernetes, run Celery workers as a separate Deployment (see `deploy/k8s/worker.yaml`) so that web and worker scaling can be tuned independently.
 
 ### Metadata catalog (minimal slice)
 
-`backend/core/models.py` includes a `DataAsset` model and a small JSON API:
+`src/core/models.py` includes a `DataAsset` model and a small JSON API:
 
 * `GET /api/v1/assets` (list)
 * `POST /api/v1/assets` (create)
@@ -52,7 +52,7 @@ In Kubernetes, run Celery workers as a separate Deployment (see `deploy/k8s/work
 
 ## Target (evolving) platform shape
 
-This is the intended direction for expanding EDMP capabilities:
+This is the intended direction for expanding Mtafiti capabilities:
 
 * **Control plane / API**: tenant administration, metadata APIs, and integration entrypoints.
 * **Data plane**: ingestion connectors, transformation jobs, and materialization/serving layers.

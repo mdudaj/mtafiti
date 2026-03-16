@@ -1,6 +1,6 @@
 # Data quality design notes
 
-This document captures a minimal, tenant-safe approach for introducing data quality checks into EDMP without expanding runtime complexity too early.
+This document captures a minimal, tenant-safe approach for introducing data quality checks into Mtafiti without expanding runtime complexity too early.
 
 ## Goals
 

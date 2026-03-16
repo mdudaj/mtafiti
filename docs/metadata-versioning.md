@@ -1,6 +1,6 @@
 # Metadata versioning (design notes)
 
-This note captures a lightweight tenant-scoped metadata versioning model for EDMP so asset definitions can evolve with an auditable change history.
+This note captures a lightweight tenant-scoped metadata versioning model for Mtafiti so asset definitions can evolve with an auditable change history.
 
 ## Goals
 

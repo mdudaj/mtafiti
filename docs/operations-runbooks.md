@@ -1,6 +1,6 @@
 # Operational runbooks and incident playbooks
 
-This guide provides first-response procedures for common EDMP operational incidents.
+This guide provides first-response procedures for common Mtafiti operational incidents.
 
 For panel/alert definitions and severity thresholds, see [operations dashboards and alerts](operations-dashboards-alerts.md).
 
@@ -103,7 +103,7 @@ curl -sS http://localhost:8000/api/v1/connectors/runs?status=queued -H "Host: <t
 curl -sS http://localhost:8000/api/v1/orchestration/runs?status=queued -H "Host: <tenant-host>"
 curl -sS http://localhost:8000/metrics | grep -E "edmp_celery_task_executions|edmp_celery_task_duration"
 kubectl get pods -n edmp
-kubectl logs deployment/edmp-platform-worker -n edmp --tail=200
+kubectl logs deployment/mtafiti-platform-worker -n edmp --tail=200
 ```
 
 ### Recovery steps

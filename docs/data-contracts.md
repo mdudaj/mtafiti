@@ -1,6 +1,6 @@
 # Data contracts (design notes)
 
-This document captures a lightweight data contract model for EDMP so producers and consumers can agree on schema and quality expectations per dataset.
+This document captures a lightweight data contract model for Mtafiti so producers and consumers can agree on schema and quality expectations per dataset.
 
 ## Goals
 

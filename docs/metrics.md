@@ -1,6 +1,6 @@
 # Metrics design notes
 
-This note defines a minimal metrics increment for EDMP operations.
+This note defines a minimal metrics increment for Mtafiti operations.
 
 ## Goals
 

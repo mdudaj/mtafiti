@@ -1,6 +1,6 @@
 # Data products (design notes)
 
-This document captures a lightweight data product model for EDMP so domain teams can publish, discover, and govern reusable analytical datasets.
+This document captures a lightweight data product model for Mtafiti so domain teams can publish, discover, and govern reusable analytical datasets.
 
 ## Goals
 

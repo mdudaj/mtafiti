@@ -699,8 +699,8 @@ def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatt
 
     database_layers = [
         {"name": "PostgreSQL", "status": "service", "evidence": "docker-compose.yml"},
-        {"name": settings.get("database_engine", ""), "status": "configured_engine", "evidence": "backend/config/settings.py"},
-        {"name": "psycopg", "status": "driver", "evidence": "backend/requirements.txt"},
+        {"name": settings.get("database_engine", ""), "status": "configured_engine", "evidence": "src/config/settings.py"},
+        {"name": "psycopg", "status": "driver", "evidence": "src/requirements.txt"},
     ]
 
     apis = []
@@ -720,7 +720,7 @@ def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatt
     infrastructure = [
         {"name": "Docker Compose", "status": "configured", "evidence": "docker-compose.yml"},
         {"name": "Kubernetes manifests", "status": "configured", "evidence": "deploy/k8s"},
-        {"name": "Helm chart", "status": "configured", "evidence": "deploy/helm/edmp-platform"},
+        {"name": "Helm chart", "status": "configured", "evidence": "deploy/helm/mtafiti-platform"},
         {"name": "GitHub Actions", "status": "configured", "evidence": ".github/workflows/ci.yml"},
     ]
 
@@ -803,11 +803,11 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
             "inputs": ["url_path", "request_methods", "serializer_logic"],
             "tools": ["Django"],
             "steps": [
-                "Add a path() entry in backend/config/urls.py.",
+                "Add a path() entry in src/config/urls.py.",
                 "Implement request parsing and response shaping in core.views.",
                 "Enforce versioning, tenancy, and role checks consistently.",
             ],
-            "evidence": ["backend/config/urls.py", "backend/core/views.py"],
+            "evidence": ["src/config/urls.py", "src/core/views.py"],
         },
         {
             "id": "implement_schema_per_tenant_api",
@@ -820,7 +820,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                 "Resolve tenants from the Host header with EDMPTenantMiddleware.",
                 "Execute ORM access inside tenant schemas and reject cross-tenant access.",
             ],
-            "evidence": ["backend/tenants/models.py", "backend/config/settings.py", "backend/core/views.py"],
+            "evidence": ["src/tenants/models.py", "src/config/settings.py", "src/core/views.py"],
         },
         {
             "id": "implement_tenant_aware_background_task",
@@ -833,7 +833,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                 "Load tenant-scoped models and perform the state transition.",
                 "Publish completion and audit events with correlation metadata.",
             ],
-            "evidence": ["backend/core/tasks.py", "backend/core/celery.py", "backend/core/events.py"],
+            "evidence": ["src/core/tasks.py", "src/core/celery.py", "src/core/events.py"],
         },
     ]
 
@@ -850,7 +850,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                     "Expose create/list/detail/transition endpoints under /api/v1/workflows.",
                     "Apply role checks and tenant-scoped task visibility rules.",
                 ],
-                "evidence": ["backend/core/models.py", "backend/core/views.py", "backend/tests/test_workflow_ui_api.py"],
+                "evidence": ["src/core/models.py", "src/core/views.py", "src/tests/test_workflow_ui_api.py"],
             }
         )
 
@@ -867,7 +867,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                     "Return summary widgets and allowed actions for each workbench item.",
                     "Preserve tenant scoping so future server-rendered dashboards stay isolated.",
                 ],
-                "evidence": ["docs/workflow-ui.md", "backend/core/views.py"],
+                "evidence": ["docs/workflow-ui.md", "src/core/views.py"],
             }
         )
 
@@ -884,7 +884,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                     "Expose query and mutation APIs for lineage traversal.",
                     "Attach properties and metadata needed for downstream reasoning.",
                 ],
-                "evidence": ["backend/core/models.py", "docs/lineage.md"],
+                "evidence": ["src/core/models.py", "docs/lineage.md"],
             }
         )
 
@@ -901,7 +901,7 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
                     "Expose invitation and lifecycle APIs for member operations.",
                     "Emit notification and audit data for role or status changes.",
                 ],
-                "evidence": ["backend/core/models.py", "backend/core/views.py"],
+                "evidence": ["src/core/models.py", "src/core/views.py"],
             }
         )
 
@@ -1053,9 +1053,9 @@ def build_framework_knowledge(root: Path, settings: dict[str, Any]) -> dict[str,
             repository_fit = {
                 "status": "installed",
                 "evidence": [
-                    "backend/requirements.txt",
-                    "backend/config/settings.py",
-                    "backend/config/urls.py",
+                    "src/requirements.txt",
+                    "src/config/settings.py",
+                    "src/config/urls.py",
                 ],
                 "repository_patterns": [
                     "Function-based JsonResponse APIs in core.views",
@@ -1219,7 +1219,7 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
     for tool_name, description, profile_key in [
         ("Docker Compose", "Local service orchestration for PostgreSQL and RabbitMQ.", "docker-compose"),
         ("Kubernetes", "Deployment manifests for backend, worker, ingress, and supporting services.", "kubernetes"),
-        ("Helm", "Release packaging for the edmp-platform chart.", "helm"),
+        ("Helm", "Release packaging for the mtafiti-platform chart.", "helm"),
         ("GitHub Actions", "Repository CI/CD automation and drift gates.", "github-actions"),
         ("Context Hub", "External API documentation retrieval for coding agents via chub search/get.", None),
     ]:
@@ -1373,13 +1373,13 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
                 target_type = "framework"
             edges.append(edge("uses", skill_id, f"{target_type}:{target_slug}"))
         for evidence in skill["evidence"]:
-            if evidence.startswith("backend/core/views.py"):
+            if evidence.startswith("src/core/views.py"):
                 edges.append(edge("implements", "module:core_views", skill_id))
-            elif evidence.startswith("backend/core/models.py"):
+            elif evidence.startswith("src/core/models.py"):
                 edges.append(edge("implements", "module:core_models", skill_id))
-            elif evidence.startswith("backend/core/tasks.py"):
+            elif evidence.startswith("src/core/tasks.py"):
                 edges.append(edge("implements", "module:core_tasks", skill_id))
-            elif evidence.startswith("backend/tenants/models.py"):
+            elif evidence.startswith("src/tenants/models.py"):
                 edges.append(edge("implements", "module:tenants_models", skill_id))
 
     for framework_id in ["framework:django", "framework:django-tenants", "framework:celery"]:

@@ -1,10 +1,10 @@
 # Performance and scale baseline
 
-This baseline defines repeatable performance checks for API and worker paths in the EDMP scaffold.
+This baseline defines repeatable performance checks for API and worker paths in the Mtafiti scaffold.
 
 ## Load profiles
 
-The baseline uses deterministic local/CI profiles in `backend/tests/test_performance_baseline.py`:
+The baseline uses deterministic local/CI profiles in `src/tests/test_performance_baseline.py`:
 
 1. **API health profile**
    * 40x `GET /healthz` requests.
@@ -37,8 +37,8 @@ These thresholds are enforced by tests and are intended as guardrails against re
 
 ```bash
 docker compose up -d --wait postgres
-cd backend
-POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432 \
+cd src
+POSTGRES_DB=mtafiti_test POSTGRES_USER=mtafiti POSTGRES_PASSWORD=mtafiti POSTGRES_HOST=localhost POSTGRES_PORT=5432 \
   ../.venv/bin/pytest -q tests/test_performance_baseline.py
 ```
 

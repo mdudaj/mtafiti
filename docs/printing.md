@@ -10,8 +10,8 @@ This note defines tenant-safe label printing using a gateway-based architecture.
 
 ## Architecture contract
 
-* EDMP cluster never connects directly to site printers.
-* Print jobs are requested in EDMP, then consumed and dispatched by a print gateway.
+* Mtafiti cluster never connects directly to site printers.
+* Print jobs are requested in Mtafiti, then consumed and dispatched by a print gateway.
 * RabbitMQ is the system transport for print lifecycle events.
 
 ## Print lifecycle
@@ -22,11 +22,11 @@ This note defines tenant-safe label printing using a gateway-based architecture.
 4. Event is published (for example: `<tenant_id>.print.requested`).
 5. Gateway pulls/subscribes and dispatches to local printer.
 6. Gateway reports status (`completed`, `failed`, `retrying`).
-7. EDMP finalizes audit record and job status.
+7. Mtafiti finalizes audit record and job status.
 
 ## Gateway responsibilities
 
-* Maintain secure outbound channel from site network to EDMP.
+* Maintain secure outbound channel from site network to Mtafiti.
 * Retry transient failures with bounded retry policy.
 * Maintain offline queue while upstream is unavailable.
 * Attach printer/driver metadata in completion/failure reports.
@@ -62,7 +62,7 @@ Events:
 
 ## Standardized rendering stack (selected)
 
-To support both Zebra and A4 label workflows with one predictable toolchain, EDMP standardizes on:
+To support both Zebra and A4 label workflows with one predictable toolchain, Mtafiti standardizes on:
 
 * `qrcode` for QR payload generation
 * `reportlab` for PDF drawing/composition
@@ -85,7 +85,7 @@ Zebra template rendering also exposes derived `[[line1]]` and `[[line2]]` tokens
 
 Default participant-batch mode is also supported for Zebra jobs:
 * provide `payload.participant_prefix`, `payload.range_start`, and `payload.range_end`
-* EDMP auto-generates 9 labels per participant ID (`base`, `BLD-6mls`, `BLD-4mls`, `BLD-2mls`, `PLM1`, `PLM2`, `BLD-RNA`, `NA1`, `NA2`)
+* Mtafiti auto-generates 9 labels per participant ID (`base`, `BLD-6mls`, `BLD-4mls`, `BLD-2mls`, `PLM1`, `PLM2`, `BLD-RNA`, `NA1`, `NA2`)
 * optional `payload.serial_position = "at_end"` moves serial to the tail of each label
 * optional `payload.label_suffixes` lets you override variants (use `"base"` for the root label)
 
@@ -107,7 +107,7 @@ Default templates are provided for user selection in `/app`:
 For deployments that want persisted DB records, load fixture seed data:
 
 ```bash
-cd backend
+cd src
 python manage.py loaddata core/fixtures/printing_templates.json
 ```
 

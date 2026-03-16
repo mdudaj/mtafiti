@@ -104,9 +104,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DB_NAME = os.environ.get('POSTGRES_DB', 'edmp')
-DB_USER = os.environ.get('POSTGRES_USER', 'edmp')
-DB_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'edmp')
+DB_NAME = os.environ.get('POSTGRES_DB', 'mtafiti')
+DB_USER = os.environ.get('POSTGRES_USER', 'mtafiti')
+DB_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'mtafiti')
 DB_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
 DB_PORT = int(os.environ.get('POSTGRES_PORT', '5432'))
 

@@ -32,13 +32,13 @@ spec:
             - containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: edmp
+              value: mtafiti
             - name: POSTGRES_USER
-              value: edmp
+              value: mtafiti
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: edmp-backend-secrets
+                  name: mtafiti-backend-secrets
                   key: POSTGRES_PASSWORD
           volumeMounts:
             - name: data
@@ -61,4 +61,3 @@ spec:
         resources:
           requests:
             storage: 10Gi
-

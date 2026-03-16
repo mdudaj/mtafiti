@@ -1,6 +1,6 @@
 # Workflow engine and UI design notes
 
-This note defines how EDMP uses Viewflow and django-material as the Django-native workflow UI stack.
+This note defines how Mtafiti uses Viewflow and django-material as the Django-native workflow UI stack.
 
 ## Goals
 
@@ -139,7 +139,7 @@ UI-facing test scenarios:
 
 ## Operational UI API support (implemented scaffold increment)
 
-To enable UI implementation with a stable backend contract, EDMP now provides UI-focused operational endpoints:
+To enable UI implementation with a stable backend contract, Mtafiti now provides UI-focused operational endpoints:
 
 * `GET /api/v1/ui/operations/dashboard`
   * returns summary cards for stewardship/workflow/orchestration/agent statuses

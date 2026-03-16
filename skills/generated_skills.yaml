@@ -16,7 +16,7 @@ skills:
       - "Preserve tenant scoping so future server-rendered dashboards stay isolated."
     evidence:
       - docs/workflow-ui.md
-      - backend/core/views.py
+      - src/core/views.py
   -
     id: define_django_json_api_endpoint
     name: "Define Django JSON API Endpoint"
@@ -28,12 +28,12 @@ skills:
     tools:
       - Django
     steps:
-      - "Add a path() entry in backend/config/urls.py."
+      - "Add a path() entry in src/config/urls.py."
       - "Implement request parsing and response shaping in core.views."
       - "Enforce versioning, tenancy, and role checks consistently."
     evidence:
-      - backend/config/urls.py
-      - backend/core/views.py
+      - src/config/urls.py
+      - src/core/views.py
   -
     id: implement_schema_per_tenant_api
     name: "Implement Schema-per-Tenant API"
@@ -50,9 +50,9 @@ skills:
       - "Resolve tenants from the Host header with EDMPTenantMiddleware."
       - "Execute ORM access inside tenant schemas and reject cross-tenant access."
     evidence:
-      - backend/tenants/models.py
-      - backend/config/settings.py
-      - backend/core/views.py
+      - src/tenants/models.py
+      - src/config/settings.py
+      - src/core/views.py
   -
     id: implement_tenant_aware_background_task
     name: "Implement Tenant-aware Background Task"
@@ -69,9 +69,9 @@ skills:
       - "Load tenant-scoped models and perform the state transition."
       - "Publish completion and audit events with correlation metadata."
     evidence:
-      - backend/core/tasks.py
-      - backend/core/celery.py
-      - backend/core/events.py
+      - src/core/tasks.py
+      - src/core/celery.py
+      - src/core/events.py
   -
     id: implement_workflow_lifecycle
     name: "Implement Workflow Lifecycle"
@@ -87,9 +87,9 @@ skills:
       - "Expose create/list/detail/transition endpoints under /api/v1/workflows."
       - "Apply role checks and tenant-scoped task visibility rules."
     evidence:
-      - backend/core/models.py
-      - backend/core/views.py
-      - backend/tests/test_workflow_ui_api.py
+      - src/core/models.py
+      - src/core/views.py
+      - src/tests/test_workflow_ui_api.py
   -
     id: manage_project_membership_lifecycle
     name: "Manage Project Membership Lifecycle"
@@ -105,8 +105,8 @@ skills:
       - "Expose invitation and lifecycle APIs for member operations."
       - "Emit notification and audit data for role or status changes."
     evidence:
-      - backend/core/models.py
-      - backend/core/views.py
+      - src/core/models.py
+      - src/core/views.py
   -
     id: model_lineage_graph_edges
     name: "Model Lineage Graph Edges"
@@ -122,7 +122,7 @@ skills:
       - "Expose query and mutation APIs for lineage traversal."
       - "Attach properties and metadata needed for downstream reasoning."
     evidence:
-      - backend/core/models.py
+      - src/core/models.py
       - docs/lineage.md
   -
     id: plan_viewflow_material_workflow_ui

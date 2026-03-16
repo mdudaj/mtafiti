@@ -1,6 +1,6 @@
 # API change communication and deprecation checklist
 
-This checklist standardizes how EDMP communicates API changes so client teams can adopt updates without surprises.
+This checklist standardizes how Mtafiti communicates API changes so client teams can adopt updates without surprises.
 
 ## When to run this checklist
 
@@ -17,7 +17,7 @@ Run this checklist for any API change that affects:
    * Update `docs/openapi.yaml` in the same change.
    * Ensure the OpenAPI drift gate passes in CI.
 2. **Contract safety tests**
-   * Add or update contract regression tests under `backend/tests/test_api_versioning_contracts.py`.
+   * Add or update contract regression tests under `src/tests/test_api_versioning_contracts.py`.
    * Cover critical stable response fields for affected endpoints.
 3. **Client-facing release notes**
    * Describe what changed, why, and who is affected.

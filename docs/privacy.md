@@ -1,6 +1,6 @@
 # Data privacy management (design note)
 
-This note defines a privacy-focused increment for EDMP centered on tenant-scoped handling of lawful basis, consent state, and privacy actions across metadata and governance flows.
+This note defines a privacy-focused increment for Mtafiti centered on tenant-scoped handling of lawful basis, consent state, and privacy actions across metadata and governance flows.
 
 ## Goals
 

@@ -1,6 +1,6 @@
-# EDMP events (design scaffold)
+# Mtafiti events (design scaffold)
 
-This repository includes a small, optional domain-event publisher (`backend/core/events.py`) to support an **async-first** platform design.
+This repository includes a small, optional domain-event publisher (`src/core/events.py`) to support an **async-first** platform design.
 
 If `RABBITMQ_URL` is not configured, event publishing is a **no-op** (so local/dev and tests can run without a broker).
 
@@ -48,7 +48,7 @@ Event payloads are validated before publish. Validation covers:
   * `agent.run.*`
 * audit payload shape for all `audit.*` events (`action`, `resource_type`, `resource_id`, `details`).
 
-Regression tests in `backend/tests/test_event_payload.py` and `backend/tests/test_event_schema_gates.py` act as CI gates for schema conformance.
+Regression tests in `src/tests/test_event_payload.py` and `src/tests/test_event_schema_gates.py` act as CI gates for schema conformance.
 
 ## Configuration
 

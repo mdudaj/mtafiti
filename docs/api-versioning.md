@@ -1,6 +1,6 @@
 # API versioning and deprecation policy
 
-EDMP keeps stable APIs under `/api/v1/...` and treats `v1` as the current compatibility baseline.
+Mtafiti keeps stable APIs under `/api/v1/...` and treats `v1` as the current compatibility baseline.
 
 ## Versioning strategy
 
@@ -17,7 +17,7 @@ EDMP keeps stable APIs under `/api/v1/...` and treats `v1` as the current compat
 
 ## Compatibility checks
 
-* Contract regression tests in `backend/tests/test_api_versioning_contracts.py` protect critical response keys for stable endpoints.
+* Contract regression tests in `src/tests/test_api_versioning_contracts.py` protect critical response keys for stable endpoints.
 * OpenAPI drift checks in `.github/scripts/check_openapi_contract.py` fail CI when critical implemented routes or schemas are missing from `docs/openapi.yaml`.
 * Tests also enforce that unsupported `X-API-Version` values are rejected with `unsupported_api_version`.
 

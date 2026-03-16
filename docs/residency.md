@@ -1,6 +1,6 @@
 # Data residency controls (design notes)
 
-This document defines a lightweight tenant-scoped residency model so EDMP can enforce where governed metadata and processing outputs are allowed to persist.
+This document defines a lightweight tenant-scoped residency model so Mtafiti can enforce where governed metadata and processing outputs are allowed to persist.
 
 ## Goals
 

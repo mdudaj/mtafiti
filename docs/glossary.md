@@ -1,6 +1,6 @@
 # Business glossary (design notes)
 
-This document captures a lightweight business glossary model for EDMP so teams can define shared business terms and map them to technical assets.
+This document captures a lightweight business glossary model for Mtafiti so teams can define shared business terms and map them to technical assets.
 
 ## Goals
 

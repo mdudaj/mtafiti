@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: EDMP HTTP API (scaffold)
+  title: Mtafiti HTTP API (scaffold)
   version: 0.1.0
   description: |
-    This is a lightweight OpenAPI description of the current EDMP backend scaffold.
+    This is a lightweight OpenAPI description of the current Mtafiti application scaffold.
 
     **Multi-tenancy note**: Tenant-scoped endpoints (e.g. `/api/v1/assets`) are resolved by the request `Host`
     header via `EDMPTenantMiddleware`. Control-plane endpoints (e.g. `/api/v1/tenants`) bypass tenant resolution.

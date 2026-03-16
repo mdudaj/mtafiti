@@ -269,7 +269,7 @@ def test_ui_operations_html_pages_fallback_when_material_base_missing():
     client = Client()
     dashboard = client.get("/ui/operations/dashboard", HTTP_HOST=host)
     assert dashboard.status_code == 200
-    assert b"EDMP Operations" in dashboard.content
+    assert b"Mtafiti Operations" in dashboard.content
 
 
 @pytest.mark.django_db(transaction=True)

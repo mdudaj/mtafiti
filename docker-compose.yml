@@ -2,18 +2,18 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: edmp_test
-      POSTGRES_USER: edmp
-      POSTGRES_PASSWORD: edmp
+      POSTGRES_DB: mtafiti_test
+      POSTGRES_USER: mtafiti
+      POSTGRES_PASSWORD: mtafiti
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edmp -d edmp_test"]
+      test: ["CMD-SHELL", "pg_isready -U mtafiti -d mtafiti_test"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
-      - edmp-postgres-data:/var/lib/postgresql/data
+      - mtafiti-postgres-data:/var/lib/postgresql/data
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -26,8 +26,8 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - edmp-rabbitmq-data:/var/lib/rabbitmq
+      - mtafiti-rabbitmq-data:/var/lib/rabbitmq
 
 volumes:
-  edmp-postgres-data:
-  edmp-rabbitmq-data:
+  mtafiti-postgres-data:
+  mtafiti-rabbitmq-data:

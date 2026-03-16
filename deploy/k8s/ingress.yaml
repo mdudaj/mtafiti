@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: edmp-backend
+  name: mtafiti-backend
 spec:
   rules:
     # Control-plane hostname (tenant admin APIs).
@@ -12,7 +12,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: edmp-backend
+                name: mtafiti-backend
                 port:
                   number: 80
     # Tenant host routing (schema-per-tenant is resolved from Host header).
@@ -23,7 +23,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: edmp-backend
+                name: mtafiti-backend
                 port:
                   number: 80
 

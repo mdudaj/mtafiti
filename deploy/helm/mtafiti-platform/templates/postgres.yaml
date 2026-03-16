@@ -4,11 +4,11 @@ kind: Service
 metadata:
   name: {{ .Values.postgres.serviceName }}
   labels:
-    {{- include "edmp-platform.labels" . | nindent 4 }}
+    {{- include "mtafiti-platform.labels" . | nindent 4 }}
 spec:
   selector:
     app.kubernetes.io/component: postgres
-    {{- include "edmp-platform.selectorLabels" . | nindent 4 }}
+    {{- include "mtafiti-platform.selectorLabels" . | nindent 4 }}
   ports:
     - name: postgres
       port: {{ .Values.postgres.port }}
@@ -17,21 +17,21 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "edmp-platform.fullname" . }}-postgres
+  name: {{ include "mtafiti-platform.fullname" . }}-postgres
   labels:
-    {{- include "edmp-platform.labels" . | nindent 4 }}
+    {{- include "mtafiti-platform.labels" . | nindent 4 }}
 spec:
   serviceName: {{ .Values.postgres.serviceName }}
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/component: postgres
-      {{- include "edmp-platform.selectorLabels" . | nindent 6 }}
+      {{- include "mtafiti-platform.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         app.kubernetes.io/component: postgres
-        {{- include "edmp-platform.selectorLabels" . | nindent 8 }}
+        {{- include "mtafiti-platform.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: postgres

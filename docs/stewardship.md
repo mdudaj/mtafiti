@@ -7,7 +7,7 @@ Define a lightweight tenant-scoped stewardship model so governance users can tri
 ## Scope
 
 * In scope:
-  * Stewardship work items generated from existing EDMP domains (quality, contracts, retention, glossary, master data).
+  * Stewardship work items generated from existing Mtafiti domains (quality, contracts, retention, glossary, master data).
   * Assignment, status tracking, due dates, and resolution metadata.
   * Event conventions for work item lifecycle updates.
 * Out of scope (for this increment):

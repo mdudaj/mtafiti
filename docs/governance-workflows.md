@@ -1,6 +1,6 @@
 # Governance workflow design notes
 
-This note defines a governance-depth increment for EDMP focused on policy lifecycle workflows and stronger classification controls.
+This note defines a governance-depth increment for Mtafiti focused on policy lifecycle workflows and stronger classification controls.
 
 ## Implemented baseline
 

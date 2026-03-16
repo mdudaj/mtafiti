@@ -18,7 +18,7 @@ This document will define the tenant-aware EDCS system exposed at:
 
 ## Integration contracts (to be detailed)
 
-- Shared identity and tenant context from EDMP platform
+- Shared identity and tenant context from Mtafiti platform
 - Interoperability with ODK/REDCap-related platform services
 - Eventing, exports, and downstream data product hooks
 

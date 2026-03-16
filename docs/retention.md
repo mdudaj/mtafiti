@@ -1,6 +1,6 @@
 # Data retention & lifecycle design notes
 
-This document captures a minimal design for tenant-scoped retention controls so EDMP can enforce predictable data and metadata lifecycles.
+This document captures a minimal design for tenant-scoped retention controls so Mtafiti can enforce predictable data and metadata lifecycles.
 
 ## Goals
 

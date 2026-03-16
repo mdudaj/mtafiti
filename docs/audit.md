@@ -1,6 +1,6 @@
 # Audit events design notes
 
-This note defines a minimal, tenant-safe audit increment for EDMP.
+This note defines a minimal, tenant-safe audit increment for Mtafiti.
 
 ## Goals
 

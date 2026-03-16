@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}EDMP Workspace{% endblock %}</title>
+    <title>{% block title %}Mtafiti Workspace{% endblock %}</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" />
     <style>
       :root {
@@ -446,9 +446,9 @@
           </div>
         </div>
         <div class="brand-lockup">
-          <div class="brand-mark">ED</div>
+          <div class="brand-mark">MT</div>
           <div class="brand-copy">
-            <div class="brand">EDMP Workspace</div>
+            <div class="brand">Mtafiti Workspace</div>
             <div class="brand-subtitle">Portal patterns tuned for admin-style workflows and blue-tinted theme tokens.</div>
           </div>
         </div>
@@ -498,7 +498,7 @@
         const layout = document.querySelector('[data-ui-shell="workspace"]');
         const toggle = document.querySelector('[data-sidebar-toggle]');
         if (!layout || !toggle) return;
-        const storageKey = 'edmp-workspace-sidebar-collapsed';
+        const storageKey = 'mtafiti-workspace-sidebar-collapsed';
         const setCollapsed = (collapsed) => {
           layout.dataset.sidebarCollapsed = collapsed ? 'true' : 'false';
           toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');

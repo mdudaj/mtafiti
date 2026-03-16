@@ -1,6 +1,6 @@
 # Agentic AI execution design notes
 
-This note defines controls for tenant-safe agentic AI workflows in EDMP.
+This note defines controls for tenant-safe agentic AI workflows in Mtafiti.
 
 ## Goals
 

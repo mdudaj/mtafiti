@@ -61,11 +61,11 @@ EnvironmentInventory:
     -
       name: django_tenants.postgresql_backend
       status: configured_engine
-      evidence: backend/config/settings.py
+      evidence: src/config/settings.py
     -
       name: psycopg
       status: driver
-      evidence: backend/requirements.txt
+      evidence: src/requirements.txt
   services:
     -
       name: backend
@@ -647,7 +647,7 @@ EnvironmentInventory:
     -
       name: "Helm chart"
       status: configured
-      evidence: deploy/helm/edmp-platform
+      evidence: deploy/helm/mtafiti-platform
     -
       name: "GitHub Actions"
       status: configured
@@ -657,7 +657,7 @@ EnvironmentInventory:
       name: docs-gate
       status: configured
     -
-      name: backend-tests
+      name: src-tests
       status: configured
     -
       name: performance-baseline-tests
@@ -665,36 +665,36 @@ EnvironmentInventory:
   internal_modules:
     -
       name: config.__init__
-      path: backend/config/__init__.py
+      path: src/config/__init__.py
       imports:
         - config.celery
     -
       name: config.asgi
-      path: backend/config/asgi.py
+      path: src/config/asgi.py
       imports:
         - django.core.asgi
         - os
     -
       name: config.celery
-      path: backend/config/celery.py
+      path: src/config/celery.py
       imports:
         - celery
         - os
     -
       name: config.settings
-      path: backend/config/settings.py
+      path: src/config/settings.py
       imports:
         - importlib.util
         - os
         - pathlib
     -
       name: config.settings_test
-      path: backend/config/settings_test.py
+      path: src/config/settings_test.py
       imports:
         - config.settings
     -
       name: config.urls
-      path: backend/config/urls.py
+      path: src/config/urls.py
       imports:
         - core.views
         - django.contrib
@@ -702,28 +702,28 @@ EnvironmentInventory:
         - tenants.views
     -
       name: config.wsgi
-      path: backend/config/wsgi.py
+      path: src/config/wsgi.py
       imports:
         - django.core.wsgi
         - os
     -
       name: core.__init__
-      path: backend/core/__init__.py
+      path: src/core/__init__.py
       imports:
         []
     -
       name: core.admin
-      path: backend/core/admin.py
+      path: src/core/admin.py
       imports:
         - django.contrib
     -
       name: core.apps
-      path: backend/core/apps.py
+      path: src/core/apps.py
       imports:
         - django.apps
     -
       name: core.celery
-      path: backend/core/celery.py
+      path: src/core/celery.py
       imports:
         - __future__
         - celery
@@ -733,7 +733,7 @@ EnvironmentInventory:
         - time
     -
       name: core.events
-      path: backend/core/events.py
+      path: src/core/events.py
       imports:
         - core.logging
         - datetime
@@ -745,7 +745,7 @@ EnvironmentInventory:
         - uuid
     -
       name: core.identity
-      path: backend/core/identity.py
+      path: src/core/identity.py
       imports:
         - base64
         - django.http
@@ -756,7 +756,7 @@ EnvironmentInventory:
         - time
     -
       name: core.logging
-      path: backend/core/logging.py
+      path: src/core/logging.py
       imports:
         - contextvars
         - datetime
@@ -764,13 +764,13 @@ EnvironmentInventory:
         - logging
     -
       name: core.metrics
-      path: backend/core/metrics.py
+      path: src/core/metrics.py
       imports:
         - prometheus_client
         - time
     -
       name: core.middleware
-      path: backend/core/middleware.py
+      path: src/core/middleware.py
       imports:
         - core.identity
         - core.logging
@@ -778,13 +778,13 @@ EnvironmentInventory:
         - uuid
     -
       name: core.models
-      path: backend/core/models.py
+      path: src/core/models.py
       imports:
         - django.db
         - uuid
     -
       name: core.notifications
-      path: backend/core/notifications.py
+      path: src/core/notifications.py
       imports:
         - __future__
         - core.models
@@ -796,7 +796,7 @@ EnvironmentInventory:
         - json
     -
       name: core.printing_renderers
-      path: backend/core/printing_renderers.py
+      path: src/core/printing_renderers.py
       imports:
         - __future__
         - base64
@@ -805,7 +805,7 @@ EnvironmentInventory:
         - typing
     -
       name: core.tasks
-      path: backend/core/tasks.py
+      path: src/core/tasks.py
       imports:
         - celery
         - core.celery
@@ -817,12 +817,12 @@ EnvironmentInventory:
         - re
     -
       name: core.tests
-      path: backend/core/tests.py
+      path: src/core/tests.py
       imports:
         - django.test
     -
       name: core.views
-      path: backend/core/views.py
+      path: src/core/views.py
       imports:
         - base64
         - binascii
@@ -834,23 +834,23 @@ EnvironmentInventory:
         - core.printing_renderers
     -
       name: tenants.__init__
-      path: backend/tenants/__init__.py
+      path: src/tenants/__init__.py
       imports:
         []
     -
       name: tenants.admin
-      path: backend/tenants/admin.py
+      path: src/tenants/admin.py
       imports:
         - django.contrib
         - tenants.models
     -
       name: tenants.apps
-      path: backend/tenants/apps.py
+      path: src/tenants/apps.py
       imports:
         - django.apps
     -
       name: tenants.middleware
-      path: backend/tenants/middleware.py
+      path: src/tenants/middleware.py
       imports:
         - django.db
         - django.db.models
@@ -860,7 +860,7 @@ EnvironmentInventory:
         - tenants.models
     -
       name: tenants.models
-      path: backend/tenants/models.py
+      path: src/tenants/models.py
       imports:
         - django.db
         - django_tenants.models
@@ -868,13 +868,13 @@ EnvironmentInventory:
         - urllib.parse
     -
       name: tenants.tests
-      path: backend/tenants/tests.py
+      path: src/tenants/tests.py
       imports:
         - django.test
         - tenants.models
     -
       name: tenants.views
-      path: backend/tenants/views.py
+      path: src/tenants/views.py
       imports:
         - core.events
         - core.identity

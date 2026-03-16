@@ -6,7 +6,7 @@ This note defines a delivery workflow for agent-assisted implementation that imp
 
 * Deliver features in larger, reviewable chunks with fewer retries.
 * Detect defects early using explicit reflection and verification gates.
-* Keep implementation aligned with EDMP architecture and tenant-safety constraints.
+* Keep implementation aligned with Mtafiti architecture and tenant-safety constraints.
 
 ## Agent roles (skills)
 
@@ -155,11 +155,11 @@ Use a deterministic local dependency bootstrap before running backend tests:
 
 ```bash
 docker compose up -d --wait postgres
-cd backend
+cd src
 python -m venv ../.venv
 source ../.venv/bin/activate
 pip install -r requirements-dev.txt
-export POSTGRES_DB=edmp_test POSTGRES_USER=edmp POSTGRES_PASSWORD=edmp POSTGRES_HOST=localhost POSTGRES_PORT=5432
+export POSTGRES_DB=mtafiti_test POSTGRES_USER=mtafiti POSTGRES_PASSWORD=mtafiti POSTGRES_HOST=localhost POSTGRES_PORT=5432
 pytest -q
 docker compose down
 ```

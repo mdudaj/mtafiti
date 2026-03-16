@@ -2,7 +2,7 @@
 
 This project's backend is designed to run as a stateless service in Kubernetes. The manifests in `deploy/k8s/` are **examples** to help bootstrap the platform design.
 
-For Helm-managed deployment packaging, use `deploy/helm/edmp-platform`.
+For Helm-managed deployment packaging, use `deploy/helm/mtafiti-platform`.
 
 ## Health probes
 
@@ -28,14 +28,14 @@ See:
 
 The platform-services increment adds a first-party Helm chart:
 
-* `deploy/helm/edmp-platform/Chart.yaml`
-* `deploy/helm/edmp-platform/values.yaml`
-* `deploy/helm/edmp-platform/templates/*`
+* `deploy/helm/mtafiti-platform/Chart.yaml`
+* `deploy/helm/mtafiti-platform/values.yaml`
+* `deploy/helm/mtafiti-platform/templates/*`
 
 Quick start:
 
 ```bash
-helm upgrade --install edmp-platform deploy/helm/edmp-platform -n edmp --create-namespace
+helm upgrade --install mtafiti-platform deploy/helm/mtafiti-platform -n edmp --create-namespace
 ```
 
 Notes:
@@ -49,7 +49,7 @@ Notes:
 
 ### Secret prerequisites (example)
 
-The example manifests assume a Secret named `edmp-backend-secrets` exists with at least:
+The example manifests assume a Secret named `mtafiti-backend-secrets` exists with at least:
 
 * `DJANGO_SECRET_KEY`
 * `POSTGRES_PASSWORD`

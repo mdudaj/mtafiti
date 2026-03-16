@@ -18,7 +18,7 @@ This document will define the tenant-aware LAB system exposed at:
 
 ## Integration contracts (to be detailed)
 
-- Shared identity and tenant context from EDMP platform
+- Shared identity and tenant context from Mtafiti platform
 - Eventing and API integrations with workspace services
 - Printing and document management touchpoints
 

@@ -1,6 +1,6 @@
 # Data classification taxonomy (design notes)
 
-This document defines a lightweight tenant-scoped data-classification model so EDMP can consistently label assets, policies, and stewardship workflows.
+This document defines a lightweight tenant-scoped data-classification model so Mtafiti can consistently label assets, policies, and stewardship workflows.
 
 ## Goals
 

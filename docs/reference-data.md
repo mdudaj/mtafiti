@@ -1,6 +1,6 @@
 # Reference data management (design notes)
 
-These notes define a lightweight reference-data capability that fits the existing EDMP scaffold and keeps tenant isolation intact.
+These notes define a lightweight reference-data capability that fits the existing Mtafiti scaffold and keeps tenant isolation intact.
 
 ## Scope
 

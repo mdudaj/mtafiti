@@ -1,6 +1,6 @@
 # Policy enforcement design notes
 
-This note defines a minimal policy-enforcement increment for EDMP.
+This note defines a minimal policy-enforcement increment for Mtafiti.
 
 ## Goals
 

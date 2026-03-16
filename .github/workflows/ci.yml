@@ -24,7 +24,7 @@ jobs:
       - name: Validate knowledge graph artifacts
         run: python .github/scripts/generate_knowledge_graph.py --check
 
-  backend-tests:
+  src-tests:
     needs: docs-gate
     runs-on: ubuntu-latest
     strategy:
@@ -32,25 +32,25 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3]
         shard_count: [4]
-    name: backend-tests (shard ${{ matrix.shard }}/${{ matrix.shard_count }})
+    name: src-tests (shard ${{ matrix.shard }}/${{ matrix.shard_count }})
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: edmp_test
-          POSTGRES_USER: edmp
-          POSTGRES_PASSWORD: edmp
+          POSTGRES_DB: mtafiti_test
+          POSTGRES_USER: mtafiti
+          POSTGRES_PASSWORD: mtafiti
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U edmp -d edmp_test"
+          --health-cmd "pg_isready -U mtafiti -d mtafiti_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      POSTGRES_DB: edmp_test
-      POSTGRES_USER: edmp
-      POSTGRES_PASSWORD: edmp
+      POSTGRES_DB: mtafiti_test
+      POSTGRES_USER: mtafiti
+      POSTGRES_PASSWORD: mtafiti
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
     steps:
@@ -61,19 +61,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements-dev.txt
+          pip install -r src/requirements-dev.txt
       - name: Select shard tests
         run: |
           python .github/scripts/pytest_shard.py \
-            --tests-root backend/tests \
-            --relative-to backend \
+            --tests-root src/tests \
+            --relative-to src \
             --shard-index "${{ matrix.shard }}" \
             --shard-count "${{ matrix.shard_count }}" \
-            --exclude "backend/tests/test_performance_baseline.py" > shard_tests.txt
+            --exclude "src/tests/test_performance_baseline.py" > shard_tests.txt
           test -s shard_tests.txt
       - name: Run tests
         run: |
-          cd backend
+          cd src
           pytest -q $(cat ../shard_tests.txt)
 
   performance-baseline-tests:
@@ -83,20 +83,20 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: edmp_test
-          POSTGRES_USER: edmp
-          POSTGRES_PASSWORD: edmp
+          POSTGRES_DB: mtafiti_test
+          POSTGRES_USER: mtafiti
+          POSTGRES_PASSWORD: mtafiti
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U edmp -d edmp_test"
+          --health-cmd "pg_isready -U mtafiti -d mtafiti_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      POSTGRES_DB: edmp_test
-      POSTGRES_USER: edmp
-      POSTGRES_PASSWORD: edmp
+      POSTGRES_DB: mtafiti_test
+      POSTGRES_USER: mtafiti
+      POSTGRES_PASSWORD: mtafiti
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
     steps:
@@ -107,8 +107,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements-dev.txt
+          pip install -r src/requirements-dev.txt
       - name: Run performance baseline tests
         run: |
-          cd backend
+          cd src
           pytest -q tests/test_performance_baseline.py
