@@ -37,6 +37,11 @@ def test_normalize_django_path_converts_path_parameters():
     )
 
 
+def test_urls_path_prefers_src_scaffold():
+    module = _load_gate_module()
+    assert module._urls_path() == REPO_ROOT / "src" / "config" / "urls.py"
+
+
 def test_extract_openapi_paths_and_schemas_from_snippet():
     module = _load_gate_module()
     snippet = """
