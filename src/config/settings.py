@@ -60,6 +60,7 @@ if EDMP_UI_MATERIAL_ENABLED:
 
 TENANT_APPS = [
     'core',
+    'lims',
 ]
 
 INSTALLED_APPS = SHARED_APPS + TENANT_APPS

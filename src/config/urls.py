@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 from core.views import (
     access_request_decision,
@@ -140,6 +140,7 @@ from core.views import (
     ui_operations_stewardship_page,
     user_portal_dashboard_page,
 )
+from lims.views import lims_dashboard_page
 from tenants.views import tenant_services, tenants
 
 urlpatterns = [
@@ -150,6 +151,8 @@ urlpatterns = [
     path('metrics', metrics, name='metrics'),
     path('api/v1/tenants', tenants, name='tenants'),
     path('api/v1/tenants/services', tenant_services, name='tenant_services'),
+    path('api/v1/lims/', include(('lims.urls', 'lims'), namespace='lims')),
+    path('lims/', lims_dashboard_page, name='lims_dashboard_page'),
     path('api/v1/governance/policies', governance_policies, name='governance_policies'),
     path(
         'api/v1/governance/policies/<uuid:policy_id>',
