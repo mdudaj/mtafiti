@@ -1385,6 +1385,323 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
             ],
         },
         {
+            "entry_id": "knowledge-src/viewflow-advanced-flow-topologies",
+            "name": "viewflow-advanced-flow-topologies",
+            "description": "Advanced Viewflow control-flow patterns for parallel work, split-first race patterns, switch gateways, and subprocess orchestration.",
+            "tags": [
+                "viewflow",
+                "workflow",
+                "parallel",
+                "split",
+                "join",
+                "subprocess",
+                "switch",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/viewflow/workflow/flow/nodes.py"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Use `Split` and `Join` when multiple branches must run concurrently and later synchronize.
+- Use `SplitFirst` when several alternatives race and the first completed branch should cancel the rest.
+- Use `Switch` or `If` for mutually exclusive routing; do not fake gateway behavior with ad hoc conditionals inside views.
+- Reach for `Subprocess` / `NSubprocess` when a repeated or nested workflow deserves its own reusable flow definition and lifecycle.
+- Prefer data-driven fan-out (`data_source=` / iterable subprocess items) over hand-unrolled duplicated task nodes when the branch count is variable.
+""".strip(),
+                },
+                {
+                    "title": "Advanced flow node APIs",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/workflow/flow/nodes.py",
+                            "start_line": 324,
+                            "end_line": 520,
+                            "label": "Split, SplitFirst, Subprocess, NSubprocess, and Switch nodes",
+                        },
+                    ],
+                },
+                {
+                    "title": "Cookbook branching and synchronization example",
+                    "sources": [
+                        {
+                            "path": "cookbook/workflow101/shipment/flows.py",
+                            "start_line": 27,
+                            "end_line": 146,
+                            "label": "Shipment flow with clerk/warehouse split, conditional insurance branch, and joins",
+                        },
+                        {
+                            "path": "cookbook/patterns/README.md",
+                            "start_line": 1,
+                            "end_line": 46,
+                            "label": "Pattern catalog for sequence, choice, parallel split/join, partial joins, multiple instances, and task distribution",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-assignment-permission-patterns",
+            "name": "viewflow-assignment-permission-patterns",
+            "description": "Assignment, permission, and task-ownership patterns for Viewflow workflows using built-in APIs and django-guardian-style object checks.",
+            "tags": [
+                "viewflow",
+                "workflow",
+                "assignment",
+                "permissions",
+                "guardian",
+                "rbac",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/tests/workflow/test_managers_perms.py"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Prefer `Assign(...)` and `Permission(...)` on flow nodes instead of burying routing and authorization logic in view code.
+- Use object-aware permission callables when task access depends on a project, department, specimen, or tenant-scoped artifact.
+- Treat workflow assignment metadata as part of orchestration design: direct user assignment, permission-driven inbox visibility, and ownership handoff should be explicit in the flow.
+- Keep separation-of-duties rules in flow declarations so reviewers can audit who may start, approve, validate, or complete a task.
+""".strip(),
+                },
+                {
+                    "title": "Built-in assignment and permission examples",
+                    "sources": [
+                        {
+                            "path": "viewflow/tests/workflow/test_managers_perms.py",
+                            "start_line": 27,
+                            "end_line": 60,
+                            "label": "StartHandle, Assign, and Permission(auto_create=True) examples",
+                        },
+                        {
+                            "path": "viewflow/viewflow/utils.py",
+                            "start_line": 81,
+                            "end_line": 104,
+                            "label": "Model and object permission helper",
+                        },
+                    ],
+                },
+                {
+                    "title": "Cookbook object-permission flow example",
+                    "sources": [
+                        {
+                            "path": "cookbook/guardian_perms/bills/flows.py",
+                            "start_line": 8,
+                            "end_line": 94,
+                            "label": "Guardian-backed department bill approval flow",
+                        },
+                        {
+                            "path": "cookbook/workflow101/shipment/flows.py",
+                            "start_line": 41,
+                            "end_line": 143,
+                            "label": "Mixed Assign(...) and Permission(...) workflow example",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/django-material-advanced-ux-patterns",
+            "name": "django-material-advanced-ux-patterns",
+            "description": "Advanced django-material and Cotton UX primitives for menus, tables, floating actions, accessible interactions, and progressive enhancement.",
+            "tags": [
+                "django-material",
+                "ux",
+                "cotton",
+                "components",
+                "table",
+                "menu",
+                "fab",
+                "accessibility",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["django-material/material/templates/cotton/CLAUDE.md"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Build advanced UX by composing Cotton components and behavior scripts, not by scattering bespoke HTML/JS fragments across pages.
+- Keep interactive state explicit through ARIA attributes, `data-*` flags, and Unpoly compiler cleanup patterns.
+- Prefer reusable menu, table, FAB, button, card, and calendar primitives so admin shells, workflow inboxes, and dashboards stay visually coherent.
+- Treat keyboard handling, focus return, and screen-reader cues as part of the component contract, not optional polish.
+""".strip(),
+                },
+                {
+                    "title": "Component system and accessibility guidance",
+                    "sources": [
+                        {
+                            "path": "django-material/material/templates/cotton/CLAUDE.md",
+                            "start_line": 1,
+                            "end_line": 220,
+                            "label": "Cotton component architecture, interactivity, and accessibility rules",
+                        },
+                    ],
+                },
+                {
+                    "title": "Advanced UI building blocks",
+                    "sources": [
+                        {
+                            "path": "django-material/material/templates/cotton/table/container.html",
+                            "start_line": 1,
+                            "end_line": 25,
+                            "label": "Table container contract with caption, header, body, and footer slots",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/button/fab.html",
+                            "start_line": 1,
+                            "end_line": 43,
+                            "label": "Floating action button primitive",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/forms/select/outlined.html",
+                            "start_line": 1,
+                            "end_line": 97,
+                            "label": "Outlined select component with trigger and supporting text",
+                        },
+                        {
+                            "path": "django-material/material/templates/cotton/forms/calendar/date.html",
+                            "start_line": 1,
+                            "end_line": 40,
+                            "label": "Date field with trailing action/button pattern",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-configurable-metadata-forms",
+            "name": "viewflow-configurable-metadata-forms",
+            "description": "Patterns for schema-driven metadata capture UIs using Viewflow layouts, field groups, dependent selects, Ajax completion, and nested formsets.",
+            "tags": [
+                "viewflow",
+                "forms",
+                "metadata",
+                "schema",
+                "fieldsets",
+                "ajax",
+                "dependent-select",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["cookbook/forms101/forms/views.py"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Model configurable workflow metadata as declarative field/schema definitions, then project them into Viewflow `Layout(...)`, `FieldSet(...)`, `FormSetField(...)`, and widget attrs instead of hand-coding every step form.
+- Reuse the same form composition primitives for receiving metadata, archival metadata, storage metadata, and QC annotations so configuration stays consistent across lab workflows.
+- Use dependent selects and Ajax completion when later fields depend on tenant reference data, controlled vocabularies, or prior answers.
+- Keep computed or read-only operational values in widget attrs / client-side tags rather than mixing derived UI state into persistence logic.
+""".strip(),
+                },
+                {
+                    "title": "Dynamic form endpoints and mixins",
+                    "sources": [
+                        {
+                            "path": "cookbook/forms101/forms/views.py",
+                            "start_line": 1,
+                            "end_line": 106,
+                            "label": "FormDependentSelectMixin and FormAjaxCompleteMixin on CreateUserView",
+                        },
+                    ],
+                },
+                {
+                    "title": "Metadata grouping and dependent field composition",
+                    "sources": [
+                        {
+                            "path": "cookbook/forms101/forms/checkout_form.py",
+                            "start_line": 1,
+                            "end_line": 83,
+                            "label": "Dependent country/city/post code form with Layout, Row, Span, and FieldSet",
+                        },
+                        {
+                            "path": "cookbook/forms101/forms/hospital_form.py",
+                            "start_line": 1,
+                            "end_line": 77,
+                            "label": "Large grouped registration form with clinical FieldSets and FormSetField",
+                        },
+                        {
+                            "path": "cookbook/forms101/custom_widget/forms.py",
+                            "start_line": 1,
+                            "end_line": 72,
+                            "label": "Inline attachments and computed widget tag pattern",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-configurable-workflow-runtime-patterns",
+            "name": "viewflow-configurable-workflow-runtime-patterns",
+            "description": "Patterns for mapping configurable workflow templates to Viewflow runtime constructs, including parallel fan-out, role-based routing, and reusable task metadata.",
+            "tags": [
+                "viewflow",
+                "workflow",
+                "designer",
+                "runtime",
+                "parallel",
+                "roles",
+                "permissions",
+                "metadata",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["cookbook/patterns/README.md"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Treat workflow templates as declarative node/edge metadata that compile into a bounded set of supported Viewflow patterns: sequence, exclusive choice, split/join, multiple instances, role-based distribution, and guarded approvals.
+- Store task title, description, assignment, permission, and summary text as template metadata so lab-specific workflows can be configured without rewriting flow code for every study.
+- Use multiple-instance and split/join patterns for batch-oriented lab work such as aliquots, plates, parallel QC, and per-sample review branches.
+- Pair routing metadata with permission bundles so workflow designer choices stay compatible with guardian-backed object access and role-specific inboxes.
+""".strip(),
+                },
+                {
+                    "title": "Pattern catalog for supported workflow designer primitives",
+                    "sources": [
+                        {
+                            "path": "cookbook/patterns/README.md",
+                            "start_line": 1,
+                            "end_line": 46,
+                            "label": "Control-flow and task-distribution pattern inventory",
+                        },
+                    ],
+                },
+                {
+                    "title": "Configurable fan-out and repeated-task example",
+                    "sources": [
+                        {
+                            "path": "cookbook/patterns/flows/multiple_instances.py",
+                            "start_line": 15,
+                            "end_line": 105,
+                            "label": "FormSet-driven multiple instances using Split and task_data_source",
+                        },
+                    ],
+                },
+                {
+                    "title": "Role and permission driven routing examples",
+                    "sources": [
+                        {
+                            "path": "cookbook/patterns/flows/role_based.py",
+                            "start_line": 38,
+                            "end_line": 131,
+                            "label": "Role-based approval flow with Permission(...) and runtime assignment",
+                        },
+                        {
+                            "path": "cookbook/workflow101/shipment/flows.py",
+                            "start_line": 17,
+                            "end_line": 146,
+                            "label": "Shipment flow with process metadata, split/join coordination, Assign(...), and Permission(...)",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             "entry_id": "knowledge-src/knowledge-source-maintenance",
             "name": "knowledge-source-maintenance",
             "description": "How to extend and refresh the local knowledge-src skillset without reworking the generator from scratch.",
