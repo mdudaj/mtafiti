@@ -56,6 +56,11 @@ def test_bundle_contains_expected_framework_and_skill_nodes():
     assert "local_source_workflow" in django_node["context_hub"]
 
 
+def test_knowledge_graph_library_prefers_src_app_root():
+    module = _load_module(LIB_PATH, "knowledge_graph_lib")
+    assert module.resolve_app_root(REPO_ROOT) == REPO_ROOT / "src"
+
+
 def test_query_script_returns_dashboard_skills():
     result = subprocess.run(
         [

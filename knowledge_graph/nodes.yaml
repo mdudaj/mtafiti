@@ -44,20 +44,16 @@ nodes:
           status: matched
         -
           query: "django forms"
-          total: 3
+          total: 2
           matches:
+            -
+              id: knowledge-src/django-material-frontend-composition
+              source: community
+              description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
             -
               id: knowledge-src/django-material
               source: maintainer
               description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
           status: matched
         -
           query: "django urls"
@@ -81,6 +77,7 @@ nodes:
         - knowledge-src/django-material
         - knowledge-src/cookbook-django-admin
         - knowledge-src/django-material-theme-customization
+        - knowledge-src/django-material-frontend-composition
     repository_fit:
       status: installed
       evidence:
@@ -181,7 +178,7 @@ nodes:
       search_results:
         -
           query: django-material
-          total: 2
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
@@ -191,10 +188,14 @@ nodes:
               id: knowledge-src/django-material-theme-customization
               source: community
               description: "Local theming skill generated from django-material design token sources."
+            -
+              id: knowledge-src/django-material-frontend-composition
+              source: community
+              description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
           status: matched
         -
           query: "django material"
-          total: 2
+          total: 3
           matches:
             -
               id: knowledge-src/django-material
@@ -204,11 +205,16 @@ nodes:
               id: knowledge-src/django-material-theme-customization
               source: community
               description: "Local theming skill generated from django-material design token sources."
+            -
+              id: knowledge-src/django-material-frontend-composition
+              source: community
+              description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
           status: matched
       search_status: matched
       candidate_registry_ids:
         - knowledge-src/django-material
         - knowledge-src/django-material-theme-customization
+        - knowledge-src/django-material-frontend-composition
     repository_fit:
       status: documented_target
       evidence:
@@ -249,18 +255,22 @@ nodes:
               source: maintainer
               description: "Local knowledge source generated from the viewflow repository README."
             -
-              id: knowledge-src/cookbook-articles
+              id: knowledge-src/viewflow-workflow-orchestration
               source: community
-              description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
+              description: "Workflow architecture, APIs, and cookbook patterns for building user and programmatic orchestrations with Viewflow."
             -
-              id: knowledge-src/cookbook-crud101
+              id: knowledge-src/viewflow-dashboard-composition
               source: community
-              description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
+              description: "Dashboard composition guidance using cookbook dashboard samples, Material icons, and Viewflow site shells."
           status: matched
         -
           query: "django workflow"
-          total: 1
+          total: 2
           matches:
+            -
+              id: knowledge-src/viewflow-workflow-orchestration
+              source: community
+              description: "Workflow architecture, APIs, and cookbook patterns for building user and programmatic orchestrations with Viewflow."
             -
               id: knowledge-src/cookbook-django-admin
               source: community
@@ -269,8 +279,8 @@ nodes:
       search_status: matched
       candidate_registry_ids:
         - knowledge-src/viewflow
-        - knowledge-src/cookbook-articles
-        - knowledge-src/cookbook-crud101
+        - knowledge-src/viewflow-workflow-orchestration
+        - knowledge-src/viewflow-dashboard-composition
         - knowledge-src/cookbook-django-admin
     repository_fit:
       status: documented_target
@@ -1089,6 +1099,15 @@ nodes:
     methods:
       - POST
   -
+    id: api:api_v1_lims
+    type: API
+    name: /api/v1/lims
+    description: "API route handled by include."
+    handler: include
+    route_name: include
+    methods:
+      []
+  -
     id: api:api_v1_ingestions_ingestion_id
     type: API
     name: /api/v1/ingestions/{ingestion_id}
@@ -1661,6 +1680,15 @@ nodes:
     route_name: tenants
     methods:
       []
+  -
+    id: api:api_v1_ui_model_select_options
+    type: API
+    name: /api/v1/ui/model-select-options
+    description: "API route handled by ui_model_select_options."
+    handler: ui_model_select_options
+    route_name: ui_model_select_options
+    methods:
+      - GET
   -
     id: api:api_v1_ui_operations_agent_monitor
     type: API

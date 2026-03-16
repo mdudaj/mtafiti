@@ -63,18 +63,22 @@ context_hub:
           source: maintainer
           description: "Local knowledge source generated from the viewflow repository README."
         -
-          id: knowledge-src/cookbook-articles
+          id: knowledge-src/viewflow-workflow-orchestration
           source: community
-          description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
+          description: "Workflow architecture, APIs, and cookbook patterns for building user and programmatic orchestrations with Viewflow."
         -
-          id: knowledge-src/cookbook-crud101
+          id: knowledge-src/viewflow-dashboard-composition
           source: community
-          description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
+          description: "Dashboard composition guidance using cookbook dashboard samples, Material icons, and Viewflow site shells."
       status: matched
     -
       query: "django workflow"
-      total: 1
+      total: 2
       matches:
+        -
+          id: knowledge-src/viewflow-workflow-orchestration
+          source: community
+          description: "Workflow architecture, APIs, and cookbook patterns for building user and programmatic orchestrations with Viewflow."
         -
           id: knowledge-src/cookbook-django-admin
           source: community
@@ -83,8 +87,8 @@ context_hub:
   search_status: matched
   candidate_registry_ids:
     - knowledge-src/viewflow
-    - knowledge-src/cookbook-articles
-    - knowledge-src/cookbook-crud101
+    - knowledge-src/viewflow-workflow-orchestration
+    - knowledge-src/viewflow-dashboard-composition
     - knowledge-src/cookbook-django-admin
 repository_fit:
   status: documented_target

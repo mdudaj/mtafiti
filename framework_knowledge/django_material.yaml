@@ -55,7 +55,7 @@ context_hub:
   search_results:
     -
       query: django-material
-      total: 2
+      total: 3
       matches:
         -
           id: knowledge-src/django-material
@@ -65,10 +65,14 @@ context_hub:
           id: knowledge-src/django-material-theme-customization
           source: community
           description: "Local theming skill generated from django-material design token sources."
+        -
+          id: knowledge-src/django-material-frontend-composition
+          source: community
+          description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
       status: matched
     -
       query: "django material"
-      total: 2
+      total: 3
       matches:
         -
           id: knowledge-src/django-material
@@ -78,11 +82,16 @@ context_hub:
           id: knowledge-src/django-material-theme-customization
           source: community
           description: "Local theming skill generated from django-material design token sources."
+        -
+          id: knowledge-src/django-material-frontend-composition
+          source: community
+          description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
       status: matched
   search_status: matched
   candidate_registry_ids:
     - knowledge-src/django-material
     - knowledge-src/django-material-theme-customization
+    - knowledge-src/django-material-frontend-composition
 repository_fit:
   status: documented_target
   evidence:

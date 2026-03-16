@@ -647,9 +647,21 @@ def detect_programming_languages(root: Path) -> list[dict[str, Any]]:
     ]
 
 
+def resolve_app_root(root: Path) -> Path:
+    candidates = (root / "src", root / "backend")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Could not locate application root. Checked: "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
 def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatterns: list[dict[str, Any]], settings: dict[str, Any]) -> dict[str, Any]:
-    requirements = parse_requirements(root / "backend" / "requirements.txt")
-    requirements_dev = parse_requirements(root / "backend" / "requirements-dev.txt")
+    app_root = resolve_app_root(root)
+    requirements = parse_requirements(app_root / "requirements.txt")
+    requirements_dev = parse_requirements(app_root / "requirements-dev.txt")
     package_index = {item["name"]: item["version"] for item in [*requirements, *requirements_dev]}
     ci_jobs = parse_simple_yaml_keys(root / ".github" / "workflows" / "ci.yml", "jobs", 2)
     compose_services = parse_simple_yaml_keys(root / "docker-compose.yml", "services", 2)
@@ -1185,7 +1197,8 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
         "pytest": ("Tool", "Python test runner used by repository validation.", "pytest"),
         "pytest-django": ("Tool", "Django integration plugin for pytest.", "pytest-django"),
     }
-    for requirements_path in [root / "backend" / "requirements.txt", root / "backend" / "requirements-dev.txt"]:
+    app_root = resolve_app_root(root)
+    for requirements_path in [app_root / "requirements.txt", app_root / "requirements-dev.txt"]:
         for package in parse_requirements(requirements_path):
             if package["name"] not in package_nodes:
                 continue
@@ -1201,7 +1214,7 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
                 )
             )
 
-    for package in parse_requirements(root / "backend" / "requirements-dev.txt"):
+    for package in parse_requirements(app_root / "requirements-dev.txt"):
         classification = PACKAGE_CLASSIFICATIONS.get(package["name"], "Tool")
         if classification != "Tool":
             continue
@@ -1446,10 +1459,10 @@ def build_ontology() -> dict[str, Any]:
 
 
 def build_bundle(root: Path) -> dict[str, Any]:
-    backend_root = root / "backend"
-    modules = collect_python_modules(backend_root)
-    urlpatterns = extract_urlpatterns(root / "backend" / "config" / "urls.py")
-    settings = extract_settings(root / "backend" / "config" / "settings.py")
+    app_root = resolve_app_root(root)
+    modules = collect_python_modules(app_root)
+    urlpatterns = extract_urlpatterns(app_root / "config" / "urls.py")
+    settings = extract_settings(app_root / "config" / "settings.py")
     framework_knowledge = build_framework_knowledge(root, settings)
     models = extract_models(modules)
     tasks = extract_tasks(modules)
