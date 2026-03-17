@@ -130,6 +130,45 @@ Validation is intentionally explicit and repository-native rather than delegated
 
 This gives the later workflow-configuration and runtime slices a stable tenant-aware schema registry without needing the full workflow-template domain to exist first.
 
+## Biospecimen aggregate
+
+The current biospecimen slice introduces tenant-local specimen and pooling primitives for the first LIMS lifecycle workflows:
+
+- `BiospecimenType`
+- `Biospecimen`
+- `BiospecimenPool`
+- `BiospecimenPoolMember`
+
+Current conventions:
+
+- each sample type owns a configurable identifier/barcode prefix plus padded sequence counter
+- specimen IDs and barcodes are allocated transactionally from the sample-type sequence
+- aliquots are modeled as child `Biospecimen` records with `parent_specimen` and `lineage_root`
+- pools are modeled separately from single-parent lineage so one pool can reference many source specimens
+- artifact permissions (`lims.artifact.view` / `lims.artifact.manage`) guard the current biospecimen APIs
+
+The first API surface is exposed under:
+
+- `/api/v1/lims/biospecimen-types`
+- `/api/v1/lims/biospecimens`
+- `/api/v1/lims/biospecimens/<specimen_id>/transition`
+- `/api/v1/lims/biospecimens/<specimen_id>/aliquots`
+- `/api/v1/lims/biospecimen-pools`
+- `/api/v1/lims/biospecimen-pools/<pool_id>/transition`
+
+This slice standardizes the initial lifecycle statuses:
+
+- `registered`
+- `received`
+- `available`
+- `aliquoted`
+- `pooled`
+- `consumed`
+- `archived`
+- `disposed`
+
+These records are intentionally simple JSON APIs for now so later accessioning, batch, QC, and workflow-runtime slices can reuse the same aggregate without waiting for the full Viewflow runtime.
+
 ## Tanzania address sync
 
 Address metadata ingestion is designed to be polite and resumable:

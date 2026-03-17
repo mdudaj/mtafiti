@@ -566,6 +566,22 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:biospecimen
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:biospecimenpool
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:biospecimenpoolmember
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:biospecimentype
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:classification
   -
     relationship: implements

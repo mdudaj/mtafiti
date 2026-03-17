@@ -2352,6 +2352,64 @@ nodes:
       - ward
     source: src/lims/models.py:112
   -
+    id: datamodel:biospecimen
+    type: DataModel
+    name: Biospecimen
+    description: "Django model defined in lims.models."
+    fields:
+      - barcode
+      - collected_at
+      - external_identifier
+      - is_active
+      - kind
+      - lab
+      - lineage_root
+      - metadata
+      - parent_specimen
+      - quantity
+      - quantity_unit
+      - received_at
+      - sample_identifier
+      - sample_type
+      - site
+      - status
+      - study
+      - subject_identifier
+    source: src/lims/models.py:518
+  -
+    id: datamodel:biospecimenpool
+    type: DataModel
+    name: BiospecimenPool
+    description: "Django model defined in lims.models."
+    fields:
+      - barcode
+      - is_active
+      - lab
+      - metadata
+      - pool_identifier
+      - quantity
+      - quantity_unit
+      - sample_type
+      - site
+      - status
+      - study
+    source: src/lims/models.py:613
+  -
+    id: datamodel:biospecimentype
+    type: DataModel
+    name: BiospecimenType
+    description: "Django model defined in lims.models."
+    fields:
+      - barcode_prefix
+      - description
+      - identifier_prefix
+      - is_active
+      - key
+      - name
+      - next_sequence
+      - sequence_padding
+    source: src/lims/models.py:489
+  -
     id: datamodel:metadataschemaversion
     type: DataModel
     name: MetadataSchemaVersion
@@ -2448,6 +2506,17 @@ nodes:
       - schema_version
       - validation_rules
     source: src/lims/models.py:419
+  -
+    id: datamodel:biospecimenpoolmember
+    type: DataModel
+    name: BiospecimenPoolMember
+    description: "Django model defined in lims.models."
+    fields:
+      - contributed_quantity
+      - contributed_unit
+      - pool
+      - specimen
+    source: src/lims/models.py:669
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel

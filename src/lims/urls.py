@@ -1,6 +1,15 @@
 from django.urls import path
 
 from .views import (
+    lims_biospecimen_aliquots,
+    lims_biospecimen_detail,
+    lims_biospecimen_pool_detail,
+    lims_biospecimen_pool_transition,
+    lims_biospecimen_pools,
+    lims_biospecimen_transition,
+    lims_biospecimen_type_detail,
+    lims_biospecimen_types,
+    lims_biospecimens,
     lims_dashboard_summary,
     lims_metadata_field_definition_detail,
     lims_metadata_field_definitions,
@@ -27,6 +36,27 @@ app_name = 'lims'
 
 
 urlpatterns = [
+    path("biospecimens", lims_biospecimens, name="biospecimens"),
+    path("biospecimens/<uuid:specimen_id>", lims_biospecimen_detail, name="biospecimen_detail"),
+    path(
+        "biospecimens/<uuid:specimen_id>/aliquots",
+        lims_biospecimen_aliquots,
+        name="biospecimen_aliquots",
+    ),
+    path(
+        "biospecimens/<uuid:specimen_id>/transition",
+        lims_biospecimen_transition,
+        name="biospecimen_transition",
+    ),
+    path("biospecimen-pools", lims_biospecimen_pools, name="biospecimen_pools"),
+    path("biospecimen-pools/<uuid:pool_id>", lims_biospecimen_pool_detail, name="biospecimen_pool_detail"),
+    path(
+        "biospecimen-pools/<uuid:pool_id>/transition",
+        lims_biospecimen_pool_transition,
+        name="biospecimen_pool_transition",
+    ),
+    path("biospecimen-types", lims_biospecimen_types, name="biospecimen_types"),
+    path("biospecimen-types/<uuid:sample_type_id>", lims_biospecimen_type_detail, name="biospecimen_type_detail"),
     path("metadata/bindings", lims_metadata_schema_bindings, name="metadata_bindings"),
     path("metadata/field-definitions", lims_metadata_field_definitions, name="metadata_field_definitions"),
     path(

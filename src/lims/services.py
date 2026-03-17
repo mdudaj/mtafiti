@@ -17,6 +17,10 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import (
+    Biospecimen,
+    BiospecimenPool,
+    BiospecimenPoolMember,
+    BiospecimenType,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
     MetadataSchemaVersion,
@@ -648,3 +652,201 @@ def resolve_schema_version_for_binding(*, target_type: str, target_key: str) -> 
     if not binding:
         return None
     return binding.schema_version
+
+
+ALLOWED_BIOSPECIMEN_TRANSITIONS = {
+    Biospecimen.Status.REGISTERED: {
+        Biospecimen.Status.RECEIVED,
+        Biospecimen.Status.DISPOSED,
+    },
+    Biospecimen.Status.RECEIVED: {
+        Biospecimen.Status.AVAILABLE,
+        Biospecimen.Status.ALIQUOTED,
+        Biospecimen.Status.POOLED,
+        Biospecimen.Status.ARCHIVED,
+        Biospecimen.Status.DISPOSED,
+    },
+    Biospecimen.Status.AVAILABLE: {
+        Biospecimen.Status.ALIQUOTED,
+        Biospecimen.Status.POOLED,
+        Biospecimen.Status.CONSUMED,
+        Biospecimen.Status.ARCHIVED,
+        Biospecimen.Status.DISPOSED,
+    },
+    Biospecimen.Status.ALIQUOTED: {
+        Biospecimen.Status.POOLED,
+        Biospecimen.Status.CONSUMED,
+        Biospecimen.Status.ARCHIVED,
+        Biospecimen.Status.DISPOSED,
+    },
+    Biospecimen.Status.POOLED: {
+        Biospecimen.Status.CONSUMED,
+        Biospecimen.Status.ARCHIVED,
+    },
+    Biospecimen.Status.CONSUMED: {
+        Biospecimen.Status.ARCHIVED,
+    },
+    Biospecimen.Status.ARCHIVED: {
+        Biospecimen.Status.DISPOSED,
+    },
+    Biospecimen.Status.DISPOSED: set(),
+}
+
+ALLOWED_POOL_TRANSITIONS = {
+    BiospecimenPool.Status.ASSEMBLED: {
+        BiospecimenPool.Status.CONSUMED,
+        BiospecimenPool.Status.ARCHIVED,
+    },
+    BiospecimenPool.Status.CONSUMED: {
+        BiospecimenPool.Status.ARCHIVED,
+    },
+    BiospecimenPool.Status.ARCHIVED: set(),
+}
+
+
+class BiospecimenTransitionError(ValueError):
+    pass
+
+
+def _next_sequence_payload(sample_type_id: str) -> tuple[str, str, int]:
+    locked = BiospecimenType.objects.select_for_update().get(id=sample_type_id)
+    sequence_value = locked.next_sequence
+    locked.next_sequence += 1
+    locked.save(update_fields=["next_sequence", "updated_at"])
+    padded = str(sequence_value).zfill(locked.sequence_padding)
+    return locked.identifier_prefix.strip(), locked.barcode_prefix.strip(), padded
+
+
+def allocate_biospecimen_identifiers(sample_type: BiospecimenType, *, pooled: bool = False) -> tuple[str, str]:
+    with transaction.atomic():
+        identifier_prefix, barcode_prefix, padded = _next_sequence_payload(str(sample_type.id))
+    if pooled:
+        return f"{identifier_prefix}-POOL-{padded}", f"{barcode_prefix}-POOL-{padded}"
+    return f"{identifier_prefix}-{padded}", f"{barcode_prefix}-{padded}"
+
+
+def transition_biospecimen(specimen: Biospecimen, next_status: str) -> Biospecimen:
+    allowed = ALLOWED_BIOSPECIMEN_TRANSITIONS.get(specimen.status, set())
+    if next_status not in allowed:
+        raise BiospecimenTransitionError("invalid_transition")
+    specimen.status = next_status
+    if next_status == Biospecimen.Status.RECEIVED and specimen.received_at is None:
+        specimen.received_at = timezone.now()
+    specimen.full_clean()
+    specimen.save(update_fields=["status", "received_at", "updated_at"])
+    return specimen
+
+
+def transition_pool(pool: BiospecimenPool, next_status: str) -> BiospecimenPool:
+    allowed = ALLOWED_POOL_TRANSITIONS.get(pool.status, set())
+    if next_status not in allowed:
+        raise BiospecimenTransitionError("invalid_transition")
+    pool.status = next_status
+    pool.full_clean()
+    pool.save(update_fields=["status", "updated_at"])
+    return pool
+
+
+def create_aliquots(
+    specimen: Biospecimen,
+    *,
+    count: int,
+    quantity: Decimal,
+    quantity_unit: str,
+) -> list[Biospecimen]:
+    if specimen.status not in {
+        Biospecimen.Status.RECEIVED,
+        Biospecimen.Status.AVAILABLE,
+        Biospecimen.Status.ALIQUOTED,
+    }:
+        raise BiospecimenTransitionError("specimen_not_aliquotable")
+    if count < 1 or count > 24:
+        raise BiospecimenTransitionError("invalid_aliquot_count")
+    lineage_root = specimen.lineage_root or specimen
+    created: list[Biospecimen] = []
+    for _ in range(count):
+        sample_identifier, barcode = allocate_biospecimen_identifiers(specimen.sample_type)
+        aliquot = Biospecimen(
+            sample_type=specimen.sample_type,
+            sample_identifier=sample_identifier,
+            barcode=barcode,
+            kind=Biospecimen.Kind.ALIQUOT,
+            status=Biospecimen.Status.AVAILABLE,
+            subject_identifier=specimen.subject_identifier,
+            external_identifier=specimen.external_identifier,
+            study=specimen.study,
+            site=specimen.site,
+            lab=specimen.lab,
+            parent_specimen=specimen,
+            lineage_root=lineage_root,
+            quantity=quantity,
+            quantity_unit=quantity_unit,
+            metadata=dict(specimen.metadata or {}),
+            collected_at=specimen.collected_at,
+            received_at=specimen.received_at,
+        )
+        aliquot.full_clean()
+        aliquot.save()
+        created.append(aliquot)
+    if specimen.status != Biospecimen.Status.ALIQUOTED:
+        specimen.status = Biospecimen.Status.ALIQUOTED
+        specimen.full_clean()
+        specimen.save(update_fields=["status", "updated_at"])
+    return created
+
+
+def create_pool(
+    *,
+    sample_type: BiospecimenType,
+    specimens: list[Biospecimen],
+    quantity: Decimal,
+    quantity_unit: str,
+    study=None,
+    site=None,
+    lab=None,
+    metadata: dict[str, object] | None = None,
+) -> BiospecimenPool:
+    if not specimens:
+        raise BiospecimenTransitionError("specimens_required")
+    specimen_ids = [str(specimen.id) for specimen in specimens]
+    if len(specimen_ids) != len(set(specimen_ids)):
+        raise BiospecimenTransitionError("duplicate_specimens")
+    for specimen in specimens:
+        if specimen.sample_type_id != sample_type.id:
+            raise BiospecimenTransitionError("sample_type_mismatch")
+        if specimen.status not in {
+            Biospecimen.Status.RECEIVED,
+            Biospecimen.Status.AVAILABLE,
+            Biospecimen.Status.ALIQUOTED,
+        }:
+            raise BiospecimenTransitionError("specimen_not_poolable")
+
+    pool_identifier, barcode = allocate_biospecimen_identifiers(sample_type, pooled=True)
+    with transaction.atomic():
+        pool = BiospecimenPool(
+            sample_type=sample_type,
+            pool_identifier=pool_identifier,
+            barcode=barcode,
+            status=BiospecimenPool.Status.ASSEMBLED,
+            study=study,
+            site=site,
+            lab=lab,
+            quantity=quantity,
+            quantity_unit=quantity_unit,
+            metadata=dict(metadata or {}),
+        )
+        pool.full_clean()
+        pool.save()
+        for specimen in specimens:
+            member = BiospecimenPoolMember(
+                pool=pool,
+                specimen=specimen,
+                contributed_quantity=specimen.quantity,
+                contributed_unit=specimen.quantity_unit,
+            )
+            member.full_clean()
+            member.save()
+            specimen.status = Biospecimen.Status.POOLED
+            specimen.full_clean()
+            specimen.save(update_fields=["status", "updated_at"])
+    return pool
