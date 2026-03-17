@@ -2316,6 +2316,22 @@ nodes:
       - workspace
     source: src/core/models.py:788
   -
+    id: datamodel:receivingdiscrepancy
+    type: DataModel
+    name: ReceivingDiscrepancy
+    description: "Django model defined in lims.models."
+    fields:
+      - actual_data
+      - biospecimen
+      - code
+      - expected_data
+      - manifest
+      - manifest_item
+      - notes
+      - recorded_by
+      - status
+    source: src/lims/models.py:856
+  -
     id: datamodel:site
     type: DataModel
     name: Site
@@ -2333,7 +2349,7 @@ nodes:
       - street
       - study
       - ward
-    source: src/lims/models.py:189
+    source: src/lims/models.py:190
   -
     id: datamodel:lab
     type: DataModel
@@ -2350,7 +2366,7 @@ nodes:
       - region
       - street
       - ward
-    source: src/lims/models.py:112
+    source: src/lims/models.py:113
   -
     id: datamodel:biospecimen
     type: DataModel
@@ -2375,7 +2391,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:518
+    source: src/lims/models.py:519
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2393,7 +2409,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:613
+    source: src/lims/models.py:614
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2408,7 +2424,43 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:489
+    source: src/lims/models.py:490
+  -
+    id: datamodel:accessioningmanifestitem
+    type: DataModel
+    name: AccessioningManifestItem
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - collection_status
+      - expected_barcode
+      - expected_sample_identifier
+      - expected_subject_identifier
+      - manifest
+      - metadata
+      - notes
+      - position
+      - quantity
+      - quantity_unit
+      - received_at
+      - status
+    source: src/lims/models.py:760
+  -
+    id: datamodel:receivingevent
+    type: DataModel
+    name: ReceivingEvent
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - kind
+      - manifest
+      - manifest_item
+      - metadata
+      - notes
+      - received_at
+      - received_by
+      - scan_value
+    source: src/lims/models.py:808
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2419,7 +2471,7 @@ nodes:
       - schema
       - status
       - version_number
-    source: src/lims/models.py:391
+    source: src/lims/models.py:392
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2439,7 +2491,7 @@ nodes:
       - status
       - throttle_seconds
       - triggered_by
-    source: src/lims/models.py:250
+    source: src/lims/models.py:251
   -
     id: datamodel:metadatafielddefinition
     type: DataModel
@@ -2456,7 +2508,7 @@ nodes:
       - name
       - placeholder
       - vocabulary
-    source: src/lims/models.py:326
+    source: src/lims/models.py:327
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2467,7 +2519,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:375
+    source: src/lims/models.py:376
   -
     id: datamodel:metadatavocabulary
     type: DataModel
@@ -2478,7 +2530,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:286
+    source: src/lims/models.py:287
   -
     id: datamodel:study
     type: DataModel
@@ -2491,7 +2543,7 @@ nodes:
       - name
       - sponsor
       - status
-    source: src/lims/models.py:159
+    source: src/lims/models.py:160
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -2505,7 +2557,7 @@ nodes:
       - required
       - schema_version
       - validation_rules
-    source: src/lims/models.py:419
+    source: src/lims/models.py:420
   -
     id: datamodel:biospecimenpoolmember
     type: DataModel
@@ -2516,7 +2568,7 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:669
+    source: src/lims/models.py:670
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel
@@ -2526,7 +2578,26 @@ nodes:
       - created_at
       - id
       - updated_at
-    source: src/lims/models.py:9
+    source: src/lims/models.py:10
+  -
+    id: datamodel:accessioningmanifest
+    type: DataModel
+    name: AccessioningManifest
+    description: "Django model defined in lims.models."
+    fields:
+      - created_by
+      - lab
+      - manifest_identifier
+      - metadata
+      - notes
+      - received_at
+      - sample_type
+      - site
+      - source_reference
+      - source_system
+      - status
+      - study
+    source: src/lims/models.py:702
   -
     id: datamodel:tanzaniaward
     type: DataModel
@@ -2540,7 +2611,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:59
+    source: src/lims/models.py:60
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
@@ -2552,7 +2623,7 @@ nodes:
       - sort_order
       - value
       - vocabulary
-    source: src/lims/models.py:302
+    source: src/lims/models.py:303
   -
     id: datamodel:tanzaniastreet
     type: DataModel
@@ -2567,7 +2638,7 @@ nodes:
       - source_path
       - source_url
       - ward
-    source: src/lims/models.py:85
+    source: src/lims/models.py:86
   -
     id: datamodel:tanzaniadistrict
     type: DataModel
@@ -2581,7 +2652,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:33
+    source: src/lims/models.py:34
   -
     id: datamodel:tanzaniaregion
     type: DataModel
@@ -2594,7 +2665,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:18
+    source: src/lims/models.py:19
   -
     id: datamodel:metadataschemabinding
     type: DataModel
@@ -2606,7 +2677,7 @@ nodes:
       - target_key
       - target_label
       - target_type
-    source: src/lims/models.py:458
+    source: src/lims/models.py:459
   -
     id: datamodel:tenantserviceroute
     type: DataModel

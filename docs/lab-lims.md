@@ -169,6 +169,35 @@ This slice standardizes the initial lifecycle statuses:
 
 These records are intentionally simple JSON APIs for now so later accessioning, batch, QC, and workflow-runtime slices can reuse the same aggregate without waiting for the full Viewflow runtime.
 
+## Accessioning and receiving workflows
+
+The current accessioning slice standardizes the first receiving workflow primitives on top of the biospecimen aggregate:
+
+- `AccessioningManifest`
+- `AccessioningManifestItem`
+- `ReceivingEvent`
+- `ReceivingDiscrepancy`
+
+Current conventions:
+
+- manifests move through `draft`, `submitted`, `receiving`, and `received`
+- batch uploads create manifest items first, then receiving updates item state and either creates or binds the final biospecimen
+- single-sample receiving is supported through a direct endpoint for scan-oriented or bench-entry workflows
+- discrepancies stay explicit records instead of being hidden in free-text notes
+- receiving reports are exposed as tenant-local JSON summaries for downstream PDF/export work
+
+The first API surface is exposed under:
+
+- `/api/v1/lims/accessioning/receive-single`
+- `/api/v1/lims/accessioning/manifests`
+- `/api/v1/lims/accessioning/manifests/<manifest_id>`
+- `/api/v1/lims/accessioning/manifests/<manifest_id>/submit`
+- `/api/v1/lims/accessioning/manifests/<manifest_id>/items/<item_id>/receive`
+- `/api/v1/lims/accessioning/manifests/<manifest_id>/report`
+- `/api/v1/lims/receiving/discrepancies`
+
+Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine.
+
 ## Tanzania address sync
 
 Address metadata ingestion is designed to be polite and resumable:

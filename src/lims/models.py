@@ -4,6 +4,7 @@ import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class TimestampedUUIDModel(models.Model):
@@ -696,3 +697,217 @@ class BiospecimenPoolMember(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.pool.pool_identifier}:{self.specimen.sample_identifier}"
+
+
+class AccessioningManifest(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        SUBMITTED = "submitted"
+        RECEIVING = "receiving"
+        RECEIVED = "received"
+
+    manifest_identifier = models.CharField(max_length=64, unique=True)
+    sample_type = models.ForeignKey(
+        BiospecimenType,
+        on_delete=models.PROTECT,
+        related_name="accessioning_manifests",
+    )
+    study = models.ForeignKey(
+        Study,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="accessioning_manifests",
+    )
+    site = models.ForeignKey(
+        Site,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="accessioning_manifests",
+    )
+    lab = models.ForeignKey(
+        Lab,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="accessioning_manifests",
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    source_system = models.CharField(max_length=100, blank=True, default="")
+    source_reference = models.CharField(max_length=100, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_by = models.CharField(max_length=100, blank=True, default="")
+    received_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["manifest_identifier"], name="lims_acc_manifest_id_idx"),
+            models.Index(fields=["status", "-created_at"], name="lims_acc_manifest_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return self.manifest_identifier
+
+
+class AccessioningManifestItem(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        RECEIVED = "received"
+        DISCREPANT = "discrepant"
+
+    manifest = models.ForeignKey(
+        AccessioningManifest,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="manifest_items",
+    )
+    position = models.PositiveIntegerField(default=1)
+    expected_subject_identifier = models.CharField(max_length=100, blank=True, default="")
+    expected_sample_identifier = models.CharField(max_length=64, blank=True, default="")
+    expected_barcode = models.CharField(max_length=64, blank=True, default="")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    quantity_unit = models.CharField(max_length=32, blank=True, default="mL")
+    collection_status = models.CharField(max_length=32, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    received_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["manifest__manifest_identifier", "position", "created_at"]
+        indexes = [
+            models.Index(fields=["manifest", "status"], name="lims_acc_item_status_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["manifest", "position"], name="uniq_lims_acc_manifest_item_position"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.manifest.manifest_identifier}:{self.position}"
+
+
+class ReceivingEvent(TimestampedUUIDModel):
+    class Kind(models.TextChoices):
+        SINGLE = "single"
+        MANIFEST_ITEM = "manifest_item"
+
+    manifest = models.ForeignKey(
+        AccessioningManifest,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="receiving_events",
+    )
+    manifest_item = models.ForeignKey(
+        AccessioningManifestItem,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="receiving_events",
+    )
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        on_delete=models.PROTECT,
+        related_name="receiving_events",
+    )
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.SINGLE)
+    received_by = models.CharField(max_length=100, blank=True, default="")
+    scan_value = models.CharField(max_length=100, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    received_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-received_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["received_at"], name="lims_recv_evt_recv_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+        if self.manifest_item_id and self.manifest_id and self.manifest_item.manifest_id != self.manifest_id:
+            raise ValidationError({"manifest_item": "manifest_item must belong to the manifest"})
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.biospecimen.sample_identifier}"
+
+
+class ReceivingDiscrepancy(TimestampedUUIDModel):
+    class Code(models.TextChoices):
+        BARCODE_MISMATCH = "barcode_mismatch"
+        IDENTIFIER_MISMATCH = "identifier_mismatch"
+        MISSING_SAMPLE = "missing_sample"
+        DAMAGED_SAMPLE = "damaged_sample"
+        METADATA_MISMATCH = "metadata_mismatch"
+        OTHER = "other"
+
+    class Status(models.TextChoices):
+        OPEN = "open"
+        RESOLVED = "resolved"
+
+    manifest = models.ForeignKey(
+        AccessioningManifest,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="discrepancies",
+    )
+    manifest_item = models.ForeignKey(
+        AccessioningManifestItem,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="discrepancies",
+    )
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="receiving_discrepancies",
+    )
+    code = models.CharField(max_length=32, choices=Code.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    notes = models.TextField(blank=True, default="")
+    expected_data = models.JSONField(default=dict, blank=True)
+    actual_data = models.JSONField(default=dict, blank=True)
+    recorded_by = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="lims_receiving_disc_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.expected_data, dict):
+            raise ValidationError({"expected_data": "expected_data must be an object"})
+        if not isinstance(self.actual_data, dict):
+            raise ValidationError({"actual_data": "actual_data must be an object"})
+        if self.manifest_item_id and self.manifest_id and self.manifest_item.manifest_id != self.manifest_id:
+            raise ValidationError({"manifest_item": "manifest_item must belong to the manifest"})
+
+    def __str__(self) -> str:
+        return f"{self.code}:{self.status}"

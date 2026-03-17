@@ -11,6 +11,8 @@ from core.identity import request_roles
 
 from .permissions import permission_summary_for_roles, require_lims_permission
 from .models import (
+    AccessioningManifest,
+    AccessioningManifestItem,
     Biospecimen,
     BiospecimenPool,
     BiospecimenType,
@@ -22,6 +24,8 @@ from .models import (
     MetadataSchemaVersion,
     MetadataVocabulary,
     MetadataVocabularyItem,
+    ReceivingDiscrepancy,
+    ReceivingEvent,
     Site,
     Study,
     TanzaniaAddressSyncRun,
@@ -31,11 +35,18 @@ from .models import (
     TanzaniaWard,
 )
 from .services import (
+    accessioning_report,
+    AccessioningError,
     allocate_biospecimen_identifiers,
     BiospecimenTransitionError,
+    create_receiving_discrepancy,
     create_aliquots,
     create_pool,
+    generate_manifest_identifier,
+    receive_manifest_item,
+    receive_single_biospecimen,
     resolve_schema_version_for_binding,
+    submit_manifest,
     sync_run_to_dict,
     transition_biospecimen,
     transition_pool,
@@ -208,6 +219,74 @@ def _biospecimen_pool_to_dict(item: BiospecimenPool) -> dict[str, object]:
         "metadata": item.metadata,
         "member_ids": [str(member.specimen_id) for member in item.members.all()],
         "is_active": item.is_active,
+    }
+
+
+def _manifest_item_to_dict(item: AccessioningManifestItem) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "manifest_id": str(item.manifest_id),
+        "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+        "position": item.position,
+        "expected_subject_identifier": item.expected_subject_identifier,
+        "expected_sample_identifier": item.expected_sample_identifier,
+        "expected_barcode": item.expected_barcode,
+        "quantity": str(item.quantity),
+        "quantity_unit": item.quantity_unit,
+        "collection_status": item.collection_status,
+        "notes": item.notes,
+        "metadata": item.metadata,
+        "status": item.status,
+        "received_at": item.received_at.isoformat() if item.received_at else None,
+    }
+
+
+def _accessioning_manifest_to_dict(item: AccessioningManifest) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "manifest_identifier": item.manifest_identifier,
+        "sample_type_id": str(item.sample_type_id),
+        "study_id": str(item.study_id) if item.study_id else None,
+        "site_id": str(item.site_id) if item.site_id else None,
+        "lab_id": str(item.lab_id) if item.lab_id else None,
+        "status": item.status,
+        "source_system": item.source_system,
+        "source_reference": item.source_reference,
+        "notes": item.notes,
+        "metadata": item.metadata,
+        "created_by": item.created_by,
+        "received_at": item.received_at.isoformat() if item.received_at else None,
+        "item_count": item.items.count(),
+    }
+
+
+def _receiving_event_to_dict(item: ReceivingEvent) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "manifest_id": str(item.manifest_id) if item.manifest_id else None,
+        "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+        "biospecimen_id": str(item.biospecimen_id),
+        "kind": item.kind,
+        "received_by": item.received_by,
+        "scan_value": item.scan_value,
+        "notes": item.notes,
+        "metadata": item.metadata,
+        "received_at": item.received_at.isoformat(),
+    }
+
+
+def _receiving_discrepancy_to_dict(item: ReceivingDiscrepancy) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "manifest_id": str(item.manifest_id) if item.manifest_id else None,
+        "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+        "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+        "code": item.code,
+        "status": item.status,
+        "notes": item.notes,
+        "expected_data": item.expected_data,
+        "actual_data": item.actual_data,
+        "recorded_by": item.recorded_by,
     }
 
 
@@ -1222,6 +1301,76 @@ def _build_biospecimen_from_payload(specimen: Biospecimen, payload: dict[str, ob
     return None
 
 
+def _build_accessioning_manifest_from_payload(manifest: AccessioningManifest, payload: dict[str, object], *, request):
+    sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+    if error:
+        return error
+    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    if error:
+        return error
+    site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+    if error:
+        return error
+    lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+    if error:
+        return error
+    if sample_type is None:
+        return JsonResponse({"error": "sample_type_id is required"}, status=400)
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    manifest.sample_type = sample_type
+    manifest.study = study
+    manifest.site = site
+    manifest.lab = lab
+    manifest.source_system = str(payload.get("source_system") or "").strip()
+    manifest.source_reference = str(payload.get("source_reference") or "").strip()
+    manifest.notes = str(payload.get("notes") or "").strip()
+    manifest.metadata = metadata
+    manifest.created_by = str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip()
+    if not manifest.manifest_identifier:
+        manifest.manifest_identifier = str(payload.get("manifest_identifier") or "").strip() or generate_manifest_identifier()
+    return None
+
+
+def _build_manifest_item_from_payload(item: AccessioningManifestItem, payload: dict[str, object]):
+    biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+    if error:
+        return error
+    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    if error:
+        return error
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    try:
+        position = int(payload.get("position") or item.position or 1)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "invalid_position"}, status=400)
+    item.biospecimen = biospecimen
+    item.position = position
+    item.expected_subject_identifier = str(payload.get("expected_subject_identifier") or "").strip()
+    item.expected_sample_identifier = str(payload.get("expected_sample_identifier") or "").strip()
+    item.expected_barcode = str(payload.get("expected_barcode") or "").strip()
+    item.quantity = quantity
+    item.quantity_unit = str(payload.get("quantity_unit") or "mL").strip()
+    item.collection_status = str(payload.get("collection_status") or "").strip()
+    item.notes = str(payload.get("notes") or "").strip()
+    item.metadata = metadata
+    return None
+
+
+def _accessioning_error_response(exc: AccessioningError):
+    message = str(exc)
+    if message.startswith("metadata_invalid:"):
+        try:
+            errors = json.loads(message.split(":", 1)[1])
+        except json.JSONDecodeError:
+            errors = []
+        return JsonResponse({"error": "metadata_invalid", "errors": errors}, status=400)
+    return JsonResponse({"error": message}, status=400)
+
+
 @csrf_exempt
 def lims_biospecimen_types(request):
     if request.method == "GET":
@@ -1511,3 +1660,267 @@ def lims_biospecimen_pool_transition(request, pool_id: str):
         return JsonResponse({"error": str(exc)}, status=400)
     pool.refresh_from_db()
     return JsonResponse(_biospecimen_pool_to_dict(pool))
+
+
+@csrf_exempt
+def lims_accessioning_receive_single(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.manage")
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+    if error:
+        return error
+    if sample_type is None:
+        return JsonResponse({"error": "sample_type_id is required"}, status=400)
+    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    if error:
+        return error
+    site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+    if error:
+        return error
+    lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+    if error:
+        return error
+    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    if error:
+        return error
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    try:
+        specimen, event = receive_single_biospecimen(
+            sample_type=sample_type,
+            study=study,
+            site=site,
+            lab=lab,
+            subject_identifier=str(payload.get("subject_identifier") or "").strip(),
+            external_identifier=str(payload.get("external_identifier") or "").strip(),
+            quantity=quantity,
+            quantity_unit=str(payload.get("quantity_unit") or "mL").strip(),
+            metadata=metadata,
+            received_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+            sample_identifier=str(payload.get("sample_identifier") or "").strip(),
+            barcode=str(payload.get("barcode") or "").strip(),
+            scan_value=str(payload.get("scan_value") or "").strip(),
+            notes=str(payload.get("notes") or "").strip(),
+        )
+    except AccessioningError as exc:
+        return _accessioning_error_response(exc)
+    specimen.refresh_from_db()
+    return JsonResponse({"biospecimen": _biospecimen_to_dict(specimen), "event": _receiving_event_to_dict(event)}, status=201)
+
+
+@csrf_exempt
+def lims_accessioning_manifests(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.artifact.view")
+        if forbidden:
+            return forbidden
+        queryset = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "items"
+        ).order_by("-created_at")
+        if request.GET.get("status"):
+            queryset = queryset.filter(status=request.GET["status"])
+        if request.GET.get("sample_type_id"):
+            queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
+        items = [_accessioning_manifest_to_dict(item) for item in queryset[:200]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.artifact.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        manifest = AccessioningManifest()
+        error = _build_accessioning_manifest_from_payload(manifest, payload, request=request)
+        if error:
+            return error
+        error = _save_model(manifest)
+        if error:
+            return error
+        items_payload = payload.get("items") or []
+        if not isinstance(items_payload, list):
+            return JsonResponse({"error": "items must be a list"}, status=400)
+        for index, item_payload in enumerate(items_payload, start=1):
+            if not isinstance(item_payload, dict):
+                return JsonResponse({"error": "item must be an object"}, status=400)
+            item = AccessioningManifestItem(manifest=manifest, position=index)
+            error = _build_manifest_item_from_payload(item, {**item_payload, "position": item_payload.get("position") or index})
+            if error:
+                manifest.delete()
+                return error
+            error = _save_model(item)
+            if error:
+                manifest.delete()
+                return error
+        if bool(payload.get("submit", False)):
+            try:
+                submit_manifest(manifest)
+            except AccessioningError as exc:
+                return _accessioning_error_response(exc)
+        manifest.refresh_from_db()
+        return JsonResponse(_accessioning_manifest_to_dict(manifest), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_accessioning_manifest_detail(request, manifest_id: str):
+    try:
+        manifest = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "items"
+        ).get(id=manifest_id)
+    except (ValidationError, AccessioningManifest.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.artifact.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(
+            {
+                **_accessioning_manifest_to_dict(manifest),
+                "items": [_manifest_item_to_dict(item) for item in manifest.items.order_by("position", "created_at")],
+            }
+        )
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.artifact.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_accessioning_manifest_from_payload(manifest, payload, request=request)
+        if error:
+            return error
+        error = _save_model(manifest)
+        if error:
+            return error
+        manifest.refresh_from_db()
+        return JsonResponse(_accessioning_manifest_to_dict(manifest))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_accessioning_manifest_submit(request, manifest_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.manage")
+    if forbidden:
+        return forbidden
+    try:
+        manifest = AccessioningManifest.objects.get(id=manifest_id)
+    except (ValidationError, AccessioningManifest.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    try:
+        submit_manifest(manifest)
+    except AccessioningError as exc:
+        return _accessioning_error_response(exc)
+    manifest.refresh_from_db()
+    return JsonResponse(_accessioning_manifest_to_dict(manifest))
+
+
+@csrf_exempt
+def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.manage")
+    if forbidden:
+        return forbidden
+    try:
+        item = AccessioningManifestItem.objects.select_related("manifest", "biospecimen", "manifest__sample_type").get(
+            id=item_id, manifest_id=manifest_id
+        )
+    except (ValidationError, AccessioningManifestItem.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    try:
+        item, event = receive_manifest_item(
+            item,
+            received_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+            scan_value=str(payload.get("scan_value") or "").strip(),
+            notes=str(payload.get("notes") or "").strip(),
+            metadata=metadata,
+        )
+    except AccessioningError as exc:
+        return _accessioning_error_response(exc)
+    item.refresh_from_db()
+    return JsonResponse({"item": _manifest_item_to_dict(item), "event": _receiving_event_to_dict(event)})
+
+
+@csrf_exempt
+def lims_accessioning_manifest_report(request, manifest_id: str):
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
+    if forbidden:
+        return forbidden
+    try:
+        manifest = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").get(id=manifest_id)
+    except (ValidationError, AccessioningManifest.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    return JsonResponse(accessioning_report(manifest))
+
+
+@csrf_exempt
+def lims_receiving_discrepancies(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.artifact.view")
+        if forbidden:
+            return forbidden
+        queryset = ReceivingDiscrepancy.objects.select_related("manifest", "manifest_item", "biospecimen").order_by(
+            "-created_at"
+        )
+        if request.GET.get("manifest_id"):
+            queryset = queryset.filter(manifest_id=request.GET["manifest_id"])
+        if request.GET.get("status"):
+            queryset = queryset.filter(status=request.GET["status"])
+        items = [_receiving_discrepancy_to_dict(item) for item in queryset[:200]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.artifact.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        manifest, error = _resolve_optional_fk(AccessioningManifest, payload.get("manifest_id"), "manifest_not_found")
+        if error:
+            return error
+        item, error = _resolve_optional_fk(AccessioningManifestItem, payload.get("manifest_item_id"), "manifest_item_not_found")
+        if error:
+            return error
+        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+        if error:
+            return error
+        code = str(payload.get("code") or "").strip()
+        if code not in ReceivingDiscrepancy.Code.values:
+            return JsonResponse({"error": "invalid_code"}, status=400)
+        expected_data = payload.get("expected_data") or {}
+        actual_data = payload.get("actual_data") or {}
+        if not isinstance(expected_data, dict) or not isinstance(actual_data, dict):
+            return JsonResponse({"error": "expected_data and actual_data must be objects"}, status=400)
+        try:
+            discrepancy = create_receiving_discrepancy(
+                code=code,
+                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                manifest=manifest,
+                manifest_item=item,
+                biospecimen=biospecimen,
+                notes=str(payload.get("notes") or "").strip(),
+                expected_data=expected_data,
+                actual_data=actual_data,
+            )
+        except AccessioningError as exc:
+            return _accessioning_error_response(exc)
+        return JsonResponse(_receiving_discrepancy_to_dict(discrepancy), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
