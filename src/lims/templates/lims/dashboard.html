@@ -1,0 +1,28 @@
+{% extends "core/ui/user_base.html" %}
+{% block title %}Mtafiti LIMS{% endblock %}
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label="LIMS module" page_title="Research Lab workspace" page_summary="Tenant-aware shell for laboratory workflows, configurable metadata capture, and operator-facing processing queues." parent_label="Workspace" current_label="LIMS" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Configured workflows" count_label="count" count_value=payload.cards.workflows %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Active queues" count_label="count" count_value=payload.cards.queues %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Connected instruments" count_label="count" count_value=payload.cards.instruments %}
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="LIMS launchpad" panel_description="Initial shell placeholders for the first tenant-aware LIMS delivery slices." %}
+  <div class="cards">
+    {% for item in payload.launchpad %}
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">{{ item.title }}</h2>
+          <p class="panel-description">{{ item.description }}</p>
+        </div>
+        <span class="utility-chip">{{ item.status }}</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

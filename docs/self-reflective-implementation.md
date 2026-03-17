@@ -81,6 +81,20 @@ Each execution issue must include:
 
 Template: use `.github/ISSUE_TEMPLATE/delivery-work-item.md` for consistent issue setup.
 
+### Delivery order (required)
+
+Use this repository workflow for new implementation slices:
+
+1. update or create the human-readable plan first,
+2. create/update the GitHub issue set for reviewable work items,
+3. mirror executable work into SQL todos with dependencies,
+4. implement one issue per branch,
+5. commit and push the branch,
+6. open a PR for review,
+7. squash merge after review passes.
+
+Direct-to-`main` implementation is reserved for exceptional repository maintenance, not normal feature delivery.
+
 ## Resources to expose (to reduce looping)
 
 * Repository symbol/code index and architecture map.
@@ -135,13 +149,15 @@ PR checklist template: `.github/pull_request_template.md` enforces issue + hando
 
 ## End-to-end execution policy (mandatory)
 
-Every implementation task in this project should be executed end-to-end in one flow:
+Every implementation task in this project should be executed end-to-end in one flow on its issue branch:
 
 1. implement the slice,
 2. run tests for the slice and then full backend suite,
 3. fix discovered issues,
 4. rerun tests until green,
-5. then commit/push.
+5. then commit/push,
+6. open/update the PR,
+7. merge via squash after review.
 
 Tasks should not be reported as done while still waiting on test execution or post-implementation validation.
 

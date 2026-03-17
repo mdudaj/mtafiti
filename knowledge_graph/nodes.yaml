@@ -5,7 +5,7 @@ nodes:
     name: Django
     description: "Model-driven server-side web framework."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -16,7 +16,8 @@ nodes:
       get_commands:
         - "chub get django/forms"
         - "chub get django/urls"
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -24,63 +25,6 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: django
-          total: 3
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-        -
-          query: "django forms"
-          total: 3
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-        -
-          query: "django urls"
-          total: 3
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-      search_status: matched
-      candidate_registry_ids:
-        - knowledge-src/django-material
-        - knowledge-src/cookbook-django-admin
-        - knowledge-src/django-material-theme-customization
     repository_fit:
       status: installed
       evidence:
@@ -92,201 +36,13 @@ nodes:
         - "Django model layer in core.models"
         - "Middleware-driven request instrumentation and auth"
   -
-    id: tool:pytest-django
-    type: Tool
-    name: pytest-django
-    description: "Django integration plugin for pytest."
-    version: 4.8.0
-    context_hub:
-      available: true
-      install_command: "npm install -g @aisuite/chub"
-      update_command: "chub update"
-      help_command: "chub help"
-      search_queries:
-        - "pytest django"
-        - pytest-django
-      get_commands:
-        []
-      status: ready
-      local_source_workflow:
-        supports_git_url_directly: false
-        clone_and_build_steps:
-          - "git clone <repo-url> <local-dir>"
-          - "chub build <content-dir> -o <content-dir>/dist"
-          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
-          - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: "pytest django"
-          total: 3
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-        -
-          query: pytest-django
-          total: 3
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-      search_status: matched
-      candidate_registry_ids:
-        - knowledge-src/django-material
-        - knowledge-src/cookbook-django-admin
-        - knowledge-src/django-material-theme-customization
-  -
-    id: framework:django_material
-    type: Framework
-    name: django-material
-    description: "Server-rendered Material Design 3 component library for Django."
-    context_hub:
-      available: true
-      install_command: "npm install -g @aisuite/chub"
-      update_command: "chub update"
-      help_command: "chub help"
-      search_queries:
-        - django-material
-        - "django material"
-      get_commands:
-        []
-      status: ready
-      local_source_workflow:
-        supports_git_url_directly: false
-        clone_and_build_steps:
-          - "git clone <repo-url> <local-dir>"
-          - "chub build <content-dir> -o <content-dir>/dist"
-          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
-          - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: django-material
-          total: 2
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-        -
-          query: "django material"
-          total: 2
-          matches:
-            -
-              id: knowledge-src/django-material
-              source: maintainer
-              description: "Local knowledge source generated from the django-material repository README."
-            -
-              id: knowledge-src/django-material-theme-customization
-              source: community
-              description: "Local theming skill generated from django-material design token sources."
-          status: matched
-      search_status: matched
-      candidate_registry_ids:
-        - knowledge-src/django-material
-        - knowledge-src/django-material-theme-customization
-    repository_fit:
-      status: documented_target
-      evidence:
-        - docs/workflow-ui.md
-      repository_patterns:
-        - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
-        - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
-  -
-    id: framework:viewflow
-    type: Framework
-    name: Viewflow
-    description: "Django-native low-code framework for workflows and business apps."
-    context_hub:
-      available: true
-      install_command: "npm install -g @aisuite/chub"
-      update_command: "chub update"
-      help_command: "chub help"
-      search_queries:
-        - viewflow
-        - "django workflow"
-      get_commands:
-        []
-      status: ready
-      local_source_workflow:
-        supports_git_url_directly: false
-        clone_and_build_steps:
-          - "git clone <repo-url> <local-dir>"
-          - "chub build <content-dir> -o <content-dir>/dist"
-          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
-          - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: viewflow
-          total: 3
-          matches:
-            -
-              id: knowledge-src/viewflow
-              source: maintainer
-              description: "Local knowledge source generated from the viewflow repository README."
-            -
-              id: knowledge-src/cookbook-articles
-              source: community
-              description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
-            -
-              id: knowledge-src/cookbook-crud101
-              source: community
-              description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
-          status: matched
-        -
-          query: "django workflow"
-          total: 1
-          matches:
-            -
-              id: knowledge-src/cookbook-django-admin
-              source: community
-              description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-          status: matched
-      search_status: matched
-      candidate_registry_ids:
-        - knowledge-src/viewflow
-        - knowledge-src/cookbook-articles
-        - knowledge-src/cookbook-crud101
-        - knowledge-src/cookbook-django-admin
-    repository_fit:
-      status: documented_target
-      evidence:
-        - docs/workflow-ui.md
-      repository_patterns:
-        - "Workflow UI notes describe Viewflow as the target workflow engine."
-        - "Current code uses custom workflow models instead of installed Viewflow packages."
-  -
     id: framework:celery
     type: Framework
     name: celery
     description: "Distributed task queue used for tenant-aware background processing."
     version: 5.3.6
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -295,7 +51,8 @@ nodes:
         - "celery python"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -303,20 +60,37 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: celery
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "celery python"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
+  -
+    id: framework:django_material
+    type: Framework
+    name: django-material
+    description: "Server-rendered Material Design 3 component library for Django."
+    context_hub:
+      available: false
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - django-material
+        - "django material"
+      get_commands:
+        []
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+    repository_fit:
+      status: documented_target
+      evidence:
+        - docs/workflow-ui.md
+      repository_patterns:
+        - "Workflow UI notes describe django-material as the planned server-rendered UI stack."
+        - "Current backend has API-only operational UI endpoints and no material app in INSTALLED_APPS."
   -
     id: framework:django-tenants
     type: Framework
@@ -324,7 +98,7 @@ nodes:
     description: "Schema-per-tenant extension for Django."
     version: 3.10.0
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -333,7 +107,8 @@ nodes:
         - "django tenants"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -341,27 +116,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: django-tenants
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "django tenants"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: tool:docker_compose
     type: Tool
     name: "Docker Compose"
     description: "Local service orchestration for PostgreSQL and RabbitMQ."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -370,7 +131,8 @@ nodes:
         - docker-compose
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -378,27 +140,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: "docker compose"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: docker-compose
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: tool:github_actions
     type: Tool
     name: "GitHub Actions"
     description: "Repository CI/CD automation and drift gates."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -407,7 +155,8 @@ nodes:
         - "github workflow"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -415,27 +164,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: "github actions"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "github workflow"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: tool:helm
     type: Tool
     name: Helm
     description: "Release packaging for the mtafiti-platform chart."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -444,7 +179,8 @@ nodes:
         - "helm kubernetes"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -452,27 +188,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: helm
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "helm kubernetes"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: tool:kubernetes
     type: Tool
     name: Kubernetes
     description: "Deployment manifests for backend, worker, ingress, and supporting services."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -481,7 +203,8 @@ nodes:
         - k8s
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -489,20 +212,6 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: kubernetes
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: k8s
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: library:pika
     type: Library
@@ -510,7 +219,7 @@ nodes:
     description: "RabbitMQ/AMQP client used for event publishing."
     version: 1.3.2
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -518,7 +227,8 @@ nodes:
         - "pika rabbitmq python"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -526,21 +236,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: "pika rabbitmq python"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: service:postgres
     type: Service
     name: postgres
     description: "PostgreSQL persistence service."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -549,7 +251,8 @@ nodes:
         - postgresql
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -557,20 +260,6 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: postgres
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: postgresql
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: library:prometheus-client
     type: Library
@@ -578,7 +267,7 @@ nodes:
     description: "Prometheus instrumentation library for metrics exposure."
     version: 0.20.0
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -587,7 +276,8 @@ nodes:
         - prometheus
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -595,20 +285,6 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: "prometheus python client"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: prometheus
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: library:psycopg
     type: Library
@@ -616,7 +292,7 @@ nodes:
     description: "PostgreSQL driver used by Django and operational scripts."
     version: 3.1.18
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -625,7 +301,8 @@ nodes:
         - "postgres python driver"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -633,20 +310,31 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: psycopg
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "postgres python driver"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
+  -
+    id: tool:pytest-django
+    type: Tool
+    name: pytest-django
+    description: "Django integration plugin for pytest."
+    version: 4.8.0
+    context_hub:
+      available: false
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - "pytest django"
+        - pytest-django
+      get_commands:
+        []
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
   -
     id: tool:pytest
     type: Tool
@@ -654,7 +342,7 @@ nodes:
     description: "Python test runner used by repository validation."
     version: 8.0.2
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -663,7 +351,8 @@ nodes:
         - "pytest python"
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -671,27 +360,13 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: pytest
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: "pytest python"
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
   -
     id: service:rabbitmq
     type: Service
     name: rabbitmq
     description: "RabbitMQ broker service."
     context_hub:
-      available: true
+      available: false
       install_command: "npm install -g @aisuite/chub"
       update_command: "chub update"
       help_command: "chub help"
@@ -700,7 +375,8 @@ nodes:
         - amqp
       get_commands:
         []
-      status: ready
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
       local_source_workflow:
         supports_git_url_directly: false
         clone_and_build_steps:
@@ -708,20 +384,37 @@ nodes:
           - "chub build <content-dir> -o <content-dir>/dist"
           - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
           - "Run `chub update` to refresh configured sources"
-      search_results:
-        -
-          query: rabbitmq
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-        -
-          query: amqp
-          total: 0
-          matches:
-            []
-          status: no_registry_match
-      search_status: no_registry_match
+  -
+    id: framework:viewflow
+    type: Framework
+    name: Viewflow
+    description: "Django-native low-code framework for workflows and business apps."
+    context_hub:
+      available: false
+      install_command: "npm install -g @aisuite/chub"
+      update_command: "chub update"
+      help_command: "chub help"
+      search_queries:
+        - viewflow
+        - "django workflow"
+      get_commands:
+        []
+      status: external_optional_cli
+      registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
+      local_source_workflow:
+        supports_git_url_directly: false
+        clone_and_build_steps:
+          - "git clone <repo-url> <local-dir>"
+          - "chub build <content-dir> -o <content-dir>/dist"
+          - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
+          - "Run `chub update` to refresh configured sources"
+    repository_fit:
+      status: documented_target
+      evidence:
+        - docs/workflow-ui.md
+      repository_patterns:
+        - "Workflow UI notes describe Viewflow as the target workflow engine."
+        - "Current code uses custom workflow models instead of installed Viewflow packages."
   -
     id: api:api_v1_access_requests_request_id_decision
     type: API
@@ -1088,6 +781,15 @@ nodes:
     route_name: governance_policy_transition
     methods:
       - POST
+  -
+    id: api:api_v1_lims
+    type: API
+    name: /api/v1/lims
+    description: "API route handled by include."
+    handler: include
+    route_name: include
+    methods:
+      []
   -
     id: api:api_v1_ingestions_ingestion_id
     type: API
@@ -1661,6 +1363,15 @@ nodes:
     route_name: tenants
     methods:
       []
+  -
+    id: api:api_v1_ui_model_select_options
+    type: API
+    name: /api/v1/ui/model-select-options
+    description: "API route handled by ui_model_select_options."
+    handler: ui_model_select_options
+    route_name: ui_model_select_options
+    methods:
+      - GET
   -
     id: api:api_v1_ui_operations_agent_monitor
     type: API

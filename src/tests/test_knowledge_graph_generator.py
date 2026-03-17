@@ -56,6 +56,41 @@ def test_bundle_contains_expected_framework_and_skill_nodes():
     assert "local_source_workflow" in django_node["context_hub"]
 
 
+def test_knowledge_graph_library_prefers_src_app_root():
+    module = _load_module(LIB_PATH, "knowledge_graph_lib")
+    assert module.resolve_app_root(REPO_ROOT) == REPO_ROOT / "src"
+
+
+def test_programming_language_detection_uses_tracked_files():
+    module = _load_module(LIB_PATH, "knowledge_graph_lib")
+    languages = {
+        item["name"]: item["file_count"]
+        for item in module.detect_programming_languages(REPO_ROOT)
+    }
+    assert languages["Python"] < 1000
+    assert languages["Markdown"] < 200
+
+
+def test_context_hub_entries_are_environment_independent(monkeypatch):
+    module = _load_module(LIB_PATH, "knowledge_graph_lib")
+    monkeypatch.setattr(module.shutil, "which", lambda _: "/tmp/fake-chub")
+    module._CONTEXT_HUB_CACHE.clear()
+
+    entry = module.build_context_hub_entry("django")
+    inventory = module.build_environment_inventory(
+        REPO_ROOT,
+        module.collect_python_modules(REPO_ROOT / "src"),
+        module.extract_urlpatterns(REPO_ROOT / "src" / "config" / "urls.py"),
+        module.extract_settings(REPO_ROOT / "src" / "config" / "settings.py"),
+    )
+
+    assert entry["available"] is False
+    assert entry["status"] == "external_optional_cli"
+    assert "search_results" not in entry
+    assert "candidate_registry_ids" not in entry
+    assert inventory["EnvironmentInventory"]["context_hub_registry"]["available"] is False
+
+
 def test_query_script_returns_dashboard_skills():
     result = subprocess.run(
         [

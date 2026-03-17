@@ -165,6 +165,10 @@ edges:
     to: module:core_views
   -
     relationship: calls
+    from: api:api_v1_lims
+    to: module:core_views
+  -
+    relationship: calls
     from: api:api_v1_lineage_edges
     to: module:core_views
   -
@@ -398,6 +402,10 @@ edges:
   -
     relationship: calls
     from: api:api_v1_tenants_services
+    to: module:core_views
+  -
+    relationship: calls
+    from: api:api_v1_ui_model_select_options
     to: module:core_views
   -
     relationship: calls
@@ -842,6 +850,10 @@ edges:
   -
     relationship: implements
     from: module:core_views
+    to: uicomponent:model_select_options
+  -
+    relationship: implements
+    from: module:core_views
     to: uicomponent:operations_dashboard
   -
     relationship: implements
@@ -895,6 +907,22 @@ edges:
     relationship: uses
     from: module:core_views
     to: module:core_tasks
+  -
+    relationship: uses
+    from: module:lims_apps
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_urls
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_views
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_views
+    to: module:core_identity
   -
     relationship: uses
     from: module:tenants_admin
@@ -1127,6 +1155,10 @@ edges:
     relationship: produces
     from: service:backend
     to: api:api_v1_ingestions_ingestion_id
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_lims
   -
     relationship: produces
     from: service:backend
@@ -1363,6 +1395,10 @@ edges:
     relationship: produces
     from: service:backend
     to: api:api_v1_tenants_services
+  -
+    relationship: produces
+    from: service:backend
+    to: api:api_v1_ui_model_select_options
   -
     relationship: produces
     from: service:backend

@@ -36,7 +36,7 @@ best_practices:
   - "Model workflow steps as composable Flow nodes with clear assignee/transition boundaries."
   - "Use cookbook examples to validate dashboard and workflow interaction patterns before customization."
 context_hub:
-  available: true
+  available: false
   install_command: "npm install -g @aisuite/chub"
   update_command: "chub update"
   help_command: "chub help"
@@ -45,7 +45,8 @@ context_hub:
     - "django workflow"
   get_commands:
     []
-  status: ready
+  status: external_optional_cli
+  registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
   local_source_workflow:
     supports_git_url_directly: false
     clone_and_build_steps:
@@ -53,39 +54,6 @@ context_hub:
       - "chub build <content-dir> -o <content-dir>/dist"
       - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
       - "Run `chub update` to refresh configured sources"
-  search_results:
-    -
-      query: viewflow
-      total: 3
-      matches:
-        -
-          id: knowledge-src/viewflow
-          source: maintainer
-          description: "Local knowledge source generated from the viewflow repository README."
-        -
-          id: knowledge-src/cookbook-articles
-          source: community
-          description: "Local cookbook sample for _articles generated from the Viewflow cookbook repository."
-        -
-          id: knowledge-src/cookbook-crud101
-          source: community
-          description: "Local cookbook sample for crud101 generated from the Viewflow cookbook repository."
-      status: matched
-    -
-      query: "django workflow"
-      total: 1
-      matches:
-        -
-          id: knowledge-src/cookbook-django-admin
-          source: community
-          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-      status: matched
-  search_status: matched
-  candidate_registry_ids:
-    - knowledge-src/viewflow
-    - knowledge-src/cookbook-articles
-    - knowledge-src/cookbook-crud101
-    - knowledge-src/cookbook-django-admin
 repository_fit:
   status: documented_target
   evidence:

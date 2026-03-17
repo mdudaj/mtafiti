@@ -7,7 +7,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-URLS = ROOT / "backend" / "config" / "urls.py"
 OPENAPI = ROOT / "docs" / "openapi.yaml"
 
 CRITICAL_PATHS = {
@@ -71,6 +70,20 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _urls_path() -> Path:
+    candidates = (
+        ROOT / "src" / "config" / "urls.py",
+        ROOT / "backend" / "config" / "urls.py",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Could not locate Django URL configuration. Checked: "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
 def normalize_django_path(path_value: str) -> str:
     route = path_value.strip().strip("/")
     if not route:
@@ -130,7 +143,7 @@ def extract_schema_names(openapi_text: str) -> set[str]:
 
 
 def main() -> int:
-    implemented_paths = extract_implemented_paths(_read(URLS))
+    implemented_paths = extract_implemented_paths(_read(_urls_path()))
     openapi_text = _read(OPENAPI)
     openapi_paths = extract_openapi_paths(openapi_text)
     schema_names = extract_schema_names(openapi_text)

@@ -634,11 +634,12 @@ def extract_views(modules: list[PythonModule]) -> list[dict[str, Any]]:
 
 
 def detect_programming_languages(root: Path) -> list[dict[str, Any]]:
+    tracked_files = list_repository_files(root)
     counts = {
-        "Python": len(list(root.rglob("*.py"))),
-        "YAML": len(list(root.rglob("*.yaml"))) + len(list(root.rglob("*.yml"))),
-        "Shell": len(list(root.rglob("*.sh"))),
-        "Markdown": len(list(root.rglob("*.md"))),
+        "Python": count_suffixes(tracked_files, ".py"),
+        "YAML": count_suffixes(tracked_files, ".yaml", ".yml"),
+        "Shell": count_suffixes(tracked_files, ".sh"),
+        "Markdown": count_suffixes(tracked_files, ".md"),
     }
     return [
         {"name": name, "file_count": count}
@@ -647,9 +648,58 @@ def detect_programming_languages(root: Path) -> list[dict[str, Any]]:
     ]
 
 
+def list_repository_files(root: Path) -> list[Path]:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        ignored_parts = {
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            "dist",
+            "build",
+            "__pycache__",
+        }
+        return sorted(
+            path
+            for path in root.rglob("*")
+            if path.is_file() and not ignored_parts.intersection(path.parts)
+        )
+
+    relative_paths = [
+        item.decode("utf-8")
+        for item in completed.stdout.split(b"\x00")
+        if item
+    ]
+    return [root / relative_path for relative_path in sorted(relative_paths)]
+
+
+def count_suffixes(paths: list[Path], *suffixes: str) -> int:
+    normalized = tuple(suffix.lower() for suffix in suffixes)
+    return sum(1 for path in paths if path.suffix.lower() in normalized)
+
+
+def resolve_app_root(root: Path) -> Path:
+    candidates = (root / "src", root / "backend")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Could not locate application root. Checked: "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
 def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatterns: list[dict[str, Any]], settings: dict[str, Any]) -> dict[str, Any]:
-    requirements = parse_requirements(root / "backend" / "requirements.txt")
-    requirements_dev = parse_requirements(root / "backend" / "requirements-dev.txt")
+    app_root = resolve_app_root(root)
+    requirements = parse_requirements(app_root / "requirements.txt")
+    requirements_dev = parse_requirements(app_root / "requirements-dev.txt")
     package_index = {item["name"]: item["version"] for item in [*requirements, *requirements_dev]}
     ci_jobs = parse_simple_yaml_keys(root / ".github" / "workflows" / "ci.yml", "jobs", 2)
     compose_services = parse_simple_yaml_keys(root / "docker-compose.yml", "services", 2)
@@ -775,7 +825,9 @@ def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatt
             "ci_cd_tools": [{"name": name, "status": "configured"} for name in ci_jobs],
             "internal_modules": internal_modules,
             "context_hub_registry": {
-                "available": shutil.which("chub") is not None,
+                "available": False,
+                "status": "external_optional_cli",
+                "note": "Generated artifacts describe the repository integration contract, not the local machine PATH state.",
                 "profiles": context_hub_profiles,
                 "local_source_note": "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml.",
             },
@@ -929,15 +981,15 @@ def build_context_hub_entry(profile_key: str) -> dict[str, Any]:
     if cached is not None:
         return json.loads(json.dumps(cached))
     profile = ECOSYSTEM_CONTEXT_PROFILES.get(profile_key, {"search_queries": [profile_key], "doc_ids": []})
-    available = shutil.which("chub") is not None
     entry = {
-        "available": available,
+        "available": False,
         "install_command": "npm install -g @aisuite/chub",
         "update_command": "chub update",
         "help_command": "chub help",
         "search_queries": profile["search_queries"],
         "get_commands": [f"chub get {item}" for item in profile.get("doc_ids", [])],
-        "status": "ready" if available else "install_required",
+        "status": "external_optional_cli",
+        "registry_lookup_policy": "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts.",
         "local_source_workflow": {
             "supports_git_url_directly": False,
             "clone_and_build_steps": [
@@ -948,26 +1000,6 @@ def build_context_hub_entry(profile_key: str) -> dict[str, Any]:
             ],
         },
     }
-    if available:
-        search_results: list[dict[str, Any]] = []
-        top_ids: list[str] = []
-        for query in profile["search_queries"]:
-            result = run_chub_search(query, accept_terms=profile.get("accept_terms", []))
-            search_results.append(result)
-            for match in result.get("matches", []):
-                if match["id"] not in top_ids:
-                    top_ids.append(match["id"])
-        entry["search_results"] = search_results
-        entry["search_status"] = "matched" if top_ids else "no_registry_match"
-        if top_ids:
-            entry["candidate_registry_ids"] = top_ids[:5]
-        docs: list[dict[str, str]] = []
-        for command in entry["get_commands"][:2]:
-            content = run_command(command)
-            if content:
-                docs.append({"command": command, "content": content})
-        if docs:
-            entry["retrieved_docs"] = docs
     _CONTEXT_HUB_CACHE[profile_key] = entry
     return json.loads(json.dumps(entry))
 
@@ -1185,7 +1217,8 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
         "pytest": ("Tool", "Python test runner used by repository validation.", "pytest"),
         "pytest-django": ("Tool", "Django integration plugin for pytest.", "pytest-django"),
     }
-    for requirements_path in [root / "backend" / "requirements.txt", root / "backend" / "requirements-dev.txt"]:
+    app_root = resolve_app_root(root)
+    for requirements_path in [app_root / "requirements.txt", app_root / "requirements-dev.txt"]:
         for package in parse_requirements(requirements_path):
             if package["name"] not in package_nodes:
                 continue
@@ -1201,7 +1234,7 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
                 )
             )
 
-    for package in parse_requirements(root / "backend" / "requirements-dev.txt"):
+    for package in parse_requirements(app_root / "requirements-dev.txt"):
         classification = PACKAGE_CLASSIFICATIONS.get(package["name"], "Tool")
         if classification != "Tool":
             continue
@@ -1446,10 +1479,10 @@ def build_ontology() -> dict[str, Any]:
 
 
 def build_bundle(root: Path) -> dict[str, Any]:
-    backend_root = root / "backend"
-    modules = collect_python_modules(backend_root)
-    urlpatterns = extract_urlpatterns(root / "backend" / "config" / "urls.py")
-    settings = extract_settings(root / "backend" / "config" / "settings.py")
+    app_root = resolve_app_root(root)
+    modules = collect_python_modules(app_root)
+    urlpatterns = extract_urlpatterns(app_root / "config" / "urls.py")
+    settings = extract_settings(app_root / "config" / "settings.py")
     framework_knowledge = build_framework_knowledge(root, settings)
     models = extract_models(modules)
     tasks = extract_tasks(modules)
