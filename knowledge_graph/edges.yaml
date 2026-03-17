@@ -638,6 +638,34 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:metadatafielddefinition
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadataschema
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadataschemabinding
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadataschemafield
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadataschemaversion
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadatavocabulary
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:metadatavocabularyitem
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:notebookexecution
   -
     relationship: implements

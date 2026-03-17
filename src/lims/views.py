@@ -11,6 +11,13 @@ from core.identity import request_roles
 from .permissions import permission_summary_for_roles, require_lims_permission
 from .models import (
     Lab,
+    MetadataFieldDefinition,
+    MetadataSchema,
+    MetadataSchemaBinding,
+    MetadataSchemaField,
+    MetadataSchemaVersion,
+    MetadataVocabulary,
+    MetadataVocabularyItem,
     Site,
     Study,
     TanzaniaAddressSyncRun,
@@ -19,7 +26,7 @@ from .models import (
     TanzaniaStreet,
     TanzaniaWard,
 )
-from .services import sync_run_to_dict
+from .services import resolve_schema_version_for_binding, sync_run_to_dict, validate_metadata_payload
 from .tasks import sync_tanzania_address_run
 
 
@@ -119,6 +126,94 @@ def _site_to_dict(site: Site) -> dict[str, object]:
         "street_id": str(site.street_id) if site.street_id else None,
         "postcode": site.postcode,
         "is_active": site.is_active,
+    }
+
+
+def _vocabulary_item_to_dict(item: MetadataVocabularyItem) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "value": item.value,
+        "label": item.label,
+        "sort_order": item.sort_order,
+        "is_active": item.is_active,
+    }
+
+
+def _vocabulary_to_dict(vocabulary: MetadataVocabulary) -> dict[str, object]:
+    return {
+        "id": str(vocabulary.id),
+        "name": vocabulary.name,
+        "code": vocabulary.code,
+        "description": vocabulary.description,
+        "is_active": vocabulary.is_active,
+        "items": [_vocabulary_item_to_dict(item) for item in vocabulary.items.order_by("sort_order", "label")],
+    }
+
+
+def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, object]:
+    return {
+        "id": str(field.id),
+        "name": field.name,
+        "code": field.code,
+        "description": field.description,
+        "field_type": field.field_type,
+        "help_text": field.help_text,
+        "placeholder": field.placeholder,
+        "vocabulary_id": str(field.vocabulary_id) if field.vocabulary_id else None,
+        "default_value": field.default_value,
+        "config": field.config,
+        "is_active": field.is_active,
+    }
+
+
+def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
+    return {
+        "id": str(field.id),
+        "field_definition_id": str(field.field_definition_id),
+        "field_definition_code": field.field_definition.code,
+        "field_definition_name": field.field_definition.name,
+        "field_type": field.field_definition.field_type,
+        "field_key": field.field_key,
+        "position": field.position,
+        "required": field.required,
+        "validation_rules": dict(field.validation_rules or {}),
+        "condition": dict(field.condition or {}),
+    }
+
+
+def _schema_version_to_dict(version: MetadataSchemaVersion) -> dict[str, object]:
+    return {
+        "id": str(version.id),
+        "schema_id": str(version.schema_id),
+        "version_number": version.version_number,
+        "status": version.status,
+        "change_summary": version.change_summary,
+        "fields": [_schema_field_to_dict(item) for item in version.fields.select_related("field_definition").order_by("position", "field_key")],
+    }
+
+
+def _schema_to_dict(schema: MetadataSchema) -> dict[str, object]:
+    return {
+        "id": str(schema.id),
+        "name": schema.name,
+        "code": schema.code,
+        "description": schema.description,
+        "is_active": schema.is_active,
+        "versions": [_schema_version_to_dict(item) for item in schema.versions.order_by("-version_number")],
+    }
+
+
+def _schema_binding_to_dict(binding: MetadataSchemaBinding) -> dict[str, object]:
+    return {
+        "id": str(binding.id),
+        "schema_version_id": str(binding.schema_version_id),
+        "schema_id": str(binding.schema_version.schema_id),
+        "schema_code": binding.schema_version.schema.code,
+        "version_number": binding.schema_version.version_number,
+        "target_type": binding.target_type,
+        "target_key": binding.target_key,
+        "target_label": binding.target_label,
+        "is_active": binding.is_active,
     }
 
 
@@ -223,6 +318,90 @@ def _save_model(instance):
         return JsonResponse({"error": "validation_error"}, status=400)
     except IntegrityError:
         return JsonResponse({"error": "conflict"}, status=409)
+    return None
+
+
+def _build_vocabulary_from_payload(vocabulary: MetadataVocabulary, payload: dict[str, object]):
+    if not payload.get("name"):
+        return JsonResponse({"error": "name is required"}, status=400)
+    if not payload.get("code"):
+        return JsonResponse({"error": "code is required"}, status=400)
+    vocabulary.name = str(payload.get("name")).strip()
+    vocabulary.code = str(payload.get("code")).strip()
+    vocabulary.description = str(payload.get("description") or "").strip()
+    vocabulary.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _sync_vocabulary_items(vocabulary: MetadataVocabulary, items_payload: object):
+    if items_payload is None:
+        return None
+    if not isinstance(items_payload, list):
+        return JsonResponse({"error": "items must be a list"}, status=400)
+    retained_ids: list[str] = []
+    for index, item_payload in enumerate(items_payload):
+        if not isinstance(item_payload, dict):
+            return JsonResponse({"error": "item must be an object"}, status=400)
+        value = str(item_payload.get("value") or "").strip()
+        label = str(item_payload.get("label") or "").strip()
+        if not value or not label:
+            return JsonResponse({"error": "item value and label are required"}, status=400)
+        item_id = item_payload.get("id")
+        if item_id:
+            try:
+                item = MetadataVocabularyItem.objects.get(id=item_id, vocabulary=vocabulary)
+            except (ValidationError, MetadataVocabularyItem.DoesNotExist):
+                return JsonResponse({"error": "vocabulary_item_not_found"}, status=404)
+        else:
+            item = MetadataVocabularyItem(vocabulary=vocabulary)
+        item.value = value
+        item.label = label
+        item.sort_order = int(item_payload.get("sort_order") or index)
+        item.is_active = bool(item_payload.get("is_active", True))
+        error = _save_model(item)
+        if error:
+            return error
+        retained_ids.append(str(item.id))
+    MetadataVocabularyItem.objects.filter(vocabulary=vocabulary).exclude(id__in=retained_ids).delete()
+    return None
+
+
+def _build_field_definition_from_payload(field: MetadataFieldDefinition, payload: dict[str, object]):
+    vocabulary, error = _resolve_optional_fk(MetadataVocabulary, payload.get("vocabulary_id"), "vocabulary_not_found")
+    if error:
+        return error
+    if not payload.get("name"):
+        return JsonResponse({"error": "name is required"}, status=400)
+    if not payload.get("code"):
+        return JsonResponse({"error": "code is required"}, status=400)
+    field_type = str(payload.get("field_type") or "")
+    if field_type not in MetadataFieldDefinition.FieldType.values:
+        return JsonResponse({"error": "invalid_field_type"}, status=400)
+    config = payload.get("config") or {}
+    if not isinstance(config, dict):
+        return JsonResponse({"error": "config must be an object"}, status=400)
+    field.name = str(payload.get("name")).strip()
+    field.code = str(payload.get("code")).strip()
+    field.description = str(payload.get("description") or "").strip()
+    field.field_type = field_type
+    field.help_text = str(payload.get("help_text") or "").strip()
+    field.placeholder = str(payload.get("placeholder") or "").strip()
+    field.vocabulary = vocabulary
+    field.default_value = payload.get("default_value")
+    field.config = config
+    field.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _build_schema_from_payload(schema: MetadataSchema, payload: dict[str, object]):
+    if not payload.get("name"):
+        return JsonResponse({"error": "name is required"}, status=400)
+    if not payload.get("code"):
+        return JsonResponse({"error": "code is required"}, status=400)
+    schema.name = str(payload.get("name")).strip()
+    schema.code = str(payload.get("code")).strip()
+    schema.description = str(payload.get("description") or "").strip()
+    schema.is_active = bool(payload.get("is_active", True))
     return None
 
 
@@ -519,3 +698,373 @@ def lims_reference_address_sync_runs(request):
         )
         return JsonResponse(sync_run_to_dict(run), status=201)
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_vocabularies(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        items = [_vocabulary_to_dict(item) for item in MetadataVocabulary.objects.prefetch_related("items").order_by("name")]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        vocabulary = MetadataVocabulary()
+        error = _build_vocabulary_from_payload(vocabulary, payload)
+        if error:
+            return error
+        error = _save_model(vocabulary)
+        if error:
+            return error
+        error = _sync_vocabulary_items(vocabulary, payload.get("items"))
+        if error:
+            return error
+        vocabulary.refresh_from_db()
+        return JsonResponse(_vocabulary_to_dict(vocabulary), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_vocabulary_detail(request, vocabulary_id: str):
+    try:
+        vocabulary = MetadataVocabulary.objects.prefetch_related("items").get(id=vocabulary_id)
+    except (ValidationError, MetadataVocabulary.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_vocabulary_to_dict(vocabulary))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_vocabulary_from_payload(vocabulary, payload)
+        if error:
+            return error
+        error = _save_model(vocabulary)
+        if error:
+            return error
+        error = _sync_vocabulary_items(vocabulary, payload.get("items"))
+        if error:
+            return error
+        vocabulary.refresh_from_db()
+        return JsonResponse(_vocabulary_to_dict(vocabulary))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_field_definitions(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        items = [
+            _field_definition_to_dict(item)
+            for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")
+        ]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        field = MetadataFieldDefinition()
+        error = _build_field_definition_from_payload(field, payload)
+        if error:
+            return error
+        error = _save_model(field)
+        if error:
+            return error
+        return JsonResponse(_field_definition_to_dict(field), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_field_definition_detail(request, definition_id: str):
+    try:
+        field = MetadataFieldDefinition.objects.select_related("vocabulary").get(id=definition_id)
+    except (ValidationError, MetadataFieldDefinition.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_field_definition_to_dict(field))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_field_definition_from_payload(field, payload)
+        if error:
+            return error
+        error = _save_model(field)
+        if error:
+            return error
+        return JsonResponse(_field_definition_to_dict(field))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_schemas(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        items = [
+            _schema_to_dict(item)
+            for item in MetadataSchema.objects.prefetch_related("versions__fields__field_definition").order_by("name")
+        ]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        schema = MetadataSchema()
+        error = _build_schema_from_payload(schema, payload)
+        if error:
+            return error
+        error = _save_model(schema)
+        if error:
+            return error
+        return JsonResponse(_schema_to_dict(schema), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_schema_detail(request, schema_id: str):
+    try:
+        schema = MetadataSchema.objects.prefetch_related("versions__fields__field_definition").get(id=schema_id)
+    except (ValidationError, MetadataSchema.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_schema_to_dict(schema))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_schema_from_payload(schema, payload)
+        if error:
+            return error
+        error = _save_model(schema)
+        if error:
+            return error
+        return JsonResponse(_schema_to_dict(schema))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_schema_versions(request, schema_id: str):
+    try:
+        schema = MetadataSchema.objects.get(id=schema_id)
+    except (ValidationError, MetadataSchema.DoesNotExist):
+        return JsonResponse({"error": "schema_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        items = [
+            _schema_version_to_dict(item)
+            for item in schema.versions.prefetch_related("fields__field_definition").order_by("-version_number")
+        ]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        fields_payload = payload.get("fields")
+        if not isinstance(fields_payload, list) or not fields_payload:
+            return JsonResponse({"error": "fields must be a non-empty list"}, status=400)
+        version_number = payload.get("version_number")
+        if version_number is None:
+            latest_version = schema.versions.order_by("-version_number").first()
+            version_number = (latest_version.version_number if latest_version else 0) + 1
+        try:
+            version_number = int(version_number)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "invalid_version_number"}, status=400)
+        version = MetadataSchemaVersion(
+            schema=schema,
+            version_number=version_number,
+            status=MetadataSchemaVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "").strip(),
+        )
+        error = _save_model(version)
+        if error:
+            return error
+        for index, field_payload in enumerate(fields_payload, start=1):
+            if not isinstance(field_payload, dict):
+                return JsonResponse({"error": "field must be an object"}, status=400)
+            field_definition, error = _resolve_optional_fk(
+                MetadataFieldDefinition,
+                field_payload.get("field_definition_id"),
+                "field_definition_not_found",
+            )
+            if error:
+                return error
+            if field_definition is None:
+                return JsonResponse({"error": "field_definition_id is required"}, status=400)
+            validation_rules = field_payload.get("validation_rules") or {}
+            condition = field_payload.get("condition") or {}
+            if not isinstance(validation_rules, dict):
+                return JsonResponse({"error": "validation_rules must be an object"}, status=400)
+            if not isinstance(condition, dict):
+                return JsonResponse({"error": "condition must be an object"}, status=400)
+            schema_field = MetadataSchemaField(
+                schema_version=version,
+                field_definition=field_definition,
+                field_key=str(field_payload.get("field_key") or field_definition.code).strip(),
+                position=int(field_payload.get("position") or index),
+                required=bool(field_payload.get("required", False)),
+                validation_rules=validation_rules,
+                condition=condition,
+            )
+            error = _save_model(schema_field)
+            if error:
+                version.delete()
+                return error
+        version.refresh_from_db()
+        return JsonResponse(_schema_version_to_dict(version), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_schema_version_publish(request, schema_id: str, version_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.manage")
+    if forbidden:
+        return forbidden
+    try:
+        version = MetadataSchemaVersion.objects.get(id=version_id, schema_id=schema_id)
+    except (ValidationError, MetadataSchemaVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    MetadataSchemaVersion.objects.filter(schema_id=schema_id, status=MetadataSchemaVersion.Status.PUBLISHED).exclude(
+        id=version.id
+    ).update(status=MetadataSchemaVersion.Status.DEPRECATED)
+    version.status = MetadataSchemaVersion.Status.PUBLISHED
+    version.save(update_fields=["status", "updated_at"])
+    version.refresh_from_db()
+    return JsonResponse(_schema_version_to_dict(version))
+
+
+@csrf_exempt
+def lims_metadata_schema_bindings(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        queryset = MetadataSchemaBinding.objects.select_related("schema_version", "schema_version__schema").order_by(
+            "target_type", "target_key"
+        )
+        if request.GET.get("target_type"):
+            queryset = queryset.filter(target_type=request.GET["target_type"])
+        if request.GET.get("target_key"):
+            queryset = queryset.filter(target_key=request.GET["target_key"])
+        items = [_schema_binding_to_dict(item) for item in queryset]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        schema_version, error = _resolve_optional_fk(
+            MetadataSchemaVersion,
+            payload.get("schema_version_id"),
+            "schema_version_not_found",
+        )
+        if error:
+            return error
+        if schema_version is None:
+            return JsonResponse({"error": "schema_version_id is required"}, status=400)
+        if schema_version.status != MetadataSchemaVersion.Status.PUBLISHED:
+            return JsonResponse({"error": "schema_version_must_be_published"}, status=400)
+        target_type = str(payload.get("target_type") or "").strip()
+        if target_type not in MetadataSchemaBinding.TargetType.values:
+            return JsonResponse({"error": "invalid_target_type"}, status=400)
+        target_key = str(payload.get("target_key") or "").strip()
+        if not target_key:
+            return JsonResponse({"error": "target_key is required"}, status=400)
+        binding, _ = MetadataSchemaBinding.objects.get_or_create(
+            target_type=target_type,
+            target_key=target_key,
+            defaults={"schema_version": schema_version},
+        )
+        binding.schema_version = schema_version
+        binding.target_label = str(payload.get("target_label") or "").strip()
+        binding.is_active = bool(payload.get("is_active", True))
+        error = _save_model(binding)
+        if error:
+            return error
+        binding.refresh_from_db()
+        return JsonResponse(_schema_binding_to_dict(binding), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_validate(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
+    if forbidden:
+        return forbidden
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return JsonResponse({"error": "data must be an object"}, status=400)
+
+    schema_version = None
+    if payload.get("schema_version_id"):
+        try:
+            schema_version = MetadataSchemaVersion.objects.get(id=payload["schema_version_id"])
+        except (ValidationError, MetadataSchemaVersion.DoesNotExist):
+            return JsonResponse({"error": "schema_version_not_found"}, status=404)
+    else:
+        target_type = str(payload.get("target_type") or "").strip()
+        target_key = str(payload.get("target_key") or "").strip()
+        if not target_type or not target_key:
+            return JsonResponse({"error": "schema_version_id or target binding is required"}, status=400)
+        schema_version = resolve_schema_version_for_binding(target_type=target_type, target_key=target_key)
+        if schema_version is None:
+            return JsonResponse({"error": "binding_not_found"}, status=404)
+
+    result = validate_metadata_payload(schema_version, data)
+    return JsonResponse(
+        {
+            "valid": result.valid,
+            "schema_version_id": str(schema_version.id),
+            "schema_id": str(schema_version.schema_id),
+            "errors": result.errors,
+            "normalized_data": result.normalized_data,
+        }
+    )

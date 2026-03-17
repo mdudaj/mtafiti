@@ -93,6 +93,43 @@ Reference APIs are exposed under:
 
 These endpoints are intended for admin-style CRUD and downstream selector reuse in receiving/workflow forms.
 
+## Configurable metadata schema domain
+
+The next LIMS configuration slice standardizes tenant-local metadata building blocks for sample-type intake forms and workflow-step forms:
+
+- `MetadataVocabulary`
+- `MetadataVocabularyItem`
+- `MetadataFieldDefinition`
+- `MetadataSchema`
+- `MetadataSchemaVersion`
+- `MetadataSchemaField`
+- `MetadataSchemaBinding`
+
+This allows LIMS tenants to define reusable field definitions, publish versioned schemas, and bind a published schema to:
+
+- `sample_type` keys such as `dried-blood-spot`
+- `workflow_step` keys such as `dbs-receiving`
+
+Metadata APIs are exposed under:
+
+- `/api/v1/lims/metadata/vocabularies`
+- `/api/v1/lims/metadata/field-definitions`
+- `/api/v1/lims/metadata/schemas`
+- `/api/v1/lims/metadata/schemas/<schema_id>/versions`
+- `/api/v1/lims/metadata/schemas/<schema_id>/versions/<version_id>/publish`
+- `/api/v1/lims/metadata/bindings`
+- `/api/v1/lims/metadata/validate`
+
+Validation is intentionally explicit and repository-native rather than delegated to an external schema engine. The current validation service supports:
+
+- required versus optional fields
+- type validation for text, long text, integer, decimal, boolean, date, datetime, choice, and multi-choice fields
+- controlled vocabularies for choice-style fields
+- min/max or length/item-count range checks
+- conditional field activation and requiredness based on earlier field values
+
+This gives the later workflow-configuration and runtime slices a stable tenant-aware schema registry without needing the full workflow-template domain to exist first.
+
 ## Tanzania address sync
 
 Address metadata ingestion is designed to be polite and resumable:

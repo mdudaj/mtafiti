@@ -135,6 +135,7 @@ Use a two-speed execution pattern to reduce local cycle time while preserving fu
 2. **Pre-integration loop (required before handoff)**
    * Run docs/openapi/knowledge-graph checks and broad backend validation.
    * Command: `.github/scripts/local_fast_feedback.sh --full-gate`
+   * Stage any new or deleted source/doc files first (`git add -A` or equivalent), otherwise repository-inventory checks can produce false greens locally and fail in CI.
 
 This keeps short iterations fast but still enforces the same merge-gate expectations before integration.
 
@@ -174,7 +175,7 @@ Every implementation task in this project should be executed end-to-end in one f
 
 Tasks should not be reported as done while still waiting on test execution or post-implementation validation.
 
-If a follow-up commit is added after the initial validation, rerun the full pre-integration gate before pushing again. Even tiny structural files such as `__init__.py` or migrations package markers can change generated repository artifacts like `analysis/environment_inventory.yaml`.
+If a follow-up commit is added after the initial validation, rerun the full pre-integration gate before pushing again. Even tiny structural files such as `__init__.py`, migrations package markers, new tests, or new migration files can change generated repository artifacts like `analysis/environment_inventory.yaml`. Stage new/deleted source-doc files before running the full gate so it validates the same tracked file set that CI will see.
 
 ### Python style requirement
 

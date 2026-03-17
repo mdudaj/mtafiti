@@ -21,6 +21,16 @@ PERMISSION_DEFINITIONS = {
         'guardian_codename': 'manage_reference_record',
         'object_type': 'reference_record',
     },
+    'lims.metadata.view': {
+        'description': 'View metadata vocabularies, field definitions, schemas, and validation results.',
+        'guardian_codename': 'view_metadata_schema',
+        'object_type': 'metadata_schema',
+    },
+    'lims.metadata.manage': {
+        'description': 'Create, publish, and bind configurable metadata schemas for LIMS forms and workflow steps.',
+        'guardian_codename': 'manage_metadata_schema',
+        'object_type': 'metadata_schema',
+    },
     'lims.workflow_task.view': {
         'description': 'View workflow task state, assignee, and task-form metadata.',
         'guardian_codename': 'view_workflow_task',
@@ -58,6 +68,7 @@ ROLE_BUNDLES = {
         'description': 'Bench/operator role for day-to-day task execution.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
             'lims.reference.view',
             'lims.workflow_task.view',
             'lims.workflow_task.execute',
@@ -68,6 +79,8 @@ ROLE_BUNDLES = {
         'description': 'Operational manager role for coordination and reference-data stewardship.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
+            'lims.metadata.manage',
             'lims.reference.view',
             'lims.reference.manage',
             'lims.workflow_task.view',
@@ -80,6 +93,7 @@ ROLE_BUNDLES = {
         'description': 'Quality and compliance role for approvals, reviews, and sensitive artifacts.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
             'lims.reference.view',
             'lims.workflow_task.view',
             'lims.workflow_task.approve',
@@ -98,6 +112,7 @@ LEGACY_ROLE_BUNDLES = {
         'description': 'Legacy platform read role mapped into the LIMS read surface.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
             'lims.reference.view',
             'lims.workflow_task.view',
             'lims.artifact.view',
@@ -107,6 +122,8 @@ LEGACY_ROLE_BUNDLES = {
         'description': 'Legacy platform editor role mapped into LIMS operational edits.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
+            'lims.metadata.manage',
             'lims.reference.view',
             'lims.reference.manage',
             'lims.workflow_task.view',
@@ -118,6 +135,7 @@ LEGACY_ROLE_BUNDLES = {
         'description': 'Legacy governance admin role mapped into QA-style approvals.',
         'permissions': {
             'lims.dashboard.view',
+            'lims.metadata.view',
             'lims.reference.view',
             'lims.workflow_task.view',
             'lims.workflow_task.approve',
