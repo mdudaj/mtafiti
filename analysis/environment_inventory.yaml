@@ -1132,6 +1132,6 @@ EnvironmentInventory:
     local_source_note: "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml."
   code_analysis_summary:
     modules_scanned: 38
-    models_detected: 60
+    models_detected: 67
     views_detected: 121
     tasks_detected: 7

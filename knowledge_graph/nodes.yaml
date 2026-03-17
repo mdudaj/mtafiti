@@ -2333,7 +2333,7 @@ nodes:
       - street
       - study
       - ward
-    source: src/lims/models.py:188
+    source: src/lims/models.py:189
   -
     id: datamodel:lab
     type: DataModel
@@ -2350,7 +2350,18 @@ nodes:
       - region
       - street
       - ward
-    source: src/lims/models.py:111
+    source: src/lims/models.py:112
+  -
+    id: datamodel:metadataschemaversion
+    type: DataModel
+    name: MetadataSchemaVersion
+    description: "Django model defined in lims.models."
+    fields:
+      - change_summary
+      - schema
+      - status
+      - version_number
+    source: src/lims/models.py:391
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2370,7 +2381,46 @@ nodes:
       - status
       - throttle_seconds
       - triggered_by
-    source: src/lims/models.py:249
+    source: src/lims/models.py:250
+  -
+    id: datamodel:metadatafielddefinition
+    type: DataModel
+    name: MetadataFieldDefinition
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - config
+      - default_value
+      - description
+      - field_type
+      - help_text
+      - is_active
+      - name
+      - placeholder
+      - vocabulary
+    source: src/lims/models.py:326
+  -
+    id: datamodel:metadataschema
+    type: DataModel
+    name: MetadataSchema
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - description
+      - is_active
+      - name
+    source: src/lims/models.py:375
+  -
+    id: datamodel:metadatavocabulary
+    type: DataModel
+    name: MetadataVocabulary
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - description
+      - is_active
+      - name
+    source: src/lims/models.py:286
   -
     id: datamodel:study
     type: DataModel
@@ -2383,7 +2433,21 @@ nodes:
       - name
       - sponsor
       - status
-    source: src/lims/models.py:158
+    source: src/lims/models.py:159
+  -
+    id: datamodel:metadataschemafield
+    type: DataModel
+    name: MetadataSchemaField
+    description: "Django model defined in lims.models."
+    fields:
+      - condition
+      - field_definition
+      - field_key
+      - position
+      - required
+      - schema_version
+      - validation_rules
+    source: src/lims/models.py:419
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel
@@ -2393,7 +2457,7 @@ nodes:
       - created_at
       - id
       - updated_at
-    source: src/lims/models.py:8
+    source: src/lims/models.py:9
   -
     id: datamodel:tanzaniaward
     type: DataModel
@@ -2407,7 +2471,19 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:58
+    source: src/lims/models.py:59
+  -
+    id: datamodel:metadatavocabularyitem
+    type: DataModel
+    name: MetadataVocabularyItem
+    description: "Django model defined in lims.models."
+    fields:
+      - is_active
+      - label
+      - sort_order
+      - value
+      - vocabulary
+    source: src/lims/models.py:302
   -
     id: datamodel:tanzaniastreet
     type: DataModel
@@ -2422,7 +2498,7 @@ nodes:
       - source_path
       - source_url
       - ward
-    source: src/lims/models.py:84
+    source: src/lims/models.py:85
   -
     id: datamodel:tanzaniadistrict
     type: DataModel
@@ -2436,7 +2512,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:32
+    source: src/lims/models.py:33
   -
     id: datamodel:tanzaniaregion
     type: DataModel
@@ -2449,7 +2525,19 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:17
+    source: src/lims/models.py:18
+  -
+    id: datamodel:metadataschemabinding
+    type: DataModel
+    name: MetadataSchemaBinding
+    description: "Django model defined in lims.models."
+    fields:
+      - is_active
+      - schema_version
+      - target_key
+      - target_label
+      - target_type
+    source: src/lims/models.py:458
   -
     id: datamodel:tenantserviceroute
     type: DataModel

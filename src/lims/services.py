@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, datetime
 from datetime import timedelta
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Callable
 from urllib import error as urllib_error
@@ -15,6 +17,10 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import (
+    MetadataFieldDefinition,
+    MetadataSchemaBinding,
+    MetadataSchemaVersion,
+    MetadataVocabularyItem,
     TanzaniaAddressSyncRun,
     TanzaniaDistrict,
     TanzaniaRegion,
@@ -429,3 +435,216 @@ def process_tanzania_address_sync_run(
     run.status = TanzaniaAddressSyncRun.Status.PAUSED
     run.save(update_fields=["status", "updated_at"])
     return sync_run_to_dict(run)
+
+
+@dataclass
+class MetadataValidationResult:
+    valid: bool
+    errors: list[dict[str, str]]
+    normalized_data: dict[str, object]
+
+
+def _condition_matches(condition: dict[str, object], payload: dict[str, object]) -> bool:
+    if not condition:
+        return True
+    field_key = str(condition.get("field") or "").strip()
+    operator = str(condition.get("operator") or "equals").strip()
+    if not field_key:
+        return True
+    lhs = payload.get(field_key)
+    rhs = condition.get("value")
+    if operator == "equals":
+        return lhs == rhs
+    if operator == "not_equals":
+        return lhs != rhs
+    if operator == "in":
+        return lhs in (rhs or [])
+    if operator == "not_in":
+        return lhs not in (rhs or [])
+    if operator == "truthy":
+        return bool(lhs)
+    if operator == "falsy":
+        return not bool(lhs)
+    if operator in {"gt", "gte", "lt", "lte"}:
+        try:
+            left_number = Decimal(str(lhs))
+            right_number = Decimal(str(rhs))
+        except (InvalidOperation, TypeError, ValueError):
+            return False
+        if operator == "gt":
+            return left_number > right_number
+        if operator == "gte":
+            return left_number >= right_number
+        if operator == "lt":
+            return left_number < right_number
+        return left_number <= right_number
+    return False
+
+
+def _bool_from_value(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+    raise ValueError("invalid_boolean")
+
+
+def _normalize_field_value(field: MetadataFieldDefinition, value: object) -> object:
+    if field.field_type in {
+        MetadataFieldDefinition.FieldType.TEXT,
+        MetadataFieldDefinition.FieldType.LONG_TEXT,
+        MetadataFieldDefinition.FieldType.CHOICE,
+    }:
+        if not isinstance(value, str):
+            raise ValueError("expected_string")
+        return value.strip()
+
+    if field.field_type == MetadataFieldDefinition.FieldType.INTEGER:
+        if isinstance(value, bool):
+            raise ValueError("expected_integer")
+        return int(value)
+
+    if field.field_type == MetadataFieldDefinition.FieldType.DECIMAL:
+        if isinstance(value, bool):
+            raise ValueError("expected_decimal")
+        return str(Decimal(str(value)))
+
+    if field.field_type == MetadataFieldDefinition.FieldType.BOOLEAN:
+        return _bool_from_value(value)
+
+    if field.field_type == MetadataFieldDefinition.FieldType.DATE:
+        if not isinstance(value, str):
+            raise ValueError("expected_iso_date")
+        return date.fromisoformat(value).isoformat()
+
+    if field.field_type == MetadataFieldDefinition.FieldType.DATETIME:
+        if not isinstance(value, str):
+            raise ValueError("expected_iso_datetime")
+        return datetime.fromisoformat(value).isoformat()
+
+    if field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE:
+        if not isinstance(value, list):
+            raise ValueError("expected_list")
+        if not all(isinstance(item, str) for item in value):
+            raise ValueError("expected_list_of_strings")
+        return [item.strip() for item in value]
+
+    raise ValueError("unsupported_field_type")
+
+
+def _validate_vocabulary(field: MetadataFieldDefinition, normalized_value: object) -> str | None:
+    if not field.vocabulary_id:
+        return None
+    allowed_values = set(
+        MetadataVocabularyItem.objects.filter(vocabulary_id=field.vocabulary_id, is_active=True).values_list(
+            "value", flat=True
+        )
+    )
+    if field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE:
+        invalid = [item for item in normalized_value if item not in allowed_values]
+        if invalid:
+            return "invalid_choice"
+        return None
+    if normalized_value not in allowed_values:
+        return "invalid_choice"
+    return None
+
+
+def _compare_min_max(field: MetadataFieldDefinition, normalized_value: object, rules: dict[str, object]) -> str | None:
+    if field.field_type in {
+        MetadataFieldDefinition.FieldType.TEXT,
+        MetadataFieldDefinition.FieldType.LONG_TEXT,
+    }:
+        min_length = rules.get("min_length")
+        max_length = rules.get("max_length")
+        if min_length is not None and len(normalized_value) < int(min_length):
+            return "min_length"
+        if max_length is not None and len(normalized_value) > int(max_length):
+            return "max_length"
+        return None
+
+    if field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE:
+        min_items = rules.get("min_items")
+        max_items = rules.get("max_items")
+        if min_items is not None and len(normalized_value) < int(min_items):
+            return "min_items"
+        if max_items is not None and len(normalized_value) > int(max_items):
+            return "max_items"
+        return None
+
+    if field.field_type in {
+        MetadataFieldDefinition.FieldType.INTEGER,
+        MetadataFieldDefinition.FieldType.DECIMAL,
+    }:
+        numeric_value = Decimal(str(normalized_value))
+        if rules.get("min") is not None and numeric_value < Decimal(str(rules["min"])):
+            return "min"
+        if rules.get("max") is not None and numeric_value > Decimal(str(rules["max"])):
+            return "max"
+        return None
+
+    return None
+
+
+def validate_metadata_payload(
+    schema_version: MetadataSchemaVersion,
+    payload: dict[str, object],
+) -> MetadataValidationResult:
+    errors: list[dict[str, str]] = []
+    normalized_data: dict[str, object] = {}
+    schema_fields = list(
+        schema_version.fields.select_related("field_definition", "field_definition__vocabulary").order_by(
+            "position", "field_key"
+        )
+    )
+
+    for schema_field in schema_fields:
+        field = schema_field.field_definition
+        is_active = _condition_matches(dict(schema_field.condition or {}), payload)
+        if not is_active:
+            continue
+
+        raw_value = payload.get(schema_field.field_key)
+        if raw_value in (None, "") or raw_value == []:
+            if field.default_value is not None:
+                raw_value = field.default_value
+            elif schema_field.required:
+                errors.append({"field": schema_field.field_key, "code": "required"})
+                continue
+            else:
+                continue
+
+        try:
+            normalized_value = _normalize_field_value(field, raw_value)
+        except (TypeError, ValueError):
+            errors.append({"field": schema_field.field_key, "code": "invalid_type"})
+            continue
+
+        vocabulary_error = _validate_vocabulary(field, normalized_value)
+        if vocabulary_error:
+            errors.append({"field": schema_field.field_key, "code": vocabulary_error})
+            continue
+
+        range_error = _compare_min_max(field, normalized_value, dict(schema_field.validation_rules or {}))
+        if range_error:
+            errors.append({"field": schema_field.field_key, "code": range_error})
+            continue
+
+        normalized_data[schema_field.field_key] = normalized_value
+
+    return MetadataValidationResult(valid=not errors, errors=errors, normalized_data=normalized_data)
+
+
+def resolve_schema_version_for_binding(*, target_type: str, target_key: str) -> MetadataSchemaVersion | None:
+    binding = (
+        MetadataSchemaBinding.objects.select_related("schema_version", "schema_version__schema")
+        .filter(target_type=target_type, target_key=target_key, is_active=True)
+        .first()
+    )
+    if not binding:
+        return None
+    return binding.schema_version

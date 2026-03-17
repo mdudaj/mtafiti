@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -280,3 +281,206 @@ class TanzaniaAddressSyncRun(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.mode}:{self.status}:{self.created_at.isoformat()}"
+
+
+class MetadataVocabulary(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_meta_vocab_code_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class MetadataVocabularyItem(TimestampedUUIDModel):
+    vocabulary = models.ForeignKey(
+        MetadataVocabulary,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    value = models.CharField(max_length=100)
+    label = models.CharField(max_length=200)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["vocabulary__name", "sort_order", "label"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vocabulary", "value"],
+                name="uniq_lims_meta_vocab_item_value",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vocabulary.name}: {self.label}"
+
+
+class MetadataFieldDefinition(TimestampedUUIDModel):
+    class FieldType(models.TextChoices):
+        TEXT = "text"
+        LONG_TEXT = "long_text"
+        INTEGER = "integer"
+        DECIMAL = "decimal"
+        BOOLEAN = "boolean"
+        DATE = "date"
+        DATETIME = "datetime"
+        CHOICE = "choice"
+        MULTI_CHOICE = "multi_choice"
+
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    field_type = models.CharField(max_length=32, choices=FieldType.choices)
+    help_text = models.CharField(max_length=255, blank=True, default="")
+    placeholder = models.CharField(max_length=255, blank=True, default="")
+    vocabulary = models.ForeignKey(
+        MetadataVocabulary,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="field_definitions",
+    )
+    default_value = models.JSONField(null=True, blank=True)
+    config = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_meta_field_code_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        choice_types = {self.FieldType.CHOICE, self.FieldType.MULTI_CHOICE}
+        if self.field_type in choice_types and not self.vocabulary_id:
+            raise ValidationError({"vocabulary": "choice fields require a vocabulary"})
+        if self.field_type not in choice_types and self.vocabulary_id:
+            raise ValidationError({"vocabulary": "vocabulary is only valid for choice fields"})
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class MetadataSchema(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_meta_schema_code_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class MetadataSchemaVersion(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        PUBLISHED = "published"
+        DEPRECATED = "deprecated"
+
+    schema = models.ForeignKey(
+        MetadataSchema,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    version_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    change_summary = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["schema__name", "-version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schema", "version_number"],
+                name="uniq_lims_meta_schema_version_number",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.schema.code}:v{self.version_number}"
+
+
+class MetadataSchemaField(TimestampedUUIDModel):
+    schema_version = models.ForeignKey(
+        MetadataSchemaVersion,
+        on_delete=models.CASCADE,
+        related_name="fields",
+    )
+    field_definition = models.ForeignKey(
+        MetadataFieldDefinition,
+        on_delete=models.PROTECT,
+        related_name="schema_fields",
+    )
+    field_key = models.SlugField(max_length=100)
+    position = models.PositiveIntegerField(default=0)
+    required = models.BooleanField(default=False)
+    validation_rules = models.JSONField(default=dict, blank=True)
+    condition = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["schema_version__schema__name", "schema_version__version_number", "position", "field_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schema_version", "field_key"],
+                name="uniq_lims_meta_schema_field_key",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not self.field_key:
+            raise ValidationError({"field_key": "field_key is required"})
+        if not isinstance(self.validation_rules, dict):
+            raise ValidationError({"validation_rules": "validation_rules must be an object"})
+        if not isinstance(self.condition, dict):
+            raise ValidationError({"condition": "condition must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.schema_version} / {self.field_key}"
+
+
+class MetadataSchemaBinding(TimestampedUUIDModel):
+    class TargetType(models.TextChoices):
+        SAMPLE_TYPE = "sample_type"
+        WORKFLOW_STEP = "workflow_step"
+
+    schema_version = models.ForeignKey(
+        MetadataSchemaVersion,
+        on_delete=models.CASCADE,
+        related_name="bindings",
+    )
+    target_type = models.CharField(max_length=32, choices=TargetType.choices)
+    target_key = models.SlugField(max_length=100)
+    target_label = models.CharField(max_length=200, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["target_type", "target_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["target_type", "target_key"],
+                name="uniq_lims_meta_schema_binding_target",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["target_type", "target_key"], name="lims_meta_binding_target_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.target_type}:{self.target_key}"
