@@ -554,6 +554,14 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:accessioningmanifest
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:accessioningmanifestitem
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:accessrequest
   -
     relationship: implements
@@ -747,6 +755,14 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:qualityrule
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:receivingdiscrepancy
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:receivingevent
   -
     relationship: implements
     from: module:core_models

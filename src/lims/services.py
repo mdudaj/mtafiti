@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from datetime import date, datetime
 from datetime import timedelta
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import (
+    AccessioningManifest,
+    AccessioningManifestItem,
     Biospecimen,
     BiospecimenPool,
     BiospecimenPoolMember,
@@ -25,6 +28,8 @@ from .models import (
     MetadataSchemaBinding,
     MetadataSchemaVersion,
     MetadataVocabularyItem,
+    ReceivingDiscrepancy,
+    ReceivingEvent,
     TanzaniaAddressSyncRun,
     TanzaniaDistrict,
     TanzaniaRegion,
@@ -708,6 +713,10 @@ class BiospecimenTransitionError(ValueError):
     pass
 
 
+class AccessioningError(ValueError):
+    pass
+
+
 def _next_sequence_payload(sample_type_id: str) -> tuple[str, str, int]:
     locked = BiospecimenType.objects.select_for_update().get(id=sample_type_id)
     sequence_value = locked.next_sequence
@@ -850,3 +859,305 @@ def create_pool(
             specimen.full_clean()
             specimen.save(update_fields=["status", "updated_at"])
     return pool
+
+
+def generate_manifest_identifier() -> str:
+    return f"ACC-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+
+
+def _validate_sample_type_metadata(sample_type: BiospecimenType, metadata: dict[str, object]) -> dict[str, object]:
+    schema_version = resolve_schema_version_for_binding(target_type="sample_type", target_key=sample_type.key)
+    if schema_version is None:
+        return metadata
+    result = validate_metadata_payload(schema_version, metadata)
+    if not result.valid:
+        raise AccessioningError(f"metadata_invalid:{json.dumps(result.errors, sort_keys=True)}")
+    return result.normalized_data
+
+
+def submit_manifest(manifest: AccessioningManifest) -> AccessioningManifest:
+    if manifest.status != AccessioningManifest.Status.DRAFT:
+        raise AccessioningError("manifest_not_draft")
+    if not manifest.items.exists():
+        raise AccessioningError("manifest_items_required")
+    manifest.status = AccessioningManifest.Status.SUBMITTED
+    manifest.full_clean()
+    manifest.save(update_fields=["status", "updated_at"])
+    return manifest
+
+
+def _manifest_status_from_items(manifest: AccessioningManifest) -> str:
+    item_statuses = set(manifest.items.values_list("status", flat=True))
+    if not item_statuses or item_statuses == {AccessioningManifestItem.Status.PENDING}:
+        return AccessioningManifest.Status.SUBMITTED
+    if item_statuses.issubset({AccessioningManifestItem.Status.RECEIVED}):
+        return AccessioningManifest.Status.RECEIVED
+    return AccessioningManifest.Status.RECEIVING
+
+
+def _build_manifest_biospecimen(
+    manifest: AccessioningManifest,
+    item: AccessioningManifestItem,
+    *,
+    metadata: dict[str, object],
+) -> Biospecimen:
+    sample_identifier = item.expected_sample_identifier.strip()
+    barcode = item.expected_barcode.strip()
+    if not sample_identifier and not barcode:
+        sample_identifier, barcode = allocate_biospecimen_identifiers(manifest.sample_type)
+    elif not sample_identifier:
+        sample_identifier, generated_barcode = allocate_biospecimen_identifiers(manifest.sample_type)
+        barcode = barcode or generated_barcode
+    elif not barcode:
+        _, barcode = allocate_biospecimen_identifiers(manifest.sample_type)
+    specimen = Biospecimen(
+        sample_type=manifest.sample_type,
+        sample_identifier=sample_identifier,
+        barcode=barcode,
+        kind=Biospecimen.Kind.PRIMARY,
+        status=Biospecimen.Status.REGISTERED,
+        subject_identifier=item.expected_subject_identifier,
+        study=manifest.study,
+        site=manifest.site,
+        lab=manifest.lab,
+        quantity=item.quantity,
+        quantity_unit=item.quantity_unit,
+        metadata=metadata,
+    )
+    specimen.full_clean()
+    specimen.save()
+    return specimen
+
+
+def receive_manifest_item(
+    item: AccessioningManifestItem,
+    *,
+    received_by: str,
+    scan_value: str = "",
+    notes: str = "",
+    metadata: dict[str, object] | None = None,
+) -> tuple[AccessioningManifestItem, ReceivingEvent]:
+    if item.status == AccessioningManifestItem.Status.RECEIVED:
+        raise AccessioningError("item_already_received")
+    manifest = item.manifest
+    if manifest.status == AccessioningManifest.Status.DRAFT:
+        raise AccessioningError("manifest_not_submitted")
+    candidate_values = {
+        value.strip()
+        for value in [item.expected_sample_identifier, item.expected_barcode]
+        if isinstance(value, str) and value.strip()
+    }
+    if scan_value and candidate_values and scan_value.strip() not in candidate_values:
+        raise AccessioningError("scan_mismatch")
+
+    payload_metadata = dict(item.metadata or {})
+    payload_metadata.update(metadata or {})
+    normalized_metadata = _validate_sample_type_metadata(manifest.sample_type, payload_metadata)
+    with transaction.atomic():
+        specimen = item.biospecimen
+        if specimen is None:
+            specimen = _build_manifest_biospecimen(manifest, item, metadata=normalized_metadata)
+        else:
+            specimen.metadata = normalized_metadata
+            specimen.quantity = item.quantity
+            specimen.quantity_unit = item.quantity_unit
+            specimen.full_clean()
+            specimen.save(update_fields=["metadata", "quantity", "quantity_unit", "updated_at"])
+        if specimen.status == Biospecimen.Status.REGISTERED:
+            transition_biospecimen(specimen, Biospecimen.Status.RECEIVED)
+        elif specimen.status != Biospecimen.Status.RECEIVED:
+            raise AccessioningError("specimen_not_receivable")
+
+        now = timezone.now()
+        item.biospecimen = specimen
+        item.status = AccessioningManifestItem.Status.RECEIVED
+        item.received_at = now
+        item.notes = notes or item.notes
+        item.metadata = normalized_metadata
+        item.full_clean()
+        item.save(update_fields=["biospecimen", "status", "received_at", "notes", "metadata", "updated_at"])
+
+        manifest.status = _manifest_status_from_items(manifest)
+        if manifest.status == AccessioningManifest.Status.RECEIVED:
+            manifest.received_at = now
+        manifest.full_clean()
+        update_fields = ["status", "updated_at"]
+        if manifest.received_at:
+            update_fields.append("received_at")
+        manifest.save(update_fields=update_fields)
+
+        event = ReceivingEvent(
+            manifest=manifest,
+            manifest_item=item,
+            biospecimen=specimen,
+            kind=ReceivingEvent.Kind.MANIFEST_ITEM,
+            received_by=received_by,
+            scan_value=scan_value.strip(),
+            notes=notes,
+            metadata=normalized_metadata,
+            received_at=now,
+        )
+        event.full_clean()
+        event.save()
+    return item, event
+
+
+def receive_single_biospecimen(
+    *,
+    sample_type: BiospecimenType,
+    study,
+    site,
+    lab,
+    subject_identifier: str,
+    external_identifier: str,
+    quantity: Decimal,
+    quantity_unit: str,
+    metadata: dict[str, object],
+    received_by: str,
+    sample_identifier: str = "",
+    barcode: str = "",
+    scan_value: str = "",
+    notes: str = "",
+) -> tuple[Biospecimen, ReceivingEvent]:
+    normalized_metadata = _validate_sample_type_metadata(sample_type, metadata)
+    if scan_value and barcode and scan_value.strip() != barcode.strip():
+        raise AccessioningError("scan_mismatch")
+    if not sample_identifier and not barcode:
+        sample_identifier, barcode = allocate_biospecimen_identifiers(sample_type)
+    elif not sample_identifier:
+        sample_identifier, _ = allocate_biospecimen_identifiers(sample_type)
+    elif not barcode:
+        _, barcode = allocate_biospecimen_identifiers(sample_type)
+
+    with transaction.atomic():
+        specimen = Biospecimen(
+            sample_type=sample_type,
+            sample_identifier=sample_identifier.strip(),
+            barcode=barcode.strip(),
+            kind=Biospecimen.Kind.PRIMARY,
+            status=Biospecimen.Status.REGISTERED,
+            subject_identifier=subject_identifier.strip(),
+            external_identifier=external_identifier.strip(),
+            study=study,
+            site=site,
+            lab=lab,
+            quantity=quantity,
+            quantity_unit=quantity_unit.strip(),
+            metadata=normalized_metadata,
+        )
+        specimen.full_clean()
+        specimen.save()
+        transition_biospecimen(specimen, Biospecimen.Status.RECEIVED)
+        event = ReceivingEvent(
+            biospecimen=specimen,
+            kind=ReceivingEvent.Kind.SINGLE,
+            received_by=received_by,
+            scan_value=scan_value.strip(),
+            notes=notes,
+            metadata=normalized_metadata,
+        )
+        event.full_clean()
+        event.save()
+    return specimen, event
+
+
+def create_receiving_discrepancy(
+    *,
+    code: str,
+    recorded_by: str,
+    manifest: AccessioningManifest | None = None,
+    manifest_item: AccessioningManifestItem | None = None,
+    biospecimen: Biospecimen | None = None,
+    notes: str = "",
+    expected_data: dict[str, object] | None = None,
+    actual_data: dict[str, object] | None = None,
+) -> ReceivingDiscrepancy:
+    discrepancy = ReceivingDiscrepancy(
+        manifest=manifest,
+        manifest_item=manifest_item,
+        biospecimen=biospecimen,
+        code=code,
+        status=ReceivingDiscrepancy.Status.OPEN,
+        notes=notes,
+        expected_data=dict(expected_data or {}),
+        actual_data=dict(actual_data or {}),
+        recorded_by=recorded_by,
+    )
+    discrepancy.full_clean()
+    discrepancy.save()
+    if manifest_item and manifest_item.status == AccessioningManifestItem.Status.PENDING:
+        manifest_item.status = AccessioningManifestItem.Status.DISCREPANT
+        manifest_item.full_clean()
+        manifest_item.save(update_fields=["status", "updated_at"])
+        manifest = manifest or manifest_item.manifest
+    if manifest:
+        manifest.status = _manifest_status_from_items(manifest)
+        manifest.full_clean()
+        manifest.save(update_fields=["status", "updated_at"])
+    return discrepancy
+
+
+def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
+    items = list(manifest.items.select_related("biospecimen").order_by("position", "created_at"))
+    discrepancies = list(manifest.discrepancies.order_by("-created_at"))
+    events = list(manifest.receiving_events.select_related("biospecimen", "manifest_item").order_by("-received_at"))
+    return {
+        "manifest": {
+            "id": str(manifest.id),
+            "manifest_identifier": manifest.manifest_identifier,
+            "status": manifest.status,
+            "sample_type_id": str(manifest.sample_type_id),
+            "study_id": str(manifest.study_id) if manifest.study_id else None,
+            "site_id": str(manifest.site_id) if manifest.site_id else None,
+            "lab_id": str(manifest.lab_id) if manifest.lab_id else None,
+            "source_system": manifest.source_system,
+            "source_reference": manifest.source_reference,
+            "received_at": manifest.received_at.isoformat() if manifest.received_at else None,
+        },
+        "summary": {
+            "total_items": len(items),
+            "received_items": sum(1 for item in items if item.status == AccessioningManifestItem.Status.RECEIVED),
+            "discrepant_items": sum(1 for item in items if item.status == AccessioningManifestItem.Status.DISCREPANT),
+            "open_discrepancies": sum(1 for item in discrepancies if item.status == ReceivingDiscrepancy.Status.OPEN),
+            "receiving_events": len(events),
+        },
+        "items": [
+            {
+                "id": str(item.id),
+                "position": item.position,
+                "status": item.status,
+                "expected_subject_identifier": item.expected_subject_identifier,
+                "expected_sample_identifier": item.expected_sample_identifier,
+                "expected_barcode": item.expected_barcode,
+                "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+                "received_at": item.received_at.isoformat() if item.received_at else None,
+                "notes": item.notes,
+            }
+            for item in items
+        ],
+        "discrepancies": [
+            {
+                "id": str(item.id),
+                "code": item.code,
+                "status": item.status,
+                "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+                "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+                "notes": item.notes,
+                "expected_data": item.expected_data,
+                "actual_data": item.actual_data,
+            }
+            for item in discrepancies
+        ],
+        "events": [
+            {
+                "id": str(item.id),
+                "kind": item.kind,
+                "biospecimen_id": str(item.biospecimen_id),
+                "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+                "received_by": item.received_by,
+                "scan_value": item.scan_value,
+                "received_at": item.received_at.isoformat(),
+            }
+            for item in events
+        ],
+    }

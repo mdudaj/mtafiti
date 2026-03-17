@@ -1,6 +1,12 @@
 from django.urls import path
 
 from .views import (
+    lims_accessioning_manifest_detail,
+    lims_accessioning_manifest_item_receive,
+    lims_accessioning_manifest_report,
+    lims_accessioning_manifest_submit,
+    lims_accessioning_manifests,
+    lims_accessioning_receive_single,
     lims_biospecimen_aliquots,
     lims_biospecimen_detail,
     lims_biospecimen_pool_detail,
@@ -30,12 +36,35 @@ from .views import (
     lims_reference_sites,
     lims_reference_studies,
     lims_reference_study_detail,
+    lims_receiving_discrepancies,
 )
 
 app_name = 'lims'
 
 
 urlpatterns = [
+    path("accessioning/manifests", lims_accessioning_manifests, name="accessioning_manifests"),
+    path(
+        "accessioning/manifests/<uuid:manifest_id>",
+        lims_accessioning_manifest_detail,
+        name="accessioning_manifest_detail",
+    ),
+    path(
+        "accessioning/manifests/<uuid:manifest_id>/submit",
+        lims_accessioning_manifest_submit,
+        name="accessioning_manifest_submit",
+    ),
+    path(
+        "accessioning/manifests/<uuid:manifest_id>/items/<uuid:item_id>/receive",
+        lims_accessioning_manifest_item_receive,
+        name="accessioning_manifest_item_receive",
+    ),
+    path(
+        "accessioning/manifests/<uuid:manifest_id>/report",
+        lims_accessioning_manifest_report,
+        name="accessioning_manifest_report",
+    ),
+    path("accessioning/receive-single", lims_accessioning_receive_single, name="accessioning_receive_single"),
     path("biospecimens", lims_biospecimens, name="biospecimens"),
     path("biospecimens/<uuid:specimen_id>", lims_biospecimen_detail, name="biospecimen_detail"),
     path(
@@ -83,6 +112,7 @@ urlpatterns = [
     path("reference/sites/<uuid:site_id>", lims_reference_site_detail, name="reference_site_detail"),
     path("reference/studies", lims_reference_studies, name="reference_studies"),
     path("reference/studies/<uuid:study_id>", lims_reference_study_detail, name="reference_study_detail"),
+    path("receiving/discrepancies", lims_receiving_discrepancies, name="receiving_discrepancies"),
     path('permissions', lims_permissions_summary, name='permissions'),
     path('summary', lims_dashboard_summary, name='summary'),
 ]
