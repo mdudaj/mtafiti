@@ -26,7 +26,9 @@ from .models import (
     MetadataSchemaVersion,
     MetadataVocabulary,
     MetadataVocabularyItem,
+    PlateLayoutTemplate,
     Postcode,
+    ProcessingBatch,
     ReceivingDiscrepancy,
     ReceivingEvent,
     Region,
@@ -40,16 +42,21 @@ from .services import (
     accessioning_report,
     AccessioningError,
     allocate_biospecimen_identifiers,
+    BatchPlateError,
     BiospecimenTransitionError,
     create_receiving_discrepancy,
     create_aliquots,
+    create_processing_batch,
+    create_processing_batch_worksheet_job,
     create_pool,
     generate_manifest_identifier,
+    processing_batch_worksheet,
     receive_manifest_item,
     receive_single_biospecimen,
     resolve_schema_version_for_binding,
     submit_manifest,
     sync_run_to_dict,
+    transition_processing_batch,
     transition_biospecimen,
     transition_pool,
     validate_metadata_payload,
@@ -291,6 +298,83 @@ def _receiving_discrepancy_to_dict(item: ReceivingDiscrepancy) -> dict[str, obje
         "expected_data": item.expected_data,
         "actual_data": item.actual_data,
         "recorded_by": item.recorded_by,
+    }
+
+
+def _plate_layout_to_dict(item: PlateLayoutTemplate) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "name": item.name,
+        "key": item.key,
+        "description": item.description,
+        "rows": item.rows,
+        "columns": item.columns,
+        "capacity": item.rows * item.columns,
+        "is_active": item.is_active,
+    }
+
+
+def _batch_plate_assignment_to_dict(item) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "biospecimen_id": str(item.biospecimen_id),
+        "sample_identifier": item.biospecimen.sample_identifier,
+        "barcode": item.biospecimen.barcode,
+        "subject_identifier": item.biospecimen.subject_identifier,
+        "position_index": item.position_index,
+        "well_label": item.well_label,
+        "metadata": item.metadata,
+    }
+
+
+def _batch_plate_to_dict(item) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "batch_id": str(item.batch_id),
+        "layout_template": _plate_layout_to_dict(item.layout_template),
+        "plate_identifier": item.plate_identifier,
+        "sequence_number": item.sequence_number,
+        "label": item.label,
+        "metadata": item.metadata,
+        "is_active": item.is_active,
+        "assignments": [
+            _batch_plate_assignment_to_dict(assignment)
+            for assignment in item.assignments.select_related("biospecimen").order_by("position_index")
+        ],
+    }
+
+
+def _processing_batch_to_dict(item: ProcessingBatch, *, include_plates: bool = False) -> dict[str, object]:
+    payload = {
+        "id": str(item.id),
+        "batch_identifier": item.batch_identifier,
+        "sample_type_id": str(item.sample_type_id),
+        "study_id": str(item.study_id) if item.study_id else None,
+        "site_id": str(item.site_id) if item.site_id else None,
+        "lab_id": str(item.lab_id) if item.lab_id else None,
+        "status": item.status,
+        "notes": item.notes,
+        "metadata": item.metadata,
+        "created_by": item.created_by,
+        "plate_count": item.plates.count(),
+        "assigned_specimen_count": sum(plate.assignments.count() for plate in item.plates.all()),
+    }
+    if include_plates:
+        payload["plates"] = [
+            _batch_plate_to_dict(plate)
+            for plate in item.plates.select_related("layout_template").order_by("sequence_number")
+        ]
+    return payload
+
+
+def _print_job_summary_to_dict(item) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "template_ref": item.template_ref,
+        "output_format": item.output_format,
+        "destination": item.destination,
+        "status": item.status,
+        "gateway_metadata": item.gateway_metadata,
     }
 
 
@@ -1423,6 +1507,10 @@ def _accessioning_error_response(exc: AccessioningError):
     return JsonResponse({"error": message}, status=400)
 
 
+def _batch_plate_error_response(exc: BatchPlateError):
+    return JsonResponse({"error": str(exc)}, status=400)
+
+
 @csrf_exempt
 def lims_biospecimen_types(request):
     if request.method == "GET":
@@ -1976,3 +2064,269 @@ def lims_receiving_discrepancies(request):
             return _accessioning_error_response(exc)
         return JsonResponse(_receiving_discrepancy_to_dict(discrepancy), status=201)
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_plate_layouts(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
+    if forbidden:
+        return forbidden
+    items = [_plate_layout_to_dict(item) for item in PlateLayoutTemplate.objects.filter(is_active=True).order_by("rows", "columns")]
+    return JsonResponse({"items": items})
+
+
+@csrf_exempt
+def lims_plate_layout_detail(request, layout_id: str):
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
+    if forbidden:
+        return forbidden
+    try:
+        layout = PlateLayoutTemplate.objects.get(id=layout_id)
+    except (ValidationError, PlateLayoutTemplate.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    return JsonResponse(_plate_layout_to_dict(layout))
+
+
+@csrf_exempt
+def lims_processing_batches(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.artifact.view")
+        if forbidden:
+            return forbidden
+        queryset = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "plates", "plates__assignments"
+        ).order_by("-created_at")
+        if request.GET.get("status"):
+            queryset = queryset.filter(status=request.GET["status"])
+        if request.GET.get("sample_type_id"):
+            queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
+        items = [_processing_batch_to_dict(item) for item in queryset[:200]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.artifact.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+        if error:
+            return error
+        if sample_type is None:
+            return JsonResponse({"error": "sample_type_id is required"}, status=400)
+        study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+        if error:
+            return error
+        site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+        if error:
+            return error
+        lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+        if error:
+            return error
+        metadata = payload.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            return JsonResponse({"error": "metadata must be an object"}, status=400)
+        plates_payload = payload.get("plates") or []
+        if not isinstance(plates_payload, list):
+            return JsonResponse({"error": "plates must be a list"}, status=400)
+        prepared_plates: list[dict[str, object]] = []
+        for plate_payload in plates_payload:
+            if not isinstance(plate_payload, dict):
+                return JsonResponse({"error": "plate must be an object"}, status=400)
+            layout_template, error = _resolve_optional_fk(
+                PlateLayoutTemplate,
+                plate_payload.get("layout_template_id"),
+                "plate_layout_not_found",
+            )
+            if error:
+                return error
+            if layout_template is None:
+                return JsonResponse({"error": "layout_template_id is required"}, status=400)
+            plate_metadata = plate_payload.get("metadata") or {}
+            if not isinstance(plate_metadata, dict):
+                return JsonResponse({"error": "plate metadata must be an object"}, status=400)
+            assignments_payload = plate_payload.get("assignments") or []
+            if not isinstance(assignments_payload, list):
+                return JsonResponse({"error": "assignments must be a list"}, status=400)
+            prepared_assignments: list[dict[str, object]] = []
+            for assignment_payload in assignments_payload:
+                if not isinstance(assignment_payload, dict):
+                    return JsonResponse({"error": "assignment must be an object"}, status=400)
+                biospecimen, error = _resolve_optional_fk(
+                    Biospecimen,
+                    assignment_payload.get("biospecimen_id"),
+                    "biospecimen_not_found",
+                )
+                if error:
+                    return error
+                if biospecimen is None:
+                    return JsonResponse({"error": "biospecimen_id is required"}, status=400)
+                assignment_metadata = assignment_payload.get("metadata") or {}
+                if not isinstance(assignment_metadata, dict):
+                    return JsonResponse({"error": "assignment metadata must be an object"}, status=400)
+                raw_position = assignment_payload.get("position_index")
+                if raw_position in ("", None):
+                    position_index = None
+                else:
+                    try:
+                        position_index = int(raw_position)
+                    except (TypeError, ValueError):
+                        return JsonResponse({"error": "invalid_position_index"}, status=400)
+                prepared_assignments.append(
+                    {
+                        "biospecimen": biospecimen,
+                        "position_index": position_index,
+                        "well_label": str(assignment_payload.get("well_label") or "").strip(),
+                        "metadata": assignment_metadata,
+                    }
+                )
+            prepared_plates.append(
+                {
+                    "layout_template": layout_template,
+                    "label": str(plate_payload.get("label") or "").strip(),
+                    "metadata": plate_metadata,
+                    "assignments": prepared_assignments,
+                }
+            )
+        try:
+            batch = create_processing_batch(
+                sample_type=sample_type,
+                plates=prepared_plates,
+                study=study,
+                site=site,
+                lab=lab,
+                notes=str(payload.get("notes") or "").strip(),
+                metadata=metadata,
+                created_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+            )
+        except BatchPlateError as exc:
+            return _batch_plate_error_response(exc)
+        batch.refresh_from_db()
+        return JsonResponse(_processing_batch_to_dict(batch, include_plates=True), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_processing_batch_detail(request, batch_id: str):
+    try:
+        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
+        ).get(id=batch_id)
+    except (ValidationError, ProcessingBatch.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.artifact.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_processing_batch_to_dict(batch, include_plates=True))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.artifact.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+        if error:
+            return error
+        site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+        if error:
+            return error
+        lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+        if error:
+            return error
+        metadata = payload.get("metadata", batch.metadata)
+        if not isinstance(metadata, dict):
+            return JsonResponse({"error": "metadata must be an object"}, status=400)
+        batch.study = study
+        batch.site = site
+        batch.lab = lab
+        batch.notes = str(payload.get("notes", batch.notes) or "").strip()
+        batch.metadata = metadata
+        error = _save_model(batch)
+        if error:
+            return error
+        batch.refresh_from_db()
+        return JsonResponse(_processing_batch_to_dict(batch, include_plates=True))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_processing_batch_transition(request, batch_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.manage")
+    if forbidden:
+        return forbidden
+    try:
+        batch = ProcessingBatch.objects.get(id=batch_id)
+    except (ValidationError, ProcessingBatch.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    next_status = str(payload.get("status") or "").strip()
+    if next_status not in ProcessingBatch.Status.values:
+        return JsonResponse({"error": "invalid_status"}, status=400)
+    try:
+        transition_processing_batch(batch, next_status)
+    except BatchPlateError as exc:
+        return _batch_plate_error_response(exc)
+    batch.refresh_from_db()
+    return JsonResponse(_processing_batch_to_dict(batch))
+
+
+@csrf_exempt
+def lims_processing_batch_worksheet(request, batch_id: str):
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
+    if forbidden:
+        return forbidden
+    try:
+        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
+        ).get(id=batch_id)
+    except (ValidationError, ProcessingBatch.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    return JsonResponse(processing_batch_worksheet(batch))
+
+
+@csrf_exempt
+def lims_processing_batch_worksheet_print_job(request, batch_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.manage")
+    if forbidden:
+        return forbidden
+    try:
+        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
+            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
+        ).get(id=batch_id)
+    except (ValidationError, ProcessingBatch.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        payload = {}
+    try:
+        print_job = create_processing_batch_worksheet_job(
+            batch,
+            destination=str(payload.get("destination") or "worksheet-preview").strip(),
+            template_ref=str(payload.get("template_ref") or "a4/batch-rows").strip(),
+            output_format=str(payload.get("output_format") or "pdf").strip(),
+            pdf_sheet_preset=str(payload.get("pdf_sheet_preset") or "a4-38x21.2").strip(),
+        )
+    except BatchPlateError as exc:
+        return _batch_plate_error_response(exc)
+    batch.refresh_from_db()
+    return JsonResponse(
+        {
+            "batch": _processing_batch_to_dict(batch),
+            "print_job": _print_job_summary_to_dict(print_job),
+        },
+        status=201,
+    )

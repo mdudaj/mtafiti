@@ -2428,6 +2428,36 @@ nodes:
       - sequence_padding
     source: src/lims/models.py:554
   -
+    id: datamodel:batchplate
+    type: DataModel
+    name: BatchPlate
+    description: "Django model defined in lims.models."
+    fields:
+      - batch
+      - is_active
+      - label
+      - layout_template
+      - metadata
+      - plate_identifier
+      - sequence_number
+    source: src/lims/models.py:1064
+  -
+    id: datamodel:processingbatch
+    type: DataModel
+    name: ProcessingBatch
+    description: "Django model defined in lims.models."
+    fields:
+      - batch_identifier
+      - created_by
+      - lab
+      - metadata
+      - notes
+      - sample_type
+      - site
+      - status
+      - study
+    source: src/lims/models.py:1008
+  -
     id: datamodel:accessioningmanifestitem
     type: DataModel
     name: AccessioningManifestItem
@@ -2463,6 +2493,18 @@ nodes:
       - received_by
       - scan_value
     source: src/lims/models.py:872
+  -
+    id: datamodel:batchplateassignment
+    type: DataModel
+    name: BatchPlateAssignment
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - metadata
+      - plate
+      - position_index
+      - well_label
+    source: src/lims/models.py:1099
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2572,6 +2614,19 @@ nodes:
       - source_url
       - street
     source: src/lims/models.py:138
+  -
+    id: datamodel:platelayouttemplate
+    type: DataModel
+    name: PlateLayoutTemplate
+    description: "Django model defined in lims.models."
+    fields:
+      - columns
+      - description
+      - is_active
+      - key
+      - name
+      - rows
+    source: src/lims/models.py:980
   -
     id: datamodel:metadataschemafield
     type: DataModel

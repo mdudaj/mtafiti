@@ -975,3 +975,164 @@ class ReceivingDiscrepancy(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.code}:{self.status}"
+
+
+class PlateLayoutTemplate(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    key = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    rows = models.PositiveIntegerField(default=8)
+    columns = models.PositiveIntegerField(default=12)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["key"], name="lims_plate_layout_key_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["rows", "columns"], name="uniq_lims_plate_layout_dims"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.rows < 1 or self.rows > 26:
+            raise ValidationError({"rows": "rows must be between 1 and 26"})
+        if self.columns < 1 or self.columns > 48:
+            raise ValidationError({"columns": "columns must be between 1 and 48"})
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ProcessingBatch(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        ASSIGNED = "assigned"
+        PRINTED = "printed"
+        COMPLETED = "completed"
+        CANCELLED = "cancelled"
+
+    batch_identifier = models.CharField(max_length=80, unique=True)
+    sample_type = models.ForeignKey(
+        BiospecimenType,
+        on_delete=models.PROTECT,
+        related_name="processing_batches",
+    )
+    study = models.ForeignKey(
+        Study,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processing_batches",
+    )
+    site = models.ForeignKey(
+        Site,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processing_batches",
+    )
+    lab = models.ForeignKey(
+        Lab,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processing_batches",
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    notes = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_by = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["batch_identifier"], name="lims_proc_batch_id_idx"),
+            models.Index(fields=["status", "-created_at"], name="lims_proc_batch_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return self.batch_identifier
+
+
+class BatchPlate(TimestampedUUIDModel):
+    batch = models.ForeignKey(
+        ProcessingBatch,
+        on_delete=models.CASCADE,
+        related_name="plates",
+    )
+    layout_template = models.ForeignKey(
+        PlateLayoutTemplate,
+        on_delete=models.PROTECT,
+        related_name="plates",
+    )
+    plate_identifier = models.CharField(max_length=100, unique=True)
+    sequence_number = models.PositiveIntegerField(default=1)
+    label = models.CharField(max_length=100, blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["batch__batch_identifier", "sequence_number"]
+        indexes = [
+            models.Index(fields=["batch", "sequence_number"], name="lims_batch_plate_seq_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "sequence_number"], name="uniq_lims_batch_plate_seq"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return self.plate_identifier
+
+
+class BatchPlateAssignment(TimestampedUUIDModel):
+    plate = models.ForeignKey(
+        BatchPlate,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        on_delete=models.PROTECT,
+        related_name="plate_assignments",
+    )
+    position_index = models.PositiveIntegerField(default=1)
+    well_label = models.CharField(max_length=8)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["plate__plate_identifier", "position_index"]
+        constraints = [
+            models.UniqueConstraint(fields=["plate", "position_index"], name="uniq_lims_plate_assign_pos"),
+            models.UniqueConstraint(fields=["plate", "well_label"], name="uniq_lims_plate_assign_label"),
+            models.UniqueConstraint(fields=["plate", "biospecimen"], name="uniq_lims_plate_assign_spec"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+        if self.well_label:
+            self.well_label = self.well_label.strip().upper()
+        if not self.well_label:
+            raise ValidationError({"well_label": "well_label is required"})
+        if self.plate_id and self.position_index:
+            capacity = self.plate.layout_template.rows * self.plate.layout_template.columns
+            if self.position_index < 1 or self.position_index > capacity:
+                raise ValidationError({"position_index": "position_index is out of range for the selected layout"})
+        if self.plate_id and self.biospecimen_id and self.plate.batch.sample_type_id != self.biospecimen.sample_type_id:
+            raise ValidationError({"biospecimen": "biospecimen sample type must match the batch sample type"})
+
+    def __str__(self) -> str:
+        return f"{self.plate.plate_identifier}:{self.well_label}"

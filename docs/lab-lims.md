@@ -200,6 +200,34 @@ The first API surface is exposed under:
 
 Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine.
 
+## Batch and plate management
+
+The current batch-management slice standardizes the first processing and worksheet primitives on top of the biospecimen aggregate:
+
+- `PlateLayoutTemplate`
+- `ProcessingBatch`
+- `BatchPlate`
+- `BatchPlateAssignment`
+
+Current conventions:
+
+- seeded layout templates provide tenant-local defaults for `96-well` and `384-well` plates
+- processing batches stay tenant-aware through the same `sample_type`, `study`, `site`, and `lab` references used elsewhere in LIMS
+- each plate assignment binds one biospecimen to one validated position and normalized well label
+- duplicate specimen assignment within the same batch is rejected explicitly instead of being silently overwritten
+- worksheet generation reuses the existing printing job stack and preview renderers rather than introducing a parallel document subsystem
+
+The first API surface is exposed under:
+
+- `/api/v1/lims/plate-layouts`
+- `/api/v1/lims/processing-batches`
+- `/api/v1/lims/processing-batches/<batch_id>`
+- `/api/v1/lims/processing-batches/<batch_id>/transition`
+- `/api/v1/lims/processing-batches/<batch_id>/worksheet`
+- `/api/v1/lims/processing-batches/<batch_id>/worksheet-print-job`
+
+Worksheet print jobs default to the shared `a4/batch-rows` template and `pdf` output so operators can generate A4-ready plate worksheets while still benefiting from the standard print preview metadata produced by the platform printing service.
+
 ## Geography import and Tanzania sync
 
 Address metadata ingestion is designed to be polite and resumable, with Tanzania currently acting as the first concrete source:
