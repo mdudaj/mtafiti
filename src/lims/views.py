@@ -2,7 +2,9 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
-from core.identity import require_any_role
+from core.identity import request_roles
+
+from .permissions import permission_summary_for_roles, require_lims_permission
 
 
 def _user_context(request) -> dict[str, object]:
@@ -50,10 +52,7 @@ def _dashboard_payload(request) -> dict[str, object]:
 def lims_dashboard_summary(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(
-        request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
-    )
+    forbidden = require_lims_permission(request, 'lims.dashboard.view')
     if forbidden:
         return forbidden
     return JsonResponse(_dashboard_payload(request))
@@ -63,10 +62,7 @@ def lims_dashboard_summary(request):
 def lims_dashboard_page(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(
-        request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
-    )
+    forbidden = require_lims_permission(request, 'lims.dashboard.view')
     if forbidden:
         return forbidden
     return render(
@@ -78,3 +74,13 @@ def lims_dashboard_page(request):
             'user_context': _user_context(request),
         },
     )
+
+
+@csrf_exempt
+def lims_permissions_summary(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.dashboard.view')
+    if forbidden:
+        return forbidden
+    return JsonResponse(permission_summary_for_roles(request_roles(request)))

@@ -22,6 +22,51 @@ This document defines the target tenant-aware LIMS service exposed at:
 - API namespace: `/api/v1/lims/*`
 - HTML shell entrypoint: `/lims/`
 - Service-aware routing via `TenantServiceRoute` records for `service_key="lims"`
+- Permission model helpers in `src/lims/permissions.py` define module roles, legacy-role compatibility, and guardian-compatible object permission names.
+
+## Permission model
+
+The current LIMS permission slice standardizes four module roles:
+
+- `lims.operator`
+- `lims.manager`
+- `lims.qa`
+- `lims.admin`
+
+These roles map to guardian-compatible object permission names so future Viewflow task nodes can use stable permission codenames even before full `django-guardian` runtime integration is enabled.
+
+### Core permission bundles
+
+- `lims.dashboard.view`
+- `lims.reference.view`
+- `lims.reference.manage`
+- `lims.workflow_task.view`
+- `lims.workflow_task.execute`
+- `lims.workflow_task.assign`
+- `lims.workflow_task.approve`
+- `lims.artifact.view`
+- `lims.artifact.manage`
+
+### Guardian / Viewflow conventions
+
+- Guardian-compatible names are exposed as `lims.<codename>`, for example:
+  - `lims.view_reference_record`
+  - `lims.execute_workflow_task`
+  - `lims.approve_workflow_task`
+- Viewflow task actions should bind to the workflow-task permission family:
+  - `view`
+  - `execute`
+  - `assign`
+  - `approve`
+
+### Legacy role compatibility
+
+To preserve current platform behavior while the dedicated LIMS roles are adopted, these existing roles are recognized by the LIMS permission model:
+
+- `catalog.reader`
+- `catalog.editor`
+- `policy.admin`
+- `tenant.admin`
 
 ## Integration contracts (to be detailed)
 

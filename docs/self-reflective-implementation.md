@@ -95,6 +95,17 @@ Use this repository workflow for new implementation slices:
 
 Direct-to-`main` implementation is reserved for exceptional repository maintenance, not normal feature delivery.
 
+### Branch naming (required)
+
+Use Conventional Commit-style work labels, but convert them to Git-safe branch refs:
+
+* Human-readable label / workstream: `feat: LIMS permissions`
+* Git branch name: `feat/lims-permissions`
+
+Use the same pattern for other branch types, for example `fix/...`, `docs/...`, `refactor/...`, `test/...`, and `chore/...`.
+
+Do not use issue-number-only branches when a scoped feature/fix label is available. Git refs cannot contain `:` or spaces, so the branch must use the slash + slug form even when the human-readable convention uses `type: Title`.
+
 ## Resources to expose (to reduce looping)
 
 * Repository symbol/code index and architecture map.
