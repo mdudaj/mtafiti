@@ -23,6 +23,8 @@ This document defines the target tenant-aware LIMS service exposed at:
 - HTML shell entrypoint: `/lims/`
 - Service-aware routing via `TenantServiceRoute` records for `service_key="lims"`
 - Permission model helpers in `src/lims/permissions.py` define module roles, legacy-role compatibility, and guardian-compatible object permission names.
+- Reference-domain models and APIs now live directly in `src/lims/models.py` and `src/lims/views.py`.
+- Tanzania address metadata sync is implemented as a resumable Celery task backed by `TanzaniaAddressSyncRun`.
 
 ## Permission model
 
@@ -67,6 +69,47 @@ To preserve current platform behavior while the dedicated LIMS roles are adopted
 - `catalog.editor`
 - `policy.admin`
 - `tenant.admin`
+
+## Reference domain
+
+The first reference-data slice standardizes:
+
+- `Lab`
+- `Study`
+- `Site`
+- Tanzania address hierarchy:
+  - `TanzaniaRegion`
+  - `TanzaniaDistrict`
+  - `TanzaniaWard`
+  - `TanzaniaStreet`
+
+Reference APIs are exposed under:
+
+- `/api/v1/lims/reference/labs`
+- `/api/v1/lims/reference/studies`
+- `/api/v1/lims/reference/sites`
+- `/api/v1/lims/reference/select-options`
+- `/api/v1/lims/reference/address-sync-runs`
+
+These endpoints are intended for admin-style CRUD and downstream selector reuse in receiving/workflow forms.
+
+## Tanzania address sync
+
+Address metadata ingestion is designed to be polite and resumable:
+
+- source: `https://www.tanzaniapostcode.com/`
+- hierarchy: `region -> district -> ward -> street -> postcode`
+- execution: Celery task in `src/lims/tasks.py`
+- persisted checkpoint/state: `TanzaniaAddressSyncRun`
+
+Guardrails:
+
+- each run processes a bounded number of pages (`request_budget`)
+- the task persists a queue/checkpoint so later invocations can resume
+- `next_not_before_at` enforces a minimum delay between page fetches
+- failures are surfaced on the sync run instead of silently dropped
+
+This gives Mtafiti a path to periodic refreshes via Celery Beat or another scheduler without hammering the upstream postcode service.
 
 ## Integration contracts (to be detailed)
 

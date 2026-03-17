@@ -622,6 +622,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:lab
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:lineageedge
   -
     relationship: implements
@@ -726,7 +730,35 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:site
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:stewardshipitem
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:study
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tanzaniaaddresssyncrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tanzaniadistrict
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tanzaniaregion
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tanzaniastreet
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:tanzaniaward
   -
     relationship: implements
     from: module:core_models
@@ -735,6 +767,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:tenantserviceroute
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:timestampeduuidmodel
   -
     relationship: implements
     from: module:core_models
@@ -913,12 +949,28 @@ edges:
     to: framework:django
   -
     relationship: uses
+    from: module:lims_models
+    to: framework:django
+  -
+    relationship: uses
     from: module:lims_permissions
     to: framework:django
   -
     relationship: uses
     from: module:lims_permissions
     to: module:core_identity
+  -
+    relationship: uses
+    from: module:lims_services
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_tasks
+    to: framework:celery
+  -
+    relationship: uses
+    from: module:lims_tasks
+    to: module:core_celery
   -
     relationship: uses
     from: module:lims_urls

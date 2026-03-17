@@ -13,6 +13,7 @@ fi
 if [[ $FULL_GATE -eq 1 ]]; then
   python3 .github/scripts/check_docs_workflow.py --base-ref "${BASE_REF:-main}"
   python3 .github/scripts/check_openapi_contract.py
+  python3 .github/scripts/generate_knowledge_graph.py --check
 fi
 
 docker compose up -d --wait postgres

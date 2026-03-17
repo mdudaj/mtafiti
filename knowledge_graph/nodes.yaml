@@ -2316,6 +2316,141 @@ nodes:
       - workspace
     source: src/core/models.py:788
   -
+    id: datamodel:site
+    type: DataModel
+    name: Site
+    description: "Django model defined in lims.models."
+    fields:
+      - address_line
+      - code
+      - description
+      - district
+      - is_active
+      - lab
+      - name
+      - postcode
+      - region
+      - street
+      - study
+      - ward
+    source: src/lims/models.py:188
+  -
+    id: datamodel:lab
+    type: DataModel
+    name: Lab
+    description: "Django model defined in lims.models."
+    fields:
+      - address_line
+      - code
+      - description
+      - district
+      - is_active
+      - name
+      - postcode
+      - region
+      - street
+      - ward
+    source: src/lims/models.py:111
+  -
+    id: datamodel:tanzaniaaddresssyncrun
+    type: DataModel
+    name: TanzaniaAddressSyncRun
+    description: "Django model defined in lims.models."
+    fields:
+      - checkpoint
+      - completed_at
+      - last_error
+      - mode
+      - next_not_before_at
+      - pages_processed
+      - request_budget
+      - source_root
+      - started_at
+      - stats
+      - status
+      - throttle_seconds
+      - triggered_by
+    source: src/lims/models.py:249
+  -
+    id: datamodel:study
+    type: DataModel
+    name: Study
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - description
+      - lead_lab
+      - name
+      - sponsor
+      - status
+    source: src/lims/models.py:158
+  -
+    id: datamodel:timestampeduuidmodel
+    type: DataModel
+    name: TimestampedUUIDModel
+    description: "Django model defined in lims.models."
+    fields:
+      - created_at
+      - id
+      - updated_at
+    source: src/lims/models.py:8
+  -
+    id: datamodel:tanzaniaward
+    type: DataModel
+    name: TanzaniaWard
+    description: "Django model defined in lims.models."
+    fields:
+      - district
+      - is_active
+      - last_synced_at
+      - name
+      - slug
+      - source_path
+      - source_url
+    source: src/lims/models.py:58
+  -
+    id: datamodel:tanzaniastreet
+    type: DataModel
+    name: TanzaniaStreet
+    description: "Django model defined in lims.models."
+    fields:
+      - is_active
+      - last_synced_at
+      - name
+      - postcode
+      - slug
+      - source_path
+      - source_url
+      - ward
+    source: src/lims/models.py:84
+  -
+    id: datamodel:tanzaniadistrict
+    type: DataModel
+    name: TanzaniaDistrict
+    description: "Django model defined in lims.models."
+    fields:
+      - is_active
+      - last_synced_at
+      - name
+      - region
+      - slug
+      - source_path
+      - source_url
+    source: src/lims/models.py:32
+  -
+    id: datamodel:tanzaniaregion
+    type: DataModel
+    name: TanzaniaRegion
+    description: "Django model defined in lims.models."
+    fields:
+      - is_active
+      - last_synced_at
+      - name
+      - slug
+      - source_path
+      - source_url
+    source: src/lims/models.py:17
+  -
     id: datamodel:tenantserviceroute
     type: DataModel
     name: TenantServiceRoute
