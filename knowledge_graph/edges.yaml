@@ -574,6 +574,14 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:batchplate
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:batchplateassignment
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:biospecimen
   -
     relationship: implements
@@ -718,6 +726,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:platelayouttemplate
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:postcode
   -
     relationship: implements
@@ -739,6 +751,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:privacyprofile
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:processingbatch
   -
     relationship: implements
     from: module:core_models
@@ -1031,6 +1047,14 @@ edges:
     relationship: uses
     from: module:lims_services
     to: framework:django
+  -
+    relationship: uses
+    from: module:lims_services
+    to: module:core_models
+  -
+    relationship: uses
+    from: module:lims_services
+    to: module:core_printing_renderers
   -
     relationship: uses
     from: module:lims_tasks

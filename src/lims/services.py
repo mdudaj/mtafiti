@@ -17,9 +17,14 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
+from core.models import PrintJob, PrintTemplate
+from core.printing_renderers import render_label_preview
+
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
+    BatchPlate,
+    BatchPlateAssignment,
     Biospecimen,
     BiospecimenPool,
     BiospecimenPoolMember,
@@ -30,7 +35,9 @@ from .models import (
     MetadataSchemaBinding,
     MetadataSchemaVersion,
     MetadataVocabularyItem,
+    PlateLayoutTemplate,
     Postcode,
+    ProcessingBatch,
     Region,
     ReceivingDiscrepancy,
     ReceivingEvent,
@@ -749,11 +756,35 @@ ALLOWED_POOL_TRANSITIONS = {
 }
 
 
+ALLOWED_BATCH_TRANSITIONS = {
+    ProcessingBatch.Status.DRAFT: {
+        ProcessingBatch.Status.ASSIGNED,
+        ProcessingBatch.Status.PRINTED,
+        ProcessingBatch.Status.CANCELLED,
+    },
+    ProcessingBatch.Status.ASSIGNED: {
+        ProcessingBatch.Status.PRINTED,
+        ProcessingBatch.Status.COMPLETED,
+        ProcessingBatch.Status.CANCELLED,
+    },
+    ProcessingBatch.Status.PRINTED: {
+        ProcessingBatch.Status.COMPLETED,
+        ProcessingBatch.Status.CANCELLED,
+    },
+    ProcessingBatch.Status.COMPLETED: set(),
+    ProcessingBatch.Status.CANCELLED: set(),
+}
+
+
 class BiospecimenTransitionError(ValueError):
     pass
 
 
 class AccessioningError(ValueError):
+    pass
+
+
+class BatchPlateError(ValueError):
     pass
 
 
@@ -1201,3 +1232,268 @@ def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
             for item in events
         ],
     }
+
+
+def _plate_capacity(layout_template: PlateLayoutTemplate) -> int:
+    return layout_template.rows * layout_template.columns
+
+
+def _well_label_from_position(layout_template: PlateLayoutTemplate, position_index: int) -> str:
+    capacity = _plate_capacity(layout_template)
+    if position_index < 1 or position_index > capacity:
+        raise BatchPlateError("invalid_position_index")
+    row_index = (position_index - 1) // layout_template.columns
+    column_index = ((position_index - 1) % layout_template.columns) + 1
+    return f"{chr(ord('A') + row_index)}{column_index}"
+
+
+def _position_from_well_label(layout_template: PlateLayoutTemplate, well_label: str) -> int:
+    normalized = str(well_label or "").strip().upper()
+    match = re.fullmatch(r"([A-Z])(\d{1,2})", normalized)
+    if not match:
+        raise BatchPlateError("invalid_well_label")
+    row_label, column_raw = match.groups()
+    row_index = ord(row_label) - ord("A")
+    column_index = int(column_raw)
+    if row_index < 0 or row_index >= layout_template.rows:
+        raise BatchPlateError("invalid_well_label")
+    if column_index < 1 or column_index > layout_template.columns:
+        raise BatchPlateError("invalid_well_label")
+    return (row_index * layout_template.columns) + column_index
+
+
+def normalize_plate_position(
+    layout_template: PlateLayoutTemplate,
+    *,
+    position_index: int | None = None,
+    well_label: str = "",
+) -> tuple[int, str]:
+    if position_index is None and not str(well_label or "").strip():
+        raise BatchPlateError("position_or_well_label_required")
+    if position_index is None:
+        resolved_position = _position_from_well_label(layout_template, well_label)
+    else:
+        resolved_position = int(position_index)
+    resolved_label = _well_label_from_position(layout_template, resolved_position)
+    return resolved_position, resolved_label
+
+
+def generate_processing_batch_identifier(sample_type: BiospecimenType) -> str:
+    prefix = sample_type.identifier_prefix.strip() or sample_type.key.upper()
+    return f"{prefix}-BATCH-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+
+
+def generate_batch_plate_identifier(batch_identifier: str, sequence_number: int) -> str:
+    return f"{batch_identifier}-P{sequence_number:02d}"
+
+
+def transition_processing_batch(batch: ProcessingBatch, next_status: str) -> ProcessingBatch:
+    allowed = ALLOWED_BATCH_TRANSITIONS.get(batch.status, set())
+    if next_status not in allowed:
+        raise BatchPlateError("invalid_transition")
+    batch.status = next_status
+    batch.full_clean()
+    batch.save(update_fields=["status", "updated_at"])
+    return batch
+
+
+def _validate_assignable_specimen(specimen: Biospecimen, sample_type: BiospecimenType) -> None:
+    if specimen.sample_type_id != sample_type.id:
+        raise BatchPlateError("sample_type_mismatch")
+    if specimen.status not in {
+        Biospecimen.Status.RECEIVED,
+        Biospecimen.Status.AVAILABLE,
+        Biospecimen.Status.ALIQUOTED,
+    }:
+        raise BatchPlateError("specimen_not_assignable")
+
+
+def create_processing_batch(
+    *,
+    sample_type: BiospecimenType,
+    plates: list[dict[str, object]],
+    study=None,
+    site=None,
+    lab=None,
+    notes: str = "",
+    metadata: dict[str, object] | None = None,
+    created_by: str = "",
+) -> ProcessingBatch:
+    if not plates:
+        raise BatchPlateError("plates_required")
+
+    with transaction.atomic():
+        batch = ProcessingBatch(
+            batch_identifier=generate_processing_batch_identifier(sample_type),
+            sample_type=sample_type,
+            study=study,
+            site=site,
+            lab=lab,
+            status=ProcessingBatch.Status.DRAFT,
+            notes=notes.strip(),
+            metadata=dict(metadata or {}),
+            created_by=created_by.strip(),
+        )
+        batch.full_clean()
+        batch.save()
+
+        assigned_specimen_ids: set[str] = set()
+        for sequence_number, plate_spec in enumerate(plates, start=1):
+            layout_template = plate_spec["layout_template"]
+            if not isinstance(layout_template, PlateLayoutTemplate):
+                raise BatchPlateError("layout_template_required")
+            plate = BatchPlate(
+                batch=batch,
+                layout_template=layout_template,
+                plate_identifier=generate_batch_plate_identifier(batch.batch_identifier, sequence_number),
+                sequence_number=sequence_number,
+                label=str(plate_spec.get("label") or f"Plate {sequence_number}").strip(),
+                metadata=dict(plate_spec.get("metadata") or {}),
+            )
+            plate.full_clean()
+            plate.save()
+
+            seen_positions: set[int] = set()
+            assignments = plate_spec.get("assignments") or []
+            if not isinstance(assignments, list):
+                raise BatchPlateError("assignments_must_be_list")
+            for assignment_spec in assignments:
+                specimen = assignment_spec["biospecimen"]
+                if not isinstance(specimen, Biospecimen):
+                    raise BatchPlateError("biospecimen_required")
+                _validate_assignable_specimen(specimen, sample_type)
+                specimen_key = str(specimen.id)
+                if specimen_key in assigned_specimen_ids:
+                    raise BatchPlateError("duplicate_specimen_assignment")
+                position_index, well_label = normalize_plate_position(
+                    layout_template,
+                    position_index=assignment_spec.get("position_index"),
+                    well_label=str(assignment_spec.get("well_label") or ""),
+                )
+                if position_index in seen_positions:
+                    raise BatchPlateError("duplicate_plate_position")
+                assignment = BatchPlateAssignment(
+                    plate=plate,
+                    biospecimen=specimen,
+                    position_index=position_index,
+                    well_label=well_label,
+                    metadata=dict(assignment_spec.get("metadata") or {}),
+                )
+                assignment.full_clean()
+                assignment.save()
+                seen_positions.add(position_index)
+                assigned_specimen_ids.add(specimen_key)
+
+    return batch
+
+
+def processing_batch_worksheet(batch: ProcessingBatch) -> dict[str, object]:
+    plates = list(
+        batch.plates.select_related("layout_template").prefetch_related("assignments__biospecimen").order_by("sequence_number")
+    )
+    assignment_count = sum(plate.assignments.count() for plate in plates)
+    plate_payloads: list[dict[str, object]] = []
+    for plate in plates:
+        assignments = list(plate.assignments.select_related("biospecimen").order_by("position_index"))
+        plate_payloads.append(
+            {
+                "id": str(plate.id),
+                "plate_identifier": plate.plate_identifier,
+                "label": plate.label,
+                "sequence_number": plate.sequence_number,
+                "layout_template": {
+                    "id": str(plate.layout_template_id),
+                    "name": plate.layout_template.name,
+                    "key": plate.layout_template.key,
+                    "rows": plate.layout_template.rows,
+                    "columns": plate.layout_template.columns,
+                    "capacity": _plate_capacity(plate.layout_template),
+                },
+                "assignments": [
+                    {
+                        "id": str(item.id),
+                        "biospecimen_id": str(item.biospecimen_id),
+                        "sample_identifier": item.biospecimen.sample_identifier,
+                        "barcode": item.biospecimen.barcode,
+                        "subject_identifier": item.biospecimen.subject_identifier,
+                        "position_index": item.position_index,
+                        "well_label": item.well_label,
+                        "metadata": item.metadata,
+                    }
+                    for item in assignments
+                ],
+            }
+        )
+    return {
+        "batch": {
+            "id": str(batch.id),
+            "batch_identifier": batch.batch_identifier,
+            "status": batch.status,
+            "sample_type_id": str(batch.sample_type_id),
+            "study_id": str(batch.study_id) if batch.study_id else None,
+            "site_id": str(batch.site_id) if batch.site_id else None,
+            "lab_id": str(batch.lab_id) if batch.lab_id else None,
+            "notes": batch.notes,
+            "metadata": batch.metadata,
+            "created_by": batch.created_by,
+        },
+        "summary": {
+            "plate_count": len(plates),
+            "assigned_specimen_count": assignment_count,
+        },
+        "plates": plate_payloads,
+    }
+
+
+def create_processing_batch_worksheet_job(
+    batch: ProcessingBatch,
+    *,
+    destination: str,
+    template_ref: str = "a4/batch-rows",
+    output_format: str = PrintJob.Format.PDF,
+    pdf_sheet_preset: str = "a4-38x21.2",
+) -> PrintJob:
+    if output_format not in {PrintJob.Format.ZPL, PrintJob.Format.PDF}:
+        raise BatchPlateError("invalid_output_format")
+    worksheet = processing_batch_worksheet(batch)
+    labels: list[dict[str, str]] = []
+    for plate in worksheet["plates"]:
+        for assignment in plate["assignments"]:
+            labels.append(
+                {
+                    "content": assignment["barcode"] or assignment["sample_identifier"],
+                    "title": f'{plate["plate_identifier"]} {assignment["well_label"]}',
+                    "text": assignment["sample_identifier"],
+                }
+            )
+    if not labels:
+        raise BatchPlateError("batch_has_no_assignments")
+    template = PrintTemplate.objects.filter(template_ref=template_ref).first()
+    if template and template.output_format != output_format:
+        raise BatchPlateError("template_output_format_mismatch")
+    payload = {
+        "batch_identifier": batch.batch_identifier,
+        "labels": labels,
+        "pdf_sheet_preset": pdf_sheet_preset,
+        "plates": worksheet["plates"],
+    }
+    template_content = template.content if template else ""
+    print_job = PrintJob.objects.create(
+        template_ref=template_ref,
+        payload=payload,
+        output_format=output_format,
+        destination=destination.strip() or "worksheet-preview",
+        status=PrintJob.Status.PENDING,
+        gateway_metadata={
+            "render_preview": render_label_preview(
+                output_format=output_format,
+                template_content=template_content,
+                payload=payload,
+            )
+        },
+    )
+    if batch.status != ProcessingBatch.Status.PRINTED:
+        batch.status = ProcessingBatch.Status.PRINTED
+        batch.full_clean()
+        batch.save(update_fields=["status", "updated_at"])
+    return print_job
