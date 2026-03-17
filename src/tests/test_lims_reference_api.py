@@ -5,7 +5,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
-from lims.models import Lab, Site, Study, TanzaniaDistrict, TanzaniaRegion, TanzaniaStreet, TanzaniaWard
+from lims.models import Country, District, Lab, Postcode, Region, Site, Street, Study, Ward
 
 
 def _create_lims_host(client: Client, route_slug: str) -> str:
@@ -59,7 +59,7 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
 
     created_lab = client.post(
         "/api/v1/lims/reference/labs",
-        data=json.dumps({"name": "Central Lab", "code": "LAB-001", "postcode": "11101"}),
+        data=json.dumps({"name": "Central Lab", "code": "LAB-001"}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -105,13 +105,13 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
 
     updated_site = client.put(
         f"/api/v1/lims/reference/sites/{site_id}",
-        data=json.dumps({"name": "Moshi Site", "code": "SITE-001", "study_id": study_id, "lab_id": lab_id, "postcode": "25101"}),
+        data=json.dumps({"name": "Moshi Site", "code": "SITE-001", "study_id": study_id, "lab_id": lab_id}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.manager",
     )
     assert updated_site.status_code == 200
-    assert updated_site.json()["postcode"] == "25101"
+    assert updated_site.json()["code"] == "SITE-001"
 
     select_labs = client.get(
         "/api/v1/lims/reference/select-options?source=labs&q=central",
@@ -130,34 +130,57 @@ def test_lims_reference_selectors_filter_address_hierarchy(monkeypatch):
     schema_name = client.get("/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.admin").json()["tenant_schema"]
 
     with schema_context(schema_name):
-        region = TanzaniaRegion.objects.create(
+        country = Country.objects.get(code="TZ")
+        region = Region.objects.create(
+            country=country,
             name="Kilimanjaro",
             slug="kilimanjaro",
             source_path="/kilimanjaro",
             source_url="https://www.tanzaniapostcode.com/kilimanjaro",
         )
-        district = TanzaniaDistrict.objects.create(
+        district = District.objects.create(
             region=region,
             name="Moshi",
             slug="moshi",
             source_path="/kilimanjaro/moshi",
             source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi",
         )
-        ward = TanzaniaWard.objects.create(
+        ward = Ward.objects.create(
             district=district,
             name="Majengo",
             slug="majengo",
             source_path="/kilimanjaro/moshi/majengo",
             source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo",
         )
-        TanzaniaStreet.objects.create(
+        street = Street.objects.create(
             ward=ward,
             name="Sokoine Road",
             slug="sokoine-road",
             source_path="/kilimanjaro/moshi/majengo/sokoine-road",
             source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo/sokoine-road",
-            postcode="25112",
         )
+        postcode = Postcode.objects.create(
+            street=street,
+            code="25112",
+            source_path="/kilimanjaro/moshi/majengo/sokoine-road",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo/sokoine-road",
+        )
+
+    countries = client.get(
+        "/api/v1/lims/reference/select-options?source=countries",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert countries.status_code == 200
+    assert countries.json()["items"][0]["label"] == "Tanzania"
+
+    regions = client.get(
+        f"/api/v1/lims/reference/select-options?source=regions&country_id={country.id}",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert regions.status_code == 200
+    assert regions.json()["items"][0]["label"] == "Kilimanjaro"
 
     districts = client.get(
         f"/api/v1/lims/reference/select-options?source=districts&region_id={region.id}",
@@ -174,3 +197,19 @@ def test_lims_reference_selectors_filter_address_hierarchy(monkeypatch):
     )
     assert wards.status_code == 200
     assert wards.json()["items"][0]["label"] == "Majengo"
+
+    streets = client.get(
+        f"/api/v1/lims/reference/select-options?source=streets&ward_id={ward.id}",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert streets.status_code == 200
+    assert streets.json()["items"][0]["label"] == "Sokoine Road"
+
+    postcodes = client.get(
+        f"/api/v1/lims/reference/select-options?source=postcodes&street_id={street.id}",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert postcodes.status_code == 200
+    assert postcodes.json()["items"][0]["label"] == "25112"

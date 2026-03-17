@@ -2330,7 +2330,7 @@ nodes:
       - notes
       - recorded_by
       - status
-    source: src/lims/models.py:856
+    source: src/lims/models.py:920
   -
     id: datamodel:site
     type: DataModel
@@ -2339,6 +2339,7 @@ nodes:
     fields:
       - address_line
       - code
+      - country
       - description
       - district
       - is_active
@@ -2349,7 +2350,7 @@ nodes:
       - street
       - study
       - ward
-    source: src/lims/models.py:190
+    source: src/lims/models.py:247
   -
     id: datamodel:lab
     type: DataModel
@@ -2358,6 +2359,7 @@ nodes:
     fields:
       - address_line
       - code
+      - country
       - description
       - district
       - is_active
@@ -2366,7 +2368,7 @@ nodes:
       - region
       - street
       - ward
-    source: src/lims/models.py:113
+    source: src/lims/models.py:163
   -
     id: datamodel:biospecimen
     type: DataModel
@@ -2391,7 +2393,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:519
+    source: src/lims/models.py:583
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2409,7 +2411,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:614
+    source: src/lims/models.py:678
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2424,7 +2426,7 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:490
+    source: src/lims/models.py:554
   -
     id: datamodel:accessioningmanifestitem
     type: DataModel
@@ -2444,7 +2446,7 @@ nodes:
       - quantity_unit
       - received_at
       - status
-    source: src/lims/models.py:760
+    source: src/lims/models.py:824
   -
     id: datamodel:receivingevent
     type: DataModel
@@ -2460,7 +2462,7 @@ nodes:
       - received_at
       - received_by
       - scan_value
-    source: src/lims/models.py:808
+    source: src/lims/models.py:872
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2471,7 +2473,7 @@ nodes:
       - schema
       - status
       - version_number
-    source: src/lims/models.py:392
+    source: src/lims/models.py:456
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2491,7 +2493,7 @@ nodes:
       - status
       - throttle_seconds
       - triggered_by
-    source: src/lims/models.py:251
+    source: src/lims/models.py:315
   -
     id: datamodel:metadatafielddefinition
     type: DataModel
@@ -2508,7 +2510,7 @@ nodes:
       - name
       - placeholder
       - vocabulary
-    source: src/lims/models.py:327
+    source: src/lims/models.py:391
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2519,7 +2521,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:376
+    source: src/lims/models.py:440
   -
     id: datamodel:metadatavocabulary
     type: DataModel
@@ -2530,7 +2532,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:287
+    source: src/lims/models.py:351
   -
     id: datamodel:study
     type: DataModel
@@ -2543,7 +2545,33 @@ nodes:
       - name
       - sponsor
       - status
-    source: src/lims/models.py:160
+    source: src/lims/models.py:217
+  -
+    id: datamodel:country
+    type: DataModel
+    name: Country
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - is_active
+      - last_synced_at
+      - name
+      - slug
+      - source_url
+    source: src/lims/models.py:19
+  -
+    id: datamodel:postcode
+    type: DataModel
+    name: Postcode
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - is_active
+      - last_synced_at
+      - source_path
+      - source_url
+      - street
+    source: src/lims/models.py:138
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -2557,7 +2585,7 @@ nodes:
       - required
       - schema_version
       - validation_rules
-    source: src/lims/models.py:420
+    source: src/lims/models.py:484
   -
     id: datamodel:biospecimenpoolmember
     type: DataModel
@@ -2568,7 +2596,21 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:670
+    source: src/lims/models.py:734
+  -
+    id: datamodel:region
+    type: DataModel
+    name: Region
+    description: "Django model defined in lims.models."
+    fields:
+      - country
+      - is_active
+      - last_synced_at
+      - name
+      - slug
+      - source_path
+      - source_url
+    source: src/lims/models.py:34
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel
@@ -2597,11 +2639,11 @@ nodes:
       - source_system
       - status
       - study
-    source: src/lims/models.py:702
+    source: src/lims/models.py:766
   -
-    id: datamodel:tanzaniaward
+    id: datamodel:ward
     type: DataModel
-    name: TanzaniaWard
+    name: Ward
     description: "Django model defined in lims.models."
     fields:
       - district
@@ -2611,7 +2653,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:60
+    source: src/lims/models.py:86
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
@@ -2623,26 +2665,11 @@ nodes:
       - sort_order
       - value
       - vocabulary
-    source: src/lims/models.py:303
+    source: src/lims/models.py:367
   -
-    id: datamodel:tanzaniastreet
+    id: datamodel:district
     type: DataModel
-    name: TanzaniaStreet
-    description: "Django model defined in lims.models."
-    fields:
-      - is_active
-      - last_synced_at
-      - name
-      - postcode
-      - slug
-      - source_path
-      - source_url
-      - ward
-    source: src/lims/models.py:86
-  -
-    id: datamodel:tanzaniadistrict
-    type: DataModel
-    name: TanzaniaDistrict
+    name: District
     description: "Django model defined in lims.models."
     fields:
       - is_active
@@ -2652,11 +2679,11 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:34
+    source: src/lims/models.py:60
   -
-    id: datamodel:tanzaniaregion
+    id: datamodel:street
     type: DataModel
-    name: TanzaniaRegion
+    name: Street
     description: "Django model defined in lims.models."
     fields:
       - is_active
@@ -2665,7 +2692,8 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:19
+      - ward
+    source: src/lims/models.py:112
   -
     id: datamodel:metadataschemabinding
     type: DataModel
@@ -2677,7 +2705,7 @@ nodes:
       - target_key
       - target_label
       - target_type
-    source: src/lims/models.py:459
+    source: src/lims/models.py:523
   -
     id: datamodel:tenantserviceroute
     type: DataModel

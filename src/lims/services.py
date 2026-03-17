@@ -24,17 +24,19 @@ from .models import (
     BiospecimenPool,
     BiospecimenPoolMember,
     BiospecimenType,
+    Country,
+    District,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
     MetadataSchemaVersion,
     MetadataVocabularyItem,
+    Postcode,
+    Region,
     ReceivingDiscrepancy,
     ReceivingEvent,
+    Street,
     TanzaniaAddressSyncRun,
-    TanzaniaDistrict,
-    TanzaniaRegion,
-    TanzaniaStreet,
-    TanzaniaWard,
+    Ward,
 )
 
 TANZANIA_POSTCODE_ROOT_URL = "https://www.tanzaniapostcode.com/"
@@ -128,6 +130,8 @@ def parse_postcode(html: str) -> str:
 
 def default_sync_stats() -> dict[str, int]:
     return {
+        "countries_created": 0,
+        "countries_updated": 0,
         "regions_created": 0,
         "regions_updated": 0,
         "districts_created": 0,
@@ -136,6 +140,8 @@ def default_sync_stats() -> dict[str, int]:
         "wards_updated": 0,
         "streets_created": 0,
         "streets_updated": 0,
+        "postcodes_created": 0,
+        "postcodes_updated": 0,
     }
 
 
@@ -193,22 +199,35 @@ def _increment_stat(run: TanzaniaAddressSyncRun, key: str) -> None:
     run.stats = stats
 
 
-def _upsert_region(link: ParsedLink):
+def _ensure_tanzania_country() -> tuple[Country, bool]:
     defaults = {
+        "name": "Tanzania",
+        "slug": "tanzania",
+        "source_url": TANZANIA_POSTCODE_ROOT_URL,
+        "is_active": True,
+        "last_synced_at": timezone.now(),
+    }
+    country, created = Country.objects.update_or_create(code="TZ", defaults=defaults)
+    return country, created
+
+
+def _upsert_region(country: Country, link: ParsedLink):
+    defaults = {
+        "country": country,
         "name": link.label,
         "slug": slugify(link.label),
         "source_url": link.url,
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    region, created = TanzaniaRegion.objects.update_or_create(
+    region, created = Region.objects.update_or_create(
         source_path=link.path,
         defaults=defaults,
     )
     return region, created
 
 
-def _upsert_district(region: TanzaniaRegion, link: ParsedLink):
+def _upsert_district(region: Region, link: ParsedLink):
     defaults = {
         "region": region,
         "name": link.label,
@@ -217,14 +236,14 @@ def _upsert_district(region: TanzaniaRegion, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    district, created = TanzaniaDistrict.objects.update_or_create(
+    district, created = District.objects.update_or_create(
         source_path=link.path,
         defaults=defaults,
     )
     return district, created
 
 
-def _upsert_ward(district: TanzaniaDistrict, link: ParsedLink):
+def _upsert_ward(district: District, link: ParsedLink):
     defaults = {
         "district": district,
         "name": link.label,
@@ -233,28 +252,42 @@ def _upsert_ward(district: TanzaniaDistrict, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    ward, created = TanzaniaWard.objects.update_or_create(
+    ward, created = Ward.objects.update_or_create(
         source_path=link.path,
         defaults=defaults,
     )
     return ward, created
 
 
-def _upsert_street(ward: TanzaniaWard, link: ParsedLink, postcode: str):
+def _upsert_street(ward: Ward, link: ParsedLink):
     defaults = {
         "ward": ward,
         "name": link.label,
         "slug": slugify(link.label),
         "source_url": link.url,
-        "postcode": postcode,
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    street, created = TanzaniaStreet.objects.update_or_create(
+    street, created = Street.objects.update_or_create(
         source_path=link.path,
         defaults=defaults,
     )
     return street, created
+
+
+def _upsert_postcode(street: Street, link: ParsedLink, code: str):
+    defaults = {
+        "street": street,
+        "code": code,
+        "source_url": link.url,
+        "is_active": True,
+        "last_synced_at": timezone.now(),
+    }
+    postcode, created = Postcode.objects.update_or_create(
+        source_path=link.path,
+        defaults=defaults,
+    )
+    return postcode, created
 
 
 def _process_item(
@@ -264,9 +297,11 @@ def _process_item(
 ) -> None:
     level = item["level"]
     if level == "root":
+        country, created = _ensure_tanzania_country()
+        _increment_stat(run, "countries_created" if created else "countries_updated")
         region_items: list[dict[str, str]] = []
         for link in parse_directory_links(html, item["url"]):
-            region, created = _upsert_region(link)
+            region, created = _upsert_region(country, link)
             _increment_stat(run, "regions_created" if created else "regions_updated")
             region_items.append(
                 {
@@ -279,7 +314,7 @@ def _process_item(
         return
 
     if level == "region":
-        region = TanzaniaRegion.objects.get(id=item["region_id"])
+        region = Region.objects.get(id=item["region_id"])
         district_items: list[dict[str, str]] = []
         for link in parse_directory_links(html, item["url"]):
             district, created = _upsert_district(region, link)
@@ -295,7 +330,7 @@ def _process_item(
         return
 
     if level == "district":
-        district = TanzaniaDistrict.objects.get(id=item["district_id"])
+        district = District.objects.get(id=item["district_id"])
         ward_items: list[dict[str, str]] = []
         for link in parse_directory_links(html, item["url"]):
             ward, created = _upsert_ward(district, link)
@@ -311,7 +346,7 @@ def _process_item(
         return
 
     if level == "ward":
-        ward = TanzaniaWard.objects.get(id=item["ward_id"])
+        ward = Ward.objects.get(id=item["ward_id"])
         street_items: list[dict[str, str]] = []
         for link in parse_directory_links(html, item["url"]):
             street_items.append(
@@ -327,14 +362,18 @@ def _process_item(
         return
 
     if level == "street":
-        ward = TanzaniaWard.objects.get(id=item["ward_id"])
+        ward = Ward.objects.get(id=item["ward_id"])
         link = ParsedLink(
             label=item["street_label"],
             url=item["url"],
             path=item["street_path"],
         )
-        street, created = _upsert_street(ward, link, parse_postcode(html))
+        street, created = _upsert_street(ward, link)
         _increment_stat(run, "streets_created" if created else "streets_updated")
+        postcode_code = parse_postcode(html)
+        if postcode_code:
+            postcode, created = _upsert_postcode(street, link, postcode_code)
+            _increment_stat(run, "postcodes_created" if created else "postcodes_updated")
         return
 
     raise ValueError(f"unsupported_sync_level:{level}")
@@ -352,6 +391,7 @@ def sync_run_to_dict(run: TanzaniaAddressSyncRun) -> dict[str, object]:
         "throttle_seconds": run.throttle_seconds,
         "queue_size": len(checkpoint.get("queue") or []),
         "stats": dict(run.stats or {}),
+        "country_code": "TZ",
         "last_error": run.last_error or None,
         "triggered_by": run.triggered_by or None,
         "started_at": run.started_at.isoformat() if run.started_at else None,
