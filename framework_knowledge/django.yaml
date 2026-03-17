@@ -38,7 +38,7 @@ best_practices:
   - "Use models and migrations as the source of truth for persistence."
   - "Use POST for mutating form/API requests and pair it with CSRF or equivalent protections."
 context_hub:
-  available: true
+  available: false
   install_command: "npm install -g @aisuite/chub"
   update_command: "chub update"
   help_command: "chub help"
@@ -49,7 +49,8 @@ context_hub:
   get_commands:
     - "chub get django/forms"
     - "chub get django/urls"
-  status: ready
+  status: external_optional_cli
+  registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
   local_source_workflow:
     supports_git_url_directly: false
     clone_and_build_steps:
@@ -57,60 +58,6 @@ context_hub:
       - "chub build <content-dir> -o <content-dir>/dist"
       - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
       - "Run `chub update` to refresh configured sources"
-  search_results:
-    -
-      query: django
-      total: 3
-      matches:
-        -
-          id: knowledge-src/django-material
-          source: maintainer
-          description: "Local knowledge source generated from the django-material repository README."
-        -
-          id: knowledge-src/cookbook-django-admin
-          source: community
-          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-        -
-          id: knowledge-src/django-material-theme-customization
-          source: community
-          description: "Local theming skill generated from django-material design token sources."
-      status: matched
-    -
-      query: "django forms"
-      total: 2
-      matches:
-        -
-          id: knowledge-src/django-material-frontend-composition
-          source: community
-          description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
-        -
-          id: knowledge-src/django-material
-          source: maintainer
-          description: "Local knowledge source generated from the django-material repository README."
-      status: matched
-    -
-      query: "django urls"
-      total: 3
-      matches:
-        -
-          id: knowledge-src/django-material
-          source: maintainer
-          description: "Local knowledge source generated from the django-material repository README."
-        -
-          id: knowledge-src/cookbook-django-admin
-          source: community
-          description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-        -
-          id: knowledge-src/django-material-theme-customization
-          source: community
-          description: "Local theming skill generated from django-material design token sources."
-      status: matched
-  search_status: matched
-  candidate_registry_ids:
-    - knowledge-src/django-material
-    - knowledge-src/cookbook-django-admin
-    - knowledge-src/django-material-theme-customization
-    - knowledge-src/django-material-frontend-composition
 repository_fit:
   status: installed
   evidence:

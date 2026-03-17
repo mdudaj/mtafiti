@@ -896,10 +896,12 @@ EnvironmentInventory:
         - django_tenants.utils
         - json
   context_hub_registry:
-    available: true
+    available: false
+    status: external_optional_cli
+    note: "Generated artifacts describe the repository integration contract, not the local machine PATH state."
     profiles:
       django:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -910,7 +912,8 @@ EnvironmentInventory:
         get_commands:
           - "chub get django/forms"
           - "chub get django/urls"
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -918,62 +921,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: django
-            total: 3
-            matches:
-              -
-                id: knowledge-src/django-material
-                source: maintainer
-                description: "Local knowledge source generated from the django-material repository README."
-              -
-                id: knowledge-src/cookbook-django-admin
-                source: community
-                description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-              -
-                id: knowledge-src/django-material-theme-customization
-                source: community
-                description: "Local theming skill generated from django-material design token sources."
-            status: matched
-          -
-            query: "django forms"
-            total: 2
-            matches:
-              -
-                id: knowledge-src/django-material-frontend-composition
-                source: community
-                description: "Component-first frontend and form-composition guidance for django-material with minimal custom templates."
-              -
-                id: knowledge-src/django-material
-                source: maintainer
-                description: "Local knowledge source generated from the django-material repository README."
-            status: matched
-          -
-            query: "django urls"
-            total: 3
-            matches:
-              -
-                id: knowledge-src/django-material
-                source: maintainer
-                description: "Local knowledge source generated from the django-material repository README."
-              -
-                id: knowledge-src/cookbook-django-admin
-                source: community
-                description: "Local cookbook sample for django_admin generated from the Viewflow cookbook repository."
-              -
-                id: knowledge-src/django-material-theme-customization
-                source: community
-                description: "Local theming skill generated from django-material design token sources."
-            status: matched
-        search_status: matched
-        candidate_registry_ids:
-          - knowledge-src/django-material
-          - knowledge-src/cookbook-django-admin
-          - knowledge-src/django-material-theme-customization
-          - knowledge-src/django-material-frontend-composition
       django-tenants:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -982,7 +931,8 @@ EnvironmentInventory:
           - "django tenants"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -990,22 +940,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: django-tenants
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "django tenants"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       celery:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1014,7 +950,8 @@ EnvironmentInventory:
           - "celery python"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1022,22 +959,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: celery
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "celery python"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       psycopg:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1046,7 +969,8 @@ EnvironmentInventory:
           - "postgres python driver"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1054,22 +978,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: psycopg
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "postgres python driver"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       pika:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1077,7 +987,8 @@ EnvironmentInventory:
           - "pika rabbitmq python"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1085,16 +996,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: "pika rabbitmq python"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       prometheus-client:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1103,7 +1006,8 @@ EnvironmentInventory:
           - prometheus
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1111,22 +1015,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: "prometheus python client"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: prometheus
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       pytest:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1135,7 +1025,8 @@ EnvironmentInventory:
           - "pytest python"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1143,22 +1034,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: pytest
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "pytest python"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       postgres:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1167,7 +1044,8 @@ EnvironmentInventory:
           - postgresql
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1175,22 +1053,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: postgres
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: postgresql
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       rabbitmq:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1199,7 +1063,8 @@ EnvironmentInventory:
           - amqp
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1207,22 +1072,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: rabbitmq
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: amqp
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       kubernetes:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1231,7 +1082,8 @@ EnvironmentInventory:
           - k8s
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1239,22 +1091,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: kubernetes
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: k8s
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       helm:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1263,7 +1101,8 @@ EnvironmentInventory:
           - "helm kubernetes"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1271,22 +1110,8 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: helm
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "helm kubernetes"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
       github-actions:
-        available: true
+        available: false
         install_command: "npm install -g @aisuite/chub"
         update_command: "chub update"
         help_command: "chub help"
@@ -1295,7 +1120,8 @@ EnvironmentInventory:
           - "github workflow"
         get_commands:
           []
-        status: ready
+        status: external_optional_cli
+        registry_lookup_policy: "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts."
         local_source_workflow:
           supports_git_url_directly: false
           clone_and_build_steps:
@@ -1303,20 +1129,6 @@ EnvironmentInventory:
             - "chub build <content-dir> -o <content-dir>/dist"
             - "Add `<content-dir>/dist` as `sources[].path` in ~/.chub/config.yaml"
             - "Run `chub update` to refresh configured sources"
-        search_results:
-          -
-            query: "github actions"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-          -
-            query: "github workflow"
-            total: 0
-            matches:
-              []
-            status: no_registry_match
-        search_status: no_registry_match
     local_source_note: "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml."
   code_analysis_summary:
     modules_scanned: 34

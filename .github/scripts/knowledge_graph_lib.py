@@ -825,7 +825,9 @@ def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatt
             "ci_cd_tools": [{"name": name, "status": "configured"} for name in ci_jobs],
             "internal_modules": internal_modules,
             "context_hub_registry": {
-                "available": shutil.which("chub") is not None,
+                "available": False,
+                "status": "external_optional_cli",
+                "note": "Generated artifacts describe the repository integration contract, not the local machine PATH state.",
                 "profiles": context_hub_profiles,
                 "local_source_note": "chub update refreshes configured sources. To use a git repo, clone it locally, run `chub build <content-dir>`, and add the built dist path under `sources[].path` in ~/.chub/config.yaml.",
             },
@@ -979,15 +981,15 @@ def build_context_hub_entry(profile_key: str) -> dict[str, Any]:
     if cached is not None:
         return json.loads(json.dumps(cached))
     profile = ECOSYSTEM_CONTEXT_PROFILES.get(profile_key, {"search_queries": [profile_key], "doc_ids": []})
-    available = shutil.which("chub") is not None
     entry = {
-        "available": available,
+        "available": False,
         "install_command": "npm install -g @aisuite/chub",
         "update_command": "chub update",
         "help_command": "chub help",
         "search_queries": profile["search_queries"],
         "get_commands": [f"chub get {item}" for item in profile.get("doc_ids", [])],
-        "status": "ready" if available else "install_required",
+        "status": "external_optional_cli",
+        "registry_lookup_policy": "Resolve Context Hub matches at usage time instead of embedding machine-specific search results in generated artifacts.",
         "local_source_workflow": {
             "supports_git_url_directly": False,
             "clone_and_build_steps": [
@@ -998,26 +1000,6 @@ def build_context_hub_entry(profile_key: str) -> dict[str, Any]:
             ],
         },
     }
-    if available:
-        search_results: list[dict[str, Any]] = []
-        top_ids: list[str] = []
-        for query in profile["search_queries"]:
-            result = run_chub_search(query, accept_terms=profile.get("accept_terms", []))
-            search_results.append(result)
-            for match in result.get("matches", []):
-                if match["id"] not in top_ids:
-                    top_ids.append(match["id"])
-        entry["search_results"] = search_results
-        entry["search_status"] = "matched" if top_ids else "no_registry_match"
-        if top_ids:
-            entry["candidate_registry_ids"] = top_ids[:5]
-        docs: list[dict[str, str]] = []
-        for command in entry["get_commands"][:2]:
-            content = run_command(command)
-            if content:
-                docs.append({"command": command, "content": content})
-        if docs:
-            entry["retrieved_docs"] = docs
     _CONTEXT_HUB_CACHE[profile_key] = entry
     return json.loads(json.dumps(entry))
 
