@@ -634,17 +634,55 @@ def extract_views(modules: list[PythonModule]) -> list[dict[str, Any]]:
 
 
 def detect_programming_languages(root: Path) -> list[dict[str, Any]]:
+    tracked_files = list_repository_files(root)
     counts = {
-        "Python": len(list(root.rglob("*.py"))),
-        "YAML": len(list(root.rglob("*.yaml"))) + len(list(root.rglob("*.yml"))),
-        "Shell": len(list(root.rglob("*.sh"))),
-        "Markdown": len(list(root.rglob("*.md"))),
+        "Python": count_suffixes(tracked_files, ".py"),
+        "YAML": count_suffixes(tracked_files, ".yaml", ".yml"),
+        "Shell": count_suffixes(tracked_files, ".sh"),
+        "Markdown": count_suffixes(tracked_files, ".md"),
     }
     return [
         {"name": name, "file_count": count}
         for name, count in counts.items()
         if count
     ]
+
+
+def list_repository_files(root: Path) -> list[Path]:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        ignored_parts = {
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            "dist",
+            "build",
+            "__pycache__",
+        }
+        return sorted(
+            path
+            for path in root.rglob("*")
+            if path.is_file() and not ignored_parts.intersection(path.parts)
+        )
+
+    relative_paths = [
+        item.decode("utf-8")
+        for item in completed.stdout.split(b"\x00")
+        if item
+    ]
+    return [root / relative_path for relative_path in sorted(relative_paths)]
+
+
+def count_suffixes(paths: list[Path], *suffixes: str) -> int:
+    normalized = tuple(suffix.lower() for suffix in suffixes)
+    return sum(1 for path in paths if path.suffix.lower() in normalized)
 
 
 def resolve_app_root(root: Path) -> Path:

@@ -61,6 +61,16 @@ def test_knowledge_graph_library_prefers_src_app_root():
     assert module.resolve_app_root(REPO_ROOT) == REPO_ROOT / "src"
 
 
+def test_programming_language_detection_uses_tracked_files():
+    module = _load_module(LIB_PATH, "knowledge_graph_lib")
+    languages = {
+        item["name"]: item["file_count"]
+        for item in module.detect_programming_languages(REPO_ROOT)
+    }
+    assert languages["Python"] < 1000
+    assert languages["Markdown"] < 200
+
+
 def test_query_script_returns_dashboard_skills():
     result = subprocess.run(
         [
