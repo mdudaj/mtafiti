@@ -484,3 +484,215 @@ class MetadataSchemaBinding(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.target_type}:{self.target_key}"
+
+
+class BiospecimenType(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    key = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    identifier_prefix = models.CharField(max_length=32, default="SPEC")
+    barcode_prefix = models.CharField(max_length=32, default="BC")
+    sequence_padding = models.PositiveIntegerField(default=6)
+    next_sequence = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["key"], name="lims_bios_type_key_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.sequence_padding < 3 or self.sequence_padding > 12:
+            raise ValidationError({"sequence_padding": "sequence_padding must be between 3 and 12"})
+        if not self.identifier_prefix.strip():
+            raise ValidationError({"identifier_prefix": "identifier_prefix is required"})
+        if not self.barcode_prefix.strip():
+            raise ValidationError({"barcode_prefix": "barcode_prefix is required"})
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Biospecimen(TimestampedUUIDModel):
+    class Kind(models.TextChoices):
+        PRIMARY = "primary"
+        ALIQUOT = "aliquot"
+
+    class Status(models.TextChoices):
+        REGISTERED = "registered"
+        RECEIVED = "received"
+        AVAILABLE = "available"
+        ALIQUOTED = "aliquoted"
+        POOLED = "pooled"
+        CONSUMED = "consumed"
+        ARCHIVED = "archived"
+        DISPOSED = "disposed"
+
+    sample_type = models.ForeignKey(
+        BiospecimenType,
+        on_delete=models.PROTECT,
+        related_name="biospecimens",
+    )
+    sample_identifier = models.CharField(max_length=64, unique=True)
+    barcode = models.CharField(max_length=64, unique=True)
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.PRIMARY)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.REGISTERED)
+    subject_identifier = models.CharField(max_length=100, blank=True, default="")
+    external_identifier = models.CharField(max_length=100, blank=True, default="")
+    study = models.ForeignKey(
+        Study,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimens",
+    )
+    site = models.ForeignKey(
+        Site,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimens",
+    )
+    lab = models.ForeignKey(
+        Lab,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimens",
+    )
+    parent_specimen = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="aliquots",
+    )
+    lineage_root = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="lineage_descendants",
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    quantity_unit = models.CharField(max_length=32, blank=True, default="mL")
+    metadata = models.JSONField(default=dict, blank=True)
+    collected_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["sample_identifier"], name="lims_bio_sample_id_idx"),
+            models.Index(fields=["barcode"], name="lims_bio_barcode_idx"),
+            models.Index(fields=["status", "-created_at"], name="lims_bio_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.parent_specimen_id and self.parent_specimen_id == self.id:
+            raise ValidationError({"parent_specimen": "parent_specimen cannot reference itself"})
+        if self.lineage_root_id and self.lineage_root_id == self.id:
+            raise ValidationError({"lineage_root": "lineage_root cannot reference itself"})
+        if self.kind == self.Kind.PRIMARY and self.parent_specimen_id:
+            raise ValidationError({"parent_specimen": "primary specimens cannot define a parent"})
+        if self.kind == self.Kind.ALIQUOT and not self.parent_specimen_id:
+            raise ValidationError({"parent_specimen": "aliquots require a parent specimen"})
+        if self.parent_specimen_id and self.sample_type_id and self.parent_specimen.sample_type_id != self.sample_type_id:
+            raise ValidationError({"sample_type": "aliquots must use the same sample type as the parent"})
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return self.sample_identifier
+
+
+class BiospecimenPool(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        ASSEMBLED = "assembled"
+        CONSUMED = "consumed"
+        ARCHIVED = "archived"
+
+    sample_type = models.ForeignKey(
+        BiospecimenType,
+        on_delete=models.PROTECT,
+        related_name="pools",
+    )
+    pool_identifier = models.CharField(max_length=64, unique=True)
+    barcode = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ASSEMBLED)
+    study = models.ForeignKey(
+        Study,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimen_pools",
+    )
+    site = models.ForeignKey(
+        Site,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimen_pools",
+    )
+    lab = models.ForeignKey(
+        Lab,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="biospecimen_pools",
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    quantity_unit = models.CharField(max_length=32, blank=True, default="mL")
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["pool_identifier"], name="lims_bio_pool_id_idx"),
+            models.Index(fields=["status", "-created_at"], name="lims_bio_pool_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+
+    def __str__(self) -> str:
+        return self.pool_identifier
+
+
+class BiospecimenPoolMember(TimestampedUUIDModel):
+    pool = models.ForeignKey(
+        BiospecimenPool,
+        on_delete=models.CASCADE,
+        related_name="members",
+    )
+    specimen = models.ForeignKey(
+        Biospecimen,
+        on_delete=models.PROTECT,
+        related_name="pool_memberships",
+    )
+    contributed_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    contributed_unit = models.CharField(max_length=32, blank=True, default="mL")
+
+    class Meta:
+        ordering = ["pool__pool_identifier", "specimen__sample_identifier"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["pool", "specimen"],
+                name="uniq_lims_bio_pool_member",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.pool_id and self.specimen_id and self.pool.sample_type_id != self.specimen.sample_type_id:
+            raise ValidationError({"specimen": "pool members must share the same sample type as the pool"})
+
+    def __str__(self) -> str:
+        return f"{self.pool.pool_identifier}:{self.specimen.sample_identifier}"
