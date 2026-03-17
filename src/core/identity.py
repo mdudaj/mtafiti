@@ -19,6 +19,14 @@ def _request_roles(request) -> set[str]:
     return {role.strip() for role in raw.split(',') if role.strip()}
 
 
+def roles_enforced() -> bool:
+    return _roles_enforced()
+
+
+def request_roles(request) -> set[str]:
+    return _request_roles(request)
+
+
 def _oidc_required() -> bool:
     return os.environ.get('EDMP_OIDC_REQUIRED', '').lower() in {'1', 'true', 'yes'}
 

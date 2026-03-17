@@ -913,6 +913,14 @@ edges:
     to: framework:django
   -
     relationship: uses
+    from: module:lims_permissions
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_permissions
+    to: module:core_identity
+  -
+    relationship: uses
     from: module:lims_urls
     to: framework:django
   -
