@@ -16,6 +16,8 @@ from .models import (
     Biospecimen,
     BiospecimenPool,
     BiospecimenType,
+    Country,
+    District,
     Lab,
     MetadataFieldDefinition,
     MetadataSchema,
@@ -24,15 +26,15 @@ from .models import (
     MetadataSchemaVersion,
     MetadataVocabulary,
     MetadataVocabularyItem,
+    Postcode,
     ReceivingDiscrepancy,
     ReceivingEvent,
+    Region,
     Site,
+    Street,
     Study,
     TanzaniaAddressSyncRun,
-    TanzaniaDistrict,
-    TanzaniaRegion,
-    TanzaniaStreet,
-    TanzaniaWard,
+    Ward,
 )
 from .services import (
     accessioning_report,
@@ -115,6 +117,7 @@ def _lab_to_dict(lab: Lab) -> dict[str, object]:
         "code": lab.code,
         "description": lab.description,
         "address_line": lab.address_line,
+        "country_id": str(lab.country_id) if lab.country_id else None,
         "region_id": str(lab.region_id) if lab.region_id else None,
         "district_id": str(lab.district_id) if lab.district_id else None,
         "ward_id": str(lab.ward_id) if lab.ward_id else None,
@@ -145,6 +148,7 @@ def _site_to_dict(site: Site) -> dict[str, object]:
         "study_id": str(site.study_id) if site.study_id else None,
         "lab_id": str(site.lab_id) if site.lab_id else None,
         "address_line": site.address_line,
+        "country_id": str(site.country_id) if site.country_id else None,
         "region_id": str(site.region_id) if site.region_id else None,
         "district_id": str(site.district_id) if site.district_id else None,
         "ward_id": str(site.ward_id) if site.ward_id else None,
@@ -387,17 +391,43 @@ def _resolve_optional_fk(model, raw_id, error_code: str):
         return None, JsonResponse({"error": error_code}, status=404)
 
 
+def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: Street | None):
+    if raw_postcode_id:
+        postcode, error = _resolve_optional_fk(Postcode, raw_postcode_id, "postcode_not_found")
+        if error:
+            return None, error
+        return (postcode.code if postcode else ""), None
+    postcode_code = str(raw_postcode_code or "").strip()
+    if not postcode_code:
+        return "", None
+    queryset = Postcode.objects.filter(code=postcode_code)
+    if street:
+        queryset = queryset.filter(street=street)
+    matches = list(queryset[:2])
+    if not matches:
+        return postcode_code, None
+    if len(matches) > 1:
+        return None, JsonResponse({"error": "postcode_ambiguous"}, status=400)
+    return matches[0].code, None
+
+
 def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
-    region, error = _resolve_optional_fk(TanzaniaRegion, payload.get("region_id"), "region_not_found")
+    country, error = _resolve_optional_fk(Country, payload.get("country_id"), "country_not_found")
     if error:
         return error
-    district, error = _resolve_optional_fk(TanzaniaDistrict, payload.get("district_id"), "district_not_found")
+    region, error = _resolve_optional_fk(Region, payload.get("region_id"), "region_not_found")
     if error:
         return error
-    ward, error = _resolve_optional_fk(TanzaniaWard, payload.get("ward_id"), "ward_not_found")
+    district, error = _resolve_optional_fk(District, payload.get("district_id"), "district_not_found")
     if error:
         return error
-    street, error = _resolve_optional_fk(TanzaniaStreet, payload.get("street_id"), "street_not_found")
+    ward, error = _resolve_optional_fk(Ward, payload.get("ward_id"), "ward_not_found")
+    if error:
+        return error
+    street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
+    if error:
+        return error
+    postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
 
@@ -408,11 +438,12 @@ def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
     lab.code = str(payload.get("code") or "").strip()
     lab.description = str(payload.get("description") or "").strip()
     lab.address_line = str(payload.get("address_line") or "").strip()
+    lab.country = country
     lab.region = region
     lab.district = district
     lab.ward = ward
     lab.street = street
-    lab.postcode = str(payload.get("postcode") or "").strip()
+    lab.postcode = postcode
     lab.is_active = bool(payload.get("is_active", True))
     return None
 
@@ -442,16 +473,22 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
-    region, error = _resolve_optional_fk(TanzaniaRegion, payload.get("region_id"), "region_not_found")
+    country, error = _resolve_optional_fk(Country, payload.get("country_id"), "country_not_found")
     if error:
         return error
-    district, error = _resolve_optional_fk(TanzaniaDistrict, payload.get("district_id"), "district_not_found")
+    region, error = _resolve_optional_fk(Region, payload.get("region_id"), "region_not_found")
     if error:
         return error
-    ward, error = _resolve_optional_fk(TanzaniaWard, payload.get("ward_id"), "ward_not_found")
+    district, error = _resolve_optional_fk(District, payload.get("district_id"), "district_not_found")
     if error:
         return error
-    street, error = _resolve_optional_fk(TanzaniaStreet, payload.get("street_id"), "street_not_found")
+    ward, error = _resolve_optional_fk(Ward, payload.get("ward_id"), "ward_not_found")
+    if error:
+        return error
+    street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
+    if error:
+        return error
+    postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
     if not payload.get("name"):
@@ -462,11 +499,12 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     site.study = study
     site.lab = lab
     site.address_line = str(payload.get("address_line") or "").strip()
+    site.country = country
     site.region = region
     site.district = district
     site.ward = ward
     site.street = street
-    site.postcode = str(payload.get("postcode") or "").strip()
+    site.postcode = postcode
     site.is_active = bool(payload.get("is_active", True))
     return None
 
@@ -792,32 +830,46 @@ def lims_reference_select_options(request):
         if query:
             queryset = queryset.filter(name__icontains=query)
         items = [_model_to_option(item) for item in queryset[:50]]
+    elif source == "countries":
+        queryset = Country.objects.order_by("name")
+        if query:
+            queryset = queryset.filter(name__icontains=query)
+        items = [_model_to_option(item) for item in queryset[:50]]
     elif source == "regions":
-        queryset = TanzaniaRegion.objects.order_by("name")
+        queryset = Region.objects.order_by("name")
+        if request.GET.get("country_id"):
+            queryset = queryset.filter(country_id=request.GET["country_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
         items = [_model_to_option(item) for item in queryset[:50]]
     elif source == "districts":
-        queryset = TanzaniaDistrict.objects.order_by("name")
+        queryset = District.objects.order_by("name")
         if request.GET.get("region_id"):
             queryset = queryset.filter(region_id=request.GET["region_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
         items = [_model_to_option(item) for item in queryset[:50]]
     elif source == "wards":
-        queryset = TanzaniaWard.objects.order_by("name")
+        queryset = Ward.objects.order_by("name")
         if request.GET.get("district_id"):
             queryset = queryset.filter(district_id=request.GET["district_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
         items = [_model_to_option(item) for item in queryset[:50]]
     elif source == "streets":
-        queryset = TanzaniaStreet.objects.order_by("name")
+        queryset = Street.objects.order_by("name")
         if request.GET.get("ward_id"):
             queryset = queryset.filter(ward_id=request.GET["ward_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
         items = [_model_to_option(item) for item in queryset[:50]]
+    elif source == "postcodes":
+        queryset = Postcode.objects.order_by("code")
+        if request.GET.get("street_id"):
+            queryset = queryset.filter(street_id=request.GET["street_id"])
+        if query:
+            queryset = queryset.filter(code__icontains=query)
+        items = [_model_to_option(item, label_attr="code") for item in queryset[:50]]
     else:
         return JsonResponse({"error": "unsupported_source"}, status=400)
     return JsonResponse({"source": source, "items": items})

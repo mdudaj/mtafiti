@@ -610,6 +610,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:country
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:dataasset
   -
     relationship: implements
@@ -623,6 +627,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:datashare
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:district
   -
     relationship: implements
     from: module:core_models
@@ -710,6 +718,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:postcode
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:printgateway
   -
     relationship: implements
@@ -774,6 +786,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:region
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:residencyprofile
   -
     relationship: implements
@@ -798,27 +814,15 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:street
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:study
   -
     relationship: implements
     from: module:core_models
     to: datamodel:tanzaniaaddresssyncrun
-  -
-    relationship: implements
-    from: module:core_models
-    to: datamodel:tanzaniadistrict
-  -
-    relationship: implements
-    from: module:core_models
-    to: datamodel:tanzaniaregion
-  -
-    relationship: implements
-    from: module:core_models
-    to: datamodel:tanzaniastreet
-  -
-    relationship: implements
-    from: module:core_models
-    to: datamodel:tanzaniaward
   -
     relationship: implements
     from: module:core_models
@@ -839,6 +843,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:userprofile
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:ward
   -
     relationship: implements
     from: module:core_models

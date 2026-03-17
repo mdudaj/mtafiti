@@ -5,7 +5,7 @@ import pytest
 from django.test import Client
 from django_tenants.utils import schema_context
 
-from lims.models import TanzaniaAddressSyncRun, TanzaniaDistrict, TanzaniaRegion, TanzaniaStreet, TanzaniaWard
+from lims.models import Country, District, Postcode, Region, Street, TanzaniaAddressSyncRun, Ward
 from lims.services import process_tanzania_address_sync_run
 
 
@@ -83,10 +83,12 @@ def test_tanzania_address_sync_run_is_resumable_and_polite():
         third = process_tanzania_address_sync_run(run, fetcher=_fake_fetch)
         assert third["status"] == TanzaniaAddressSyncRun.Status.COMPLETED
         assert third["pages_processed"] == 5
-        assert TanzaniaRegion.objects.get().name == "Kilimanjaro"
-        assert TanzaniaDistrict.objects.get().name == "Moshi"
-        assert TanzaniaWard.objects.get().name == "Majengo"
-        assert TanzaniaStreet.objects.get().postcode == "25112"
+        assert Country.objects.get().code == "TZ"
+        assert Region.objects.get().name == "Kilimanjaro"
+        assert District.objects.get().name == "Moshi"
+        assert Ward.objects.get().name == "Majengo"
+        assert Street.objects.get().name == "Sokoine Road"
+        assert Postcode.objects.get().code == "25112"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -113,6 +115,7 @@ def test_address_sync_api_creates_run_and_dispatches_task(monkeypatch):
     payload = response.json()
     assert payload["mode"] == "incremental"
     assert payload["request_budget"] == 3
+    assert payload["country_code"] == "TZ"
     assert queued["tenant_schema"] == schema_name
     assert queued["run_id"] == payload["id"]
 

@@ -16,11 +16,11 @@ class TimestampedUUIDModel(models.Model):
         abstract = True
 
 
-class TanzaniaRegion(TimestampedUUIDModel):
+class Country(TimestampedUUIDModel):
     name = models.CharField(max_length=200, unique=True)
+    code = models.CharField(max_length=8, unique=True)
     slug = models.SlugField(max_length=220, blank=True, default="")
-    source_path = models.CharField(max_length=500, unique=True)
-    source_url = models.URLField(max_length=800)
+    source_url = models.URLField(max_length=800, blank=True, default="")
     is_active = models.BooleanField(default=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
 
@@ -31,9 +31,35 @@ class TanzaniaRegion(TimestampedUUIDModel):
         return self.name
 
 
-class TanzaniaDistrict(TimestampedUUIDModel):
+class Region(TimestampedUUIDModel):
+    country = models.ForeignKey(
+        Country,
+        on_delete=models.CASCADE,
+        related_name="regions",
+    )
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220, blank=True, default="")
+    source_path = models.CharField(max_length=500, unique=True)
+    source_url = models.URLField(max_length=800)
+    is_active = models.BooleanField(default=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["country__name", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["country", "name"],
+                name="uniq_lims_region_per_country",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.country.name} / {self.name}"
+
+
+class District(TimestampedUUIDModel):
     region = models.ForeignKey(
-        TanzaniaRegion,
+        Region,
         on_delete=models.CASCADE,
         related_name="districts",
     )
@@ -49,7 +75,7 @@ class TanzaniaDistrict(TimestampedUUIDModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["region", "name"],
-                name="uniq_lims_tz_district_per_region",
+                name="uniq_lims_district_per_region",
             )
         ]
 
@@ -57,9 +83,9 @@ class TanzaniaDistrict(TimestampedUUIDModel):
         return f"{self.region.name} / {self.name}"
 
 
-class TanzaniaWard(TimestampedUUIDModel):
+class Ward(TimestampedUUIDModel):
     district = models.ForeignKey(
-        TanzaniaDistrict,
+        District,
         on_delete=models.CASCADE,
         related_name="wards",
     )
@@ -75,7 +101,7 @@ class TanzaniaWard(TimestampedUUIDModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["district", "name"],
-                name="uniq_lims_tz_ward_per_district",
+                name="uniq_lims_ward_per_district",
             )
         ]
 
@@ -83,9 +109,9 @@ class TanzaniaWard(TimestampedUUIDModel):
         return f"{self.district.name} / {self.name}"
 
 
-class TanzaniaStreet(TimestampedUUIDModel):
+class Street(TimestampedUUIDModel):
     ward = models.ForeignKey(
-        TanzaniaWard,
+        Ward,
         on_delete=models.CASCADE,
         related_name="streets",
     )
@@ -93,7 +119,6 @@ class TanzaniaStreet(TimestampedUUIDModel):
     slug = models.SlugField(max_length=220, blank=True, default="")
     source_path = models.CharField(max_length=500, unique=True)
     source_url = models.URLField(max_length=800)
-    postcode = models.CharField(max_length=16, blank=True, default="")
     is_active = models.BooleanField(default=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
 
@@ -102,7 +127,7 @@ class TanzaniaStreet(TimestampedUUIDModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["ward", "name"],
-                name="uniq_lims_tz_street_per_ward",
+                name="uniq_lims_street_per_ward",
             )
         ]
 
@@ -110,34 +135,66 @@ class TanzaniaStreet(TimestampedUUIDModel):
         return f"{self.ward.name} / {self.name}"
 
 
+class Postcode(TimestampedUUIDModel):
+    street = models.ForeignKey(
+        Street,
+        on_delete=models.CASCADE,
+        related_name="postcodes",
+    )
+    code = models.CharField(max_length=16)
+    source_path = models.CharField(max_length=500, unique=True)
+    source_url = models.URLField(max_length=800)
+    is_active = models.BooleanField(default=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["street__ward__district__region__country__name", "code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["street", "code"],
+                name="uniq_lims_postcode_per_street",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.code
+
+
 class Lab(TimestampedUUIDModel):
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=64, blank=True, default="")
     description = models.TextField(blank=True, default="")
     address_line = models.CharField(max_length=255, blank=True, default="")
+    country = models.ForeignKey(
+        Country,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="labs",
+    )
     region = models.ForeignKey(
-        TanzaniaRegion,
+        Region,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="labs",
     )
     district = models.ForeignKey(
-        TanzaniaDistrict,
+        District,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="labs",
     )
     ward = models.ForeignKey(
-        TanzaniaWard,
+        Ward,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="labs",
     )
     street = models.ForeignKey(
-        TanzaniaStreet,
+        Street,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -206,29 +263,36 @@ class Site(TimestampedUUIDModel):
         related_name="sites",
     )
     address_line = models.CharField(max_length=255, blank=True, default="")
+    country = models.ForeignKey(
+        Country,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sites",
+    )
     region = models.ForeignKey(
-        TanzaniaRegion,
+        Region,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="sites",
     )
     district = models.ForeignKey(
-        TanzaniaDistrict,
+        District,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="sites",
     )
     ward = models.ForeignKey(
-        TanzaniaWard,
+        Ward,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="sites",
     )
     street = models.ForeignKey(
-        TanzaniaStreet,
+        Street,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

@@ -24,7 +24,7 @@ This document defines the target tenant-aware LIMS service exposed at:
 - Service-aware routing via `TenantServiceRoute` records for `service_key="lims"`
 - Permission model helpers in `src/lims/permissions.py` define module roles, legacy-role compatibility, and guardian-compatible object permission names.
 - Reference-domain models and APIs now live directly in `src/lims/models.py` and `src/lims/views.py`.
-- Tanzania address metadata sync is implemented as a resumable Celery task backed by `TanzaniaAddressSyncRun`.
+- Geography metadata sync is implemented as a resumable Celery task backed by `TanzaniaAddressSyncRun`, with Tanzanian addresses currently serving as the first ingestion source into the generalized geography hierarchy.
 
 ## Permission model
 
@@ -72,16 +72,18 @@ To preserve current platform behavior while the dedicated LIMS roles are adopted
 
 ## Reference domain
 
-The first reference-data slice standardizes:
+The current reference-data slice standardizes:
 
 - `Lab`
 - `Study`
 - `Site`
-- Tanzania address hierarchy:
-  - `TanzaniaRegion`
-  - `TanzaniaDistrict`
-  - `TanzaniaWard`
-  - `TanzaniaStreet`
+- generalized geography hierarchy:
+  - `Country`
+  - `Region`
+  - `District`
+  - `Ward`
+  - `Street`
+  - `Postcode`
 
 Reference APIs are exposed under:
 
@@ -198,12 +200,12 @@ The first API surface is exposed under:
 
 Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine.
 
-## Tanzania address sync
+## Geography import and Tanzania sync
 
-Address metadata ingestion is designed to be polite and resumable:
+Address metadata ingestion is designed to be polite and resumable, with Tanzania currently acting as the first concrete source:
 
 - source: `https://www.tanzaniapostcode.com/`
-- hierarchy: `region -> district -> ward -> street -> postcode`
+- imported hierarchy target: `country -> region -> district -> ward -> street -> postcode`
 - execution: Celery task in `src/lims/tasks.py`
 - persisted checkpoint/state: `TanzaniaAddressSyncRun`
 
@@ -214,7 +216,7 @@ Guardrails:
 - `next_not_before_at` enforces a minimum delay between page fetches
 - failures are surfaced on the sync run instead of silently dropped
 
-This gives Mtafiti a path to periodic refreshes via Celery Beat or another scheduler without hammering the upstream postcode service.
+This gives Mtafiti a path to periodic refreshes via Celery Beat or another scheduler without hammering the upstream postcode service, while leaving room for additional country-specific importers to populate the same generalized geography model later.
 
 ## Integration contracts (to be detailed)
 
