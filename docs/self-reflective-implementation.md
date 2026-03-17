@@ -133,7 +133,7 @@ Use a two-speed execution pattern to reduce local cycle time while preserving fu
    * Command: `.github/scripts/local_fast_feedback.sh <pytest selectors>`
    * Example: `.github/scripts/local_fast_feedback.sh tests/test_printing_api.py -k gateway`
 2. **Pre-integration loop (required before handoff)**
-   * Run docs/openapi checks and broad backend validation.
+   * Run docs/openapi/knowledge-graph checks and broad backend validation.
    * Command: `.github/scripts/local_fast_feedback.sh --full-gate`
 
 This keeps short iterations fast but still enforces the same merge-gate expectations before integration.
@@ -152,9 +152,11 @@ A task is complete only when:
 Every lane must pass the same merge gate before integration:
 
 1. Docs workflow gate (`.github/scripts/check_docs_workflow.py`)
-2. Backend tests (`pytest -q`)
-3. Reviewer sign-off for correctness/security risks
-4. Issue checklist updated with completed deliverables and acceptance criteria
+2. OpenAPI drift gate (`.github/scripts/check_openapi_contract.py`)
+3. Knowledge graph drift gate (`.github/scripts/generate_knowledge_graph.py --check`)
+4. Backend tests (`pytest -q`)
+5. Reviewer sign-off for correctness/security risks
+6. Issue checklist updated with completed deliverables and acceptance criteria
 
 PR checklist template: `.github/pull_request_template.md` enforces issue + handoff contract items.
 
@@ -171,6 +173,8 @@ Every implementation task in this project should be executed end-to-end in one f
 7. merge via squash after review.
 
 Tasks should not be reported as done while still waiting on test execution or post-implementation validation.
+
+If a follow-up commit is added after the initial validation, rerun the full pre-integration gate before pushing again. Even tiny structural files such as `__init__.py` or migrations package markers can change generated repository artifacts like `analysis/environment_inventory.yaml`.
 
 ### Python style requirement
 
