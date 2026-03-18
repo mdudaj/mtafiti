@@ -1,0 +1,34 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Publish version" %}
+
+{% if payload.capabilities.can_manage_metadata %}
+<section class="panel" data-lims-action="metadata-version-publish">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Publish schema version" panel_description="Promote one draft version at a time." %}
+  <div class="section-stack">
+    <label class="field-group"><span class="field-label">Schema version</span><select class="select" data-lims-field="publish-version">{% for option in payload.schema_version_options %}<option value="{{ option.value }}" data-schema-id="{{ option.schema_id }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="publishSchemaVersion()"><span class="material-symbols-outlined button-icon" aria-hidden="true">publish</span><span>Publish version</span></button>
+      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function publishSchemaVersion() {
+  const option = limsSelectedOption("publish-version");
+  if (!option) {
+    limsFeedback("Select a schema version first", true);
+    return;
+  }
+  await limsPortalAction(
+    "/api/v1/lims/metadata/schemas/" + option.dataset.schemaId + "/versions/" + option.value + "/publish",
+    {},
+    "Schema version published",
+  );
+}
+{% endblock %}

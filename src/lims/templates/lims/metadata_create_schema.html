@@ -1,0 +1,323 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Create schema + version" %}
+{{ payload.field_definition_catalog|json_script:"lims-field-definition-catalog" }}
+
+{% if payload.capabilities.can_manage_metadata %}
+<section class="panel" data-lims-action="metadata-schema-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Visual schema builder" panel_description="Use a formbuilder-compatible designer to order existing field definitions visually, then create the first schema version from that canvas." %}
+  <div class="section-stack">
+    <label class="field-group"><span class="field-label">Schema name</span><input class="input" data-lims-field="schema-name" /></label>
+    <label class="field-group"><span class="field-label">Schema code</span><input class="input" data-lims-field="schema-code" /></label>
+    <label class="field-group"><span class="field-label">Change summary</span><input class="input" data-lims-field="schema-change-summary" value="Initial version" /></label>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group">
+        <span class="field-label">Add existing field definitions</span>
+        <select class="select" data-lims-field="schema-field-picker">
+          <option value="">Select field</option>
+          {% for option in payload.field_definition_options %}
+          <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="button-row" style="align-items:end;">
+        <button class="button button-secondary" type="button" onclick="addFieldDefinitionToDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add</span><span>Add to designer</span></button>
+        <button class="button button-secondary" type="button" onclick="clearDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">delete_sweep</span><span>Clear designer</span></button>
+      </div>
+    </div>
+    <div class="cards" style="grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);">
+      <div class="panel">
+        {% include "core/ui/includes/panel_header.html" with panel_title="Designer canvas" panel_description="The page attempts to enhance this area with the `formBuilder.online` library; the fallback still uses the same compatible field shape." %}
+        <div id="metadata-schema-builder" class="section-stack"></div>
+      </div>
+      <div class="panel">
+        {% include "core/ui/includes/panel_header.html" with panel_title="Schema payload preview" panel_description="Review the emitted schema-version field payload before saving." %}
+        <label class="field-group"><span class="field-label">Fields JSON preview</span><textarea class="textarea" rows="14" data-lims-field="schema-fields-preview" readonly>[]</textarea></label>
+      </div>
+    </div>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createSchemaAndVersionFromDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create schema + version</span></button>
+      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsFieldDefinitionCatalog = JSON.parse(document.getElementById("lims-field-definition-catalog").textContent);
+let limsSchemaDesignerFields = [];
+let limsExternalDesigner = null;
+
+function fieldDefinitionById(fieldDefinitionId) {
+  return limsFieldDefinitionCatalog.find((item) => item.id === fieldDefinitionId) || null;
+}
+
+function fieldTypeToFormBuilderType(fieldDefinition) {
+  if (!fieldDefinition) {
+    return "text";
+  }
+  if (fieldDefinition.field_type === "long_text") {
+    return "textarea";
+  }
+  if (fieldDefinition.field_type === "integer" || fieldDefinition.field_type === "decimal") {
+    return "number";
+  }
+  if (fieldDefinition.field_type === "boolean") {
+    return "checkbox";
+  }
+  if (fieldDefinition.field_type === "date") {
+    return "date";
+  }
+  if (fieldDefinition.field_type === "choice") {
+    return "select";
+  }
+  if (fieldDefinition.field_type === "multi_choice") {
+    return "checkbox-group";
+  }
+  return "text";
+}
+
+function designerControlFromFieldDefinition(fieldDefinition, position) {
+  return {
+    field_definition_id: fieldDefinition.id,
+    field_key: fieldDefinition.code,
+    position: position,
+    required: false,
+    validation_rules: {},
+    condition: {},
+    formbuilder: {
+      name: fieldDefinition.code,
+      label: fieldDefinition.name,
+      type: fieldTypeToFormBuilderType(fieldDefinition),
+      subtype: fieldDefinition.field_type === "integer" ? "integer" : (fieldDefinition.field_type === "long_text" ? "textarea" : "text"),
+      required: false,
+      placeholder: fieldDefinition.placeholder || "",
+      description: fieldDefinition.help_text || "",
+      values: fieldDefinition.vocabulary_items || [],
+      ui_step: ((fieldDefinition.config || {}).ui_step || "metadata"),
+    },
+  };
+}
+
+function designerSchemaFieldsPayload() {
+  return limsSchemaDesignerFields.map((field, index) => ({
+    field_definition_id: field.field_definition_id,
+    field_key: field.field_key,
+    position: index + 1,
+    required: field.required,
+    validation_rules: field.validation_rules || {},
+    condition: field.condition || {},
+  }));
+}
+
+function syncExternalDesigner() {
+  if (!limsExternalDesigner || typeof limsExternalDesigner.actions?.setData !== "function") {
+    return;
+  }
+  limsExternalDesigner.actions.setData(
+    limsSchemaDesignerFields.map((field) => ({
+      ...field.formbuilder,
+      required: field.required,
+    })),
+  );
+}
+
+function updateDesignerFromInputs() {
+  document.querySelectorAll("[data-designer-prop]").forEach((field) => {
+    const index = Number(field.getAttribute("data-designer-index"));
+    const prop = field.getAttribute("data-designer-prop");
+    if (!Number.isInteger(index) || !limsSchemaDesignerFields[index]) {
+      return;
+    }
+    if (prop === "required") {
+      limsSchemaDesignerFields[index].required = field.value === "true";
+    }
+    if (prop === "position") {
+      limsSchemaDesignerFields[index].position = Number(field.value || index + 1);
+    }
+  });
+  limsSchemaDesignerFields.sort((left, right) => (left.position || 0) - (right.position || 0));
+  limsSchemaDesignerFields.forEach((field, index) => {
+    field.position = index + 1;
+  });
+  renderDesigner();
+}
+
+function renderDesigner() {
+  const container = document.getElementById("metadata-schema-builder");
+  const preview = limsField("schema-fields-preview");
+  if (!container || !preview) {
+    return;
+  }
+  if (!limsSchemaDesignerFields.length) {
+    container.innerHTML = "<p>No fields in the designer yet. Add field definitions to start composing the schema.</p>";
+    preview.value = "[]";
+    return;
+  }
+  container.innerHTML = limsSchemaDesignerFields.map((field, index) => {
+    const step = ((fieldDefinitionById(field.field_definition_id)?.config || {}).ui_step || "metadata");
+    return `
+      <article class="card">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">${limsEscapeHtml(field.formbuilder.label)}</h2>
+            <p class="panel-description">${limsEscapeHtml(field.field_key)} · ${limsEscapeHtml(step)} step</p>
+          </div>
+        </div>
+        <div class="section-stack">
+          <label class="field-group"><span class="field-label">Required</span><select class="select" data-designer-prop="required" data-designer-index="${index}"><option value="true"${field.required ? " selected" : ""}>Yes</option><option value="false"${field.required ? "" : " selected"}>No</option></select></label>
+          <label class="field-group"><span class="field-label">Position</span><input class="input" type="number" min="1" value="${index + 1}" data-designer-prop="position" data-designer-index="${index}" /></label>
+          <div class="button-row">
+            <button class="button button-secondary" type="button" onclick="moveDesignerField(${index}, -1)">Up</button>
+            <button class="button button-secondary" type="button" onclick="moveDesignerField(${index}, 1)">Down</button>
+            <button class="button button-secondary" type="button" onclick="removeDesignerField(${index})">Remove</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+  container.querySelectorAll("[data-designer-prop]").forEach((field) => {
+    field.addEventListener("change", updateDesignerFromInputs);
+  });
+  preview.value = JSON.stringify(designerSchemaFieldsPayload(), null, 2);
+  syncExternalDesigner();
+}
+
+function addFieldDefinitionToDesigner() {
+  const fieldDefinitionId = limsValue("schema-field-picker");
+  if (!fieldDefinitionId) {
+    limsFeedback("Select a field definition first", true);
+    return;
+  }
+  const fieldDefinition = fieldDefinitionById(fieldDefinitionId);
+  if (!fieldDefinition) {
+    limsFeedback("Selected field definition was not found", true);
+    return;
+  }
+  limsSchemaDesignerFields.push(designerControlFromFieldDefinition(fieldDefinition, limsSchemaDesignerFields.length + 1));
+  renderDesigner();
+}
+
+function clearDesigner() {
+  limsSchemaDesignerFields = [];
+  renderDesigner();
+}
+
+function moveDesignerField(index, delta) {
+  const target = index + delta;
+  if (target < 0 || target >= limsSchemaDesignerFields.length) {
+    return;
+  }
+  const [field] = limsSchemaDesignerFields.splice(index, 1);
+  limsSchemaDesignerFields.splice(target, 0, field);
+  limsSchemaDesignerFields.forEach((item, position) => {
+    item.position = position + 1;
+  });
+  renderDesigner();
+}
+
+function removeDesignerField(index) {
+  limsSchemaDesignerFields.splice(index, 1);
+  limsSchemaDesignerFields.forEach((item, position) => {
+    item.position = position + 1;
+  });
+  renderDesigner();
+}
+
+async function createSchemaAndVersionFromDesigner() {
+  if (!limsSchemaDesignerFields.length) {
+    limsFeedback("Add at least one field definition to the designer", true);
+    return;
+  }
+  const schemaResponse = await fetch("/api/v1/lims/metadata/schemas", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      name: limsValue("schema-name"),
+      code: limsValue("schema-code"),
+    }),
+  });
+  if (!schemaResponse.ok) {
+    const error = await schemaResponse.json().catch(() => ({error: "Action failed"}));
+    limsFeedback(error.error || "Action failed", true);
+    return;
+  }
+  const schema = await schemaResponse.json();
+  await limsPortalAction("/api/v1/lims/metadata/schemas/" + schema.id + "/versions", {
+    change_summary: limsValue("schema-change-summary") || "Initial version",
+    fields: designerSchemaFieldsPayload(),
+  }, "Schema + version created");
+}
+
+function enhanceDesignerWithFormBuilder() {
+  if (typeof window.jQuery === "undefined" || typeof window.jQuery.fn.formBuilder !== "function") {
+    return;
+  }
+  const $container = window.jQuery("#metadata-schema-builder");
+  if (!$container.length) {
+    return;
+  }
+  limsExternalDesigner = $container.formBuilder({
+    formData: limsSchemaDesignerFields.map((field) => ({
+      ...field.formbuilder,
+      required: field.required,
+    })),
+    disableFields: ["autocomplete", "button", "file", "header", "hidden", "paragraph"],
+    onSave(_, formData) {
+      try {
+        const parsed = JSON.parse(formData || "[]");
+        limsSchemaDesignerFields = parsed
+          .map((item, index) => {
+            const fieldDefinition = fieldDefinitionById(item.field_definition_id) || fieldDefinitionById(item.name);
+            if (!fieldDefinition) {
+              return null;
+            }
+            return {
+              field_definition_id: fieldDefinition.id,
+              field_key: fieldDefinition.code,
+              position: index + 1,
+              required: Boolean(item.required),
+              validation_rules: {},
+              condition: {},
+              formbuilder: {
+                ...designerControlFromFieldDefinition(fieldDefinition, index + 1).formbuilder,
+                ...item,
+              },
+            };
+          })
+          .filter(Boolean);
+        renderDesigner();
+      } catch (_error) {}
+    },
+  });
+}
+
+function loadDesignerEnhancementScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function bootstrapDesignerEnhancement() {
+  try {
+    if (typeof window.jQuery === "undefined") {
+      await loadDesignerEnhancementScript("https://code.jquery.com/jquery-3.7.1.min.js");
+    }
+    if (typeof window.jQuery.fn.formBuilder !== "function") {
+      await loadDesignerEnhancementScript("https://formbuilder.online/assets/js/form-builder.min.js");
+    }
+    enhanceDesignerWithFormBuilder();
+  } catch (_error) {}
+}
+
+renderDesigner();
+bootstrapDesignerEnhancement();
+{% endblock %}

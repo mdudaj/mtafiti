@@ -1,0 +1,50 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Create field definition" %}
+
+{% if payload.capabilities.can_manage_metadata %}
+<section class="panel" data-lims-action="metadata-field-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Field definition form" panel_description="Define one reusable field and its placement in the receiving wizard." %}
+  <div class="section-stack">
+    <label class="field-group"><span class="field-label">Field name</span><input class="input" data-lims-field="field-name" /></label>
+    <label class="field-group"><span class="field-label">Field code</span><input class="input" data-lims-field="field-code" /></label>
+    <label class="field-group"><span class="field-label">Field type</span><select class="select" data-lims-field="field-type">{% for option in payload.field_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <label class="field-group"><span class="field-label">Vocabulary</span><select class="select" data-lims-field="field-vocabulary"><option value="">None</option>{% for option in payload.vocabulary_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <label class="field-group"><span class="field-label">Help text</span><input class="input" data-lims-field="field-help-text" /></label>
+    <label class="field-group"><span class="field-label">Placeholder</span><input class="input" data-lims-field="field-placeholder" /></label>
+    <label class="field-group"><span class="field-label">Default value JSON</span><textarea class="textarea" rows="2" data-lims-field="field-default-value">null</textarea></label>
+    <label class="field-group"><span class="field-label">Wizard step</span><select class="select" data-lims-field="field-ui-step">{% for option in payload.ui_step_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createFieldDefinition()"><span class="material-symbols-outlined button-icon" aria-hidden="true">data_object</span><span>Create field</span></button>
+      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createFieldDefinition() {
+  let defaultValue = null;
+  try {
+    defaultValue = limsJsonValue("field-default-value", null);
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/metadata/field-definitions", {
+    name: limsValue("field-name"),
+    code: limsValue("field-code"),
+    field_type: limsValue("field-type"),
+    vocabulary_id: limsOptionalValue("field-vocabulary"),
+    help_text: limsValue("field-help-text"),
+    placeholder: limsValue("field-placeholder"),
+    default_value: defaultValue,
+    config: {
+      ui_step: limsValue("field-ui-step") || "metadata",
+    },
+  }, "Field definition created");
+}
+{% endblock %}

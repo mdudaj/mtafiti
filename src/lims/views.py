@@ -233,12 +233,12 @@ def _dashboard_payload(request) -> dict[str, object]:
     return payload
 
 
-def _reference_page_payload(request) -> dict[str, object]:
+def _reference_launchpad_payload(request) -> dict[str, object]:
     payload = _page_payload_base(
         request,
         active_key="lims-reference",
         title="Reference and geography",
-        summary="Maintain labs, studies, sites, and the Tanzania-backed geography sync used by tenant reference selectors.",
+        summary="Choose a focused reference-data task, then complete it on a dedicated single-action page.",
         kicker="Reference operations",
     )
     payload["cards"] = {
@@ -251,17 +251,88 @@ def _reference_page_payload(request) -> dict[str, object]:
     payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
     payload["sites"] = [_site_to_dict(item) for item in Site.objects.select_related("study", "lab").order_by("name")[:10]]
     payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["actions"] = [
+        {
+            "title": "Create lab",
+            "description": "Register one tenant lab at a time using a dedicated lab form.",
+            "href": "/lims/reference/labs/create/",
+            "icon": "add_business",
+        },
+        {
+            "title": "Create study",
+            "description": "Create one study and optionally attach its lead lab.",
+            "href": "/lims/reference/studies/create/",
+            "icon": "schema",
+        },
+        {
+            "title": "Create site",
+            "description": "Register one field or collection site and link it to study and lab selectors.",
+            "href": "/lims/reference/sites/create/",
+            "icon": "location_city",
+        },
+        {
+            "title": "Run geography sync",
+            "description": "Start the Tanzania-backed geography import from a single sync action page.",
+            "href": "/lims/reference/address-sync/",
+            "icon": "sync",
+        },
+    ]
     return payload
 
 
-def _metadata_page_payload(request) -> dict[str, object]:
+def _reference_create_lab_page_payload(request) -> dict[str, object]:
+    return _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create lab",
+        summary="Capture one tenant lab at a time without mixing this form with other setup actions.",
+        kicker="Reference setup",
+    )
+
+
+def _reference_create_study_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create study",
+        summary="Create one study record and optionally assign a lead lab for routing and receiving defaults.",
+        kicker="Reference setup",
+    )
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    return payload
+
+
+def _reference_create_site_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create site",
+        summary="Register one site at a time so downstream receiving and biospecimen forms stay focused.",
+        kicker="Reference setup",
+    )
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    return payload
+
+
+def _reference_address_sync_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Run geography sync",
+        summary="Queue one geography sync run at a time from a dedicated action page.",
+        kicker="Reference setup",
+    )
+    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:8]]
+    return payload
+
+
+def _metadata_launchpad_payload(request) -> dict[str, object]:
     payload = _page_payload_base(
         request,
         active_key="lims-metadata",
         title="Metadata configuration",
-        summary="Configure vocabularies, field definitions, schema versions, and published bindings for sample and workflow metadata.",
+        summary="Choose a focused metadata task, then complete it on a dedicated single-action page.",
         kicker="Configurable metadata",
     )
     payload["cards"] = {
@@ -275,10 +346,6 @@ def _metadata_page_payload(request) -> dict[str, object]:
         _field_definition_to_dict(item)
         for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")[:10]
     ]
-    payload["field_definition_catalog"] = [
-        _field_definition_to_dict(item)
-        for item in MetadataFieldDefinition.objects.select_related("vocabulary").prefetch_related("vocabulary__items").order_by("name")
-    ]
     payload["schemas"] = [
         _schema_to_dict(item)
         for item in MetadataSchema.objects.prefetch_related(
@@ -290,17 +357,114 @@ def _metadata_page_payload(request) -> dict[str, object]:
         _schema_binding_to_dict(item)
         for item in MetadataSchemaBinding.objects.select_related("schema_version__schema").order_by("target_type", "target_key")[:10]
     ]
-    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
-    payload["binding_target_type_options"] = [
-        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+    payload["actions"] = [
+        {
+            "title": "Create vocabulary",
+            "description": "Seed one controlled vocabulary from a dedicated create form.",
+            "href": "/lims/metadata/vocabularies/create/",
+            "icon": "list_alt",
+        },
+        {
+            "title": "Create field definition",
+            "description": "Define one reusable metadata field and its wizard-step placement.",
+            "href": "/lims/metadata/fields/create/",
+            "icon": "data_object",
+        },
+        {
+            "title": "Create schema + version",
+            "description": "Compose one schema version with the visual builder on its own page.",
+            "href": "/lims/metadata/schemas/create/",
+            "icon": "schema",
+        },
+        {
+            "title": "Create binding",
+            "description": "Attach one published schema version to one sample type or workflow target.",
+            "href": "/lims/metadata/bindings/create/",
+            "icon": "link",
+        },
+        {
+            "title": "Publish version",
+            "description": "Promote one draft schema version without mixing publishing with binding creation.",
+            "href": "/lims/metadata/versions/publish/",
+            "icon": "publish",
+        },
     ]
+    return payload
+
+
+def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
+    return _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create vocabulary",
+        summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
+        kicker="Metadata setup",
+    )
+
+
+def _metadata_create_field_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create field definition",
+        summary="Define one reusable field, including help text, placeholder, defaults, and wizard-step placement.",
+        kicker="Metadata setup",
+    )
+    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
     payload["ui_step_options"] = [
         {"value": "metadata", "label": "Wizard metadata step"},
         {"value": "storage", "label": "Wizard storage step"},
     ]
     payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.order_by("name")]
+    return payload
+
+
+def _metadata_create_schema_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create schema and first version",
+        summary="Use the visual builder to assemble one schema version without mixing it with other metadata actions.",
+        kicker="Metadata setup",
+    )
+    payload["field_definition_catalog"] = [
+        _field_definition_to_dict(item)
+        for item in MetadataFieldDefinition.objects.select_related("vocabulary").prefetch_related("vocabulary__items").order_by("name")
+    ]
     payload["field_definition_options"] = [_model_to_option(item) for item in MetadataFieldDefinition.objects.order_by("name")]
-    payload["schema_options"] = [_model_to_option(item) for item in MetadataSchema.objects.order_by("name")]
+    return payload
+
+
+def _metadata_create_binding_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create schema binding",
+        summary="Bind one schema version to one target from a dedicated attachment page.",
+        kicker="Metadata setup",
+    )
+    payload["binding_target_type_options"] = [
+        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+    ]
+    payload["schema_version_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.schema.code} v{item.version_number} ({item.status})",
+            "schema_id": str(item.schema_id),
+        }
+        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+    ]
+    return payload
+
+
+def _metadata_publish_version_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Publish schema version",
+        summary="Promote one draft schema version from a single publish form.",
+        kicker="Metadata setup",
+    )
     payload["schema_version_options"] = [
         {
             "value": str(item.id),
@@ -1171,7 +1335,67 @@ def lims_reference_page(request):
     forbidden = require_lims_permission(request, 'lims.reference.view')
     if forbidden:
         return forbidden
-    return render(request, 'lims/reference.html', _page_context(request, active_nav='lims-reference', payload=_reference_page_payload(request)))
+    return render(
+        request,
+        'lims/reference.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_lab_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_lab.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_lab_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_study_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_study.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_study_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_site_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_site.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_site_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_address_sync_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_address_sync.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_address_sync_page_payload(request)),
+    )
 
 
 @csrf_exempt
@@ -1181,7 +1405,81 @@ def lims_metadata_page(request):
     forbidden = require_lims_permission(request, 'lims.metadata.view')
     if forbidden:
         return forbidden
-    return render(request, 'lims/metadata.html', _page_context(request, active_nav='lims-metadata', payload=_metadata_page_payload(request)))
+    return render(
+        request,
+        'lims/metadata.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_vocabulary_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_vocabulary.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_vocabulary_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_field_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_field.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_field_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_schema_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_schema.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_schema_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_binding_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_binding.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_binding_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_publish_version_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_publish_version.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_publish_version_page_payload(request)),
+    )
 
 
 @csrf_exempt

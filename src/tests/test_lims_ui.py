@@ -46,8 +46,17 @@ def test_lims_html_pages_render_with_role_aware_actions():
 
     pages = [
         ("/lims/", b"Laboratory operations workspace", None),
-        ("/lims/reference/", b"Reference and geography", b'data-lims-action="reference-lab-create"'),
-        ("/lims/metadata/", b"Metadata configuration", b'data-lims-action="metadata-schema-create"'),
+        ("/lims/reference/", b"Reference and geography", b"Choose a reference workflow"),
+        ("/lims/reference/labs/create/", b"Create lab", b'data-lims-action="reference-lab-create"'),
+        ("/lims/reference/studies/create/", b"Create study", b'data-lims-action="reference-study-create"'),
+        ("/lims/reference/sites/create/", b"Create site", b'data-lims-action="reference-site-create"'),
+        ("/lims/reference/address-sync/", b"Run geography sync", b'data-lims-action="reference-address-sync"'),
+        ("/lims/metadata/", b"Metadata configuration", b"Choose a metadata workflow"),
+        ("/lims/metadata/vocabularies/create/", b"Create vocabulary", b'data-lims-action="metadata-vocabulary-create"'),
+        ("/lims/metadata/fields/create/", b"Create field definition", b'data-lims-action="metadata-field-create"'),
+        ("/lims/metadata/schemas/create/", b"Create schema and first version", b'data-lims-action="metadata-schema-create"'),
+        ("/lims/metadata/bindings/create/", b"Create schema binding", b'data-lims-action="metadata-binding-create"'),
+        ("/lims/metadata/versions/publish/", b"Publish schema version", b'data-lims-action="metadata-version-publish"'),
         ("/lims/biospecimens/", b"Biospecimen registry", b'data-lims-action="biospecimen-create"'),
         ("/lims/receiving/", b"Receiving and accessioning", b"Choose a receiving workflow"),
         ("/lims/receiving/single/", b"Receive single specimen", b'data-lims-action="receiving-single-create"'),
@@ -75,8 +84,8 @@ def test_lims_operator_can_view_metadata_page_without_manage_actions(monkeypatch
 
     assert response.status_code == 200
     assert b"Metadata configuration" in response.content
-    assert b'data-lims-action="metadata-schema-create"' not in response.content
-    assert b'data-lims-action="metadata-vocabulary-create"' not in response.content
+    assert b"Choose a metadata workflow" not in response.content
+    assert b"Open create vocabulary" not in response.content
 
 
 @pytest.mark.django_db(transaction=True)
@@ -84,13 +93,13 @@ def test_metadata_page_shows_visual_schema_builder_for_admins():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-metadata-builder")
 
-    response = client.get("/lims/metadata/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    response = client.get("/lims/metadata/schemas/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
 
     assert response.status_code == 200
     assert b"Visual schema builder" in response.content
     assert b"Add to designer" in response.content
-    assert b"Wizard step" in response.content
     assert b"Schema payload preview" in response.content
+    assert b"Back to metadata" in response.content
 
 
 @pytest.mark.django_db(transaction=True)

@@ -249,6 +249,22 @@ The single-sample path has now moved one step closer to the intended cookbook-st
 
 Those dynamic steps are driven by the published sample-type metadata binding. Schema fields now expose a formbuilder-compatible field description in the metadata API, and the operator wizard uses a repository-native renderer so the controls stay aligned with the shared portal shell instead of introducing a separate frontend stack.
 
+The same launchpad-versus-task-page pattern now extends to reference and metadata setup:
+
+- `/lims/reference/` stays an overview/launchpad for labs, studies, sites, and geography sync status
+- `/lims/reference/labs/create/`
+- `/lims/reference/studies/create/`
+- `/lims/reference/sites/create/`
+- `/lims/reference/address-sync/`
+- `/lims/metadata/` stays an overview/launchpad for vocabularies, fields, schemas, and bindings
+- `/lims/metadata/vocabularies/create/`
+- `/lims/metadata/fields/create/`
+- `/lims/metadata/schemas/create/`
+- `/lims/metadata/bindings/create/`
+- `/lims/metadata/versions/publish/`
+
+This keeps operator/admin pages closer to the CRUD cookbook direction: summary pages remain navigational, while each input page exposes one focused task with one primary submit action.
+
 ## Batch and plate management
 
 The current batch-management slice standardizes the first processing and worksheet primitives on top of the biospecimen aggregate:

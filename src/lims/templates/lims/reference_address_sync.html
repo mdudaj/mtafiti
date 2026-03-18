@@ -1,0 +1,43 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Run geography sync" %}
+
+{% if payload.capabilities.can_manage_reference %}
+<section class="panel" data-lims-action="reference-address-sync">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Geography sync action" panel_description="Queue one Tanzania-backed geography sync run." %}
+  <div class="button-row">
+    <button class="button" type="button" onclick="startAddressSync()"><span class="material-symbols-outlined button-icon" aria-hidden="true">sync</span><span>Start address sync</span></button>
+    <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent sync runs" panel_description="Latest sync execution history for quick verification." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th></tr></thead>
+      <tbody>
+        {% for item in payload.sync_runs %}
+        <tr>
+          <td>{{ item.status }}</td>
+          <td>{{ item.country_code|default:"TZ" }}</td>
+          <td>{{ item.processed_count }}</td>
+          <td>{{ item.failure_count }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No sync runs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function startAddressSync() {
+  await limsPortalAction("/api/v1/lims/reference/address-sync-runs", {}, "Address sync started");
+}
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Create site" %}
+
+{% if payload.capabilities.can_manage_reference %}
+<section class="panel" data-lims-action="reference-site-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Site setup form" panel_description="Register one site and attach its study and lab selectors." %}
+  <div class="section-stack">
+    <label class="field-group"><span class="field-label">Site name</span><input class="input" data-lims-field="site-name" /></label>
+    <label class="field-group"><span class="field-label">Site code</span><input class="input" data-lims-field="site-code" /></label>
+    <label class="field-group">
+      <span class="field-label">Study</span>
+      <select class="select" data-lims-field="site-study">
+        <option value="">No study</option>
+        {% for option in payload.study_options %}
+        <option value="{{ option.value }}">{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field-group">
+      <span class="field-label">Lab</span>
+      <select class="select" data-lims-field="site-lab">
+        <option value="">No lab</option>
+        {% for option in payload.lab_options %}
+        <option value="{{ option.value }}">{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createSite()"><span class="material-symbols-outlined button-icon" aria-hidden="true">location_city</span><span>Create site</span></button>
+      <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createSite() {
+  await limsPortalAction("/api/v1/lims/reference/sites", {
+    name: limsValue("site-name"),
+    code: limsValue("site-code"),
+    study_id: limsOptionalValue("site-study"),
+    lab_id: limsOptionalValue("site-lab"),
+  }, "Site created");
+}
+{% endblock %}
