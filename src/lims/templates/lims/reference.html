@@ -1,0 +1,146 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Reference" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="active + draft" count_value=payload.cards.labs %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Studies" count_label="configured" count_value=payload.cards.studies %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Sites" count_label="configured" count_value=payload.cards.sites %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Address sync runs" count_label="history" count_value=payload.cards.sync_runs %}
+</div>
+
+{% if payload.capabilities.can_manage_reference %}
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel" data-lims-action="reference-lab-create">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Create lab" panel_description="Add a tenant-scoped lab used by studies, sites, and receiving flows." %}
+    <div class="section-stack">
+      <label class="field-group"><span class="field-label">Lab name</span><input class="input" data-lims-field="lab-name" /></label>
+      <label class="field-group"><span class="field-label">Lab code</span><input class="input" data-lims-field="lab-code" /></label>
+      <label class="field-group"><span class="field-label">Address line</span><input class="input" data-lims-field="lab-address" /></label>
+      <button class="button" type="button" onclick="createLab()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_business</span><span>Create lab</span></button>
+    </div>
+  </section>
+
+  <section class="panel" data-lims-action="reference-study-create">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Create study" panel_description="Link a study to an optional lead lab for receiving and biospecimen routing." %}
+    <div class="section-stack">
+      <label class="field-group"><span class="field-label">Study name</span><input class="input" data-lims-field="study-name" /></label>
+      <label class="field-group"><span class="field-label">Study code</span><input class="input" data-lims-field="study-code" /></label>
+      <label class="field-group">
+        <span class="field-label">Lead lab</span>
+        <select class="select" data-lims-field="study-lead-lab">
+          <option value="">No lead lab</option>
+          {% for option in payload.lab_options %}
+          <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button" type="button" onclick="createStudy()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create study</span></button>
+    </div>
+  </section>
+
+  <section class="panel" data-lims-action="reference-site-create">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Create site" panel_description="Register field or collection sites and attach them to study/lab selectors." %}
+    <div class="section-stack">
+      <label class="field-group"><span class="field-label">Site name</span><input class="input" data-lims-field="site-name" /></label>
+      <label class="field-group"><span class="field-label">Site code</span><input class="input" data-lims-field="site-code" /></label>
+      <label class="field-group">
+        <span class="field-label">Study</span>
+        <select class="select" data-lims-field="site-study">
+          <option value="">No study</option>
+          {% for option in payload.study_options %}
+          <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field-group">
+        <span class="field-label">Lab</span>
+        <select class="select" data-lims-field="site-lab">
+          <option value="">No lab</option>
+          {% for option in payload.lab_options %}
+          <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button" type="button" onclick="createSite()"><span class="material-symbols-outlined button-icon" aria-hidden="true">location_city</span><span>Create site</span></button>
+    </div>
+  </section>
+</div>
+
+<section class="panel" data-lims-action="reference-address-sync">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Run Tanzania address sync" panel_description="Queue a resumable sync for the Tanzania-backed geography importer." %}
+  <div class="button-row">
+    <button class="button" type="button" onclick="startAddressSync()"><span class="material-symbols-outlined button-icon" aria-hidden="true">sync</span><span>Start address sync</span></button>
+  </div>
+</section>
+{% endif %}
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Labs" panel_description="Current tenant lab registry." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Postcode</th></tr></thead><tbody>{% for item in payload.labs %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.postcode|default:"-" }}</td></tr>{% empty %}<tr><td colspan="3">No labs yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Studies" panel_description="Study setup used across receiving and specimen registration." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Status</th></tr></thead><tbody>{% for item in payload.studies %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.status }}</td></tr>{% empty %}<tr><td colspan="3">No studies yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Sites" panel_description="Tenant site list powering selectors in biospecimen and receiving forms." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Postcode</th></tr></thead><tbody>{% for item in payload.sites %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.postcode|default:"-" }}</td></tr>{% empty %}<tr><td colspan="3">No sites yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent address sync runs" panel_description="Latest sync execution history for the Tanzania source import." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th></tr></thead>
+      <tbody>
+        {% for item in payload.sync_runs %}
+        <tr>
+          <td>{{ item.status }}</td>
+          <td>{{ item.country_code|default:"TZ" }}</td>
+          <td>{{ item.processed_count }}</td>
+          <td>{{ item.failure_count }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No sync runs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createLab() {
+  await limsPortalAction("/api/v1/lims/reference/labs", {
+    name: limsValue("lab-name"),
+    code: limsValue("lab-code"),
+    address_line: limsValue("lab-address"),
+  }, "Lab created");
+}
+
+async function createStudy() {
+  await limsPortalAction("/api/v1/lims/reference/studies", {
+    name: limsValue("study-name"),
+    code: limsValue("study-code"),
+    lead_lab_id: limsOptionalValue("study-lead-lab"),
+  }, "Study created");
+}
+
+async function createSite() {
+  await limsPortalAction("/api/v1/lims/reference/sites", {
+    name: limsValue("site-name"),
+    code: limsValue("site-code"),
+    study_id: limsOptionalValue("site-study"),
+    lab_id: limsOptionalValue("site-lab"),
+  }, "Site created");
+}
+
+async function startAddressSync() {
+  await limsPortalAction("/api/v1/lims/reference/address-sync-runs", {}, "Address sync started");
+}
+{% endblock %}

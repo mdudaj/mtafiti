@@ -1007,6 +1007,8 @@ def receive_manifest_item(
     scan_value: str = "",
     notes: str = "",
     metadata: dict[str, object] | None = None,
+    receipt_context: dict[str, object] | None = None,
+    received_at=None,
 ) -> tuple[AccessioningManifestItem, ReceivingEvent]:
     if item.status == AccessioningManifestItem.Status.RECEIVED:
         raise AccessioningError("item_already_received")
@@ -1039,7 +1041,11 @@ def receive_manifest_item(
         elif specimen.status != Biospecimen.Status.RECEIVED:
             raise AccessioningError("specimen_not_receivable")
 
-        now = timezone.now()
+        now = received_at or timezone.now()
+        if received_at and specimen.received_at != now:
+            specimen.received_at = now
+            specimen.full_clean()
+            specimen.save(update_fields=["received_at", "updated_at"])
         item.biospecimen = specimen
         item.status = AccessioningManifestItem.Status.RECEIVED
         item.received_at = now
@@ -1065,7 +1071,11 @@ def receive_manifest_item(
             received_by=received_by,
             scan_value=scan_value.strip(),
             notes=notes,
-            metadata=normalized_metadata,
+            metadata=(
+                {"sample_metadata": normalized_metadata, "receipt_context": dict(receipt_context or {})}
+                if receipt_context
+                else normalized_metadata
+            ),
             received_at=now,
         )
         event.full_clean()
@@ -1089,6 +1099,8 @@ def receive_single_biospecimen(
     barcode: str = "",
     scan_value: str = "",
     notes: str = "",
+    receipt_context: dict[str, object] | None = None,
+    received_at=None,
 ) -> tuple[Biospecimen, ReceivingEvent]:
     normalized_metadata = _validate_sample_type_metadata(sample_type, metadata)
     if scan_value and barcode and scan_value.strip() != barcode.strip():
@@ -1115,6 +1127,7 @@ def receive_single_biospecimen(
             quantity=quantity,
             quantity_unit=quantity_unit.strip(),
             metadata=normalized_metadata,
+            received_at=received_at,
         )
         specimen.full_clean()
         specimen.save()
@@ -1125,7 +1138,12 @@ def receive_single_biospecimen(
             received_by=received_by,
             scan_value=scan_value.strip(),
             notes=notes,
-            metadata=normalized_metadata,
+            metadata=(
+                {"sample_metadata": normalized_metadata, "receipt_context": dict(receipt_context or {})}
+                if receipt_context
+                else normalized_metadata
+            ),
+            received_at=received_at or timezone.now(),
         )
         event.full_clean()
         event.save()

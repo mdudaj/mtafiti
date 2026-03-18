@@ -50,7 +50,7 @@ def test_lims_service_route_exposes_summary_and_html_shell():
 
     page = client.get('/lims/', HTTP_HOST=host, HTTP_X_USER_ROLES='tenant.admin')
     assert page.status_code == 200
-    assert b'Research Lab workspace' in page.content
+    assert b'Laboratory operations workspace' in page.content
 
 
 @pytest.mark.django_db(transaction=True)

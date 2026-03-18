@@ -140,7 +140,14 @@ from core.views import (
     ui_operations_stewardship_page,
     user_portal_dashboard_page,
 )
-from lims.views import lims_dashboard_page
+from lims.views import (
+    lims_biospecimens_page,
+    lims_dashboard_page,
+    lims_metadata_page,
+    lims_processing_page,
+    lims_receiving_page,
+    lims_reference_page,
+)
 from tenants.views import tenant_services, tenants
 
 urlpatterns = [
@@ -153,6 +160,11 @@ urlpatterns = [
     path('api/v1/tenants/services', tenant_services, name='tenant_services'),
     path('api/v1/lims/', include(('lims.urls', 'lims'), namespace='lims')),
     path('lims/', lims_dashboard_page, name='lims_dashboard_page'),
+    path('lims/reference/', lims_reference_page, name='lims_reference_page'),
+    path('lims/metadata/', lims_metadata_page, name='lims_metadata_page'),
+    path('lims/biospecimens/', lims_biospecimens_page, name='lims_biospecimens_page'),
+    path('lims/receiving/', lims_receiving_page, name='lims_receiving_page'),
+    path('lims/processing/', lims_processing_page, name='lims_processing_page'),
     path('api/v1/governance/policies', governance_policies, name='governance_policies'),
     path(
         'api/v1/governance/policies/<uuid:policy_id>',

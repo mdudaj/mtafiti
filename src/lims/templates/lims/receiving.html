@@ -1,0 +1,46 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Receiving" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Manifests" count_label="created" count_value=payload.cards.manifests %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Receiving events" count_label="logged" count_value=payload.cards.received_events %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Discrepancies" count_label="open + resolved" count_value=payload.cards.discrepancies %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Pending manifest items" count_label="awaiting receipt" count_value=payload.cards.pending_items %}
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Choose a receiving workflow" panel_description="Operator input starts from a dedicated page per task, rather than a mixed multi-form dashboard." %}
+  <div class="cards">
+    {% for item in payload.actions %}
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">{{ item.title }}</h2>
+          <p class="panel-description">{{ item.description }}</p>
+        </div>
+        <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+      </div>
+      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent manifests" panel_description="Newest manifests and intake state." %}
+    <div class="table-wrap"><table><thead><tr><th>Manifest</th><th>Status</th><th>Items</th></tr></thead><tbody>{% for item in payload.manifests %}<tr><td>{{ item.manifest_identifier }}</td><td>{{ item.status }}</td><td>{{ item.item_count }}</td></tr>{% empty %}<tr><td colspan="3">No manifests yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent receiving events" panel_description="Latest direct or manifest-driven intake events." %}
+    <div class="table-wrap"><table><thead><tr><th>Kind</th><th>Specimen</th><th>Receiver</th><th>Received at</th></tr></thead><tbody>{% for item in payload.events %}<tr><td>{{ item.kind }}</td><td>{{ item.biospecimen_id }}</td><td>{{ item.received_by|default:"-" }}</td><td>{{ item.received_at }}</td></tr>{% empty %}<tr><td colspan="4">No receiving events yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Discrepancies" panel_description="Current discrepancy log raised during receiving." %}
+  <div class="table-wrap"><table><thead><tr><th>Code</th><th>Status</th><th>Recorded by</th><th>Notes</th></tr></thead><tbody>{% for item in payload.discrepancies %}<tr><td>{{ item.code }}</td><td>{{ item.status }}</td><td>{{ item.recorded_by|default:"-" }}</td><td>{{ item.notes|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">No discrepancies yet.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

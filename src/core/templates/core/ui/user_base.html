@@ -458,6 +458,15 @@
           {% if payload.navigation.can_view_operations %}
           <a href="/ui/operations/printing"><span class="nav-icon material-symbols-outlined" aria-hidden="true">print</span><span class="nav-label">Operations printing</span></a>
           {% endif %}
+          {% if payload.navigation.lims_links %}
+          <div class="nav-section-label">LIMS</div>
+          {% for item in payload.navigation.lims_links %}
+          <a href="{{ item.href }}" class="{% if active_nav == item.key %}active{% endif %}">
+            <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+            <span class="nav-label">{{ item.label }}</span>
+          </a>
+          {% endfor %}
+          {% endif %}
         </nav>
       </aside>
         <main class="content" id="main-content">
@@ -699,6 +708,7 @@
         current.searchParams.set("ui_error", "0");
         window.location.assign(current.toString());
       }
+      {% block extra_scripts %}{% endblock %}
     </script>
   </body>
 </html>

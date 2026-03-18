@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.http import JsonResponse
@@ -6,10 +7,11 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
-from core.identity import request_roles
+from core.identity import request_roles, roles_enforced
 
-from .permissions import permission_summary_for_roles, require_lims_permission
+from .permissions import has_lims_permission, permission_summary_for_roles, require_lims_permission
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
@@ -76,33 +78,420 @@ def _user_context(request) -> dict[str, object]:
     }
 
 
-def _dashboard_payload(request) -> dict[str, object]:
+def _ui_feedback_context(request) -> dict[str, object]:
+    message = (request.GET.get("ui_message") or "").strip()
+    error = (request.GET.get("ui_error") or "").strip()
     return {
-        'service_key': 'lims',
-        'tenant_schema': _user_context(request)['tenant_schema'],
-        'cards': {
-            'workflows': 0,
-            'queues': 0,
-            'instruments': 0,
-        },
-        'launchpad': [
-            {
-                'title': 'Reference data',
-                'description': 'Prepare lab, study, and site structures for tenant onboarding.',
-                'status': 'planned',
-            },
-            {
-                'title': 'Workflow configuration',
-                'description': 'Design draft/publish workflow templates and metadata schemas.',
-                'status': 'planned',
-            },
-            {
-                'title': 'Operator workspace',
-                'description': 'Provide inbox, receiving, QC, and storage entrypoints.',
-                'status': 'planned',
-            },
-        ],
+        "ui_message": error or message,
+        "ui_error": bool(error),
     }
+
+
+def _can_view_operations(request) -> bool:
+    if not roles_enforced():
+        return True
+    return bool(
+        set(request_roles(request))
+        & {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin", "lims.operator", "lims.manager", "lims.qa", "lims.admin"}
+    )
+
+
+def _has_permission(request, permission_key: str) -> bool:
+    if not roles_enforced():
+        return True
+    return has_lims_permission(request_roles(request), permission_key)
+
+
+def _lims_navigation(request, active_key: str) -> dict[str, object]:
+    links = []
+    candidates = [
+        ("lims-dashboard", "Dashboard", "dashboard", "/lims/", "lims.dashboard.view"),
+        ("lims-reference", "Reference", "globe_location_pin", "/lims/reference/", "lims.reference.view"),
+        ("lims-metadata", "Metadata", "schema", "/lims/metadata/", "lims.metadata.view"),
+        ("lims-biospecimens", "Biospecimens", "biotech", "/lims/biospecimens/", "lims.artifact.view"),
+        ("lims-receiving", "Receiving", "inventory_2", "/lims/receiving/", "lims.artifact.view"),
+        ("lims-processing", "Processing", "science", "/lims/processing/", "lims.artifact.view"),
+    ]
+    for key, label, icon, href, permission_key in candidates:
+        if _has_permission(request, permission_key):
+            links.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "icon": icon,
+                    "href": href,
+                    "is_active": key == active_key,
+                }
+            )
+    return {
+        "can_view_operations": _can_view_operations(request),
+        "lims_links": links,
+    }
+
+
+def _page_payload_base(request, *, active_key: str, title: str, summary: str, kicker: str) -> dict[str, object]:
+    user_context = _user_context(request)
+    return {
+        "service_key": "lims",
+        "tenant_schema": user_context["tenant_schema"],
+        "user_context": user_context,
+        "navigation": _lims_navigation(request, active_key),
+        "capabilities": {
+            "can_view_reference": _has_permission(request, "lims.reference.view"),
+            "can_manage_reference": _has_permission(request, "lims.reference.manage"),
+            "can_view_metadata": _has_permission(request, "lims.metadata.view"),
+            "can_manage_metadata": _has_permission(request, "lims.metadata.manage"),
+            "can_view_artifacts": _has_permission(request, "lims.artifact.view"),
+            "can_manage_artifacts": _has_permission(request, "lims.artifact.manage"),
+            "can_execute_tasks": _has_permission(request, "lims.workflow.execute"),
+            "can_approve_tasks": _has_permission(request, "lims.workflow.approve"),
+        },
+        "page": {
+            "page_title": title,
+            "page_summary": summary,
+            "topbar_title": title,
+            "topbar_subtitle": summary,
+            "kicker": kicker,
+            "section_label": "LIMS",
+        },
+        "cards": {},
+    }
+
+
+def _page_context(request, *, active_nav: str, payload: dict[str, object]) -> dict[str, object]:
+    return {
+        "active_nav": active_nav,
+        "payload": payload,
+        **_ui_feedback_context(request),
+    }
+
+
+def _dashboard_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-dashboard",
+        title="Laboratory operations workspace",
+        summary="Use tenant-scoped reference, metadata, accessioning, and processing tools from one admin-style shell.",
+        kicker="LIMS overview",
+    )
+    labs_count = Lab.objects.count()
+    schema_count = MetadataSchema.objects.count()
+    specimen_count = Biospecimen.objects.count()
+    manifest_count = AccessioningManifest.objects.count()
+    batch_count = ProcessingBatch.objects.count()
+    payload["cards"] = {
+        "labs": labs_count,
+        "schemas": schema_count,
+        "biospecimens": specimen_count,
+        "manifests": manifest_count,
+        "batches": batch_count,
+    }
+    payload["launchpad"] = [
+        {
+            "title": "Reference data",
+            "description": "Manage labs, studies, sites, and address sync runs for the tenant.",
+            "href": "/lims/reference/",
+            "status": "ready" if payload["capabilities"]["can_view_reference"] else "restricted",
+        },
+        {
+            "title": "Metadata schemas",
+            "description": "Define vocabularies, fields, schemas, and published bindings for configurable forms.",
+            "href": "/lims/metadata/",
+            "status": "ready" if payload["capabilities"]["can_view_metadata"] else "restricted",
+        },
+        {
+            "title": "Biospecimens",
+            "description": "Register sample types, create specimens, and assemble pools for downstream workflow steps.",
+            "href": "/lims/biospecimens/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+        {
+            "title": "Receiving",
+            "description": "Receive single samples, track manifests, and capture discrepancy workflows.",
+            "href": "/lims/receiving/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+        {
+            "title": "Processing",
+            "description": "Create plate-based batches, review assignments, and trigger worksheet print jobs.",
+            "href": "/lims/processing/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+    ]
+    payload["recent_manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    payload["recent_batches"] = [
+        _processing_batch_to_dict(item)
+        for item in ProcessingBatch.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    payload["recent_specimens"] = [
+        _biospecimen_to_dict(item)
+        for item in Biospecimen.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    return payload
+
+
+def _reference_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Reference and geography",
+        summary="Maintain labs, studies, sites, and the Tanzania-backed geography sync used by tenant reference selectors.",
+        kicker="Reference operations",
+    )
+    payload["cards"] = {
+        "labs": Lab.objects.count(),
+        "studies": Study.objects.count(),
+        "sites": Site.objects.count(),
+        "sync_runs": TanzaniaAddressSyncRun.objects.count(),
+    }
+    payload["labs"] = [_lab_to_dict(item) for item in Lab.objects.order_by("name")[:10]]
+    payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
+    payload["sites"] = [_site_to_dict(item) for item in Site.objects.select_related("study", "lab").order_by("name")[:10]]
+    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    return payload
+
+
+def _metadata_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Metadata configuration",
+        summary="Configure vocabularies, field definitions, schema versions, and published bindings for sample and workflow metadata.",
+        kicker="Configurable metadata",
+    )
+    payload["cards"] = {
+        "vocabularies": MetadataVocabulary.objects.count(),
+        "fields": MetadataFieldDefinition.objects.count(),
+        "schemas": MetadataSchema.objects.count(),
+        "bindings": MetadataSchemaBinding.objects.count(),
+    }
+    payload["vocabularies"] = [_vocabulary_to_dict(item) for item in MetadataVocabulary.objects.prefetch_related("items").order_by("name")[:8]]
+    payload["field_definitions"] = [
+        _field_definition_to_dict(item)
+        for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")[:10]
+    ]
+    payload["field_definition_catalog"] = [
+        _field_definition_to_dict(item)
+        for item in MetadataFieldDefinition.objects.select_related("vocabulary").prefetch_related("vocabulary__items").order_by("name")
+    ]
+    payload["schemas"] = [
+        _schema_to_dict(item)
+        for item in MetadataSchema.objects.prefetch_related(
+            "versions__fields__field_definition",
+            "versions__schema",
+        ).order_by("name")[:6]
+    ]
+    payload["bindings"] = [
+        _schema_binding_to_dict(item)
+        for item in MetadataSchemaBinding.objects.select_related("schema_version__schema").order_by("target_type", "target_key")[:10]
+    ]
+    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
+    payload["binding_target_type_options"] = [
+        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+    ]
+    payload["ui_step_options"] = [
+        {"value": "metadata", "label": "Wizard metadata step"},
+        {"value": "storage", "label": "Wizard storage step"},
+    ]
+    payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.order_by("name")]
+    payload["field_definition_options"] = [_model_to_option(item) for item in MetadataFieldDefinition.objects.order_by("name")]
+    payload["schema_options"] = [_model_to_option(item) for item in MetadataSchema.objects.order_by("name")]
+    payload["schema_version_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.schema.code} v{item.version_number} ({item.status})",
+            "schema_id": str(item.schema_id),
+        }
+        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+    ]
+    return payload
+
+
+def _biospecimens_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-biospecimens",
+        title="Biospecimen registry",
+        summary="Register sample types, create specimens, and monitor pool composition before receiving and batch processing.",
+        kicker="Specimen inventory",
+    )
+    payload["cards"] = {
+        "sample_types": BiospecimenType.objects.count(),
+        "specimens": Biospecimen.objects.count(),
+        "aliquots": Biospecimen.objects.filter(kind=Biospecimen.Kind.ALIQUOT).count(),
+        "pools": BiospecimenPool.objects.count(),
+    }
+    payload["sample_types"] = [_biospecimen_type_to_dict(item) for item in BiospecimenType.objects.order_by("name")[:10]]
+    payload["specimens"] = [
+        _biospecimen_to_dict(item)
+        for item in Biospecimen.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+    ]
+    payload["pools"] = [
+        _biospecimen_pool_to_dict(item)
+        for item in BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:8]
+    ]
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["specimen_options"] = [
+        {"value": str(item.id), "label": f"{item.sample_identifier} ({item.status})"}
+        for item in Biospecimen.objects.order_by("-created_at")[:50]
+    ]
+    return payload
+
+
+def _receiving_launchpad_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receiving and accessioning",
+        summary="Choose a focused receiving flow, then complete that task on a dedicated one-form page.",
+        kicker="Accessioning",
+    )
+    payload["cards"] = {
+        "manifests": AccessioningManifest.objects.count(),
+        "received_events": ReceivingEvent.objects.count(),
+        "discrepancies": ReceivingDiscrepancy.objects.count(),
+        "pending_items": AccessioningManifestItem.objects.filter(status=AccessioningManifestItem.Status.PENDING).count(),
+    }
+    payload["manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+    ]
+    payload["events"] = [
+        _receiving_event_to_dict(item)
+        for item in ReceivingEvent.objects.select_related("biospecimen").order_by("-received_at")[:8]
+    ]
+    payload["discrepancies"] = [
+        _receiving_discrepancy_to_dict(item)
+        for item in ReceivingDiscrepancy.objects.order_by("-created_at")[:8]
+    ]
+    payload["actions"] = [
+        {
+            "title": "Single sample receipt",
+            "description": "Capture intake metadata, record a QC accept/reject decision, then log storage or rejection details.",
+            "href": "/lims/receiving/single/",
+            "icon": "move_to_inbox",
+        },
+        {
+            "title": "Batch manifest receipt",
+            "description": "Download an Excel-friendly CSV template, complete receipt/QC/storage columns, and import the batch.",
+            "href": "/lims/receiving/batch/",
+            "icon": "upload_file",
+        },
+        {
+            "title": "Retrieve from EDC",
+            "description": "Specify the lab form, expected sample, and external ID, then process the imported record through QC.",
+            "href": "/lims/receiving/edc-import/",
+            "icon": "cloud_download",
+        },
+    ]
+    return payload
+
+
+def _receiving_single_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receive single specimen",
+        summary="Capture initial metadata, complete the first QC decision, then log storage or document a rejection.",
+        kicker="Single receipt",
+    )
+    payload["sample_type_options"] = [
+        {"value": str(item.id), "label": item.name, "key": item.key}
+        for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    return payload
+
+
+def _receiving_batch_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receive batch manifest",
+        summary="Use one batch import form to load intake metadata, QC outcomes, and storage instructions from a template.",
+        kicker="Batch receipt",
+    )
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    payload["recent_manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:8]
+    ]
+    return payload
+
+
+def _receiving_edc_import_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Retrieve metadata from EDC",
+        summary="Capture the lab form, expected sample, external ID import target, and QC/storage outcome in one flow.",
+        kicker="EDC intake",
+    )
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    payload["edc_source_options"] = [
+        {"value": "redcap", "label": "REDCap"},
+        {"value": "odk", "label": "ODK"},
+        {"value": "odk-central", "label": "ODK Central"},
+    ]
+    return payload
+
+
+def _processing_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-processing",
+        title="Batch and plate processing",
+        summary="Create processing batches, inspect plate layouts, and issue worksheet print jobs for downstream lab execution.",
+        kicker="Batch management",
+    )
+    payload["cards"] = {
+        "layouts": PlateLayoutTemplate.objects.count(),
+        "batches": ProcessingBatch.objects.count(),
+        "draft_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.DRAFT).count(),
+        "printed_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.PRINTED).count(),
+    }
+    payload["layouts"] = [_plate_layout_to_dict(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["batches"] = [
+        _processing_batch_to_dict(item, include_plates=True)
+        for item in ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab")
+        .prefetch_related("plates__layout_template", "plates__assignments__biospecimen")
+        .order_by("-created_at")[:8]
+    ]
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["layout_options"] = [_model_to_option(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["batch_options"] = [
+        {"value": str(item.id), "label": f"{item.batch_identifier} ({item.status})"}
+        for item in ProcessingBatch.objects.order_by("-created_at")[:50]
+    ]
+    return payload
 
 
 def _parse_json_body(request):
@@ -173,6 +562,19 @@ def _parse_decimal(value, *, field: str, default: str | None = None):
         return Decimal(str(raw)), None
     except (InvalidOperation, TypeError, ValueError):
         return None, JsonResponse({"error": f"invalid_{field}"}, status=400)
+
+
+def _parse_optional_received_at(value):
+    if value in (None, ""):
+        return None, None
+    raw = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(f"{raw}T00:00:00" if len(raw) == 10 else raw)
+    except ValueError:
+        return None, JsonResponse({"error": "invalid_received_at"}, status=400)
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed, None
 
 
 def _biospecimen_type_to_dict(item: BiospecimenType) -> dict[str, object]:
@@ -400,6 +802,12 @@ def _vocabulary_to_dict(vocabulary: MetadataVocabulary) -> dict[str, object]:
 
 
 def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, object]:
+    vocabulary_items = []
+    if field.vocabulary_id:
+        vocabulary_items = [
+            {"label": item.label, "value": item.value}
+            for item in field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+        ]
     return {
         "id": str(field.id),
         "name": field.name,
@@ -409,6 +817,7 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
         "help_text": field.help_text,
         "placeholder": field.placeholder,
         "vocabulary_id": str(field.vocabulary_id) if field.vocabulary_id else None,
+        "vocabulary_items": vocabulary_items,
         "default_value": field.default_value,
         "config": field.config,
         "is_active": field.is_active,
@@ -416,6 +825,23 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
 
 
 def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
+    vocabulary_items = []
+    if field.field_definition.vocabulary_id:
+        vocabulary_items = [
+            {"label": item.label, "value": item.value}
+            for item in field.field_definition.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+        ]
+    formbuilder_type = {
+        MetadataFieldDefinition.FieldType.TEXT: "text",
+        MetadataFieldDefinition.FieldType.LONG_TEXT: "textarea",
+        MetadataFieldDefinition.FieldType.INTEGER: "number",
+        MetadataFieldDefinition.FieldType.DECIMAL: "number",
+        MetadataFieldDefinition.FieldType.BOOLEAN: "checkbox",
+        MetadataFieldDefinition.FieldType.DATE: "date",
+        MetadataFieldDefinition.FieldType.DATETIME: "text",
+        MetadataFieldDefinition.FieldType.CHOICE: "select",
+        MetadataFieldDefinition.FieldType.MULTI_CHOICE: "checkbox-group",
+    }[field.field_definition.field_type]
     return {
         "id": str(field.id),
         "field_definition_id": str(field.field_definition_id),
@@ -427,6 +853,36 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
         "required": field.required,
         "validation_rules": dict(field.validation_rules or {}),
         "condition": dict(field.condition or {}),
+        "help_text": field.field_definition.help_text,
+        "placeholder": field.field_definition.placeholder,
+        "default_value": field.field_definition.default_value,
+        "config": dict(field.field_definition.config or {}),
+        "vocabulary_items": vocabulary_items,
+        "formbuilder": {
+            "name": field.field_key,
+            "label": field.field_definition.name,
+            "type": formbuilder_type,
+            "subtype": (
+                "textarea"
+                if field.field_definition.field_type == MetadataFieldDefinition.FieldType.LONG_TEXT
+                else (
+                    "integer"
+                    if field.field_definition.field_type == MetadataFieldDefinition.FieldType.INTEGER
+                    else (
+                        "datetime-local"
+                        if field.field_definition.field_type == MetadataFieldDefinition.FieldType.DATETIME
+                        else "text"
+                    )
+                )
+            ),
+            "required": field.required,
+            "placeholder": field.field_definition.placeholder,
+            "description": field.field_definition.help_text,
+            "multiple": field.field_definition.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+            "values": vocabulary_items,
+            "value": field.field_definition.default_value,
+            "ui_step": str(field.field_definition.config.get("ui_step") or "metadata"),
+        },
     }
 
 
@@ -705,14 +1161,110 @@ def lims_dashboard_page(request):
     forbidden = require_lims_permission(request, 'lims.dashboard.view')
     if forbidden:
         return forbidden
+    return render(request, 'lims/dashboard.html', _page_context(request, active_nav='lims-dashboard', payload=_dashboard_payload(request)))
+
+
+@csrf_exempt
+def lims_reference_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(request, 'lims/reference.html', _page_context(request, active_nav='lims-reference', payload=_reference_page_payload(request)))
+
+
+@csrf_exempt
+def lims_metadata_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(request, 'lims/metadata.html', _page_context(request, active_nav='lims-metadata', payload=_metadata_page_payload(request)))
+
+
+@csrf_exempt
+def lims_biospecimens_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
     return render(
         request,
-        'lims/dashboard.html',
-        {
-            'active_nav': 'lims',
-            'payload': _dashboard_payload(request),
-            'user_context': _user_context(request),
-        },
+        'lims/biospecimens.html',
+        _page_context(request, active_nav='lims-biospecimens', payload=_biospecimens_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_single_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_single.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_single_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_batch_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_batch.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_batch_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_edc_import_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_edc_import.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_edc_import_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_processing_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/processing.html',
+        _page_context(request, active_nav='lims-processing', payload=_processing_page_payload(request)),
     )
 
 
@@ -1832,6 +2384,12 @@ def lims_accessioning_receive_single(request):
     metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
         return JsonResponse({"error": "metadata must be an object"}, status=400)
+    receipt_context = payload.get("receipt_context") or {}
+    if not isinstance(receipt_context, dict):
+        return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    received_at, error = _parse_optional_received_at(payload.get("received_at"))
+    if error:
+        return error
     try:
         specimen, event = receive_single_biospecimen(
             sample_type=sample_type,
@@ -1848,6 +2406,8 @@ def lims_accessioning_receive_single(request):
             barcode=str(payload.get("barcode") or "").strip(),
             scan_value=str(payload.get("scan_value") or "").strip(),
             notes=str(payload.get("notes") or "").strip(),
+            receipt_context=receipt_context,
+            received_at=received_at,
         )
     except AccessioningError as exc:
         return _accessioning_error_response(exc)
@@ -1983,6 +2543,12 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
         return JsonResponse({"error": "metadata must be an object"}, status=400)
+    receipt_context = payload.get("receipt_context") or {}
+    if not isinstance(receipt_context, dict):
+        return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    received_at, error = _parse_optional_received_at(payload.get("received_at"))
+    if error:
+        return error
     try:
         item, event = receive_manifest_item(
             item,
@@ -1990,6 +2556,8 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
             scan_value=str(payload.get("scan_value") or "").strip(),
             notes=str(payload.get("notes") or "").strip(),
             metadata=metadata,
+            receipt_context=receipt_context,
+            received_at=received_at,
         )
     except AccessioningError as exc:
         return _accessioning_error_response(exc)

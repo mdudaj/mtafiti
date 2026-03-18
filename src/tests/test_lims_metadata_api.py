@@ -81,6 +81,8 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
                 "code": "age",
                 "field_type": "integer",
                 "help_text": "Participant age in years",
+                "placeholder": "18",
+                "config": {"ui_step": "metadata"},
             }
         ),
         content_type="application/json",
@@ -88,6 +90,8 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
         HTTP_X_USER_ROLES="lims.admin",
     )
     assert age_field.status_code == 201
+    assert age_field.json()["config"]["ui_step"] == "metadata"
+    assert age_field.json()["placeholder"] == "18"
 
     consent_field = client.post(
         "/api/v1/lims/metadata/field-definitions",
@@ -112,6 +116,7 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
                 "code": "outcome",
                 "field_type": "choice",
                 "vocabulary_id": vocabulary_id,
+                "config": {"ui_step": "storage"},
             }
         ),
         content_type="application/json",
@@ -119,6 +124,8 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
         HTTP_X_USER_ROLES="lims.admin",
     )
     assert outcome_field.status_code == 201
+    assert outcome_field.json()["config"]["ui_step"] == "storage"
+    assert outcome_field.json()["vocabulary_items"][0]["value"] == "positive"
 
     notes_field = client.post(
         "/api/v1/lims/metadata/field-definitions",
@@ -221,6 +228,16 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     )
     assert listed_bindings.status_code == 200
     assert listed_bindings.json()["items"][0]["schema_code"] == "dbs-accessioning"
+
+    listed_schemas = client.get(
+        f"/api/v1/lims/metadata/schemas/{schema_id}",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert listed_schemas.status_code == 200
+    schema_fields = listed_schemas.json()["versions"][0]["fields"]
+    assert schema_fields[0]["formbuilder"]["name"] == "age"
+    assert schema_fields[0]["formbuilder"]["ui_step"] == "metadata"
 
     valid = client.post(
         "/api/v1/lims/metadata/validate",

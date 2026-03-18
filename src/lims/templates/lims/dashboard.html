@@ -1,16 +1,18 @@
-{% extends "core/ui/user_base.html" %}
-{% block title %}Mtafiti LIMS{% endblock %}
+{% extends "lims/base.html" %}
+
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label="LIMS module" page_title="Research Lab workspace" page_summary="Tenant-aware shell for laboratory workflows, configurable metadata capture, and operator-facing processing queues." parent_label="Workspace" current_label="LIMS" %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Workspace" current_label="LIMS dashboard" %}
 
 <div class="stat-grid">
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Configured workflows" count_label="count" count_value=payload.cards.workflows %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Active queues" count_label="count" count_value=payload.cards.queues %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Connected instruments" count_label="count" count_value=payload.cards.instruments %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="records" count_value=payload.cards.labs link_href="/lims/reference/" link_label="Open reference" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="published + draft" count_value=payload.cards.schemas link_href="/lims/metadata/" link_label="Open metadata" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Biospecimens" count_label="registered" count_value=payload.cards.biospecimens link_href="/lims/biospecimens/" link_label="Open biospecimens" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Manifests" count_label="intake runs" count_value=payload.cards.manifests link_href="/lims/receiving/" link_label="Open receiving" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Batches" count_label="processing sets" count_value=payload.cards.batches link_href="/lims/processing/" link_label="Open processing" %}
 </div>
 
 <section class="panel">
-  {% include "core/ui/includes/panel_header.html" with panel_title="LIMS launchpad" panel_description="Initial shell placeholders for the first tenant-aware LIMS delivery slices." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="LIMS launchpad" panel_description="Move across the major operational areas without dropping back to raw JSON APIs." %}
   <div class="cards">
     {% for item in payload.launchpad %}
     <article class="card">
@@ -21,8 +23,79 @@
         </div>
         <span class="utility-chip">{{ item.status }}</span>
       </div>
+      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
     </article>
     {% endfor %}
+  </div>
+</section>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent manifests" panel_description="Newest accessioning manifests created in this tenant." %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Identifier</th><th>Status</th><th>Items</th></tr>
+        </thead>
+        <tbody>
+          {% for item in payload.recent_manifests %}
+          <tr>
+            <td>{{ item.manifest_identifier }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.item_count }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3">No manifests yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent processing batches" panel_description="Draft, assigned, and printed batches with plate counts." %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Batch</th><th>Status</th><th>Plates</th><th>Assignments</th></tr>
+        </thead>
+        <tbody>
+          {% for item in payload.recent_batches %}
+          <tr>
+            <td>{{ item.batch_identifier }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.plate_count }}</td>
+            <td>{{ item.assigned_specimen_count }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No processing batches yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Newest biospecimens" panel_description="Latest samples entering the registry and ready for downstream receiving or processing actions." %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Sample identifier</th><th>Status</th><th>Subject</th><th>Kind</th></tr>
+      </thead>
+      <tbody>
+        {% for item in payload.recent_specimens %}
+        <tr>
+          <td>{{ item.sample_identifier }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.subject_identifier|default:"-" }}</td>
+          <td>{{ item.kind }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No biospecimens yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </section>
 {% endblock %}

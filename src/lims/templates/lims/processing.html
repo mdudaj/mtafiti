@@ -1,0 +1,73 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Processing" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Layouts" count_label="plate templates" count_value=payload.cards.layouts %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Batches" count_label="all statuses" count_value=payload.cards.batches %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Draft batches" count_label="pre-assignment" count_value=payload.cards.draft_batches %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Printed batches" count_label="worksheet issued" count_value=payload.cards.printed_batches %}
+</div>
+
+{% if payload.capabilities.can_manage_artifacts %}
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel" data-lims-action="processing-batch-create">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Create processing batch" panel_description="Create a batch and seed one or more plates using JSON plate definitions." %}
+    <div class="section-stack">
+      <label class="field-group"><span class="field-label">Sample type</span><select class="select" data-lims-field="batch-sample-type">{% for option in payload.sample_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="batch-lab"><option value="">None</option>{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Notes</span><input class="input" data-lims-field="batch-notes" /></label>
+      <label class="field-group"><span class="field-label">Plates JSON</span><textarea class="textarea" rows="8" data-lims-field="batch-plates">[{"layout_template_id":"","label":"Plate 1","assignments":[]}]</textarea></label>
+      <button class="button" type="button" onclick="createProcessingBatch()"><span class="material-symbols-outlined button-icon" aria-hidden="true">science</span><span>Create batch</span></button>
+    </div>
+  </section>
+
+  <section class="panel" data-lims-action="processing-worksheet-print">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Create worksheet print job" panel_description="Send an existing batch worksheet through the shared printing stack." %}
+    <div class="section-stack">
+      <label class="field-group"><span class="field-label">Batch</span><select class="select" data-lims-field="worksheet-batch">{% for option in payload.batch_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Destination</span><input class="input" data-lims-field="worksheet-destination" value="worksheet-preview" /></label>
+      <button class="button" type="button" onclick="createWorksheetPrintJob()"><span class="material-symbols-outlined button-icon" aria-hidden="true">print</span><span>Create worksheet print job</span></button>
+    </div>
+  </section>
+</div>
+{% endif %}
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Plate layouts" panel_description="Seeded 96/384-well layouts and any tenant-specific additions." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Key</th><th>Capacity</th></tr></thead><tbody>{% for item in payload.layouts %}<tr><td>{{ item.name }}</td><td>{{ item.key }}</td><td>{{ item.capacity }}</td></tr>{% empty %}<tr><td colspan="3">No layouts yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Processing batches" panel_description="Newest batches with status, plate count, and assignment totals." %}
+    <div class="table-wrap"><table><thead><tr><th>Batch</th><th>Status</th><th>Plates</th><th>Assignments</th></tr></thead><tbody>{% for item in payload.batches %}<tr><td>{{ item.batch_identifier }}</td><td>{{ item.status }}</td><td>{{ item.plate_count }}</td><td>{{ item.assigned_specimen_count }}</td></tr>{% empty %}<tr><td colspan="4">No batches yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createProcessingBatch() {
+  let plates;
+  try {
+    plates = limsJsonValue("batch-plates", []);
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/processing-batches", {
+    sample_type_id: limsValue("batch-sample-type"),
+    lab_id: limsOptionalValue("batch-lab"),
+    notes: limsValue("batch-notes"),
+    plates: plates,
+  }, "Processing batch created");
+}
+
+async function createWorksheetPrintJob() {
+  const batchId = limsValue("worksheet-batch");
+  await limsPortalAction("/api/v1/lims/processing-batches/" + batchId + "/worksheet-print-job", {
+    destination: limsValue("worksheet-destination"),
+  }, "Worksheet print job created");
+}
+{% endblock %}
