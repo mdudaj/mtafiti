@@ -98,6 +98,25 @@ docker compose down
 
 Note: Django creates a separate test database (e.g. `test_mtafiti_test`) during `pytest`, so the configured `POSTGRES_USER` must have the `CREATEDB` privilege (or be a superuser).
 
+### Local UI preview
+
+```bash
+# bootstrap database + tenant/service routes, then run Django
+./scripts/local_preview.sh up
+
+# or prepare once, then start/stop separately
+./scripts/local_preview.sh prep
+./scripts/local_preview.sh serve
+./scripts/local_preview.sh down
+```
+
+The preview helper provisions a local tenant and prints service URLs such as:
+
+* `http://workspace.local.localhost:8000/app`
+* `http://lims.local.localhost:8000/lims/`
+
+It also prepares an `edcs.local.localhost` route for future service work, even though EDCS does not yet expose a dedicated UI.
+
 ### Generate the knowledge graph
 
 ```bash
