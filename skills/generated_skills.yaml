@@ -136,9 +136,9 @@ skills:
       - Viewflow
       - django-material
     steps:
-      - "Map workflow states and actions to Viewflow Flow nodes."
+      - "Map workflow states and actions to a bounded Viewflow Flow node palette with explicit Process/Task runtime state."
       - "Map dashboards, cards, and menus to django-material components."
-      - "Keep server-side role enforcement and tenant isolation aligned with backend APIs."
+      - "Keep server-side role enforcement, assignment, and tenant isolation aligned with backend APIs."
     evidence:
       - docs/workflow-ui.md
       - https://github.com/viewflow/viewflow

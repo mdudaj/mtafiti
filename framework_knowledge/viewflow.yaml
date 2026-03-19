@@ -8,32 +8,47 @@ concepts:
   - Flow
   - Process
   - Start
+  - StartHandle
   - View
+  - If
+  - Switch
+  - Split
+  - Join
   - End
   - FlowAppViewset
   - Site
 components:
   - viewflow.workflow.flow.Flow
   - viewflow.workflow.flow.Start
+  - viewflow.workflow.flow.StartHandle
   - viewflow.workflow.flow.View
+  - viewflow.workflow.flow.If
+  - viewflow.workflow.flow.Switch
+  - viewflow.workflow.flow.Split
+  - viewflow.workflow.flow.Join
   - viewflow.workflow.flow.End
   - viewflow.workflow.models.Process
+  - viewflow.workflow.models.Task
 configuration_patterns:
   - "Install django-viewflow and add viewflow apps to INSTALLED_APPS."
-  - "Create Process models for workflow state and data."
+  - "Create explicit Process and Task models (or proxies) for workflow state and data."
+  - "Declare assignment and permission rules on flow nodes instead of burying them in task views."
   - "Register Flow classes through FlowAppViewset and Site URLs."
 api_surfaces:
-  - "Flow classes with Start/View/End nodes"
-  - "Process model integration"
+  - "Flow classes with Start/StartHandle/View/If/Switch/Split/Join/End nodes"
+  - "Process and Task model integration"
+  - "Activation lifecycle and task status transitions"
   - "AuthViewset and FlowAppViewset URL registration"
   - "Cookbook samples for workflow, CRUD, and dashboards"
 architecture:
   - "Django-native low-code framework for workflows and business apps."
   - "Workflows are modeled as Flow classes that advance Process instances through nodes."
-  - "The framework ships integrated routing and UI viewsets for workflow-driven applications."
+  - "Runtime execution state lives in Process and Task records while node definitions stay in Flow classes."
 best_practices:
   - "Keep process data in explicit Process models."
   - "Model workflow steps as composable Flow nodes with clear assignee/transition boundaries."
+  - "Keep workflow designers bounded to supported node families that can compile cleanly to Viewflow constructs."
+  - "Declare assignment and permission rules in node definitions so authorization stays auditable and reusable."
   - "Use cookbook examples to validate dashboard and workflow interaction patterns before customization."
 context_hub:
   available: false
