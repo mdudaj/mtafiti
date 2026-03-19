@@ -11,7 +11,7 @@ EnvironmentInventory:
       file_count: 3
     -
       name: Markdown
-      file_count: 74
+      file_count: 77
   frameworks:
     -
       name: Django
