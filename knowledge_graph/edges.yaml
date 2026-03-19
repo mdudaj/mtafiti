@@ -702,6 +702,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:metadatavocabularydomain
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:metadatavocabularyitem
   -
     relationship: implements

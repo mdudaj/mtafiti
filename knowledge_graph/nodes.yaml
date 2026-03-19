@@ -2330,7 +2330,7 @@ nodes:
       - notes
       - recorded_by
       - status
-    source: src/lims/models.py:956
+    source: src/lims/models.py:1005
   -
     id: datamodel:site
     type: DataModel
@@ -2394,7 +2394,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:619
+    source: src/lims/models.py:668
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2412,7 +2412,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:714
+    source: src/lims/models.py:763
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2427,7 +2427,7 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:590
+    source: src/lims/models.py:639
   -
     id: datamodel:batchplate
     type: DataModel
@@ -2441,7 +2441,7 @@ nodes:
       - metadata
       - plate_identifier
       - sequence_number
-    source: src/lims/models.py:1100
+    source: src/lims/models.py:1149
   -
     id: datamodel:processingbatch
     type: DataModel
@@ -2457,7 +2457,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:1044
+    source: src/lims/models.py:1093
   -
     id: datamodel:accessioningmanifestitem
     type: DataModel
@@ -2477,7 +2477,7 @@ nodes:
       - quantity_unit
       - received_at
       - status
-    source: src/lims/models.py:860
+    source: src/lims/models.py:909
   -
     id: datamodel:receivingevent
     type: DataModel
@@ -2493,7 +2493,7 @@ nodes:
       - received_at
       - received_by
       - scan_value
-    source: src/lims/models.py:908
+    source: src/lims/models.py:957
   -
     id: datamodel:batchplateassignment
     type: DataModel
@@ -2505,7 +2505,7 @@ nodes:
       - plate
       - position_index
       - well_label
-    source: src/lims/models.py:1135
+    source: src/lims/models.py:1184
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2516,7 +2516,7 @@ nodes:
       - schema
       - status
       - version_number
-    source: src/lims/models.py:492
+    source: src/lims/models.py:515
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2553,7 +2553,19 @@ nodes:
       - name
       - placeholder
       - vocabulary
-    source: src/lims/models.py:427
+    source: src/lims/models.py:449
+  -
+    id: datamodel:metadatavocabulary
+    type: DataModel
+    name: MetadataVocabulary
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - description
+      - domain
+      - is_active
+      - name
+    source: src/lims/models.py:403
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2564,11 +2576,12 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:476
+      - purpose
+    source: src/lims/models.py:498
   -
-    id: datamodel:metadatavocabulary
+    id: datamodel:metadatavocabularydomain
     type: DataModel
-    name: MetadataVocabulary
+    name: MetadataVocabularyDomain
     description: "Django model defined in lims.models."
     fields:
       - code
@@ -2627,7 +2640,7 @@ nodes:
       - key
       - name
       - rows
-    source: src/lims/models.py:1016
+    source: src/lims/models.py:1065
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -2635,13 +2648,21 @@ nodes:
     description: "Django model defined in lims.models."
     fields:
       - condition
+      - config
+      - default_value
+      - description
       - field_definition
       - field_key
+      - field_type
+      - help_text
+      - name
+      - placeholder
       - position
       - required
       - schema_version
       - validation_rules
-    source: src/lims/models.py:520
+      - vocabulary
+    source: src/lims/models.py:543
   -
     id: datamodel:biospecimenpoolmember
     type: DataModel
@@ -2652,7 +2673,7 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:770
+    source: src/lims/models.py:819
   -
     id: datamodel:region
     type: DataModel
@@ -2695,7 +2716,7 @@ nodes:
       - source_system
       - status
       - study
-    source: src/lims/models.py:802
+    source: src/lims/models.py:851
   -
     id: datamodel:ward
     type: DataModel
@@ -2721,7 +2742,7 @@ nodes:
       - sort_order
       - value
       - vocabulary
-    source: src/lims/models.py:403
+    source: src/lims/models.py:425
   -
     id: datamodel:district
     type: DataModel
@@ -2761,7 +2782,7 @@ nodes:
       - target_key
       - target_label
       - target_type
-    source: src/lims/models.py:559
+    source: src/lims/models.py:608
   -
     id: datamodel:tenantserviceroute
     type: DataModel

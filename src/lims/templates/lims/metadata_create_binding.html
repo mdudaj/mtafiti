@@ -9,6 +9,7 @@
   <div class="section-stack">
     <label class="field-group"><span class="field-label">Schema version</span><select class="select" data-lims-field="binding-version">{% for option in payload.schema_version_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
     <label class="field-group"><span class="field-label">Target type</span><select class="select" data-lims-field="binding-target-type">{% for option in payload.binding_target_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <label class="field-group"><span class="field-label">Sample type shortcut</span><select class="select" data-lims-field="binding-sample-type" onchange="applySampleTypeShortcut()"><option value="">Manual target</option>{% for option in payload.sample_type_options %}<option value="{{ option.value }}" data-label="{{ option.label }}">{{ option.label }}</option>{% endfor %}</select></label>
     <label class="field-group"><span class="field-label">Target key</span><input class="input" data-lims-field="binding-target-key" value="dbs" /></label>
     <label class="field-group"><span class="field-label">Target label</span><input class="input" data-lims-field="binding-target-label" value="DBS" /></label>
     <div class="button-row">
@@ -22,6 +23,16 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+function applySampleTypeShortcut() {
+  const option = limsSelectedOption("binding-sample-type");
+  if (!option || !option.value) {
+    return;
+  }
+  limsField("binding-target-type").value = "sample_type";
+  limsField("binding-target-key").value = option.value;
+  limsField("binding-target-label").value = option.dataset.label || option.textContent.trim();
+}
+
 async function createSchemaBinding() {
   await limsPortalAction("/api/v1/lims/metadata/bindings", {
     schema_version_id: limsValue("binding-version"),

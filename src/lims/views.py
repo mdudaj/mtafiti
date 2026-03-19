@@ -29,6 +29,7 @@ from .models import (
     MetadataSchemaField,
     MetadataSchemaVersion,
     MetadataVocabulary,
+    MetadataVocabularyDomain,
     MetadataVocabularyItem,
     PlateLayoutTemplate,
     Postcode,
@@ -54,7 +55,9 @@ from .services import (
     create_processing_batch_worksheet_job,
     create_pool,
     generate_manifest_identifier,
+    get_default_metadata_vocabulary_domain,
     processing_batch_worksheet,
+    provision_default_metadata_vocabularies,
     receive_manifest_item,
     receive_single_biospecimen,
     resolve_schema_version_for_binding,
@@ -344,20 +347,26 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
         kicker="Configurable metadata",
     )
     payload["cards"] = {
+        "domains": MetadataVocabularyDomain.objects.count(),
         "vocabularies": MetadataVocabulary.objects.count(),
-        "fields": MetadataFieldDefinition.objects.count(),
+        "versions": MetadataSchemaVersion.objects.count(),
         "schemas": MetadataSchema.objects.count(),
         "bindings": MetadataSchemaBinding.objects.count(),
     }
-    payload["vocabularies"] = [_vocabulary_to_dict(item) for item in MetadataVocabulary.objects.prefetch_related("items").order_by("name")[:8]]
-    payload["field_definitions"] = [
-        _field_definition_to_dict(item)
-        for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")[:10]
+    payload["vocabularies"] = [
+        _vocabulary_to_dict(item)
+        for item in MetadataVocabulary.objects.select_related("domain").prefetch_related("items").order_by("name")[:8]
+    ]
+    payload["draft_versions"] = [
+        _schema_version_to_dict(item)
+        for item in MetadataSchemaVersion.objects.select_related("schema").prefetch_related("fields__vocabulary").filter(
+            status=MetadataSchemaVersion.Status.DRAFT
+        ).order_by("-updated_at")[:10]
     ]
     payload["schemas"] = [
         _schema_to_dict(item)
         for item in MetadataSchema.objects.prefetch_related(
-            "versions__fields__field_definition",
+            "versions__fields__vocabulary",
             "versions__schema",
         ).order_by("name")[:6]
     ]
@@ -373,14 +382,8 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
             "icon": "list_alt",
         },
         {
-            "title": "Create field definition",
-            "description": "Define one reusable metadata field and its wizard-step placement.",
-            "href": "/lims/metadata/fields/create/",
-            "icon": "data_object",
-        },
-        {
-            "title": "Create schema + version",
-            "description": "Compose one schema version with the visual builder on its own page.",
+            "title": "Create form + draft",
+            "description": "Define form metadata first, then build the initial draft version with version-owned fields.",
             "href": "/lims/metadata/schemas/create/",
             "icon": "schema",
         },
@@ -401,13 +404,15 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
 
 
 def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
-    return _page_payload_base(
+    payload = _page_payload_base(
         request,
         active_key="lims-metadata",
         title="Create vocabulary",
         summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
         kicker="Metadata setup",
     )
+    payload["domain_options"] = [_model_to_option(item) for item in MetadataVocabularyDomain.objects.filter(is_active=True).order_by("name")]
+    return payload
 
 
 def _metadata_create_field_page_payload(request) -> dict[str, object]:
@@ -431,15 +436,45 @@ def _metadata_create_schema_page_payload(request) -> dict[str, object]:
     payload = _page_payload_base(
         request,
         active_key="lims-metadata",
-        title="Create schema and first version",
-        summary="Use the visual builder to assemble one schema version without mixing it with other metadata actions.",
+        title="Create form and draft version",
+        summary="Step 1 creates the form definition and initial draft. Step 2 edits fields that belong directly to that draft version.",
         kicker="Metadata setup",
     )
-    payload["field_definition_catalog"] = [
-        _field_definition_to_dict(item)
-        for item in MetadataFieldDefinition.objects.select_related("vocabulary").prefetch_related("vocabulary__items").order_by("name")
+    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
+    payload["ui_step_options"] = [
+        {"value": "metadata", "label": "Wizard metadata step"},
+        {"value": "storage", "label": "Wizard storage step"},
     ]
-    payload["field_definition_options"] = [_model_to_option(item) for item in MetadataFieldDefinition.objects.order_by("name")]
+    payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.filter(is_active=True).order_by("name")]
+    payload["schema_options"] = [
+        {
+            "value": str(item.id),
+            "label": item.name,
+            "code": item.code,
+            "draft_version_id": next(
+                (str(version.id) for version in item.versions.all() if version.status == MetadataSchemaVersion.Status.DRAFT),
+                "",
+            ),
+        }
+        for item in MetadataSchema.objects.prefetch_related("versions").order_by("name")
+    ]
+    payload["published_version_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.schema.name} v{item.version_number}",
+            "schema_id": str(item.schema_id),
+        }
+        for item in MetadataSchemaVersion.objects.select_related("schema")
+        .filter(status=MetadataSchemaVersion.Status.PUBLISHED)
+        .order_by("schema__name", "-version_number")
+    ]
+    payload["binding_target_type_options"] = [
+        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+    ]
+    payload["sample_type_options"] = [
+        {"value": item.key, "label": item.name}
+        for item in BiospecimenType.objects.order_by("name")
+    ]
     return payload
 
 
@@ -460,7 +495,13 @@ def _metadata_create_binding_page_payload(request) -> dict[str, object]:
             "label": f"{item.schema.code} v{item.version_number} ({item.status})",
             "schema_id": str(item.schema_id),
         }
-        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+        for item in MetadataSchemaVersion.objects.select_related("schema")
+        .filter(status=MetadataSchemaVersion.Status.PUBLISHED)
+        .order_by("schema__name", "-version_number")
+    ]
+    payload["sample_type_options"] = [
+        {"value": item.key, "label": item.name}
+        for item in BiospecimenType.objects.order_by("name")
     ]
     return payload
 
@@ -479,7 +520,9 @@ def _metadata_publish_version_page_payload(request) -> dict[str, object]:
             "label": f"{item.schema.code} v{item.version_number} ({item.status})",
             "schema_id": str(item.schema_id),
         }
-        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+        for item in MetadataSchemaVersion.objects.select_related("schema")
+        .filter(status=MetadataSchemaVersion.Status.DRAFT)
+        .order_by("schema__name", "-version_number")
     ]
     return payload
 
@@ -1033,12 +1076,29 @@ def _vocabulary_item_to_dict(item: MetadataVocabularyItem) -> dict[str, object]:
     }
 
 
+def _vocabulary_domain_to_dict(domain: MetadataVocabularyDomain) -> dict[str, object]:
+    vocabulary_count = len(getattr(domain, "_prefetched_objects_cache", {}).get("vocabularies", []))
+    if not vocabulary_count:
+        vocabulary_count = domain.vocabularies.count()
+    return {
+        "id": str(domain.id),
+        "name": domain.name,
+        "code": domain.code,
+        "description": domain.description,
+        "is_active": domain.is_active,
+        "vocabulary_count": vocabulary_count,
+    }
+
+
 def _vocabulary_to_dict(vocabulary: MetadataVocabulary) -> dict[str, object]:
     return {
         "id": str(vocabulary.id),
         "name": vocabulary.name,
         "code": vocabulary.code,
         "description": vocabulary.description,
+        "domain_id": str(vocabulary.domain_id),
+        "domain_code": vocabulary.domain.code,
+        "domain_name": vocabulary.domain.name,
         "is_active": vocabulary.is_active,
         "items": [_vocabulary_item_to_dict(item) for item in vocabulary.items.order_by("sort_order", "label")],
     }
@@ -1067,14 +1127,8 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
     }
 
 
-def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
-    vocabulary_items = []
-    if field.field_definition.vocabulary_id:
-        vocabulary_items = [
-            {"label": item.label, "value": item.value}
-            for item in field.field_definition.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
-        ]
-    formbuilder_type = {
+def _formbuilder_type_from_field_type(field_type: str) -> str:
+    return {
         MetadataFieldDefinition.FieldType.TEXT: "text",
         MetadataFieldDefinition.FieldType.LONG_TEXT: "textarea",
         MetadataFieldDefinition.FieldType.INTEGER: "number",
@@ -1084,47 +1138,60 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
         MetadataFieldDefinition.FieldType.DATETIME: "text",
         MetadataFieldDefinition.FieldType.CHOICE: "select",
         MetadataFieldDefinition.FieldType.MULTI_CHOICE: "checkbox-group",
-    }[field.field_definition.field_type]
+    }[field_type]
+
+
+def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
+    vocabulary_items = []
+    if field.vocabulary_id:
+        vocabulary_items = [
+            {"label": item.label, "value": item.value}
+            for item in field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+        ]
+    formbuilder_type = _formbuilder_type_from_field_type(field.field_type)
     return {
         "id": str(field.id),
-        "field_definition_id": str(field.field_definition_id),
-        "field_definition_code": field.field_definition.code,
-        "field_definition_name": field.field_definition.name,
-        "field_type": field.field_definition.field_type,
+        "field_definition_id": str(field.field_definition_id) if field.field_definition_id else None,
+        "field_definition_code": field.field_key,
+        "field_definition_name": field.name,
+        "field_type": field.field_type,
         "field_key": field.field_key,
+        "name": field.name,
+        "description": field.description,
         "position": field.position,
         "required": field.required,
         "validation_rules": dict(field.validation_rules or {}),
         "condition": dict(field.condition or {}),
-        "help_text": field.field_definition.help_text,
-        "placeholder": field.field_definition.placeholder,
-        "default_value": field.field_definition.default_value,
-        "config": dict(field.field_definition.config or {}),
+        "help_text": field.help_text,
+        "placeholder": field.placeholder,
+        "vocabulary_id": str(field.vocabulary_id) if field.vocabulary_id else None,
+        "default_value": field.default_value,
+        "config": dict(field.config or {}),
         "vocabulary_items": vocabulary_items,
         "formbuilder": {
             "name": field.field_key,
-            "label": field.field_definition.name,
+            "label": field.name,
             "type": formbuilder_type,
             "subtype": (
                 "textarea"
-                if field.field_definition.field_type == MetadataFieldDefinition.FieldType.LONG_TEXT
+                if field.field_type == MetadataFieldDefinition.FieldType.LONG_TEXT
                 else (
                     "integer"
-                    if field.field_definition.field_type == MetadataFieldDefinition.FieldType.INTEGER
+                    if field.field_type == MetadataFieldDefinition.FieldType.INTEGER
                     else (
                         "datetime-local"
-                        if field.field_definition.field_type == MetadataFieldDefinition.FieldType.DATETIME
+                        if field.field_type == MetadataFieldDefinition.FieldType.DATETIME
                         else "text"
                     )
                 )
             ),
             "required": field.required,
-            "placeholder": field.field_definition.placeholder,
-            "description": field.field_definition.help_text,
-            "multiple": field.field_definition.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+            "placeholder": field.placeholder,
+            "description": field.help_text,
+            "multiple": field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
             "values": vocabulary_items,
-            "value": field.field_definition.default_value,
-            "ui_step": str(field.field_definition.config.get("ui_step") or "metadata"),
+            "value": field.default_value,
+            "ui_step": str(field.config.get("ui_step") or "metadata"),
         },
     }
 
@@ -1133,21 +1200,30 @@ def _schema_version_to_dict(version: MetadataSchemaVersion) -> dict[str, object]
     return {
         "id": str(version.id),
         "schema_id": str(version.schema_id),
+        "schema_name": version.schema.name,
+        "schema_code": version.schema.code,
         "version_number": version.version_number,
         "status": version.status,
+        "is_editable": version.status == MetadataSchemaVersion.Status.DRAFT,
         "change_summary": version.change_summary,
-        "fields": [_schema_field_to_dict(item) for item in version.fields.select_related("field_definition").order_by("position", "field_key")],
+        "fields": [_schema_field_to_dict(item) for item in version.fields.select_related("vocabulary").order_by("position", "field_key")],
     }
 
 
 def _schema_to_dict(schema: MetadataSchema) -> dict[str, object]:
+    versions = [_schema_version_to_dict(item) for item in schema.versions.order_by("-version_number")]
+    draft_version = next((item for item in versions if item["status"] == MetadataSchemaVersion.Status.DRAFT), None)
+    published_version = next((item for item in versions if item["status"] == MetadataSchemaVersion.Status.PUBLISHED), None)
     return {
         "id": str(schema.id),
         "name": schema.name,
         "code": schema.code,
         "description": schema.description,
+        "purpose": schema.purpose,
         "is_active": schema.is_active,
-        "versions": [_schema_version_to_dict(item) for item in schema.versions.order_by("-version_number")],
+        "draft_version_id": draft_version["id"] if draft_version else None,
+        "published_version_id": published_version["id"] if published_version else None,
+        "versions": versions,
     }
 
 
@@ -1197,6 +1273,19 @@ def _resolve_optional_fk_list(model, raw_ids, error_code: str):
 
 def _normalize_code(name: str, raw_code: object) -> str:
     return slugify(str(raw_code or "").strip() or name)
+
+
+def _parse_positive_int_query(request, key: str, *, default: int, maximum: int) -> int | JsonResponse:
+    raw_value = str(request.GET.get(key) or "").strip()
+    if not raw_value:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return JsonResponse({"error": f"invalid_{key}"}, status=400)
+    if value < 0:
+        return JsonResponse({"error": f"invalid_{key}"}, status=400)
+    return min(value, maximum)
 
 
 def _expand_address_hierarchy(*, country, region, district, ward, street):
@@ -1416,9 +1505,24 @@ def _build_vocabulary_from_payload(vocabulary: MetadataVocabulary, payload: dict
         return JsonResponse({"error": "name is required"}, status=400)
     if not payload.get("code"):
         return JsonResponse({"error": "code is required"}, status=400)
+    domain = None
+    raw_domain_id = payload.get("domain_id")
+    raw_domain_code = str(payload.get("domain_code") or "").strip()
+    if raw_domain_id:
+        domain, error = _resolve_optional_fk(MetadataVocabularyDomain, raw_domain_id, "domain_not_found")
+        if error:
+            return error
+    elif raw_domain_code:
+        try:
+            domain = MetadataVocabularyDomain.objects.get(code=raw_domain_code)
+        except MetadataVocabularyDomain.DoesNotExist:
+            return JsonResponse({"error": "domain_not_found"}, status=404)
+    else:
+        domain = get_default_metadata_vocabulary_domain()
     vocabulary.name = str(payload.get("name")).strip()
     vocabulary.code = str(payload.get("code")).strip()
     vocabulary.description = str(payload.get("description") or "").strip()
+    vocabulary.domain = domain
     vocabulary.is_active = bool(payload.get("is_active", True))
     return None
 
@@ -1491,8 +1595,130 @@ def _build_schema_from_payload(schema: MetadataSchema, payload: dict[str, object
     schema.name = str(payload.get("name")).strip()
     schema.code = str(payload.get("code")).strip()
     schema.description = str(payload.get("description") or "").strip()
+    schema.purpose = str(payload.get("purpose") or "").strip()
     schema.is_active = bool(payload.get("is_active", True))
     return None
+
+
+def _apply_field_definition_defaults(schema_field: MetadataSchemaField, field_definition: MetadataFieldDefinition) -> None:
+    schema_field.field_definition = field_definition
+    schema_field.name = field_definition.name
+    schema_field.description = field_definition.description
+    schema_field.field_type = field_definition.field_type
+    schema_field.help_text = field_definition.help_text
+    schema_field.placeholder = field_definition.placeholder
+    schema_field.vocabulary = field_definition.vocabulary
+    schema_field.default_value = field_definition.default_value
+    schema_field.config = dict(field_definition.config or {})
+
+
+def _build_schema_field_from_payload(
+    schema_field: MetadataSchemaField,
+    field_payload: dict[str, object],
+    *,
+    index: int,
+) -> JsonResponse | None:
+    field_definition = None
+    if field_payload.get("field_definition_id"):
+        field_definition, error = _resolve_optional_fk(
+            MetadataFieldDefinition,
+            field_payload.get("field_definition_id"),
+            "field_definition_not_found",
+        )
+        if error:
+            return error
+        if field_definition:
+            _apply_field_definition_defaults(schema_field, field_definition)
+
+    name = str(field_payload.get("name") or schema_field.name or "").strip()
+    field_type = str(field_payload.get("field_type") or schema_field.field_type or "").strip()
+    field_key = str(field_payload.get("field_key") or slugify(name) or "").strip()
+    if not name:
+        return JsonResponse({"error": "field name is required"}, status=400)
+    if not field_type or field_type not in MetadataFieldDefinition.FieldType.values:
+        return JsonResponse({"error": "invalid_field_type"}, status=400)
+    if not field_key:
+        return JsonResponse({"error": "field_key is required"}, status=400)
+
+    vocabulary, error = _resolve_optional_fk(MetadataVocabulary, field_payload.get("vocabulary_id"), "vocabulary_not_found")
+    if error:
+        return error
+    if vocabulary is None and field_definition is not None:
+        vocabulary = field_definition.vocabulary
+
+    validation_rules = field_payload.get("validation_rules") or {}
+    condition = field_payload.get("condition") or {}
+    config = field_payload.get("config")
+    if config is None:
+        config = dict(schema_field.config or {})
+    if not isinstance(validation_rules, dict):
+        return JsonResponse({"error": "validation_rules must be an object"}, status=400)
+    if not isinstance(condition, dict):
+        return JsonResponse({"error": "condition must be an object"}, status=400)
+    if not isinstance(config, dict):
+        return JsonResponse({"error": "config must be an object"}, status=400)
+
+    schema_field.name = name
+    schema_field.description = str(field_payload.get("description") or schema_field.description or "").strip()
+    schema_field.field_type = field_type
+    schema_field.field_key = field_key
+    schema_field.help_text = str(field_payload.get("help_text") or schema_field.help_text or "").strip()
+    schema_field.placeholder = str(field_payload.get("placeholder") or schema_field.placeholder or "").strip()
+    schema_field.vocabulary = vocabulary
+    schema_field.default_value = field_payload.get("default_value", schema_field.default_value)
+    schema_field.config = config
+    schema_field.position = int(field_payload.get("position") or index)
+    schema_field.required = bool(field_payload.get("required", False))
+    schema_field.validation_rules = validation_rules
+    schema_field.condition = condition
+    return None
+
+
+def _sync_schema_version_fields(version: MetadataSchemaVersion, fields_payload: object) -> JsonResponse | None:
+    if not isinstance(fields_payload, list):
+        return JsonResponse({"error": "fields must be a list"}, status=400)
+    retained_ids: list[str] = []
+    for index, field_payload in enumerate(fields_payload, start=1):
+        if not isinstance(field_payload, dict):
+            return JsonResponse({"error": "field must be an object"}, status=400)
+        field_id = field_payload.get("id")
+        if field_id:
+            try:
+                schema_field = MetadataSchemaField.objects.get(id=field_id, schema_version=version)
+            except (ValidationError, MetadataSchemaField.DoesNotExist):
+                return JsonResponse({"error": "schema_field_not_found"}, status=404)
+        else:
+            schema_field = MetadataSchemaField(schema_version=version)
+        error = _build_schema_field_from_payload(schema_field, field_payload, index=index)
+        if error:
+            return error
+        error = _save_model(schema_field)
+        if error:
+            return error
+        retained_ids.append(str(schema_field.id))
+    MetadataSchemaField.objects.filter(schema_version=version).exclude(id__in=retained_ids).delete()
+    return None
+
+
+def _clone_schema_version_fields(source_version: MetadataSchemaVersion, target_version: MetadataSchemaVersion) -> None:
+    for field in source_version.fields.all().order_by("position", "field_key"):
+        MetadataSchemaField.objects.create(
+            schema_version=target_version,
+            field_definition=field.field_definition,
+            name=field.name,
+            description=field.description,
+            field_type=field.field_type,
+            field_key=field.field_key,
+            help_text=field.help_text,
+            placeholder=field.placeholder,
+            vocabulary=field.vocabulary,
+            default_value=field.default_value,
+            config=dict(field.config or {}),
+            position=field.position,
+            required=field.required,
+            validation_rules=dict(field.validation_rules or {}),
+            condition=dict(field.condition or {}),
+        )
 
 
 @csrf_exempt
@@ -2062,12 +2288,107 @@ def lims_reference_address_sync_runs(request):
 
 
 @csrf_exempt
+def lims_metadata_vocabulary_domains(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
+        queryset = MetadataVocabularyDomain.objects.prefetch_related("vocabularies").order_by("name")
+        if search_term:
+            queryset = queryset.filter(
+                Q(name__icontains=search_term)
+                | Q(code__icontains=search_term)
+                | Q(description__icontains=search_term)
+            )
+        return JsonResponse({"items": [_vocabulary_domain_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            return JsonResponse({"error": "name is required"}, status=400)
+        code = _normalize_code(name, payload.get("code"))
+        if not code:
+            return JsonResponse({"error": "code is required"}, status=400)
+        domain = MetadataVocabularyDomain(
+            name=name,
+            code=code,
+            description=str(payload.get("description") or "").strip(),
+            is_active=bool(payload.get("is_active", True)),
+        )
+        error = _save_model(domain)
+        if error:
+            return error
+        return JsonResponse(_vocabulary_domain_to_dict(domain), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_vocabulary_domain_detail(request, domain_id: str):
+    try:
+        domain = MetadataVocabularyDomain.objects.prefetch_related("vocabularies").get(id=domain_id)
+    except (ValidationError, MetadataVocabularyDomain.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_vocabulary_domain_to_dict(domain))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            return JsonResponse({"error": "name is required"}, status=400)
+        code = _normalize_code(name, payload.get("code"))
+        if not code:
+            return JsonResponse({"error": "code is required"}, status=400)
+        domain.name = name
+        domain.code = code
+        domain.description = str(payload.get("description") or "").strip()
+        domain.is_active = bool(payload.get("is_active", True))
+        error = _save_model(domain)
+        if error:
+            return error
+        domain.refresh_from_db()
+        return JsonResponse(_vocabulary_domain_to_dict(domain))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
 def lims_metadata_vocabularies(request):
     if request.method == "GET":
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
-        items = [_vocabulary_to_dict(item) for item in MetadataVocabulary.objects.prefetch_related("items").order_by("name")]
+        queryset = MetadataVocabulary.objects.select_related("domain").prefetch_related("items").order_by("name")
+        search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
+        raw_domain_id = str(request.GET.get("domain_id") or "").strip()
+        raw_domain_code = str(request.GET.get("domain_code") or "").strip()
+        if raw_domain_id:
+            queryset = queryset.filter(domain_id=raw_domain_id)
+        if raw_domain_code:
+            queryset = queryset.filter(domain__code=raw_domain_code)
+        if search_term:
+            queryset = queryset.filter(
+                Q(name__icontains=search_term)
+                | Q(code__icontains=search_term)
+                | Q(description__icontains=search_term)
+                | Q(domain__name__icontains=search_term)
+                | Q(domain__code__icontains=search_term)
+                | Q(items__label__icontains=search_term)
+                | Q(items__value__icontains=search_term)
+            ).distinct()
+        items = [_vocabulary_to_dict(item) for item in queryset]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.metadata.manage")
@@ -2094,7 +2415,7 @@ def lims_metadata_vocabularies(request):
 @csrf_exempt
 def lims_metadata_vocabulary_detail(request, vocabulary_id: str):
     try:
-        vocabulary = MetadataVocabulary.objects.prefetch_related("items").get(id=vocabulary_id)
+        vocabulary = MetadataVocabulary.objects.select_related("domain").prefetch_related("items").get(id=vocabulary_id)
     except (ValidationError, MetadataVocabulary.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -2121,6 +2442,62 @@ def lims_metadata_vocabulary_detail(request, vocabulary_id: str):
         vocabulary.refresh_from_db()
         return JsonResponse(_vocabulary_to_dict(vocabulary))
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_vocabulary_items(request, vocabulary_id: str):
+    try:
+        vocabulary = MetadataVocabulary.objects.select_related("domain").get(id=vocabulary_id)
+    except (ValidationError, MetadataVocabulary.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
+    if forbidden:
+        return forbidden
+    limit = _parse_positive_int_query(request, "limit", default=20, maximum=100)
+    if isinstance(limit, JsonResponse):
+        return limit
+    offset = _parse_positive_int_query(request, "offset", default=0, maximum=10_000)
+    if isinstance(offset, JsonResponse):
+        return offset
+    search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
+    include_inactive = str(request.GET.get("include_inactive") or "").strip().lower() in {"1", "true", "yes"}
+    queryset = vocabulary.items.order_by("sort_order", "label")
+    if not include_inactive:
+        queryset = queryset.filter(is_active=True)
+    if search_term:
+        queryset = queryset.filter(Q(label__icontains=search_term) | Q(value__icontains=search_term))
+    total_count = queryset.count()
+    items = [_vocabulary_item_to_dict(item) for item in queryset[offset: offset + limit]]
+    return JsonResponse(
+        {
+            "vocabulary": _vocabulary_to_dict(vocabulary),
+            "items": items,
+            "count": total_count,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + limit < total_count,
+        }
+    )
+
+
+@csrf_exempt
+def lims_metadata_vocabulary_provision_defaults(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.manage")
+    if forbidden:
+        return forbidden
+    summary = provision_default_metadata_vocabularies()
+    return JsonResponse(
+        {
+            "status": "ok",
+            **summary,
+            "domains": MetadataVocabularyDomain.objects.count(),
+            "vocabularies": MetadataVocabulary.objects.count(),
+        }
+    )
 
 
 @csrf_exempt
@@ -2188,7 +2565,7 @@ def lims_metadata_schemas(request):
             return forbidden
         items = [
             _schema_to_dict(item)
-            for item in MetadataSchema.objects.prefetch_related("versions__fields__field_definition").order_by("name")
+            for item in MetadataSchema.objects.prefetch_related("versions__fields__vocabulary").order_by("name")
         ]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -2205,6 +2582,24 @@ def lims_metadata_schemas(request):
         error = _save_model(schema)
         if error:
             return error
+        initial_version = MetadataSchemaVersion(
+            schema=schema,
+            version_number=1,
+            status=MetadataSchemaVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+        )
+        error = _save_model(initial_version)
+        if error:
+            schema.delete()
+            return error
+        fields_payload = payload.get("fields")
+        if fields_payload is not None:
+            error = _sync_schema_version_fields(initial_version, fields_payload)
+            if error:
+                initial_version.delete()
+                schema.delete()
+                return error
+        schema.refresh_from_db()
         return JsonResponse(_schema_to_dict(schema), status=201)
     return JsonResponse({"error": "method_not_allowed"}, status=405)
 
@@ -2212,7 +2607,7 @@ def lims_metadata_schemas(request):
 @csrf_exempt
 def lims_metadata_schema_detail(request, schema_id: str):
     try:
-        schema = MetadataSchema.objects.prefetch_related("versions__fields__field_definition").get(id=schema_id)
+        schema = MetadataSchema.objects.prefetch_related("versions__fields__vocabulary").get(id=schema_id)
     except (ValidationError, MetadataSchema.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -2247,9 +2642,15 @@ def lims_metadata_schema_versions(request, schema_id: str):
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
+        queryset = schema.versions.prefetch_related("fields__vocabulary").order_by("-version_number")
+        status_filter = str(request.GET.get("status") or "").strip()
+        if status_filter:
+            if status_filter not in MetadataSchemaVersion.Status.values:
+                return JsonResponse({"error": "invalid_status"}, status=400)
+            queryset = queryset.filter(status=status_filter)
         items = [
             _schema_version_to_dict(item)
-            for item in schema.versions.prefetch_related("fields__field_definition").order_by("-version_number")
+            for item in queryset
         ]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -2259,9 +2660,18 @@ def lims_metadata_schema_versions(request, schema_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
+        if schema.versions.filter(status=MetadataSchemaVersion.Status.DRAFT).exists():
+            return JsonResponse({"error": "draft_version_already_exists"}, status=409)
         fields_payload = payload.get("fields")
-        if not isinstance(fields_payload, list) or not fields_payload:
-            return JsonResponse({"error": "fields must be a non-empty list"}, status=400)
+        source_version = None
+        if payload.get("source_version_id"):
+            try:
+                source_version = MetadataSchemaVersion.objects.prefetch_related("fields__vocabulary").get(
+                    id=payload["source_version_id"],
+                    schema=schema,
+                )
+            except (ValidationError, MetadataSchemaVersion.DoesNotExist):
+                return JsonResponse({"error": "source_version_not_found"}, status=404)
         version_number = payload.get("version_number")
         if version_number is None:
             latest_version = schema.versions.order_by("-version_number").first()
@@ -2279,39 +2689,49 @@ def lims_metadata_schema_versions(request, schema_id: str):
         error = _save_model(version)
         if error:
             return error
-        for index, field_payload in enumerate(fields_payload, start=1):
-            if not isinstance(field_payload, dict):
-                return JsonResponse({"error": "field must be an object"}, status=400)
-            field_definition, error = _resolve_optional_fk(
-                MetadataFieldDefinition,
-                field_payload.get("field_definition_id"),
-                "field_definition_not_found",
-            )
-            if error:
-                return error
-            if field_definition is None:
-                return JsonResponse({"error": "field_definition_id is required"}, status=400)
-            validation_rules = field_payload.get("validation_rules") or {}
-            condition = field_payload.get("condition") or {}
-            if not isinstance(validation_rules, dict):
-                return JsonResponse({"error": "validation_rules must be an object"}, status=400)
-            if not isinstance(condition, dict):
-                return JsonResponse({"error": "condition must be an object"}, status=400)
-            schema_field = MetadataSchemaField(
-                schema_version=version,
-                field_definition=field_definition,
-                field_key=str(field_payload.get("field_key") or field_definition.code).strip(),
-                position=int(field_payload.get("position") or index),
-                required=bool(field_payload.get("required", False)),
-                validation_rules=validation_rules,
-                condition=condition,
-            )
-            error = _save_model(schema_field)
+        if fields_payload is not None:
+            error = _sync_schema_version_fields(version, fields_payload)
             if error:
                 version.delete()
                 return error
+        elif source_version is not None:
+            _clone_schema_version_fields(source_version, version)
         version.refresh_from_db()
         return JsonResponse(_schema_version_to_dict(version), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_metadata_schema_version_detail(request, schema_id: str, version_id: str):
+    try:
+        version = MetadataSchemaVersion.objects.prefetch_related("fields__vocabulary").get(id=version_id, schema_id=schema_id)
+    except (ValidationError, MetadataSchemaVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_schema_version_to_dict(version))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        if version.status != MetadataSchemaVersion.Status.DRAFT:
+            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if "change_summary" in payload:
+            version.change_summary = str(payload.get("change_summary") or "").strip()
+            error = _save_model(version)
+            if error:
+                return error
+        if "fields" in payload:
+            error = _sync_schema_version_fields(version, payload.get("fields"))
+            if error:
+                return error
+        version.refresh_from_db()
+        return JsonResponse(_schema_version_to_dict(version))
     return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
@@ -2326,6 +2746,10 @@ def lims_metadata_schema_version_publish(request, schema_id: str, version_id: st
         version = MetadataSchemaVersion.objects.get(id=version_id, schema_id=schema_id)
     except (ValidationError, MetadataSchemaVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
+    if version.status != MetadataSchemaVersion.Status.DRAFT:
+        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+    if not version.fields.exists():
+        return JsonResponse({"error": "version_requires_fields"}, status=400)
     MetadataSchemaVersion.objects.filter(schema_id=schema_id, status=MetadataSchemaVersion.Status.PUBLISHED).exclude(
         id=version.id
     ).update(status=MetadataSchemaVersion.Status.DEPRECATED)
