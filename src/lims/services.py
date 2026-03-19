@@ -33,7 +33,10 @@ from .models import (
     District,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
+    MetadataSchemaField,
     MetadataSchemaVersion,
+    MetadataVocabulary,
+    MetadataVocabularyDomain,
     MetadataVocabularyItem,
     PlateLayoutTemplate,
     Postcode,
@@ -48,6 +51,130 @@ from .models import (
 
 TANZANIA_POSTCODE_ROOT_URL = "https://www.tanzaniapostcode.com/"
 POSTCODE_RE = re.compile(r"\b\d{5}\b")
+DEFAULT_METADATA_VOCABULARY_DOMAIN_CODE = "general"
+DEFAULT_METADATA_VOCABULARY_PACK = (
+    {
+        "domain": {
+            "code": "roles",
+            "name": "Roles",
+            "description": "Role and responsibility vocabularies for study, site, laboratory, and workflow assignments.",
+        },
+        "vocabularies": (
+            {
+                "code": "study-team-roles",
+                "name": "Study team roles",
+                "description": "Common responsibilities for study coordination and site operations.",
+                "items": (
+                    ("principal-investigator", "Principal investigator"),
+                    ("study-coordinator", "Study coordinator"),
+                    ("site-coordinator", "Site coordinator"),
+                    ("laboratory-technician", "Laboratory technician"),
+                    ("data-manager", "Data manager"),
+                    ("qa-officer", "QA officer"),
+                ),
+            },
+        ),
+    },
+    {
+        "domain": {
+            "code": "consent",
+            "name": "Consent",
+            "description": "Consent and participation state vocabularies.",
+        },
+        "vocabularies": (
+            {
+                "code": "consent-status",
+                "name": "Consent status",
+                "description": "Controlled values describing participant consent state.",
+                "items": (
+                    ("pending", "Pending"),
+                    ("received", "Received"),
+                    ("waived", "Waived"),
+                    ("withdrawn", "Withdrawn"),
+                ),
+            },
+        ),
+    },
+    {
+        "domain": {
+            "code": "outcomes",
+            "name": "Outcomes",
+            "description": "Laboratory and workflow outcome vocabularies.",
+        },
+        "vocabularies": (
+            {
+                "code": "test-outcome",
+                "name": "Test outcome",
+                "description": "Common qualitative outcome values for diagnostic or assay workflows.",
+                "items": (
+                    ("positive", "Positive"),
+                    ("negative", "Negative"),
+                    ("indeterminate", "Indeterminate"),
+                    ("invalid", "Invalid"),
+                ),
+            },
+        ),
+    },
+    {
+        "domain": {
+            "code": "biospecimen",
+            "name": "Biospecimen",
+            "description": "Condition and handling vocabularies for biospecimen operations.",
+        },
+        "vocabularies": (
+            {
+                "code": "sample-condition",
+                "name": "Sample condition",
+                "description": "Observed specimen condition at receipt or review.",
+                "items": (
+                    ("acceptable", "Acceptable"),
+                    ("haemolysed", "Haemolysed"),
+                    ("clotted", "Clotted"),
+                    ("insufficient-volume", "Insufficient volume"),
+                    ("leaking", "Leaking"),
+                ),
+            },
+        ),
+    },
+    {
+        "domain": {
+            "code": "workflow",
+            "name": "Workflow",
+            "description": "Decision and transition vocabularies for workflow-driven tasks.",
+        },
+        "vocabularies": (
+            {
+                "code": "workflow-decision",
+                "name": "Workflow decision",
+                "description": "Common decision values used when progressing configurable workflows.",
+                "items": (
+                    ("accept", "Accept"),
+                    ("reject", "Reject"),
+                    ("repeat", "Repeat"),
+                    ("escalate", "Escalate"),
+                ),
+            },
+        ),
+    },
+    {
+        "domain": {
+            "code": "units",
+            "name": "Units",
+            "description": "Measurement and reporting unit vocabularies.",
+        },
+        "vocabularies": (
+            {
+                "code": "temperature-unit",
+                "name": "Temperature unit",
+                "description": "Temperature units for storage, transport, and reporting.",
+                "items": (
+                    ("celsius", "Celsius"),
+                    ("fahrenheit", "Fahrenheit"),
+                ),
+            },
+        ),
+    },
+)
 
 
 class AddressSyncFetchError(RuntimeError):
@@ -620,7 +747,7 @@ def _bool_from_value(value: object) -> bool:
     raise ValueError("invalid_boolean")
 
 
-def _normalize_field_value(field: MetadataFieldDefinition, value: object) -> object:
+def _normalize_field_value(field: MetadataSchemaField, value: object) -> object:
     if field.field_type in {
         MetadataFieldDefinition.FieldType.TEXT,
         MetadataFieldDefinition.FieldType.LONG_TEXT,
@@ -663,7 +790,7 @@ def _normalize_field_value(field: MetadataFieldDefinition, value: object) -> obj
     raise ValueError("unsupported_field_type")
 
 
-def _validate_vocabulary(field: MetadataFieldDefinition, normalized_value: object) -> str | None:
+def _validate_vocabulary(field: MetadataSchemaField, normalized_value: object) -> str | None:
     if not field.vocabulary_id:
         return None
     allowed_values = set(
@@ -681,7 +808,98 @@ def _validate_vocabulary(field: MetadataFieldDefinition, normalized_value: objec
     return None
 
 
-def _compare_min_max(field: MetadataFieldDefinition, normalized_value: object, rules: dict[str, object]) -> str | None:
+def get_default_metadata_vocabulary_domain() -> MetadataVocabularyDomain:
+    domain, _ = MetadataVocabularyDomain.objects.get_or_create(
+        code=DEFAULT_METADATA_VOCABULARY_DOMAIN_CODE,
+        defaults={
+            "name": "General",
+            "description": "Fallback domain for vocabularies created before functional categorization was introduced.",
+            "is_active": True,
+        },
+    )
+    return domain
+
+
+@transaction.atomic
+def provision_default_metadata_vocabularies() -> dict[str, object]:
+    created_domains = 0
+    created_vocabularies = 0
+    created_items = 0
+
+    for pack in DEFAULT_METADATA_VOCABULARY_PACK:
+        domain_payload = pack["domain"]
+        domain, domain_created = MetadataVocabularyDomain.objects.get_or_create(
+            code=domain_payload["code"],
+            defaults={
+                "name": domain_payload["name"],
+                "description": domain_payload["description"],
+                "is_active": True,
+            },
+        )
+        if not domain_created:
+            changed = False
+            for attr in ("name", "description"):
+                value = domain_payload[attr]
+                if getattr(domain, attr) != value:
+                    setattr(domain, attr, value)
+                    changed = True
+            if not domain.is_active:
+                domain.is_active = True
+                changed = True
+            if changed:
+                domain.save(update_fields=["name", "description", "is_active", "updated_at"])
+        else:
+            created_domains += 1
+
+        for vocabulary_payload in pack["vocabularies"]:
+            vocabulary, vocabulary_created = MetadataVocabulary.objects.get_or_create(
+                code=vocabulary_payload["code"],
+                defaults={
+                    "domain": domain,
+                    "name": vocabulary_payload["name"],
+                    "description": vocabulary_payload["description"],
+                    "is_active": True,
+                },
+            )
+            if not vocabulary_created:
+                changed = False
+                if vocabulary.domain_id != domain.id:
+                    vocabulary.domain = domain
+                    changed = True
+                for attr in ("name", "description"):
+                    value = vocabulary_payload[attr]
+                    if getattr(vocabulary, attr) != value:
+                        setattr(vocabulary, attr, value)
+                        changed = True
+                if not vocabulary.is_active:
+                    vocabulary.is_active = True
+                    changed = True
+                if changed:
+                    vocabulary.save(update_fields=["domain", "name", "description", "is_active", "updated_at"])
+            else:
+                created_vocabularies += 1
+
+            for sort_order, (value, label) in enumerate(vocabulary_payload["items"], start=1):
+                _, item_created = MetadataVocabularyItem.objects.update_or_create(
+                    vocabulary=vocabulary,
+                    value=value,
+                    defaults={
+                        "label": label,
+                        "sort_order": sort_order,
+                        "is_active": True,
+                    },
+                )
+                if item_created:
+                    created_items += 1
+
+    return {
+        "created_domains": created_domains,
+        "created_vocabularies": created_vocabularies,
+        "created_items": created_items,
+    }
+
+
+def _compare_min_max(field: MetadataSchemaField, normalized_value: object, rules: dict[str, object]) -> str | None:
     if field.field_type in {
         MetadataFieldDefinition.FieldType.TEXT,
         MetadataFieldDefinition.FieldType.LONG_TEXT,
@@ -724,21 +942,18 @@ def validate_metadata_payload(
     errors: list[dict[str, str]] = []
     normalized_data: dict[str, object] = {}
     schema_fields = list(
-        schema_version.fields.select_related("field_definition", "field_definition__vocabulary").order_by(
-            "position", "field_key"
-        )
+        schema_version.fields.select_related("vocabulary").order_by("position", "field_key")
     )
 
     for schema_field in schema_fields:
-        field = schema_field.field_definition
         is_active = _condition_matches(dict(schema_field.condition or {}), payload)
         if not is_active:
             continue
 
         raw_value = payload.get(schema_field.field_key)
         if raw_value in (None, "") or raw_value == []:
-            if field.default_value is not None:
-                raw_value = field.default_value
+            if schema_field.default_value is not None:
+                raw_value = schema_field.default_value
             elif schema_field.required:
                 errors.append({"field": schema_field.field_key, "code": "required"})
                 continue
@@ -746,17 +961,17 @@ def validate_metadata_payload(
                 continue
 
         try:
-            normalized_value = _normalize_field_value(field, raw_value)
+            normalized_value = _normalize_field_value(schema_field, raw_value)
         except (TypeError, ValueError):
             errors.append({"field": schema_field.field_key, "code": "invalid_type"})
             continue
 
-        vocabulary_error = _validate_vocabulary(field, normalized_value)
+        vocabulary_error = _validate_vocabulary(schema_field, normalized_value)
         if vocabulary_error:
             errors.append({"field": schema_field.field_key, "code": vocabulary_error})
             continue
 
-        range_error = _compare_min_max(field, normalized_value, dict(schema_field.validation_rules or {}))
+        range_error = _compare_min_max(schema_field, normalized_value, dict(schema_field.validation_rules or {}))
         if range_error:
             errors.append({"field": schema_field.field_key, "code": range_error})
             continue

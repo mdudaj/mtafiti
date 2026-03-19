@@ -57,7 +57,7 @@ def test_lims_html_pages_render_with_role_aware_actions():
         ("/lims/metadata/", b"Metadata configuration", b"Choose a metadata workflow"),
         ("/lims/metadata/vocabularies/create/", b"Create vocabulary", b'data-lims-action="metadata-vocabulary-create"'),
         ("/lims/metadata/fields/create/", b"Create field definition", b'data-lims-action="metadata-field-create"'),
-        ("/lims/metadata/schemas/create/", b"Create schema and first version", b'data-lims-action="metadata-schema-create"'),
+        ("/lims/metadata/schemas/create/", b"Create form and draft version", b'data-lims-action="metadata-schema-create"'),
         ("/lims/metadata/bindings/create/", b"Create schema binding", b'data-lims-action="metadata-binding-create"'),
         ("/lims/metadata/versions/publish/", b"Publish schema version", b'data-lims-action="metadata-version-publish"'),
         ("/lims/biospecimens/", b"Biospecimen registry", b'data-lims-action="biospecimen-create"'),
@@ -99,9 +99,10 @@ def test_metadata_page_shows_visual_schema_builder_for_admins():
     response = client.get("/lims/metadata/schemas/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
 
     assert response.status_code == 200
-    assert b"Visual schema builder" in response.content
-    assert b"Add to designer" in response.content
-    assert b"Schema payload preview" in response.content
+    assert b"Form metadata" in response.content
+    assert b"Draft field builder" in response.content
+    assert b"Add field to draft" in response.content
+    assert b"Draft payload preview" in response.content
     assert b"Back to metadata" in response.content
 
 

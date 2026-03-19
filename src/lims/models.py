@@ -384,7 +384,7 @@ class TanzaniaAddressSyncRun(TimestampedUUIDModel):
         return f"{self.mode}:{self.status}:{self.created_at.isoformat()}"
 
 
-class MetadataVocabulary(TimestampedUUIDModel):
+class MetadataVocabularyDomain(TimestampedUUIDModel):
     name = models.CharField(max_length=200)
     code = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True, default="")
@@ -393,7 +393,29 @@ class MetadataVocabulary(TimestampedUUIDModel):
     class Meta:
         ordering = ["name"]
         indexes = [
+            models.Index(fields=["code"], name="lims_meta_vdom_code_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class MetadataVocabulary(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    domain = models.ForeignKey(
+        MetadataVocabularyDomain,
+        on_delete=models.PROTECT,
+        related_name="vocabularies",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
             models.Index(fields=["code"], name="lims_meta_vocab_code_idx"),
+            models.Index(fields=["domain", "name"], name="lims_meta_vocab_dname_idx"),
         ]
 
     def __str__(self) -> str:
@@ -477,6 +499,7 @@ class MetadataSchema(TimestampedUUIDModel):
     name = models.CharField(max_length=200)
     code = models.SlugField(max_length=100, unique=True)
     description = models.TextField(blank=True, default="")
+    purpose = models.CharField(max_length=200, blank=True, default="")
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -525,10 +548,26 @@ class MetadataSchemaField(TimestampedUUIDModel):
     )
     field_definition = models.ForeignKey(
         MetadataFieldDefinition,
-        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name="schema_fields",
     )
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    field_type = models.CharField(max_length=32, choices=MetadataFieldDefinition.FieldType.choices)
     field_key = models.SlugField(max_length=100)
+    help_text = models.CharField(max_length=255, blank=True, default="")
+    placeholder = models.CharField(max_length=255, blank=True, default="")
+    vocabulary = models.ForeignKey(
+        MetadataVocabulary,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="schema_fields",
+    )
+    default_value = models.JSONField(null=True, blank=True)
+    config = models.JSONField(default=dict, blank=True)
     position = models.PositiveIntegerField(default=0)
     required = models.BooleanField(default=False)
     validation_rules = models.JSONField(default=dict, blank=True)
@@ -547,6 +586,16 @@ class MetadataSchemaField(TimestampedUUIDModel):
         super().clean()
         if not self.field_key:
             raise ValidationError({"field_key": "field_key is required"})
+        choice_types = {
+            MetadataFieldDefinition.FieldType.CHOICE,
+            MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+        }
+        if self.field_type in choice_types and not self.vocabulary_id:
+            raise ValidationError({"vocabulary": "choice fields require a vocabulary"})
+        if self.field_type not in choice_types and self.vocabulary_id:
+            raise ValidationError({"vocabulary": "vocabulary is only valid for choice fields"})
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
         if not isinstance(self.validation_rules, dict):
             raise ValidationError({"validation_rules": "validation_rules must be an object"})
         if not isinstance(self.condition, dict):

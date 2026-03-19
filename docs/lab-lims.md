@@ -110,25 +110,29 @@ The initial reference page now exposes lab, study, site, and address-sync action
 
 The next LIMS configuration slice standardizes tenant-local metadata building blocks for sample-type intake forms and workflow-step forms:
 
+- `MetadataVocabularyDomain`
 - `MetadataVocabulary`
 - `MetadataVocabularyItem`
-- `MetadataFieldDefinition`
 - `MetadataSchema`
 - `MetadataSchemaVersion`
 - `MetadataSchemaField`
 - `MetadataSchemaBinding`
 
-This allows LIMS tenants to define reusable field definitions, publish versioned schemas, and bind a published schema to:
+This allows LIMS tenants to define form metadata, establish a draft version immediately, add fields that belong directly to that version, publish it, and bind the published form to:
 
 - `sample_type` keys such as `dried-blood-spot`
 - `workflow_step` keys such as `dbs-receiving`
 
 Metadata APIs are exposed under:
 
+- `/api/v1/lims/metadata/vocabulary-domains`
 - `/api/v1/lims/metadata/vocabularies`
+- `/api/v1/lims/metadata/vocabularies/provision-defaults`
+- `/api/v1/lims/metadata/vocabularies/<vocabulary_id>/items`
 - `/api/v1/lims/metadata/field-definitions`
 - `/api/v1/lims/metadata/schemas`
 - `/api/v1/lims/metadata/schemas/<schema_id>/versions`
+- `/api/v1/lims/metadata/schemas/<schema_id>/versions/<version_id>`
 - `/api/v1/lims/metadata/schemas/<schema_id>/versions/<version_id>/publish`
 - `/api/v1/lims/metadata/bindings`
 - `/api/v1/lims/metadata/validate`
@@ -143,7 +147,11 @@ Validation is intentionally explicit and repository-native rather than delegated
 
 This gives the later workflow-configuration and runtime slices a stable tenant-aware schema registry without needing the full workflow-template domain to exist first.
 
-The first HTML control surface for this slice is `/lims/metadata/`, which provides vocabulary, field, schema-version, and binding actions for users with `lims.metadata.manage`.
+Vocabulary domains are tenant-scoped and searchable so select and multi-select widgets can resolve the right controlled list by functional category, then fetch filtered items on demand. The current default provisioning pack seeds starter domains and vocabularies for roles, consent, outcomes, biospecimen condition, workflow decisions, and units while still allowing tenants to define additional domains and vocabularies through the same API surface.
+
+Form authoring now follows a two-step flow: create the form definition under `/api/v1/lims/metadata/schemas` to get an initial draft version, then update that draft version through `/api/v1/lims/metadata/schemas/<schema_id>/versions/<version_id>` with version-owned fields. Published versions are immutable; future changes are made by creating a new draft version, optionally cloned from an existing version. Version listings can also be filtered by status so authoring pages can focus on drafts while activation pages only expose published versions.
+
+The first HTML control surface for this slice is `/lims/metadata/`, which provides vocabulary, form, draft-version, publish, and binding actions for users with `lims.metadata.manage`. The form authoring page now supports loading an existing draft, cloning a new draft from a published version, editing version-owned fields, publishing the current draft, and activating a published version for a runtime target such as a biospecimen type.
 
 ## Biospecimen aggregate
 

@@ -7,11 +7,21 @@
 <section class="panel" data-lims-action="metadata-vocabulary-create">
   {% include "core/ui/includes/panel_header.html" with panel_title="Vocabulary setup form" panel_description="Seed one vocabulary and its initial values." %}
   <div class="section-stack">
+    <label class="field-group">
+      <span class="field-label">Functional domain</span>
+      <select class="input" data-lims-field="vocabulary-domain-id">
+        <option value="">General (default)</option>
+        {% for item in payload.domain_options %}
+        <option value="{{ item.value }}">{{ item.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label class="field-group"><span class="field-label">Vocabulary name</span><input class="input" data-lims-field="vocabulary-name" /></label>
     <label class="field-group"><span class="field-label">Vocabulary code</span><input class="input" data-lims-field="vocabulary-code" /></label>
     <label class="field-group"><span class="field-label">Items JSON</span><textarea class="textarea" rows="5" data-lims-field="vocabulary-items">[{"value":"dbs","label":"DBS"}]</textarea></label>
     <div class="button-row">
       <button class="button" type="button" onclick="createVocabulary()"><span class="material-symbols-outlined button-icon" aria-hidden="true">list_alt</span><span>Create vocabulary</span></button>
+      <button class="button button-secondary" type="button" onclick="provisionDefaults()"><span class="material-symbols-outlined button-icon" aria-hidden="true">publish</span><span>Provision defaults</span></button>
       <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
     </div>
   </div>
@@ -30,9 +40,14 @@ async function createVocabulary() {
     return;
   }
   await limsPortalAction("/api/v1/lims/metadata/vocabularies", {
+    domain_id: limsValue("vocabulary-domain-id"),
     name: limsValue("vocabulary-name"),
     code: limsValue("vocabulary-code"),
     items: items,
   }, "Vocabulary created");
+}
+
+async function provisionDefaults() {
+  await limsPortalAction("/api/v1/lims/metadata/vocabularies/provision-defaults", {}, "Default vocabularies provisioned");
 }
 {% endblock %}

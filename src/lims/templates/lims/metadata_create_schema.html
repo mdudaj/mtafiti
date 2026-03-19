@@ -1,44 +1,130 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Create schema + version" %}
-{{ payload.field_definition_catalog|json_script:"lims-field-definition-catalog" }}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Author form" %}
 
 {% if payload.capabilities.can_manage_metadata %}
 <section class="panel" data-lims-action="metadata-schema-create">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Visual schema builder" panel_description="Use a formbuilder-compatible designer to order existing field definitions visually, then create the first schema version from that canvas." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Step 1 · Form metadata" panel_description="Create a new form definition or load an existing draft so you can continue authoring it." %}
   <div class="section-stack">
-    <label class="field-group"><span class="field-label">Schema name</span><input class="input" data-lims-field="schema-name" /></label>
-    <label class="field-group"><span class="field-label">Schema code</span><input class="input" data-lims-field="schema-code" /></label>
-    <label class="field-group"><span class="field-label">Change summary</span><input class="input" data-lims-field="schema-change-summary" value="Initial version" /></label>
     <div class="field-grid field-grid--wide">
       <label class="field-group">
-        <span class="field-label">Add existing field definitions</span>
-        <select class="select" data-lims-field="schema-field-picker">
-          <option value="">Select field</option>
-          {% for option in payload.field_definition_options %}
-          <option value="{{ option.value }}">{{ option.label }}</option>
+        <span class="field-label">Existing form</span>
+        <select class="select" data-lims-field="schema-existing">
+          <option value="">Select an existing form</option>
+          {% for option in payload.schema_options %}
+          <option value="{{ option.value }}" data-draft-version-id="{{ option.draft_version_id }}">{{ option.label }} ({{ option.code }})</option>
           {% endfor %}
         </select>
       </label>
       <div class="button-row" style="align-items:end;">
-        <button class="button button-secondary" type="button" onclick="addFieldDefinitionToDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add</span><span>Add to designer</span></button>
-        <button class="button button-secondary" type="button" onclick="clearDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">delete_sweep</span><span>Clear designer</span></button>
+        <button class="button button-secondary" type="button" onclick="loadExistingDraft()"><span class="material-symbols-outlined button-icon" aria-hidden="true">folder_open</span><span>Load draft</span></button>
       </div>
+    </div>
+    <label class="field-group"><span class="field-label">Form name</span><input class="input" data-lims-field="schema-name" /></label>
+    <label class="field-group"><span class="field-label">Form code</span><input class="input" data-lims-field="schema-code" /></label>
+    <label class="field-group"><span class="field-label">Purpose</span><input class="input" data-lims-field="schema-purpose" placeholder="DBS receiving, workflow QC, site intake..." /></label>
+    <label class="field-group"><span class="field-label">Description</span><textarea class="textarea" rows="3" data-lims-field="schema-description"></textarea></label>
+    <label class="field-group"><span class="field-label">Draft change summary</span><input class="input" data-lims-field="schema-change-summary" value="Initial draft" /></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createDraftForm()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create form + draft</span></button>
+      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-lims-action="metadata-schema-clone">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Step 1b · Start a new draft from a published version" panel_description="When a published version is already live, clone it into a fresh draft before making changes." %}
+  <div class="field-grid field-grid--wide">
+    <label class="field-group">
+      <span class="field-label">Published source version</span>
+      <select class="select" data-lims-field="schema-published-source">
+        <option value="">Select a published version</option>
+        {% for option in payload.published_version_options %}
+        <option value="{{ option.value }}" data-schema-id="{{ option.schema_id }}">{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="button-row" style="align-items:end;">
+      <button class="button button-secondary" type="button" onclick="createDraftFromPublished()"><span class="material-symbols-outlined button-icon" aria-hidden="true">content_copy</span><span>Create next draft</span></button>
+    </div>
+  </div>
+</section>
+
+<section class="panel" data-lims-action="metadata-schema-fields">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Step 2 · Draft field builder" panel_description="Fields belong directly to the selected draft version. Save the draft as many times as needed before publishing." %}
+  <div class="section-stack">
+    <p id="metadata-draft-status">No draft version loaded yet.</p>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Field label</span><input class="input" data-lims-field="draft-field-name" /></label>
+      <label class="field-group"><span class="field-label">Field key</span><input class="input" data-lims-field="draft-field-key" /></label>
+      <label class="field-group"><span class="field-label">Field type</span><select class="select" data-lims-field="draft-field-type">{% for option in payload.field_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Vocabulary</span><select class="select" data-lims-field="draft-field-vocabulary"><option value="">None</option>{% for option in payload.vocabulary_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">UI step</span><select class="select" data-lims-field="draft-field-ui-step">{% for option in payload.ui_step_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Required</span><select class="select" data-lims-field="draft-field-required"><option value="false">No</option><option value="true">Yes</option></select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Help text</span><input class="input" data-lims-field="draft-field-help-text" /></label>
+    <label class="field-group"><span class="field-label">Placeholder</span><input class="input" data-lims-field="draft-field-placeholder" /></label>
+    <label class="field-group"><span class="field-label">Default value JSON</span><textarea class="textarea" rows="2" data-lims-field="draft-field-default-value">null</textarea></label>
+    <label class="field-group"><span class="field-label">Validation rules JSON</span><textarea class="textarea" rows="2" data-lims-field="draft-field-validation">{}</textarea></label>
+    <label class="field-group"><span class="field-label">Condition JSON</span><textarea class="textarea" rows="2" data-lims-field="draft-field-condition">{}</textarea></label>
+    <div class="button-row">
+      <button class="button button-secondary" type="button" onclick="saveFieldDraftRow()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add</span><span id="draft-field-action-label">Add field to draft</span></button>
+      <button class="button button-secondary" type="button" onclick="resetDraftFieldInputs()"><span class="material-symbols-outlined button-icon" aria-hidden="true">restart_alt</span><span>Reset field editor</span></button>
+      <button class="button button-secondary" type="button" onclick="clearDraftFields()"><span class="material-symbols-outlined button-icon" aria-hidden="true">delete_sweep</span><span>Clear fields</span></button>
+      <button class="button" type="button" onclick="saveDraftFields()"><span class="material-symbols-outlined button-icon" aria-hidden="true">save</span><span>Save draft fields</span></button>
     </div>
     <div class="cards" style="grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);">
       <div class="panel">
-        {% include "core/ui/includes/panel_header.html" with panel_title="Designer canvas" panel_description="The page attempts to enhance this area with the `formBuilder.online` library; the fallback still uses the same compatible field shape." %}
+        {% include "core/ui/includes/panel_header.html" with panel_title="Draft fields" panel_description="Edit, reorder, and review the fields that belong directly to this draft version." %}
         <div id="metadata-schema-builder" class="section-stack"></div>
       </div>
       <div class="panel">
-        {% include "core/ui/includes/panel_header.html" with panel_title="Schema payload preview" panel_description="Review the emitted schema-version field payload before saving." %}
-        <label class="field-group"><span class="field-label">Fields JSON preview</span><textarea class="textarea" rows="14" data-lims-field="schema-fields-preview" readonly>[]</textarea></label>
+        {% include "core/ui/includes/panel_header.html" with panel_title="Draft payload preview" panel_description="This payload is sent to the draft-version update endpoint." %}
+        <label class="field-group"><span class="field-label">Fields JSON preview</span><textarea class="textarea" rows="18" data-lims-field="schema-fields-preview" readonly>[]</textarea></label>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="panel" data-lims-action="metadata-schema-release">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Step 3 · Publish and activate" panel_description="Publish the current draft, then attach the published version to a runtime target." %}
+  <div class="section-stack">
     <div class="button-row">
-      <button class="button" type="button" onclick="createSchemaAndVersionFromDesigner()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create schema + version</span></button>
-      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+      <button class="button" type="button" onclick="publishCurrentDraft()"><span class="material-symbols-outlined button-icon" aria-hidden="true">publish</span><span>Publish current draft</span></button>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group">
+        <span class="field-label">Published version to activate</span>
+        <select class="select" data-lims-field="activation-version">
+          <option value="">Use the current published version</option>
+          {% for option in payload.published_version_options %}
+          <option value="{{ option.value }}" data-schema-id="{{ option.schema_id }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field-group">
+        <span class="field-label">Target type</span>
+        <select class="select" data-lims-field="binding-target-type">
+          {% for option in payload.binding_target_type_options %}
+          <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field-group">
+        <span class="field-label">Sample type shortcut</span>
+        <select class="select" data-lims-field="binding-sample-type" onchange="applySampleTypeShortcut()">
+          <option value="">Manual target</option>
+          {% for option in payload.sample_type_options %}
+          <option value="{{ option.value }}" data-label="{{ option.label }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field-group"><span class="field-label">Target key</span><input class="input" data-lims-field="binding-target-key" value="dbs" /></label>
+      <label class="field-group"><span class="field-label">Target label</span><input class="input" data-lims-field="binding-target-label" value="DBS" /></label>
+    </div>
+    <div class="button-row">
+      <button class="button" type="button" onclick="activatePublishedVersion()"><span class="material-symbols-outlined button-icon" aria-hidden="true">link</span><span>Activate for target</span></button>
     </div>
   </div>
 </section>
@@ -47,277 +133,347 @@
 
 {% block extra_scripts %}
 {{ block.super }}
-const limsFieldDefinitionCatalog = JSON.parse(document.getElementById("lims-field-definition-catalog").textContent);
+let limsDraftSchemaId = null;
+let limsDraftVersionId = null;
+let limsPublishedVersionId = null;
 let limsSchemaDesignerFields = [];
-let limsExternalDesigner = null;
+let limsEditingFieldIndex = null;
 
-function fieldDefinitionById(fieldDefinitionId) {
-  return limsFieldDefinitionCatalog.find((item) => item.id === fieldDefinitionId) || null;
-}
-
-function fieldTypeToFormBuilderType(fieldDefinition) {
-  if (!fieldDefinition) {
-    return "text";
-  }
-  if (fieldDefinition.field_type === "long_text") {
-    return "textarea";
-  }
-  if (fieldDefinition.field_type === "integer" || fieldDefinition.field_type === "decimal") {
-    return "number";
-  }
-  if (fieldDefinition.field_type === "boolean") {
-    return "checkbox";
-  }
-  if (fieldDefinition.field_type === "date") {
-    return "date";
-  }
-  if (fieldDefinition.field_type === "choice") {
-    return "select";
-  }
-  if (fieldDefinition.field_type === "multi_choice") {
-    return "checkbox-group";
-  }
-  return "text";
-}
-
-function designerControlFromFieldDefinition(fieldDefinition, position) {
-  return {
-    field_definition_id: fieldDefinition.id,
-    field_key: fieldDefinition.code,
-    position: position,
-    required: false,
-    validation_rules: {},
-    condition: {},
-    formbuilder: {
-      name: fieldDefinition.code,
-      label: fieldDefinition.name,
-      type: fieldTypeToFormBuilderType(fieldDefinition),
-      subtype: fieldDefinition.field_type === "integer" ? "integer" : (fieldDefinition.field_type === "long_text" ? "textarea" : "text"),
-      required: false,
-      placeholder: fieldDefinition.placeholder || "",
-      description: fieldDefinition.help_text || "",
-      values: fieldDefinition.vocabulary_items || [],
-      ui_step: ((fieldDefinition.config || {}).ui_step || "metadata"),
-    },
-  };
-}
-
-function designerSchemaFieldsPayload() {
+function draftFieldsPayload() {
   return limsSchemaDesignerFields.map((field, index) => ({
-    field_definition_id: field.field_definition_id,
+    id: field.id || null,
+    name: field.name,
     field_key: field.field_key,
+    field_type: field.field_type,
+    vocabulary_id: field.vocabulary_id || null,
+    help_text: field.help_text || "",
+    placeholder: field.placeholder || "",
+    default_value: field.default_value,
+    config: field.config || {},
     position: index + 1,
-    required: field.required,
+    required: Boolean(field.required),
     validation_rules: field.validation_rules || {},
     condition: field.condition || {},
   }));
 }
 
-function syncExternalDesigner() {
-  if (!limsExternalDesigner || typeof limsExternalDesigner.actions?.setData !== "function") {
+async function limsFetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => ({error: "Action failed"}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Action failed");
+  }
+  return payload;
+}
+
+function setDraftStatus(message) {
+  document.getElementById("metadata-draft-status").textContent = message;
+}
+
+function setFieldActionLabel(label) {
+  const element = document.getElementById("draft-field-action-label");
+  if (element) {
+    element.textContent = label;
+  }
+}
+
+function resetDraftFieldInputs() {
+  limsField("draft-field-name").value = "";
+  limsField("draft-field-key").value = "";
+  limsField("draft-field-help-text").value = "";
+  limsField("draft-field-placeholder").value = "";
+  limsField("draft-field-default-value").value = "null";
+  limsField("draft-field-validation").value = "{}";
+  limsField("draft-field-condition").value = "{}";
+  limsField("draft-field-vocabulary").value = "";
+  limsField("draft-field-type").value = "text";
+  limsField("draft-field-ui-step").value = "metadata";
+  limsField("draft-field-required").value = "false";
+  limsEditingFieldIndex = null;
+  setFieldActionLabel("Add field to draft");
+}
+
+function applySchemaMetadata(schema, version) {
+  limsDraftSchemaId = schema.id;
+  limsDraftVersionId = version.id;
+  limsPublishedVersionId = schema.published_version_id || "";
+  limsField("schema-name").value = schema.name || "";
+  limsField("schema-code").value = schema.code || "";
+  limsField("schema-purpose").value = schema.purpose || "";
+  limsField("schema-description").value = schema.description || "";
+  limsField("schema-change-summary").value = version.change_summary || "Draft updated";
+  setDraftStatus(`Editing ${schema.name} draft v${version.version_number}`);
+}
+
+function applyVersionFields(version) {
+  limsSchemaDesignerFields = (version.fields || []).map((field) => ({
+    id: field.id,
+    name: field.name,
+    field_key: field.field_key,
+    field_type: field.field_type,
+    vocabulary_id: field.vocabulary_id,
+    help_text: field.help_text || "",
+    placeholder: field.placeholder || "",
+    default_value: field.default_value,
+    config: field.config || {},
+    required: Boolean(field.required),
+    validation_rules: field.validation_rules || {},
+    condition: field.condition || {},
+  }));
+  resetDraftFieldInputs();
+  renderDraftFields();
+}
+
+function loadFieldIntoEditor(index) {
+  const field = limsSchemaDesignerFields[index];
+  if (!field) {
     return;
   }
-  limsExternalDesigner.actions.setData(
-    limsSchemaDesignerFields.map((field) => ({
-      ...field.formbuilder,
-      required: field.required,
-    })),
-  );
+  limsEditingFieldIndex = index;
+  limsField("draft-field-name").value = field.name || "";
+  limsField("draft-field-key").value = field.field_key || "";
+  limsField("draft-field-help-text").value = field.help_text || "";
+  limsField("draft-field-placeholder").value = field.placeholder || "";
+  limsField("draft-field-default-value").value = JSON.stringify(field.default_value ?? null, null, 2);
+  limsField("draft-field-validation").value = JSON.stringify(field.validation_rules || {}, null, 2);
+  limsField("draft-field-condition").value = JSON.stringify(field.condition || {}, null, 2);
+  limsField("draft-field-vocabulary").value = field.vocabulary_id || "";
+  limsField("draft-field-type").value = field.field_type || "text";
+  limsField("draft-field-ui-step").value = ((field.config || {}).ui_step || "metadata");
+  limsField("draft-field-required").value = field.required ? "true" : "false";
+  setFieldActionLabel("Update selected field");
 }
 
-function updateDesignerFromInputs() {
-  document.querySelectorAll("[data-designer-prop]").forEach((field) => {
-    const index = Number(field.getAttribute("data-designer-index"));
-    const prop = field.getAttribute("data-designer-prop");
-    if (!Number.isInteger(index) || !limsSchemaDesignerFields[index]) {
-      return;
-    }
-    if (prop === "required") {
-      limsSchemaDesignerFields[index].required = field.value === "true";
-    }
-    if (prop === "position") {
-      limsSchemaDesignerFields[index].position = Number(field.value || index + 1);
-    }
-  });
-  limsSchemaDesignerFields.sort((left, right) => (left.position || 0) - (right.position || 0));
-  limsSchemaDesignerFields.forEach((field, index) => {
-    field.position = index + 1;
-  });
-  renderDesigner();
-}
-
-function renderDesigner() {
+function renderDraftFields() {
   const container = document.getElementById("metadata-schema-builder");
   const preview = limsField("schema-fields-preview");
   if (!container || !preview) {
     return;
   }
+  preview.value = JSON.stringify(draftFieldsPayload(), null, 2);
   if (!limsSchemaDesignerFields.length) {
-    container.innerHTML = "<p>No fields in the designer yet. Add field definitions to start composing the schema.</p>";
-    preview.value = "[]";
+    container.innerHTML = "<p>No draft fields yet. Add the first field above.</p>";
     return;
   }
-  container.innerHTML = limsSchemaDesignerFields.map((field, index) => {
-    const step = ((fieldDefinitionById(field.field_definition_id)?.config || {}).ui_step || "metadata");
-    return `
-      <article class="card">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">${limsEscapeHtml(field.formbuilder.label)}</h2>
-            <p class="panel-description">${limsEscapeHtml(field.field_key)} · ${limsEscapeHtml(step)} step</p>
-          </div>
+  container.innerHTML = limsSchemaDesignerFields.map((field, index) => `
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">${limsEscapeHtml(field.name)}</h2>
+          <p class="panel-description">${limsEscapeHtml(field.field_key)} · ${limsEscapeHtml(field.field_type)} · ${limsEscapeHtml((field.config || {}).ui_step || "metadata")}</p>
         </div>
-        <div class="section-stack">
-          <label class="field-group"><span class="field-label">Required</span><select class="select" data-designer-prop="required" data-designer-index="${index}"><option value="true"${field.required ? " selected" : ""}>Yes</option><option value="false"${field.required ? "" : " selected"}>No</option></select></label>
-          <label class="field-group"><span class="field-label">Position</span><input class="input" type="number" min="1" value="${index + 1}" data-designer-prop="position" data-designer-index="${index}" /></label>
-          <div class="button-row">
-            <button class="button button-secondary" type="button" onclick="moveDesignerField(${index}, -1)">Up</button>
-            <button class="button button-secondary" type="button" onclick="moveDesignerField(${index}, 1)">Down</button>
-            <button class="button button-secondary" type="button" onclick="removeDesignerField(${index})">Remove</button>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join("");
-  container.querySelectorAll("[data-designer-prop]").forEach((field) => {
-    field.addEventListener("change", updateDesignerFromInputs);
-  });
-  preview.value = JSON.stringify(designerSchemaFieldsPayload(), null, 2);
-  syncExternalDesigner();
+      </div>
+      <div class="button-row">
+        <button class="button button-secondary" type="button" onclick="loadFieldIntoEditor(${index})">Edit</button>
+        <button class="button button-secondary" type="button" onclick="moveDraftField(${index}, -1)">Up</button>
+        <button class="button button-secondary" type="button" onclick="moveDraftField(${index}, 1)">Down</button>
+        <button class="button button-secondary" type="button" onclick="removeDraftField(${index})">Remove</button>
+      </div>
+    </article>
+  `).join("");
 }
 
-function addFieldDefinitionToDesigner() {
-  const fieldDefinitionId = limsValue("schema-field-picker");
-  if (!fieldDefinitionId) {
-    limsFeedback("Select a field definition first", true);
-    return;
-  }
-  const fieldDefinition = fieldDefinitionById(fieldDefinitionId);
-  if (!fieldDefinition) {
-    limsFeedback("Selected field definition was not found", true);
-    return;
-  }
-  limsSchemaDesignerFields.push(designerControlFromFieldDefinition(fieldDefinition, limsSchemaDesignerFields.length + 1));
-  renderDesigner();
-}
-
-function clearDesigner() {
-  limsSchemaDesignerFields = [];
-  renderDesigner();
-}
-
-function moveDesignerField(index, delta) {
+function moveDraftField(index, delta) {
   const target = index + delta;
   if (target < 0 || target >= limsSchemaDesignerFields.length) {
     return;
   }
   const [field] = limsSchemaDesignerFields.splice(index, 1);
   limsSchemaDesignerFields.splice(target, 0, field);
-  limsSchemaDesignerFields.forEach((item, position) => {
-    item.position = position + 1;
-  });
-  renderDesigner();
+  renderDraftFields();
 }
 
-function removeDesignerField(index) {
+function removeDraftField(index) {
   limsSchemaDesignerFields.splice(index, 1);
-  limsSchemaDesignerFields.forEach((item, position) => {
-    item.position = position + 1;
-  });
-  renderDesigner();
+  if (limsEditingFieldIndex === index) {
+    resetDraftFieldInputs();
+  }
+  renderDraftFields();
 }
 
-async function createSchemaAndVersionFromDesigner() {
-  if (!limsSchemaDesignerFields.length) {
-    limsFeedback("Add at least one field definition to the designer", true);
-    return;
-  }
-  const schemaResponse = await fetch("/api/v1/lims/metadata/schemas", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      name: limsValue("schema-name"),
-      code: limsValue("schema-code"),
-    }),
-  });
-  if (!schemaResponse.ok) {
-    const error = await schemaResponse.json().catch(() => ({error: "Action failed"}));
-    limsFeedback(error.error || "Action failed", true);
-    return;
-  }
-  const schema = await schemaResponse.json();
-  await limsPortalAction("/api/v1/lims/metadata/schemas/" + schema.id + "/versions", {
-    change_summary: limsValue("schema-change-summary") || "Initial version",
-    fields: designerSchemaFieldsPayload(),
-  }, "Schema + version created");
+function clearDraftFields() {
+  limsSchemaDesignerFields = [];
+  resetDraftFieldInputs();
+  renderDraftFields();
 }
 
-function enhanceDesignerWithFormBuilder() {
-  if (typeof window.jQuery === "undefined" || typeof window.jQuery.fn.formBuilder !== "function") {
-    return;
-  }
-  const $container = window.jQuery("#metadata-schema-builder");
-  if (!$container.length) {
-    return;
-  }
-  limsExternalDesigner = $container.formBuilder({
-    formData: limsSchemaDesignerFields.map((field) => ({
-      ...field.formbuilder,
-      required: field.required,
-    })),
-    disableFields: ["autocomplete", "button", "file", "header", "hidden", "paragraph"],
-    onSave(_, formData) {
-      try {
-        const parsed = JSON.parse(formData || "[]");
-        limsSchemaDesignerFields = parsed
-          .map((item, index) => {
-            const fieldDefinition = fieldDefinitionById(item.field_definition_id) || fieldDefinitionById(item.name);
-            if (!fieldDefinition) {
-              return null;
-            }
-            return {
-              field_definition_id: fieldDefinition.id,
-              field_key: fieldDefinition.code,
-              position: index + 1,
-              required: Boolean(item.required),
-              validation_rules: {},
-              condition: {},
-              formbuilder: {
-                ...designerControlFromFieldDefinition(fieldDefinition, index + 1).formbuilder,
-                ...item,
-              },
-            };
-          })
-          .filter(Boolean);
-        renderDesigner();
-      } catch (_error) {}
-    },
-  });
-}
-
-function loadDesignerEnhancementScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
-
-async function bootstrapDesignerEnhancement() {
+function buildDraftFieldFromInputs() {
+  let defaultValue;
+  let validationRules;
+  let condition;
   try {
-    if (typeof window.jQuery === "undefined") {
-      await loadDesignerEnhancementScript("https://code.jquery.com/jquery-3.7.1.min.js");
-    }
-    if (typeof window.jQuery.fn.formBuilder !== "function") {
-      await loadDesignerEnhancementScript("https://formbuilder.online/assets/js/form-builder.min.js");
-    }
-    enhanceDesignerWithFormBuilder();
-  } catch (_error) {}
+    defaultValue = limsJsonValue("draft-field-default-value", null);
+    validationRules = limsJsonValue("draft-field-validation", {});
+    condition = limsJsonValue("draft-field-condition", {});
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return null;
+  }
+  const name = limsValue("draft-field-name");
+  const fieldKey = limsValue("draft-field-key");
+  if (!name || !fieldKey) {
+    limsFeedback("Field label and key are required", true);
+    return null;
+  }
+  return {
+    id: limsEditingFieldIndex !== null ? limsSchemaDesignerFields[limsEditingFieldIndex]?.id || null : null,
+    name: name,
+    field_key: fieldKey,
+    field_type: limsValue("draft-field-type"),
+    vocabulary_id: limsOptionalValue("draft-field-vocabulary"),
+    help_text: limsValue("draft-field-help-text"),
+    placeholder: limsValue("draft-field-placeholder"),
+    default_value: defaultValue,
+    config: {ui_step: limsValue("draft-field-ui-step") || "metadata"},
+    required: limsValue("draft-field-required") === "true",
+    validation_rules: validationRules,
+    condition: condition,
+  };
 }
 
-renderDesigner();
-bootstrapDesignerEnhancement();
+function saveFieldDraftRow() {
+  const field = buildDraftFieldFromInputs();
+  if (!field) {
+    return;
+  }
+  if (limsEditingFieldIndex !== null) {
+    limsSchemaDesignerFields[limsEditingFieldIndex] = field;
+  } else {
+    limsSchemaDesignerFields.push(field);
+  }
+  resetDraftFieldInputs();
+  renderDraftFields();
+}
+
+async function loadDraftVersion(schemaId, versionId) {
+  try {
+    const [schema, version] = await Promise.all([
+      limsFetchJson(`/api/v1/lims/metadata/schemas/${schemaId}`),
+      limsFetchJson(`/api/v1/lims/metadata/schemas/${schemaId}/versions/${versionId}`),
+    ]);
+    applySchemaMetadata(schema, version);
+    applyVersionFields(version);
+    limsFeedback("Draft version loaded");
+  } catch (error) {
+    limsFeedback(error.message, true);
+  }
+}
+
+async function loadExistingDraft() {
+  const option = limsSelectedOption("schema-existing");
+  if (!option) {
+    limsFeedback("Select a form first", true);
+    return;
+  }
+  const draftVersionId = option.dataset.draftVersionId;
+  if (!draftVersionId) {
+    limsFeedback("That form does not currently have a draft version", true);
+    return;
+  }
+  await loadDraftVersion(option.value, draftVersionId);
+}
+
+async function createDraftForm() {
+  try {
+    const payload = await limsFetchJson("/api/v1/lims/metadata/schemas", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        name: limsValue("schema-name"),
+        code: limsValue("schema-code"),
+        purpose: limsValue("schema-purpose"),
+        description: limsValue("schema-description"),
+        change_summary: limsValue("schema-change-summary") || "Initial draft",
+      }),
+    });
+    limsDraftSchemaId = payload.id;
+    limsDraftVersionId = payload.draft_version_id;
+    limsPublishedVersionId = payload.published_version_id || "";
+    limsSchemaDesignerFields = [];
+    renderDraftFields();
+    setDraftStatus(`Editing ${payload.name} draft v1`);
+    limsFeedback("Form definition and initial draft created");
+  } catch (error) {
+    limsFeedback(error.message, true);
+  }
+}
+
+async function createDraftFromPublished() {
+  const option = limsSelectedOption("schema-published-source");
+  if (!option) {
+    limsFeedback("Select a published version first", true);
+    return;
+  }
+  try {
+    const version = await limsFetchJson(`/api/v1/lims/metadata/schemas/${option.dataset.schemaId}/versions`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        change_summary: limsValue("schema-change-summary") || "Follow-up draft",
+        source_version_id: option.value,
+      }),
+    });
+    await loadDraftVersion(option.dataset.schemaId, version.id);
+  } catch (error) {
+    limsFeedback(error.message, true);
+  }
+}
+
+async function saveDraftFields() {
+  if (!limsDraftSchemaId || !limsDraftVersionId) {
+    limsFeedback("Create or load a draft first", true);
+    return;
+  }
+  await limsPortalAction(`/api/v1/lims/metadata/schemas/${limsDraftSchemaId}/versions/${limsDraftVersionId}`, {
+    change_summary: limsValue("schema-change-summary") || "Draft updated",
+    fields: draftFieldsPayload(),
+  }, "Draft fields saved");
+}
+
+async function publishCurrentDraft() {
+  if (!limsDraftSchemaId || !limsDraftVersionId) {
+    limsFeedback("Create or load a draft first", true);
+    return;
+  }
+  try {
+    const version = await limsFetchJson(`/api/v1/lims/metadata/schemas/${limsDraftSchemaId}/versions/${limsDraftVersionId}/publish`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({}),
+    });
+    limsPublishedVersionId = version.id;
+    setDraftStatus(`Published ${version.schema_code} v${version.version_number}. Create a new draft to continue editing.`);
+    limsFeedback("Draft published");
+  } catch (error) {
+    limsFeedback(error.message, true);
+  }
+}
+
+function applySampleTypeShortcut() {
+  const option = limsSelectedOption("binding-sample-type");
+  if (!option || !option.value) {
+    return;
+  }
+  limsField("binding-target-type").value = "sample_type";
+  limsField("binding-target-key").value = option.value;
+  limsField("binding-target-label").value = option.dataset.label || option.textContent.trim();
+}
+
+async function activatePublishedVersion() {
+  const selectedActivationVersion = limsValue("activation-version");
+  const versionId = selectedActivationVersion || limsPublishedVersionId;
+  if (!versionId) {
+    limsFeedback("Publish or select a published version first", true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/metadata/bindings", {
+    schema_version_id: versionId,
+    target_type: limsValue("binding-target-type"),
+    target_key: limsValue("binding-target-key"),
+    target_label: limsValue("binding-target-label"),
+  }, "Published version activated for target");
+}
+
+resetDraftFieldInputs();
+renderDraftFields();
 {% endblock %}

@@ -4,8 +4,9 @@
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Metadata" %}
 
 <div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Domains" count_label="functional groupings" count_value=payload.cards.domains %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Vocabularies" count_label="controlled lists" count_value=payload.cards.vocabularies %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Field definitions" count_label="reusable fields" count_value=payload.cards.fields %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Versions" count_label="draft + published forms" count_value=payload.cards.versions %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="configurable forms" count_value=payload.cards.schemas %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Bindings" count_label="active attachments" count_value=payload.cards.bindings %}
 </div>
@@ -32,12 +33,12 @@
 
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
   <section class="panel">
-    {% include "core/ui/includes/panel_header.html" with panel_title="Vocabularies" panel_description="Controlled lists and seeded values." %}
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Items</th></tr></thead><tbody>{% for item in payload.vocabularies %}<tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.items|length }}</td></tr>{% empty %}<tr><td colspan="3">No vocabularies yet.</td></tr>{% endfor %}</tbody></table></div>
+    {% include "core/ui/includes/panel_header.html" with panel_title="Vocabularies" panel_description="Controlled lists grouped by functional domains for widget-driven selection." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Domain</th><th>Code</th><th>Items</th></tr></thead><tbody>{% for item in payload.vocabularies %}<tr><td>{{ item.name }}</td><td>{{ item.domain_name }}</td><td>{{ item.code }}</td><td>{{ item.items|length }}</td></tr>{% empty %}<tr><td colspan="4">No vocabularies yet.</td></tr>{% endfor %}</tbody></table></div>
   </section>
   <section class="panel">
-    {% include "core/ui/includes/panel_header.html" with panel_title="Field definitions" panel_description="Reusable field building blocks for form schemas." %}
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Type</th></tr></thead><tbody>{% for item in payload.field_definitions %}<tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.field_type }}</td></tr>{% empty %}<tr><td colspan="3">No field definitions yet.</td></tr>{% endfor %}</tbody></table></div>
+    {% include "core/ui/includes/panel_header.html" with panel_title="Draft versions" panel_description="Draft form versions remain editable until you publish them." %}
+    <div class="table-wrap"><table><thead><tr><th>Form</th><th>Version</th><th>Fields</th></tr></thead><tbody>{% for item in payload.draft_versions %}<tr><td>{{ item.schema_name }}</td><td>v{{ item.version_number }}</td><td>{{ item.fields|length }}</td></tr>{% empty %}<tr><td colspan="3">No draft versions yet.</td></tr>{% endfor %}</tbody></table></div>
   </section>
 </div>
 
@@ -45,16 +46,17 @@
   {% include "core/ui/includes/panel_header.html" with panel_title="Schemas and versions" panel_description="Current schema versions with inline field counts for quick review." %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Schema</th><th>Versions</th><th>Latest status</th></tr></thead>
+      <thead><tr><th>Schema</th><th>Versions</th><th>Draft</th><th>Published</th></tr></thead>
       <tbody>
         {% for item in payload.schemas %}
         <tr>
           <td>{{ item.name }}</td>
           <td>{{ item.versions|length }}</td>
-          <td>{% if item.versions %}{{ item.versions.0.status }}{% else %}-{% endif %}</td>
+          <td>{% if item.draft_version_id %}available{% else %}-{% endif %}</td>
+          <td>{% if item.published_version_id %}active{% else %}-{% endif %}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="3">No schemas yet.</td></tr>
+        <tr><td colspan="4">No schemas yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

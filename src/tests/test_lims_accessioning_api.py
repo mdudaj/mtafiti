@@ -92,32 +92,26 @@ def _create_sample_type(client: Client, host: str) -> str:
 
 
 def _bind_sample_type_metadata_schema(client: Client, host: str) -> None:
-    field = client.post(
-        "/api/v1/lims/metadata/field-definitions",
-        data=json.dumps({"name": "Tube count", "code": "tube_count", "field_type": "integer"}),
-        content_type="application/json",
-        HTTP_HOST=host,
-        HTTP_X_USER_ROLES="lims.admin",
-    )
-    assert field.status_code == 201
-
     schema = client.post(
         "/api/v1/lims/metadata/schemas",
-        data=json.dumps({"name": "DBS receiving", "code": "dbs-receiving"}),
+        data=json.dumps({"name": "DBS receiving", "code": "dbs-receiving", "change_summary": "Initial draft"}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
     )
     assert schema.status_code == 201
     schema_id = schema.json()["id"]
+    version_id = schema.json()["draft_version_id"]
 
-    version = client.post(
-        f"/api/v1/lims/metadata/schemas/{schema_id}/versions",
+    version = client.put(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{version_id}",
         data=json.dumps(
             {
                 "fields": [
                     {
-                        "field_definition_id": field.json()["id"],
+                        "name": "Tube count",
+                        "field_key": "tube_count",
+                        "field_type": "integer",
                         "required": True,
                     }
                 ]
@@ -127,8 +121,7 @@ def _bind_sample_type_metadata_schema(client: Client, host: str) -> None:
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
     )
-    assert version.status_code == 201
-    version_id = version.json()["id"]
+    assert version.status_code == 200
 
     published = client.post(
         f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{version_id}/publish",

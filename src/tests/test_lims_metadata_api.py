@@ -54,10 +54,27 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     )
     assert denied.status_code == 403
 
+    domain = client.post(
+        "/api/v1/lims/metadata/vocabulary-domains",
+        data=json.dumps(
+            {
+                "name": "Workflow",
+                "code": "workflow",
+                "description": "Workflow decisions and route controls.",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert domain.status_code == 201
+    domain_id = domain.json()["id"]
+
     vocabulary = client.post(
         "/api/v1/lims/metadata/vocabularies",
         data=json.dumps(
             {
+                "domain_id": domain_id,
                 "name": "Outcome",
                 "code": "outcome",
                 "items": [
@@ -72,75 +89,33 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     )
     assert vocabulary.status_code == 201
     vocabulary_id = vocabulary.json()["id"]
+    assert vocabulary.json()["domain_code"] == "workflow"
 
-    age_field = client.post(
-        "/api/v1/lims/metadata/field-definitions",
-        data=json.dumps(
-            {
-                "name": "Age",
-                "code": "age",
-                "field_type": "integer",
-                "help_text": "Participant age in years",
-                "placeholder": "18",
-                "config": {"ui_step": "metadata"},
-            }
-        ),
-        content_type="application/json",
+    domain_list = client.get(
+        "/api/v1/lims/metadata/vocabulary-domains?search=work",
         HTTP_HOST=host,
-        HTTP_X_USER_ROLES="lims.admin",
+        HTTP_X_USER_ROLES="lims.operator",
     )
-    assert age_field.status_code == 201
-    assert age_field.json()["config"]["ui_step"] == "metadata"
-    assert age_field.json()["placeholder"] == "18"
+    assert domain_list.status_code == 200
+    assert domain_list.json()["items"][0]["code"] == "workflow"
 
-    consent_field = client.post(
-        "/api/v1/lims/metadata/field-definitions",
-        data=json.dumps(
-            {
-                "name": "Consent received",
-                "code": "consent_received",
-                "field_type": "boolean",
-            }
-        ),
-        content_type="application/json",
+    filtered_vocabularies = client.get(
+        "/api/v1/lims/metadata/vocabularies?domain_code=workflow&search=posit",
         HTTP_HOST=host,
-        HTTP_X_USER_ROLES="lims.admin",
+        HTTP_X_USER_ROLES="lims.operator",
     )
-    assert consent_field.status_code == 201
+    assert filtered_vocabularies.status_code == 200
+    assert filtered_vocabularies.json()["items"][0]["code"] == "outcome"
 
-    outcome_field = client.post(
-        "/api/v1/lims/metadata/field-definitions",
-        data=json.dumps(
-            {
-                "name": "Outcome",
-                "code": "outcome",
-                "field_type": "choice",
-                "vocabulary_id": vocabulary_id,
-                "config": {"ui_step": "storage"},
-            }
-        ),
-        content_type="application/json",
+    item_search = client.get(
+        f"/api/v1/lims/metadata/vocabularies/{vocabulary_id}/items?search=neg&limit=1",
         HTTP_HOST=host,
-        HTTP_X_USER_ROLES="lims.admin",
+        HTTP_X_USER_ROLES="lims.operator",
     )
-    assert outcome_field.status_code == 201
-    assert outcome_field.json()["config"]["ui_step"] == "storage"
-    assert outcome_field.json()["vocabulary_items"][0]["value"] == "positive"
-
-    notes_field = client.post(
-        "/api/v1/lims/metadata/field-definitions",
-        data=json.dumps(
-            {
-                "name": "Notes",
-                "code": "notes",
-                "field_type": "long_text",
-            }
-        ),
-        content_type="application/json",
-        HTTP_HOST=host,
-        HTTP_X_USER_ROLES="lims.admin",
-    )
-    assert notes_field.status_code == 201
+    assert item_search.status_code == 200
+    assert item_search.json()["count"] == 1
+    assert item_search.json()["items"][0]["value"] == "negative"
+    assert item_search.json()["has_more"] is False
 
     schema = client.post(
         "/api/v1/lims/metadata/schemas",
@@ -149,6 +124,8 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
                 "name": "DBS accessioning",
                 "code": "dbs-accessioning",
                 "description": "Configurable metadata captured during DBS accessioning.",
+                "purpose": "Receiving intake",
+                "change_summary": "Initial draft",
             }
         ),
         content_type="application/json",
@@ -157,24 +134,36 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     )
     assert schema.status_code == 201
     schema_id = schema.json()["id"]
+    version_id = schema.json()["draft_version_id"]
+    assert version_id
 
-    version = client.post(
-        f"/api/v1/lims/metadata/schemas/{schema_id}/versions",
+    version = client.put(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{version_id}",
         data=json.dumps(
             {
-                "change_summary": "Initial draft",
                 "fields": [
                     {
-                        "field_definition_id": age_field.json()["id"],
+                        "name": "Age",
+                        "field_key": "age",
+                        "field_type": "integer",
+                        "help_text": "Participant age in years",
+                        "placeholder": "18",
+                        "config": {"ui_step": "metadata"},
                         "required": True,
                         "validation_rules": {"min": 0, "max": 120},
                     },
                     {
-                        "field_definition_id": consent_field.json()["id"],
+                        "name": "Consent received",
+                        "field_key": "consent_received",
+                        "field_type": "boolean",
                         "required": True,
                     },
                     {
-                        "field_definition_id": outcome_field.json()["id"],
+                        "name": "Outcome",
+                        "field_key": "outcome",
+                        "field_type": "choice",
+                        "vocabulary_id": vocabulary_id,
+                        "config": {"ui_step": "storage"},
                         "required": True,
                         "condition": {
                             "field": "consent_received",
@@ -183,7 +172,9 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
                         },
                     },
                     {
-                        "field_definition_id": notes_field.json()["id"],
+                        "name": "Notes",
+                        "field_key": "notes",
+                        "field_type": "long_text",
                         "validation_rules": {"max_length": 50},
                     },
                 ],
@@ -193,8 +184,7 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
     )
-    assert version.status_code == 201
-    version_id = version.json()["id"]
+    assert version.status_code == 200
 
     published = client.post(
         f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{version_id}/publish",
@@ -238,6 +228,75 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     schema_fields = listed_schemas.json()["versions"][0]["fields"]
     assert schema_fields[0]["formbuilder"]["name"] == "age"
     assert schema_fields[0]["formbuilder"]["ui_step"] == "metadata"
+    assert schema_fields[0]["name"] == "Age"
+
+    immutable = client.put(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{version_id}",
+        data=json.dumps({"change_summary": "Should fail", "fields": []}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert immutable.status_code == 400
+    assert immutable.json()["error"] == "published_versions_are_immutable"
+
+    next_draft = client.post(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions",
+        data=json.dumps(
+            {
+                "change_summary": "Follow-up draft",
+                "source_version_id": version_id,
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert next_draft.status_code == 201
+    assert next_draft.json()["status"] == "draft"
+    assert len(next_draft.json()["fields"]) == 4
+    next_draft_id = next_draft.json()["id"]
+
+    listed_drafts = client.get(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions?status=draft",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert listed_drafts.status_code == 200
+    assert [item["id"] for item in listed_drafts.json()["items"]] == [next_draft_id]
+
+    listed_published = client.get(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions?status=published",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert listed_published.status_code == 200
+    assert [item["id"] for item in listed_published.json()["items"]] == [version_id]
+
+    published_follow_up = client.post(
+        f"/api/v1/lims/metadata/schemas/{schema_id}/versions/{next_draft_id}/publish",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert published_follow_up.status_code == 200
+    assert published_follow_up.json()["version_number"] == 2
+
+    switched_binding = client.post(
+        "/api/v1/lims/metadata/bindings",
+        data=json.dumps(
+            {
+                "schema_version_id": next_draft_id,
+                "target_type": "sample_type",
+                "target_key": "dried-blood-spot",
+                "target_label": "Dried blood spot",
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+    )
+    assert switched_binding.status_code == 201
+    assert switched_binding.json()["version_number"] == 2
 
     valid = client.post(
         "/api/v1/lims/metadata/validate",
@@ -281,6 +340,14 @@ def test_lims_metadata_domain_supports_vocabularies_versions_bindings_and_valida
     assert invalid.json()["valid"] is False
     assert {"field": "age", "code": "max"} in invalid.json()["errors"]
     assert {"field": "outcome", "code": "invalid_choice"} in invalid.json()["errors"]
+
+    switched_bindings = client.get(
+        "/api/v1/lims/metadata/bindings?target_type=sample_type&target_key=dried-blood-spot",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert switched_bindings.status_code == 200
+    assert switched_bindings.json()["items"][0]["version_number"] == 2
 
     conditional = client.post(
         "/api/v1/lims/metadata/validate",
@@ -332,3 +399,46 @@ def test_lims_metadata_domain_is_tenant_scoped(monkeypatch):
     )
     assert list_b.status_code == 200
     assert list_b.json()["items"] == []
+
+    provisioned = client.post(
+        "/api/v1/lims/metadata/vocabularies/provision-defaults",
+        data=json.dumps({}),
+        content_type="application/json",
+        HTTP_HOST=host_a,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert provisioned.status_code == 200
+    assert provisioned.json()["created_domains"] >= 1
+    assert provisioned.json()["created_vocabularies"] >= 1
+
+    tenant_a_domains = client.get(
+        "/api/v1/lims/metadata/vocabulary-domains",
+        HTTP_HOST=host_a,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert tenant_a_domains.status_code == 200
+    assert {item["code"] for item in tenant_a_domains.json()["items"]} >= {"general", "roles", "consent"}
+
+    tenant_b_domains = client.get(
+        "/api/v1/lims/metadata/vocabulary-domains",
+        HTTP_HOST=host_b,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert tenant_b_domains.status_code == 200
+    assert {item["code"] for item in tenant_b_domains.json()["items"]} == {"general"}
+
+    fallback_vocabulary = client.post(
+        "/api/v1/lims/metadata/vocabularies",
+        data=json.dumps(
+            {
+                "name": "Priority",
+                "code": "priority",
+                "items": [{"value": "routine", "label": "Routine"}],
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host_a,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert fallback_vocabulary.status_code == 201
+    assert fallback_vocabulary.json()["domain_code"] == "general"
