@@ -10,6 +10,13 @@ assignees: ""
 
 Describe the problem and expected user/platform outcome.
 
+## Spec Kit artifacts
+
+- Spec path:
+- Plan path:
+- Tasks path:
+- Generated with: `python .github/scripts/spec_kit_workflow.py issue-body specs/<feature-dir>`
+
 ## Deliverables
 
 - [ ] Deliverable 1
@@ -32,6 +39,7 @@ Describe the problem and expected user/platform outcome.
 
 - Roadmap item:
 - Design docs:
+- Spec bundle:
 
 ## Handoff contract (required updates during execution)
 

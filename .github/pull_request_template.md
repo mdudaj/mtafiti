@@ -2,6 +2,13 @@
 
 Describe what this PR changes and why.
 
+## Spec Kit artifacts
+
+- [ ] Spec path recorded.
+- [ ] Plan path recorded.
+- [ ] Tasks path recorded.
+- [ ] PR body refreshed from `python .github/scripts/spec_kit_workflow.py pr-body specs/<feature-dir>`.
+
 ## Issue contract
 
 - [ ] Linked execution issue includes Objective, Deliverables, Acceptance Criteria, Dependencies, and References.

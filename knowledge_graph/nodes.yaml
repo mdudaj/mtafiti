@@ -2330,7 +2330,7 @@ nodes:
       - notes
       - recorded_by
       - status
-    source: src/lims/models.py:920
+    source: src/lims/models.py:956
   -
     id: datamodel:site
     type: DataModel
@@ -2348,9 +2348,10 @@ nodes:
       - postcode
       - region
       - street
+      - studies
       - study
       - ward
-    source: src/lims/models.py:247
+    source: src/lims/models.py:268
   -
     id: datamodel:lab
     type: DataModel
@@ -2368,7 +2369,7 @@ nodes:
       - region
       - street
       - ward
-    source: src/lims/models.py:163
+    source: src/lims/models.py:174
   -
     id: datamodel:biospecimen
     type: DataModel
@@ -2393,7 +2394,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:583
+    source: src/lims/models.py:619
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2411,7 +2412,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:678
+    source: src/lims/models.py:714
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2426,7 +2427,7 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:554
+    source: src/lims/models.py:590
   -
     id: datamodel:batchplate
     type: DataModel
@@ -2440,7 +2441,7 @@ nodes:
       - metadata
       - plate_identifier
       - sequence_number
-    source: src/lims/models.py:1064
+    source: src/lims/models.py:1100
   -
     id: datamodel:processingbatch
     type: DataModel
@@ -2456,7 +2457,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:1008
+    source: src/lims/models.py:1044
   -
     id: datamodel:accessioningmanifestitem
     type: DataModel
@@ -2476,7 +2477,7 @@ nodes:
       - quantity_unit
       - received_at
       - status
-    source: src/lims/models.py:824
+    source: src/lims/models.py:860
   -
     id: datamodel:receivingevent
     type: DataModel
@@ -2492,7 +2493,7 @@ nodes:
       - received_at
       - received_by
       - scan_value
-    source: src/lims/models.py:872
+    source: src/lims/models.py:908
   -
     id: datamodel:batchplateassignment
     type: DataModel
@@ -2504,7 +2505,7 @@ nodes:
       - plate
       - position_index
       - well_label
-    source: src/lims/models.py:1099
+    source: src/lims/models.py:1135
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2515,7 +2516,7 @@ nodes:
       - schema
       - status
       - version_number
-    source: src/lims/models.py:456
+    source: src/lims/models.py:492
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2535,7 +2536,7 @@ nodes:
       - status
       - throttle_seconds
       - triggered_by
-    source: src/lims/models.py:315
+    source: src/lims/models.py:351
   -
     id: datamodel:metadatafielddefinition
     type: DataModel
@@ -2552,7 +2553,7 @@ nodes:
       - name
       - placeholder
       - vocabulary
-    source: src/lims/models.py:391
+    source: src/lims/models.py:427
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2563,7 +2564,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:440
+    source: src/lims/models.py:476
   -
     id: datamodel:metadatavocabulary
     type: DataModel
@@ -2574,7 +2575,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:351
+    source: src/lims/models.py:387
   -
     id: datamodel:study
     type: DataModel
@@ -2587,7 +2588,7 @@ nodes:
       - name
       - sponsor
       - status
-    source: src/lims/models.py:217
+    source: src/lims/models.py:238
   -
     id: datamodel:country
     type: DataModel
@@ -2600,7 +2601,7 @@ nodes:
       - name
       - slug
       - source_url
-    source: src/lims/models.py:19
+    source: src/lims/models.py:30
   -
     id: datamodel:postcode
     type: DataModel
@@ -2613,7 +2614,7 @@ nodes:
       - source_path
       - source_url
       - street
-    source: src/lims/models.py:138
+    source: src/lims/models.py:149
   -
     id: datamodel:platelayouttemplate
     type: DataModel
@@ -2626,7 +2627,7 @@ nodes:
       - key
       - name
       - rows
-    source: src/lims/models.py:980
+    source: src/lims/models.py:1016
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -2640,7 +2641,7 @@ nodes:
       - required
       - schema_version
       - validation_rules
-    source: src/lims/models.py:484
+    source: src/lims/models.py:520
   -
     id: datamodel:biospecimenpoolmember
     type: DataModel
@@ -2651,7 +2652,7 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:734
+    source: src/lims/models.py:770
   -
     id: datamodel:region
     type: DataModel
@@ -2665,7 +2666,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:34
+    source: src/lims/models.py:45
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel
@@ -2694,7 +2695,7 @@ nodes:
       - source_system
       - status
       - study
-    source: src/lims/models.py:766
+    source: src/lims/models.py:802
   -
     id: datamodel:ward
     type: DataModel
@@ -2708,7 +2709,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:86
+    source: src/lims/models.py:97
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
@@ -2720,7 +2721,7 @@ nodes:
       - sort_order
       - value
       - vocabulary
-    source: src/lims/models.py:367
+    source: src/lims/models.py:403
   -
     id: datamodel:district
     type: DataModel
@@ -2734,7 +2735,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:60
+    source: src/lims/models.py:71
   -
     id: datamodel:street
     type: DataModel
@@ -2748,7 +2749,7 @@ nodes:
       - source_path
       - source_url
       - ward
-    source: src/lims/models.py:112
+    source: src/lims/models.py:123
   -
     id: datamodel:metadataschemabinding
     type: DataModel
@@ -2760,7 +2761,7 @@ nodes:
       - target_key
       - target_label
       - target_type
-    source: src/lims/models.py:523
+    source: src/lims/models.py:559
   -
     id: datamodel:tenantserviceroute
     type: DataModel

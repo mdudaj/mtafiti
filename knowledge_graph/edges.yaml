@@ -1062,6 +1062,10 @@ edges:
   -
     relationship: uses
     from: module:lims_tasks
+    to: framework:django
+  -
+    relationship: uses
+    from: module:lims_tasks
     to: module:core_celery
   -
     relationship: uses

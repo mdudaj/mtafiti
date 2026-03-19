@@ -2,7 +2,7 @@ EnvironmentInventory:
   programming_languages:
     -
       name: Python
-      file_count: 147
+      file_count: 150
     -
       name: YAML
       file_count: 28
@@ -11,7 +11,7 @@ EnvironmentInventory:
       file_count: 3
     -
       name: Markdown
-      file_count: 60
+      file_count: 65
   frameworks:
     -
       name: Django

@@ -154,6 +154,24 @@ chub search cookbook-crud101
 chub search theme
 ```
 
+### Spec-first delivery with Spec Kit
+
+This repository now keeps project-local `spec-kit` rules under `.specify/` and expects substantial work to flow through:
+
+1. `/speckit.specify`
+2. `/speckit.plan`
+3. `/speckit.tasks`
+4. `python .github/scripts/spec_kit_workflow.py issue-body specs/<feature>`
+5. `python .github/scripts/spec_kit_workflow.py pr-body specs/<feature>`
+
+Install the upstream CLI with:
+
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+```
+
+See `docs/spec-kit-workflow.md` for the repository-specific workflow, branch naming rules, and how knowledge graph / Context Hub inputs fit into the spec bundle.
+
 ### Faster local feedback loop
 
 ```bash

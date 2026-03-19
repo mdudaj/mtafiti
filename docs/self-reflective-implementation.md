@@ -85,15 +85,17 @@ Template: use `.github/ISSUE_TEMPLATE/delivery-work-item.md` for consistent issu
 
 Use this repository workflow for new implementation slices:
 
-1. update or create the human-readable plan first,
-2. create/update the GitHub issue set for reviewable work items,
+1. create or refresh the `spec-kit` bundle first (`spec.md`, `plan.md`, `tasks.md`),
+2. generate or refresh the GitHub issue set from the spec bundle,
 3. mirror executable work into SQL todos with dependencies,
 4. implement one issue per branch,
 5. commit and push the branch,
-6. open a PR for review,
+6. open a PR generated from the same spec bundle for review,
 7. squash merge after review passes.
 
 Direct-to-`main` implementation is reserved for exceptional repository maintenance, not normal feature delivery.
+
+Use `docs/spec-kit-workflow.md` and `.github/scripts/spec_kit_workflow.py` to keep issue and PR text aligned with the approved spec bundle.
 
 ### Branch naming (required)
 
