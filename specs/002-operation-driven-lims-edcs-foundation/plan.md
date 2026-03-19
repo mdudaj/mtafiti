@@ -5,7 +5,7 @@
 
 ## Summary
 
-Redefine the current LIMS/EDCS direction around a shared operation-driven architecture where versioned operations own standards-aware electronic form packages, Viewflow-compatible workflow templates, task-level metadata capture, branching rules, and auditable runtime execution. The already-merged metadata vocabulary and versioned-form work should be retained as lower-level primitives inside this broader foundation, with LIMS sample accession as the first reference operation.
+Redefine the current LIMS/EDCS direction around a shared operation-driven architecture where versioned operations own standards-aware electronic form packages, Viewflow-compatible workflow templates, task-level metadata capture, branching rules, and auditable runtime execution. The already-merged metadata vocabulary work should be retained, while the earlier versioned-form implementation should be treated as an intermediate step and redefined toward an ODM/OpenClinica-style package model inside this broader foundation, with LIMS sample accession as the first reference operation.
 
 ## Technical Context
 
@@ -25,7 +25,7 @@ Redefine the current LIMS/EDCS direction around a shared operation-driven archit
 - [x] Tenant/service-routing implications remain explicit for both `lims` and `edcs`.
 - [x] Existing knowledge skills and Viewflow conventions are treated as evidence, not ignored.
 - [x] The plan distinguishes design-time configuration entities from runtime execution entities.
-- [x] The plan preserves already-merged metadata work by repositioning it as shared foundation.
+- [x] The plan preserves useful metadata/vocabulary work while explicitly redefining the earlier versioned-form slice toward the ODM/OpenClinica target model.
 
 ## Research & Knowledge Inputs
 
@@ -34,7 +34,7 @@ Redefine the current LIMS/EDCS direction around a shared operation-driven archit
 - `docs/lab-lims.md` shows the current architecture is still centered on metadata schemas, bindings, biospecimens, and receiving rather than first-class operations.
 - `docs/edcs.md` is still a placeholder, which makes this the right time to define a shared foundation instead of duplicating assumptions later.
 - `docs/workflow-ui.md` and `src/core/models.py` show the existing workflow layer is lightweight and generic: definitions, runs, tasks, orchestration workflows, and transitions exist, but not operation-specific design/runtime boundaries.
-- The current `src/lims/` metadata models already provide useful primitives: vocabularies, schema versions, fields, bindings, and validation services.
+- The current `src/lims/` metadata models already provide useful primitives: vocabularies, schema versions, fields, bindings, and validation services, but the form-version model should now be considered transitional and subject to redesign toward package/section/group/item semantics.
 
 ### Knowledge Graph / Skills
 
@@ -75,7 +75,7 @@ Redefine the current LIMS/EDCS direction around a shared operation-driven archit
 
 ### 3. Standards-aware form engine
 
-- Reuse the merged versioned metadata work, but evolve it into a more explicit `FormPackage` / `FormPackageVersion` model.
+- Reuse the merged metadata foundation, but explicitly redefine the earlier versioned-form implementation into a more explicit `FormPackage` / `FormPackageVersion` model aligned with ODM/OpenClinica package semantics.
 - Prefer a canonical relational persistence model with **lossless ODM/XML and XLSX import/export artifacts** in the first phase.
 - Keep controlled vocabularies, edit checks, conditional rules, and presentation hints attached to form package versions.
 - Model form structure explicitly around package metadata, sections/pages, item groups/repeats, items/questions, and choice lists with stable identifiers.
@@ -114,6 +114,7 @@ Redefine the current LIMS/EDCS direction around a shared operation-driven archit
 
 3. **Form engine evolution**
    - map current metadata schema primitives into form packages, versioned artifacts, edit checks, identifiers/OIDs, and export/import contracts
+   - explicitly document which parts of the merged versioned-form work are retained, renamed, or replaced to conform to ODM/OpenClinica-style structure
 
 4. **Workflow builder**
    - define node templates, task-level field/section bindings, branching rules, approval semantics, and Viewflow compilation boundaries around the supported node palette

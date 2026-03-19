@@ -17,12 +17,12 @@
 
 ## Architectural Position
 
-This specification **supersedes the current metadata-first framing as the primary LIMS architecture direction**. The merged metadata/vocabulary work remains valid, but it becomes a **shared lower-level subsystem** inside a broader operation-driven foundation used by both `lims` and `edcs`.
+This specification **supersedes the current metadata-first framing as the primary LIMS architecture direction**. The merged metadata/vocabulary work remains valuable, but it should now be treated as a **transitional lower-level subsystem** that must be **redefined toward an ODM/OpenClinica-style form-package model** inside a broader operation-driven foundation used by both `lims` and `edcs`.
 
 In practical terms:
 
 - controlled vocabularies remain reusable foundation primitives
-- versioned form definitions remain reusable foundation primitives
+- the earlier versioned-form work is not the final target model; it should be evolved into OpenClinica-style governed form packages with sections, groups, items, stable identifiers, and ODM/XLSX artifacts
 - workflow binding moves up a level from "bind a form to a target key" toward "bind forms and rules to tasks inside a versioned operation/workflow template"
 - LIMS sample accession becomes the first reference operation proving the foundation
 - EDCS should later reuse the same form/version/rule/audit core for study visits, CRFs, and submission/review flows
@@ -42,6 +42,7 @@ In practical terms:
   - stable identifiers / OIDs for downstream import/export and interoperability
 - ODM XML is best treated as an **interchange and artifact contract** for metadata/data portability, not necessarily as the only canonical persistence model for application runtime.
 - Historical data remains tied to the original authored form version, so runtime submissions must always keep a durable reference to the exact version used.
+- This means the current repository's versioned-form work should be regarded as an **intermediate foundation** rather than the final architecture; it needs to be reshaped to match package/section/group/item semantics and stable identifier behavior expected by ODM/OpenClinica-style systems.
 
 ### Viewflow-inspired workflow findings
 
@@ -90,7 +91,7 @@ As a form designer, I want to author and version electronic forms using ODM-comp
 
 **Acceptance Scenarios**:
 
-1. **Given** a new operation form is needed, **When** a designer creates it, **Then** the form has identity metadata, version lifecycle, and package artifacts rather than being just a loose schema binding.
+1. **Given** a new operation form is needed, **When** a designer creates it, **Then** the form has identity metadata, version lifecycle, package structure, and artifacts rather than being just a loose schema binding.
 2. **Given** a published form exists, **When** a designer downloads the definition, **Then** the system provides a machine-readable ODM/XML representation and a spreadsheet-friendly representation for governed change workflows.
 3. **Given** a tenant later needs EDCS reuse, **When** the same form engine is used for a study visit form, **Then** the core versioning, field, rule, and export contracts remain the same even if the runtime context differs.
 
@@ -165,19 +166,19 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **FR-005**: The system MUST model form packages with structure comparable to governed CRF systems: form/package metadata, sections/pages, item groups including repeating groups, items/questions, and controlled choices.
 - **FR-006**: The system MUST allow form questions/fields, edit checks, vocabularies, and presentation hints to belong to a specific form version/package version.
 - **FR-007**: The system MUST preserve stable identifiers for forms, sections, groups, and items so import/export and historical submission rendering remain lossless across versions.
-- **FR-008**: The system MUST allow workflow templates to be defined per operation version using Viewflow-compatible task/node and edge concepts.
-- **FR-009**: The workflow-template model MUST compile only into a bounded supported node palette derived from Viewflow capabilities rather than unrestricted arbitrary graph semantics.
-- **FR-010**: The system MUST allow each workflow node/task to declare which form package, sections, groups, or fields are captured at that step.
-- **FR-011**: The system MUST support conditional branching and task visibility rules based on prior task outcomes or captured data.
-- **FR-012**: The system MUST keep design-time workflow/template definitions separate from runtime `Process`/`Task`-style execution state.
-- **FR-013**: The system MUST record operation execution as runtime records separate from design-time definitions.
-- **FR-013**: The system MUST support audit trails for operation versioning, workflow progression, data capture, overrides, approvals, and configuration changes.
-- **FR-014**: The system MUST support audit trails for operation versioning, workflow progression, data capture, overrides, approvals, and configuration changes.
-- **FR-015**: The system MUST support role-based access controls for design, execution, review, approval, and administrative actions, with object-level controls where needed.
-- **FR-016**: The system MUST support signature/approval semantics as explicit workflow or task requirements, even if stricter Part 11 behavior is phased in later.
-- **FR-017**: The system MUST support import/export and integration boundaries for EDC, instrument, and reporting workflows without tightly coupling runtime logic to a single external system.
-- **FR-018**: The system MUST support material or specimen usage linkage from workflow tasks to resulting artifacts where applicable.
-- **FR-019**: The system MUST preserve tenant isolation across operation definitions, form packages, workflow templates, vocabularies, runtime records, and analytics.
+- **FR-008**: The current merged versioned-form implementation MUST be treated as a migration starting point and redefined toward the governed ODM/OpenClinica-style package structure rather than preserved verbatim as the final model.
+- **FR-009**: The system MUST allow workflow templates to be defined per operation version using Viewflow-compatible task/node and edge concepts.
+- **FR-010**: The workflow-template model MUST compile only into a bounded supported node palette derived from Viewflow capabilities rather than unrestricted arbitrary graph semantics.
+- **FR-011**: The system MUST allow each workflow node/task to declare which form package, sections, groups, or fields are captured at that step.
+- **FR-012**: The system MUST support conditional branching and task visibility rules based on prior task outcomes or captured data.
+- **FR-013**: The system MUST keep design-time workflow/template definitions separate from runtime `Process`/`Task`-style execution state.
+- **FR-014**: The system MUST record operation execution as runtime records separate from design-time definitions.
+- **FR-015**: The system MUST support audit trails for operation versioning, workflow progression, data capture, overrides, approvals, and configuration changes.
+- **FR-016**: The system MUST support role-based access controls for design, execution, review, approval, and administrative actions, with object-level controls where needed.
+- **FR-017**: The system MUST support signature/approval semantics as explicit workflow or task requirements, even if stricter Part 11 behavior is phased in later.
+- **FR-018**: The system MUST support import/export and integration boundaries for EDC, instrument, and reporting workflows without tightly coupling runtime logic to a single external system.
+- **FR-019**: The system MUST support material or specimen usage linkage from workflow tasks to resulting artifacts where applicable.
+- **FR-020**: The system MUST preserve tenant isolation across operation definitions, form packages, workflow templates, vocabularies, runtime records, and analytics.
 
 ### Non-Goals
 
@@ -212,7 +213,7 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **SC-002**: Sample accession can be described end-to-end as a versioned operation with task-specific form capture and QC-driven branching.
 - **SC-003**: The form engine is specified as reusable by both LIMS and EDCS rather than being hard-coded to one module.
 - **SC-004**: The specification provides enough structure to generate a reviewable issue backlog for domain modeling, form packaging, workflow builder, and runtime execution.
-- **SC-005**: The design keeps the already-merged metadata vocabulary/form work as reusable primitives instead of orphaning or discarding it.
+- **SC-005**: The design clearly explains that the already-merged metadata vocabulary/form work is useful but transitional, and must be redefined toward the governed ODM/OpenClinica-style package model instead of being treated as the final target.
 
 ## Delivery Mapping *(mandatory)*
 
