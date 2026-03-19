@@ -13,7 +13,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import urljoin, urlsplit
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -137,6 +137,7 @@ def parse_postcode(html: str) -> str:
 
 def default_sync_stats() -> dict[str, int]:
     return {
+        "failure_count": 0,
         "countries_created": 0,
         "countries_updated": 0,
         "regions_created": 0,
@@ -206,6 +207,28 @@ def _increment_stat(run: TanzaniaAddressSyncRun, key: str) -> None:
     run.stats = stats
 
 
+def _sync_progress_fields(run: TanzaniaAddressSyncRun) -> dict[str, object]:
+    checkpoint = dict(run.checkpoint or {})
+    queue_size = len(checkpoint.get("queue") or [])
+    processed_count = int(run.pages_processed or 0)
+    discovered_workload = processed_count + queue_size
+    if run.status == TanzaniaAddressSyncRun.Status.COMPLETED:
+        progress_percent = 100
+    elif discovered_workload > 0:
+        progress_percent = round((processed_count / discovered_workload) * 100, 1)
+    else:
+        progress_percent = 0
+    stats = dict(run.stats or {})
+    return {
+        "queue_size": queue_size,
+        "remaining_count": queue_size,
+        "processed_count": processed_count,
+        "failure_count": int(stats.get("failure_count") or 0),
+        "discovered_workload": discovered_workload,
+        "progress_percent": progress_percent,
+    }
+
+
 def _ensure_tanzania_country() -> tuple[Country, bool]:
     defaults = {
         "name": "Tanzania",
@@ -218,6 +241,36 @@ def _ensure_tanzania_country() -> tuple[Country, bool]:
     return country, created
 
 
+def _save_existing_sync_record(instance, values: dict[str, object]):
+    for field_name, value in values.items():
+        setattr(instance, field_name, value)
+    instance.save(update_fields=[*values.keys(), "updated_at"])
+    return instance, False
+
+
+def _update_or_create_sync_record(model, *, lookup: dict[str, object], defaults: dict[str, object], fallbacks: list[dict[str, object]]):
+    for fallback in fallbacks:
+        candidate = model.objects.filter(**fallback).first()
+        if candidate is not None:
+            return _save_existing_sync_record(candidate, defaults)
+
+    candidate = model.objects.filter(**lookup).first()
+    if candidate is not None:
+        return _save_existing_sync_record(candidate, defaults)
+
+    try:
+        return model.objects.create(**lookup, **defaults), True
+    except IntegrityError:
+        for fallback in fallbacks:
+            candidate = model.objects.filter(**fallback).first()
+            if candidate is not None:
+                return _save_existing_sync_record(candidate, defaults)
+        candidate = model.objects.filter(**lookup).first()
+        if candidate is not None:
+            return _save_existing_sync_record(candidate, defaults)
+        raise
+
+
 def _upsert_region(country: Country, link: ParsedLink):
     defaults = {
         "country": country,
@@ -227,9 +280,11 @@ def _upsert_region(country: Country, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    region, created = Region.objects.update_or_create(
-        source_path=link.path,
+    region, created = _update_or_create_sync_record(
+        Region,
+        lookup={"source_path": link.path},
         defaults=defaults,
+        fallbacks=[{"country": country, "name": link.label}],
     )
     return region, created
 
@@ -243,9 +298,11 @@ def _upsert_district(region: Region, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    district, created = District.objects.update_or_create(
-        source_path=link.path,
+    district, created = _update_or_create_sync_record(
+        District,
+        lookup={"source_path": link.path},
         defaults=defaults,
+        fallbacks=[{"region": region, "name": link.label}],
     )
     return district, created
 
@@ -259,9 +316,11 @@ def _upsert_ward(district: District, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    ward, created = Ward.objects.update_or_create(
-        source_path=link.path,
+    ward, created = _update_or_create_sync_record(
+        Ward,
+        lookup={"source_path": link.path},
         defaults=defaults,
+        fallbacks=[{"district": district, "name": link.label}],
     )
     return ward, created
 
@@ -275,9 +334,11 @@ def _upsert_street(ward: Ward, link: ParsedLink):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    street, created = Street.objects.update_or_create(
-        source_path=link.path,
+    street, created = _update_or_create_sync_record(
+        Street,
+        lookup={"source_path": link.path},
         defaults=defaults,
+        fallbacks=[{"ward": ward, "name": link.label}],
     )
     return street, created
 
@@ -290,9 +351,11 @@ def _upsert_postcode(street: Street, link: ParsedLink, code: str):
         "is_active": True,
         "last_synced_at": timezone.now(),
     }
-    postcode, created = Postcode.objects.update_or_create(
-        source_path=link.path,
+    postcode, created = _update_or_create_sync_record(
+        Postcode,
+        lookup={"source_path": link.path},
         defaults=defaults,
+        fallbacks=[{"street": street, "code": code}],
     )
     return postcode, created
 
@@ -387,7 +450,7 @@ def _process_item(
 
 
 def sync_run_to_dict(run: TanzaniaAddressSyncRun) -> dict[str, object]:
-    checkpoint = dict(run.checkpoint or {})
+    progress = _sync_progress_fields(run)
     return {
         "id": str(run.id),
         "mode": run.mode,
@@ -396,7 +459,7 @@ def sync_run_to_dict(run: TanzaniaAddressSyncRun) -> dict[str, object]:
         "pages_processed": run.pages_processed,
         "request_budget": run.request_budget,
         "throttle_seconds": run.throttle_seconds,
-        "queue_size": len(checkpoint.get("queue") or []),
+        **progress,
         "stats": dict(run.stats or {}),
         "country_code": "TZ",
         "last_error": run.last_error or None,
@@ -435,58 +498,66 @@ def process_tanzania_address_sync_run(
     run.save(update_fields=["checkpoint", "stats", "started_at", "status", "last_error", "updated_at"])
 
     remaining_budget = max(1, run.request_budget)
-    while remaining_budget > 0:
-        queue = _queue_items(run)
-        if not queue:
-            run.status = TanzaniaAddressSyncRun.Status.COMPLETED
-            run.completed_at = timezone.now()
-            run.next_not_before_at = run.completed_at
-            run.save(
-                update_fields=[
-                    "checkpoint",
-                    "stats",
-                    "status",
-                    "completed_at",
-                    "next_not_before_at",
-                    "updated_at",
-                ]
-            )
-            return sync_run_to_dict(run)
+    try:
+        while remaining_budget > 0:
+            queue = _queue_items(run)
+            if not queue:
+                run.status = TanzaniaAddressSyncRun.Status.COMPLETED
+                run.completed_at = timezone.now()
+                run.next_not_before_at = run.completed_at
+                run.save(
+                    update_fields=[
+                        "checkpoint",
+                        "stats",
+                        "status",
+                        "completed_at",
+                        "next_not_before_at",
+                        "updated_at",
+                    ]
+                )
+                return sync_run_to_dict(run)
 
-        item = queue.pop(0)
-        _replace_queue(run, queue)
-        try:
-            html = fetcher(item["url"])
-        except AddressSyncFetchError as exc:
-            run.status = TanzaniaAddressSyncRun.Status.PAUSED
-            run.last_error = str(exc)
-            run.next_not_before_at = timezone.now() + timedelta(seconds=max(run.throttle_seconds, 5))
-            run.save(
-                update_fields=[
-                    "checkpoint",
-                    "stats",
-                    "status",
-                    "last_error",
-                    "next_not_before_at",
-                    "updated_at",
-                ]
-            )
-            return sync_run_to_dict(run)
+            item = queue.pop(0)
+            _replace_queue(run, queue)
+            try:
+                html = fetcher(item["url"])
+            except AddressSyncFetchError as exc:
+                _increment_stat(run, "failure_count")
+                run.status = TanzaniaAddressSyncRun.Status.PAUSED
+                run.last_error = str(exc)
+                run.next_not_before_at = timezone.now() + timedelta(seconds=max(run.throttle_seconds, 5))
+                run.save(
+                    update_fields=[
+                        "checkpoint",
+                        "stats",
+                        "status",
+                        "last_error",
+                        "next_not_before_at",
+                        "updated_at",
+                    ]
+                )
+                return sync_run_to_dict(run)
 
-        with transaction.atomic():
-            _process_item(run, item, html)
-            run.pages_processed += 1
-            run.next_not_before_at = timezone.now() + timedelta(seconds=run.throttle_seconds)
-            run.save(
-                update_fields=[
-                    "checkpoint",
-                    "stats",
-                    "pages_processed",
-                    "next_not_before_at",
-                    "updated_at",
-                ]
-            )
-        remaining_budget -= 1
+            with transaction.atomic():
+                _process_item(run, item, html)
+                run.pages_processed += 1
+                run.next_not_before_at = timezone.now() + timedelta(seconds=run.throttle_seconds)
+                run.save(
+                    update_fields=[
+                        "checkpoint",
+                        "stats",
+                        "pages_processed",
+                        "next_not_before_at",
+                        "updated_at",
+                    ]
+                )
+            remaining_budget -= 1
+    except Exception as exc:
+        _increment_stat(run, "failure_count")
+        run.status = TanzaniaAddressSyncRun.Status.FAILED
+        run.last_error = str(exc)
+        run.save(update_fields=["stats", "status", "last_error", "updated_at"])
+        raise
 
     run.status = TanzaniaAddressSyncRun.Status.PAUSED
     run.save(update_fields=["status", "updated_at"])

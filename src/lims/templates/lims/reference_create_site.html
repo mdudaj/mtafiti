@@ -5,14 +5,13 @@
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-site-create">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Site setup form" panel_description="Register one site and attach its study and lab selectors." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Site setup form" panel_description="Register one site, relate it to one or more studies, and capture its address." %}
   <div class="section-stack">
     <label class="field-group"><span class="field-label">Site name</span><input class="input" data-lims-field="site-name" /></label>
-    <label class="field-group"><span class="field-label">Site code</span><input class="input" data-lims-field="site-code" /></label>
+    <label class="field-group"><span class="field-label">Site code</span><input class="input" data-lims-field="site-code" placeholder="Auto-generated from site name, but editable" /></label>
     <label class="field-group">
-      <span class="field-label">Study</span>
-      <select class="select" data-lims-field="site-study">
-        <option value="">No study</option>
+      <span class="field-label">Studies</span>
+      <select class="select" data-lims-field="site-studies" multiple size="6">
         {% for option in payload.study_options %}
         <option value="{{ option.value }}">{{ option.label }}</option>
         {% endfor %}
@@ -27,6 +26,10 @@
         {% endfor %}
       </select>
     </label>
+    <label class="field-group"><span class="field-label">Address line</span><input class="input" data-lims-field="site-address" /></label>
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="region_id" hidden_data_field="site-region-id" field_label="City / region" endpoint_url="/api/v1/lims/reference/select-options?source=regions" placeholder="Search city or region" %}
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="district_id" hidden_data_field="site-district-id" field_label="District" endpoint_url="/api/v1/lims/reference/select-options?source=districts" placeholder="Search district" %}
+    <p class="muted">Choose either a city / region for a coarse site location or a district when you need more detail. Ward, street, country, and postcode are derived through the saved relationships.</p>
     <div class="button-row">
       <button class="button" type="button" onclick="createSite()"><span class="material-symbols-outlined button-icon" aria-hidden="true">location_city</span><span>Create site</span></button>
       <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
@@ -38,12 +41,71 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+function slugifyReferenceCode(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+(function initializeSiteCodeSlug() {
+  const nameInput = document.querySelector('[data-lims-field="site-name"]');
+  const codeInput = document.querySelector('[data-lims-field="site-code"]');
+  if (!nameInput || !codeInput) {
+    return;
+  }
+  let manualEdit = false;
+  codeInput.addEventListener("input", () => {
+    manualEdit = codeInput.value.trim().length > 0;
+  });
+  nameInput.addEventListener("input", () => {
+    if (!manualEdit || !codeInput.value.trim()) {
+      codeInput.value = slugifyReferenceCode(nameInput.value);
+    }
+  });
+}());
+
+(function initializeAddressFilters() {
+  const regionInput = document.querySelector('[data-field="site-region-id"]');
+  const districtInput = document.querySelector('[data-field="site-district-id"]');
+
+  function clearAddressSelect(hiddenInput) {
+    const root = hiddenInput ? hiddenInput.closest("[data-ajax-model-select]") : null;
+    const textInput = root ? root.querySelector(".ajax-model-select__input") : null;
+    if (hiddenInput) {
+      hiddenInput.value = "";
+    }
+    if (textInput) {
+      textInput.value = "";
+    }
+  }
+
+  if (regionInput) {
+    regionInput.addEventListener("change", () => {
+      clearAddressSelect(districtInput);
+    });
+  }
+  if (districtInput) {
+    districtInput.addEventListener("change", () => {
+      if (districtInput.value && regionInput) {
+        clearAddressSelect(regionInput);
+      }
+    });
+  }
+}());
+
 async function createSite() {
+  const selectedStudies = Array.from(document.querySelector('[data-lims-field="site-studies"]').selectedOptions).map((option) => option.value);
   await limsPortalAction("/api/v1/lims/reference/sites", {
     name: limsValue("site-name"),
     code: limsValue("site-code"),
-    study_id: limsOptionalValue("site-study"),
+    study_ids: selectedStudies,
+    study_id: selectedStudies[0] || null,
     lab_id: limsOptionalValue("site-lab"),
+    address_line: limsValue("site-address"),
+    region_id: limsOptionalValue("site-region-id"),
+    district_id: limsOptionalValue("site-district-id"),
   }, "Site created");
 }
 {% endblock %}

@@ -326,9 +326,11 @@
       table { width: 100%; border-collapse: collapse; background: #fff; }
       th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; vertical-align: top; }
       th { background: #eff6ff; font-weight: 700; color: var(--color-primary-strong); }
-      .banner { border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; font-size: 14px; }
+      .banner { border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
       .banner.ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
       .banner.err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+      .banner-icon { flex: 0 0 auto; }
+      .banner-message { flex: 1 1 auto; font-weight: 600; }
       .snackbar {
         display: flex;
         align-items: center;
@@ -526,14 +528,22 @@
       (function initializeSnackbars() {
         document.querySelectorAll('[data-snackbar]').forEach((snackbar) => {
           const dismiss = snackbar.querySelector('.snackbar-dismiss');
-          if (!dismiss) return;
-          dismiss.addEventListener('click', () => snackbar.remove());
+          const removeSnackbar = () => snackbar.remove();
+          if (dismiss) {
+            dismiss.addEventListener('click', removeSnackbar);
+          }
           window.setTimeout(() => {
             if (document.body.contains(snackbar)) {
-              snackbar.remove();
+              removeSnackbar();
             }
           }, 5000);
         });
+        const current = new URL(window.location.href);
+        if (current.searchParams.has('ui_message') || current.searchParams.has('ui_error')) {
+          current.searchParams.delete('ui_message');
+          current.searchParams.delete('ui_error');
+          window.history.replaceState({}, document.title, current.toString());
+        }
       }());
 
       function debounce(callback, delay) {
@@ -646,7 +656,7 @@
 
         async loadOptions(query) {
           const token = ++this.requestToken;
-          const url = new URL(this.endpoint, window.location.origin);
+          const url = new URL(this.root.dataset.endpoint || this.endpoint, window.location.origin);
           url.searchParams.set('q', query);
           url.searchParams.set('limit', '12');
           try {

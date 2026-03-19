@@ -265,6 +265,8 @@ The same launchpad-versus-task-page pattern now extends to reference and metadat
 
 This keeps operator/admin pages closer to the CRUD cookbook direction: summary pages remain navigational, while each input page exposes one focused task with one primary submit action.
 
+For Tanzania geography sync, a run may still enter `paused` between slices because it respects `request_budget` and `throttle_seconds`, but worker tasks now auto-resume paused runs until the queue is exhausted. Operators should not need a separate "resume" button for normal incremental progress.
+
 ## Batch and plate management
 
 The current batch-management slice standardizes the first processing and worksheet primitives on top of the biospecimen aggregate:

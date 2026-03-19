@@ -2,6 +2,7 @@
 
 {% block content %}
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Reference" %}
+{{ payload.sync_runs|json_script:"lims-reference-sync-runs" }}
 
 <div class="stat-grid">
   {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="active + draft" count_value=payload.cards.labs %}
@@ -33,36 +34,124 @@
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
   <section class="panel">
     {% include "core/ui/includes/panel_header.html" with panel_title="Labs" panel_description="Current tenant lab registry." %}
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Postcode</th></tr></thead><tbody>{% for item in payload.labs %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.postcode|default:"-" }}</td></tr>{% empty %}<tr><td colspan="3">No labs yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Lab</th><th>Address</th></tr></thead><tbody>{% for item in payload.labs %}<tr><td><strong>{{ item.name }}</strong><div class="muted">{{ item.code|default:"-" }}</div></td><td>{% if item.address_breadcrumb %}{{ item.address_breadcrumb }}{% else %}<span class="muted">No address configured</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="2">No labs yet.</td></tr>{% endfor %}</tbody></table></div>
   </section>
   <section class="panel">
     {% include "core/ui/includes/panel_header.html" with panel_title="Studies" panel_description="Study setup used across receiving and specimen registration." %}
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Status</th></tr></thead><tbody>{% for item in payload.studies %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.status }}</td></tr>{% empty %}<tr><td colspan="3">No studies yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Status</th></tr></thead><tbody>{% for item in payload.studies %}<tr><td><strong>{{ item.name }}</strong><div class="muted">{{ item.code|default:"-" }}</div>{% if item.lead_lab_name %}<div class="muted">Lead lab: {{ item.lead_lab_name }}</div>{% endif %}</td><td>{{ item.status }}</td></tr>{% empty %}<tr><td colspan="2">No studies yet.</td></tr>{% endfor %}</tbody></table></div>
   </section>
   <section class="panel">
     {% include "core/ui/includes/panel_header.html" with panel_title="Sites" panel_description="Tenant site list powering selectors in biospecimen and receiving forms." %}
-    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Postcode</th></tr></thead><tbody>{% for item in payload.sites %}<tr><td>{{ item.name }}</td><td>{{ item.code|default:"-" }}</td><td>{{ item.postcode|default:"-" }}</td></tr>{% empty %}<tr><td colspan="3">No sites yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Site</th><th>Studies</th><th>Address</th></tr></thead>
+        <tbody>
+          {% for item in payload.sites %}
+          <tr>
+            <td>
+              <strong>{{ item.name }}</strong>
+              <div class="muted">{{ item.code|default:"-" }}</div>
+              {% if item.lab_name %}<div class="muted">Lab: {{ item.lab_name }}</div>{% endif %}
+            </td>
+            <td>
+              {% if item.study_labels %}
+                <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
+                  {% for label in item.study_labels %}
+                  {% include "lims/includes/badge.html" with label=label tone="info" %}
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="muted">No studies linked</span>
+              {% endif %}
+            </td>
+            <td>{% if item.address_breadcrumb %}{{ item.address_breadcrumb }}{% else %}<span class="muted">No address configured</span>{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3">No sites yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 </div>
 
 <section class="panel">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Recent address sync runs" panel_description="Latest sync execution history for the Tanzania source import." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent address sync runs" panel_description="Latest sync execution history for the Tanzania source import. Progress updates automatically while a run is active." %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th></tr></thead>
-      <tbody>
+      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th><th>Progress</th></tr></thead>
+      <tbody data-reference-sync-runs-table>
         {% for item in payload.sync_runs %}
-        <tr>
-          <td>{{ item.status }}</td>
+        <tr{% if item.status == "pending" or item.status == "running" or item.status == "paused" %} style="background: rgba(2, 132, 199, 0.08); box-shadow: inset 4px 0 0 #0284c7;"{% endif %}>
+          <td>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <strong>{{ item.status }}</strong>
+              {% if item.status == "pending" or item.status == "running" or item.status == "paused" %}
+              {% include "lims/includes/badge.html" with label="Active run" tone="active" %}
+              {% endif %}
+            </div>
+          </td>
           <td>{{ item.country_code|default:"TZ" }}</td>
           <td>{{ item.processed_count }}</td>
           <td>{{ item.failure_count }}</td>
+          <td>{{ item.progress_percent }}%</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No sync runs yet.</td></tr>
+        <tr><td colspan="5">No sync runs yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsReferenceInitialSyncRuns = JSON.parse(document.getElementById("lims-reference-sync-runs").textContent);
+
+function referenceSyncStatusTone(status) {
+  if (status === "failed") return "var(--color-danger, #991b1b)";
+  if (status === "completed") return "#166534";
+  if (status === "running") return "#0f766e";
+  return "var(--color-text)";
+}
+
+function isReferenceSyncRunActive(status) {
+  return ["pending", "running", "paused"].includes(status);
+}
+
+function renderReferenceSyncRuns(items) {
+  const tableBody = document.querySelector("[data-reference-sync-runs-table]");
+  if (!tableBody) {
+    return;
+  }
+  if (!items.length) {
+    tableBody.innerHTML = '<tr><td colspan="5">No sync runs yet.</td></tr>';
+    return;
+  }
+  tableBody.innerHTML = items.map((item) => `
+    <tr style="${isReferenceSyncRunActive(item.status) ? "background: rgba(2, 132, 199, 0.08); box-shadow: inset 4px 0 0 #0284c7;" : ""}">
+      <td>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <strong style="color:${limsEscapeHtml(referenceSyncStatusTone(item.status))}">${limsEscapeHtml(item.status)}</strong>
+          ${isReferenceSyncRunActive(item.status) ? limsBadgeHtml("Active run", "active") : ""}
+        </div>
+      </td>
+      <td>${limsEscapeHtml(item.country_code || "TZ")}</td>
+      <td>${limsEscapeHtml(String(item.processed_count || 0))}</td>
+      <td>${limsEscapeHtml(String(item.failure_count || 0))}</td>
+      <td>${limsEscapeHtml(String(item.progress_percent || 0))}%</td>
+    </tr>
+  `).join("");
+}
+
+async function refreshReferenceSyncRuns() {
+  try {
+    const response = await limsPortalRequest("/api/v1/lims/reference/address-sync-runs", null, "GET");
+    renderReferenceSyncRuns((response && response.items) || []);
+  } catch (_error) {}
+}
+
+renderReferenceSyncRuns(limsReferenceInitialSyncRuns || []);
+window.setInterval(refreshReferenceSyncRuns, 5000);
 {% endblock %}

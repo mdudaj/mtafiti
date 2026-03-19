@@ -6,8 +6,10 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.text import slugify
 
 from core.identity import request_roles, roles_enforced
 
@@ -82,8 +84,8 @@ def _ui_feedback_context(request) -> dict[str, object]:
     message = (request.GET.get("ui_message") or "").strip()
     error = (request.GET.get("ui_error") or "").strip()
     return {
-        "ui_message": error or message,
-        "ui_error": bool(error),
+        "ui_message": message,
+        "ui_error": error.lower() in {"1", "true", "yes"},
     }
 
 
@@ -249,7 +251,10 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
     }
     payload["labs"] = [_lab_to_dict(item) for item in Lab.objects.order_by("name")[:10]]
     payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
-    payload["sites"] = [_site_to_dict(item) for item in Site.objects.select_related("study", "lab").order_by("name")[:10]]
+    payload["sites"] = [
+        _site_to_dict(item)
+        for item in Site.objects.select_related("study", "lab").prefetch_related("studies").order_by("name")[:10]
+    ]
     payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]]
     payload["actions"] = [
         {
@@ -281,13 +286,15 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
 
 
 def _reference_create_lab_page_payload(request) -> dict[str, object]:
-    return _page_payload_base(
+    payload = _page_payload_base(
         request,
         active_key="lims-reference",
         title="Create lab",
         summary="Capture one tenant lab at a time without mixing this form with other setup actions.",
         kicker="Reference setup",
     )
+    payload["address_country"] = Country.objects.filter(code="TZ").first()
+    return payload
 
 
 def _reference_create_study_page_payload(request) -> dict[str, object]:
@@ -312,6 +319,7 @@ def _reference_create_site_page_payload(request) -> dict[str, object]:
     )
     payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
     payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["address_country"] = Country.objects.filter(code="TZ").first()
     return payload
 
 
@@ -670,13 +678,59 @@ def _model_to_option(item, label_attr: str = "name") -> dict[str, str]:
     return {"value": str(item.id), "label": getattr(item, label_attr)}
 
 
+def _option(value: str, label: str, description: str = "") -> dict[str, str]:
+    payload = {"value": value, "label": label}
+    if description:
+        payload["description"] = description
+    return payload
+
+
+def _address_breadcrumb(*, country=None, region=None, district=None, ward=None, street=None, postcode: str = "", address_line: str = "") -> str:
+    parts = []
+    if address_line:
+        parts.append(address_line)
+    if street:
+        parts.append(street.name)
+    if ward:
+        parts.append(ward.name)
+    if district:
+        parts.append(district.name)
+    if region:
+        parts.append(region.name)
+    if country:
+        parts.append(country.name)
+    if postcode:
+        parts.append(postcode)
+    return " / ".join(parts)
+
+
+def _badge(label: str, tone: str = "info") -> dict[str, str]:
+    return {"label": label, "tone": tone}
+
+
 def _lab_to_dict(lab: Lab) -> dict[str, object]:
+    address_breadcrumb = _address_breadcrumb(
+        country=lab.country,
+        region=lab.region,
+        district=lab.district,
+        ward=lab.ward,
+        street=lab.street,
+        postcode=lab.postcode,
+        address_line=lab.address_line,
+    )
     return {
         "id": str(lab.id),
         "name": lab.name,
         "code": lab.code,
         "description": lab.description,
         "address_line": lab.address_line,
+        "country_label": lab.country.name if lab.country_id else "",
+        "region_label": lab.region.name if lab.region_id else "",
+        "district_label": lab.district.name if lab.district_id else "",
+        "ward_label": lab.ward.name if lab.ward_id else "",
+        "street_label": lab.street.name if lab.street_id else "",
+        "address_breadcrumb": address_breadcrumb,
+        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
         "country_id": str(lab.country_id) if lab.country_id else None,
         "region_id": str(lab.region_id) if lab.region_id else None,
         "district_id": str(lab.district_id) if lab.district_id else None,
@@ -695,19 +749,44 @@ def _study_to_dict(study: Study) -> dict[str, object]:
         "description": study.description,
         "sponsor": study.sponsor,
         "lead_lab_id": str(study.lead_lab_id) if study.lead_lab_id else None,
+        "lead_lab_name": study.lead_lab.name if study.lead_lab_id else "",
+        "lead_lab_badge": _badge(study.lead_lab.name, "neutral") if study.lead_lab_id else None,
         "status": study.status,
+        "status_badge": _badge(study.get_status_display(), "info"),
     }
 
 
 def _site_to_dict(site: Site) -> dict[str, object]:
+    studies = sorted(site.studies.all(), key=lambda item: item.name)
+    primary_study_id = str(site.study_id) if site.study_id else (str(studies[0].id) if studies else None)
+    address_breadcrumb = _address_breadcrumb(
+        country=site.country,
+        region=site.region,
+        district=site.district,
+        ward=site.ward,
+        street=site.street,
+        postcode=site.postcode,
+        address_line=site.address_line,
+    )
     return {
         "id": str(site.id),
         "name": site.name,
         "code": site.code,
         "description": site.description,
-        "study_id": str(site.study_id) if site.study_id else None,
+        "study_id": primary_study_id,
+        "study_ids": [str(item.id) for item in studies],
+        "study_labels": [item.name for item in studies],
+        "study_badges": [_badge(item.name, "info") for item in studies],
         "lab_id": str(site.lab_id) if site.lab_id else None,
+        "lab_name": site.lab.name if site.lab_id else "",
         "address_line": site.address_line,
+        "country_label": site.country.name if site.country_id else "",
+        "region_label": site.region.name if site.region_id else "",
+        "district_label": site.district.name if site.district_id else "",
+        "ward_label": site.ward.name if site.ward_id else "",
+        "street_label": site.street.name if site.street_id else "",
+        "address_breadcrumb": address_breadcrumb,
+        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
         "country_id": str(site.country_id) if site.country_id else None,
         "region_id": str(site.region_id) if site.region_id else None,
         "district_id": str(site.district_id) if site.district_id else None,
@@ -1095,6 +1174,63 @@ def _resolve_optional_fk(model, raw_id, error_code: str):
         return None, JsonResponse({"error": error_code}, status=404)
 
 
+def _resolve_optional_fk_list(model, raw_ids, error_code: str):
+    if raw_ids in (None, ""):
+        return [], None
+    if not isinstance(raw_ids, list):
+        return None, JsonResponse({"error": f"{error_code}_invalid"}, status=400)
+    resolved = []
+    seen = set()
+    for raw_id in raw_ids:
+        if not raw_id:
+            continue
+        obj, error = _resolve_optional_fk(model, raw_id, error_code)
+        if error:
+            return None, error
+        key = str(obj.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        resolved.append(obj)
+    return resolved, None
+
+
+def _normalize_code(name: str, raw_code: object) -> str:
+    return slugify(str(raw_code or "").strip() or name)
+
+
+def _expand_address_hierarchy(*, country, region, district, ward, street):
+    resolved_country = country
+    resolved_region = region
+    resolved_district = district
+    resolved_ward = ward
+    resolved_street = street
+
+    if resolved_street:
+        if resolved_ward and resolved_street.ward_id != resolved_ward.id:
+            return None, JsonResponse({"error": "street_ward_mismatch"}, status=400)
+        resolved_ward = resolved_street.ward
+    if resolved_ward:
+        if resolved_district and resolved_ward.district_id != resolved_district.id:
+            return None, JsonResponse({"error": "ward_district_mismatch"}, status=400)
+        resolved_district = resolved_ward.district
+    if resolved_district:
+        if resolved_region and resolved_district.region_id != resolved_region.id:
+            return None, JsonResponse({"error": "district_region_mismatch"}, status=400)
+        resolved_region = resolved_district.region
+    if resolved_region:
+        if resolved_country and resolved_region.country_id != resolved_country.id:
+            return None, JsonResponse({"error": "region_country_mismatch"}, status=400)
+        resolved_country = resolved_region.country
+    return {
+        "country": resolved_country,
+        "region": resolved_region,
+        "district": resolved_district,
+        "ward": resolved_ward,
+        "street": resolved_street,
+    }, None
+
+
 def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: Street | None):
     if raw_postcode_id:
         postcode, error = _resolve_optional_fk(Postcode, raw_postcode_id, "postcode_not_found")
@@ -1102,6 +1238,10 @@ def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: S
             return None, error
         return (postcode.code if postcode else ""), None
     postcode_code = str(raw_postcode_code or "").strip()
+    if not postcode_code and street:
+        matches = list(Postcode.objects.filter(street=street).order_by("code")[:2])
+        if len(matches) == 1:
+            return matches[0].code, None
     if not postcode_code:
         return "", None
     queryset = Postcode.objects.filter(code=postcode_code)
@@ -1131,22 +1271,35 @@ def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
     street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
     if error:
         return error
+    hierarchy, error = _expand_address_hierarchy(
+        country=country,
+        region=region,
+        district=district,
+        ward=ward,
+        street=street,
+    )
+    if error:
+        return error
     postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
 
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
 
-    lab.name = str(payload.get("name")).strip()
-    lab.code = str(payload.get("code") or "").strip()
+    lab.name = name
+    lab.code = code
     lab.description = str(payload.get("description") or "").strip()
     lab.address_line = str(payload.get("address_line") or "").strip()
-    lab.country = country
-    lab.region = region
-    lab.district = district
-    lab.ward = ward
-    lab.street = street
+    lab.country = hierarchy["country"]
+    lab.region = hierarchy["region"]
+    lab.district = hierarchy["district"]
+    lab.ward = hierarchy["ward"]
+    lab.street = hierarchy["street"]
     lab.postcode = postcode
     lab.is_active = bool(payload.get("is_active", True))
     return None
@@ -1156,10 +1309,14 @@ def _build_study_from_payload(study: Study, payload: dict[str, object]):
     lead_lab, error = _resolve_optional_fk(Lab, payload.get("lead_lab_id"), "lab_not_found")
     if error:
         return error
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
-    study.name = str(payload.get("name")).strip()
-    study.code = str(payload.get("code") or "").strip()
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    study.name = name
+    study.code = code
     study.description = str(payload.get("description") or "").strip()
     study.sponsor = str(payload.get("sponsor") or "").strip()
     study.lead_lab = lead_lab
@@ -1171,9 +1328,14 @@ def _build_study_from_payload(study: Study, payload: dict[str, object]):
 
 
 def _build_site_from_payload(site: Site, payload: dict[str, object]):
+    studies, error = _resolve_optional_fk_list(Study, payload.get("study_ids"), "study_not_found")
+    if error:
+        return error
     study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
     if error:
         return error
+    if study and all(str(item.id) != str(study.id) for item in studies):
+        studies = [study, *studies]
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
@@ -1192,24 +1354,38 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
     if error:
         return error
+    hierarchy, error = _expand_address_hierarchy(
+        country=country,
+        region=region,
+        district=district,
+        ward=ward,
+        street=street,
+    )
+    if error:
+        return error
     postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
-    site.name = str(payload.get("name")).strip()
-    site.code = str(payload.get("code") or "").strip()
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    site.name = name
+    site.code = code
     site.description = str(payload.get("description") or "").strip()
-    site.study = study
+    site.study = studies[0] if studies else study
     site.lab = lab
     site.address_line = str(payload.get("address_line") or "").strip()
-    site.country = country
-    site.region = region
-    site.district = district
-    site.ward = ward
-    site.street = street
+    site.country = hierarchy["country"]
+    site.region = hierarchy["region"]
+    site.district = hierarchy["district"]
+    site.ward = hierarchy["ward"]
+    site.street = hierarchy["street"]
     site.postcode = postcode
     site.is_active = bool(payload.get("is_active", True))
+    site._pending_studies = studies
     return None
 
 
@@ -1221,6 +1397,17 @@ def _save_model(instance):
         return JsonResponse({"error": "validation_error"}, status=400)
     except IntegrityError:
         return JsonResponse({"error": "conflict"}, status=409)
+    return None
+
+
+def _save_site_model(site: Site):
+    error = _save_model(site)
+    if error:
+        return error
+    pending_studies = getattr(site, "_pending_studies", None)
+    if pending_studies is not None:
+        site.studies.set(pending_studies)
+        delattr(site, "_pending_studies")
     return None
 
 
@@ -1582,7 +1769,10 @@ def lims_reference_labs(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [_lab_to_dict(item) for item in Lab.objects.select_related("region", "district", "ward", "street").order_by("name")]
+        items = [
+            _lab_to_dict(item)
+            for item in Lab.objects.select_related("country", "region", "district", "ward", "street").order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -1690,7 +1880,12 @@ def lims_reference_sites(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [_site_to_dict(item) for item in Site.objects.select_related("study", "lab", "region", "district", "ward", "street").order_by("name")]
+        items = [
+            _site_to_dict(item)
+            for item in Site.objects.select_related("study", "lab", "country", "region", "district", "ward", "street")
+            .prefetch_related("studies")
+            .order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -1703,7 +1898,7 @@ def lims_reference_sites(request):
         error = _build_site_from_payload(site, payload)
         if error:
             return error
-        error = _save_model(site)
+        error = _save_site_model(site)
         if error:
             return error
         return JsonResponse(_site_to_dict(site), status=201)
@@ -1713,7 +1908,7 @@ def lims_reference_sites(request):
 @csrf_exempt
 def lims_reference_site_detail(request, site_id: str):
     try:
-        site = Site.objects.get(id=site_id)
+        site = Site.objects.prefetch_related("studies").get(id=site_id)
     except (ValidationError, Site.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -1731,7 +1926,7 @@ def lims_reference_site_detail(request, site_id: str):
         error = _build_site_from_payload(site, payload)
         if error:
             return error
-        error = _save_model(site)
+        error = _save_site_model(site)
         if error:
             return error
         return JsonResponse(_site_to_dict(site))
@@ -1748,65 +1943,84 @@ def lims_reference_select_options(request):
 
     source = (request.GET.get("source") or "").strip()
     query = (request.GET.get("q") or "").strip().lower()
+    try:
+        limit = max(1, min(int(request.GET.get("limit", "50")), 50))
+    except ValueError:
+        return JsonResponse({"error": "invalid_limit"}, status=400)
     items = []
     if source == "labs":
         queryset = Lab.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "studies":
         queryset = Study.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "sites":
         queryset = Site.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "countries":
         queryset = Country.objects.order_by("name")
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "regions":
-        queryset = Region.objects.order_by("name")
+        queryset = Region.objects.select_related("country").order_by("name")
         if request.GET.get("country_id"):
             queryset = queryset.filter(country_id=request.GET["country_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+        items = [_option(str(item.id), item.name, item.country.name) for item in queryset[:limit]]
     elif source == "districts":
-        queryset = District.objects.order_by("name")
+        queryset = District.objects.select_related("region", "region__country").order_by("name")
         if request.GET.get("region_id"):
             queryset = queryset.filter(region_id=request.GET["region_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(region__name__icontains=query))
+        items = [_option(str(item.id), item.name, item.region.name) for item in queryset[:limit]]
     elif source == "wards":
-        queryset = Ward.objects.order_by("name")
+        queryset = Ward.objects.select_related("district", "district__region").order_by("name")
         if request.GET.get("district_id"):
             queryset = queryset.filter(district_id=request.GET["district_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(district__name__icontains=query))
+        items = [
+            _option(str(item.id), item.name, f"{item.district.name} / {item.district.region.name}")
+            for item in queryset[:limit]
+        ]
     elif source == "streets":
-        queryset = Street.objects.order_by("name")
+        queryset = Street.objects.select_related("ward", "ward__district", "ward__district__region").order_by("name")
         if request.GET.get("ward_id"):
             queryset = queryset.filter(ward_id=request.GET["ward_id"])
+        if request.GET.get("district_id"):
+            queryset = queryset.filter(ward__district_id=request.GET["district_id"])
+        if request.GET.get("region_id"):
+            queryset = queryset.filter(ward__district__region_id=request.GET["region_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(ward__name__icontains=query)
+                | Q(ward__district__name__icontains=query)
+                | Q(ward__district__region__name__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, f"{item.ward.name} / {item.ward.district.name} / {item.ward.district.region.name}")
+            for item in queryset[:limit]
+        ]
     elif source == "postcodes":
-        queryset = Postcode.objects.order_by("code")
+        queryset = Postcode.objects.select_related("street", "street__ward", "street__ward__district").order_by("code")
         if request.GET.get("street_id"):
             queryset = queryset.filter(street_id=request.GET["street_id"])
         if query:
             queryset = queryset.filter(code__icontains=query)
-        items = [_model_to_option(item, label_attr="code") for item in queryset[:50]]
+        items = [_option(str(item.id), item.code, item.street.name) for item in queryset[:limit]]
     else:
         return JsonResponse({"error": "unsupported_source"}, status=400)
-    return JsonResponse({"source": source, "items": items})
+    return JsonResponse({"source": source, "items": items, "results": items})
 
 
 @csrf_exempt

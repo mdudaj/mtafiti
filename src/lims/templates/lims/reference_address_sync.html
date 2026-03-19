@@ -2,6 +2,7 @@
 
 {% block content %}
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Run geography sync" %}
+{{ payload.sync_runs|json_script:"lims-sync-runs" }}
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-address-sync">
@@ -14,20 +15,49 @@
 {% endif %}
 
 <section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Current progress" panel_description="Progress updates automatically as the worker processes the discovered Tanzania geography workload." %}
+  {% with current_run=payload.sync_runs|first %}
+  <div class="stat-grid" data-sync-overview-cards>
+    <article class="card"><strong>Status</strong><p data-sync-current-status>{{ current_run.status|default:"No sync running" }}</p></article>
+    <article class="card"><strong>Processed</strong><p data-sync-current-processed>{{ current_run.processed_count|default:0 }}</p></article>
+    <article class="card"><strong>Failures</strong><p data-sync-current-failures>{{ current_run.failure_count|default:0 }}</p></article>
+    <article class="card"><strong>Discovered workload</strong><p data-sync-current-workload>{{ current_run.discovered_workload|default:0 }}</p></article>
+    <article class="card"><strong>Progress</strong><p data-sync-current-progress>{{ current_run.progress_percent|default:0 }}%</p></article>
+    <article class="card"><strong>Remaining</strong><p data-sync-current-remaining>{{ current_run.remaining_count|default:0 }}</p></article>
+  </div>
+  <div class="section-stack">
+    <div style="height: 12px; border-radius: 999px; background: #e2e8f0; overflow: hidden;">
+      <div data-sync-progress-bar style="height: 100%; width: {{ current_run.progress_percent|default:0 }}%; background: linear-gradient(90deg, #0284c7 0%, #22c55e 100%); transition: width .25s ease;"></div>
+    </div>
+    <p class="muted" data-sync-progress-caption>Progress is based on pages discovered so far, so the percentage may adjust upward as new pages are found.</p>
+  </div>
+  {% endwith %}
+</section>
+
+<section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Recent sync runs" panel_description="Latest sync execution history for quick verification." %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th></tr></thead>
-      <tbody>
+      <thead><tr><th>Status</th><th>Country</th><th>Processed</th><th>Failures</th><th>Discovered workload</th><th>Progress</th></tr></thead>
+      <tbody data-sync-runs-table>
         {% for item in payload.sync_runs %}
-        <tr>
-          <td>{{ item.status }}</td>
+        <tr{% if item.status == "pending" or item.status == "running" or item.status == "paused" %} style="background: rgba(2, 132, 199, 0.08); box-shadow: inset 4px 0 0 #0284c7;"{% endif %}>
+          <td>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <strong>{{ item.status }}</strong>
+              {% if item.status == "pending" or item.status == "running" or item.status == "paused" %}
+              {% include "lims/includes/badge.html" with label="Active run" tone="active" %}
+              {% endif %}
+            </div>
+          </td>
           <td>{{ item.country_code|default:"TZ" }}</td>
           <td>{{ item.processed_count }}</td>
           <td>{{ item.failure_count }}</td>
+          <td>{{ item.discovered_workload }}</td>
+          <td>{{ item.progress_percent }}%</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No sync runs yet.</td></tr>
+        <tr><td colspan="6">No sync runs yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -37,7 +67,86 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+const limsInitialSyncRuns = JSON.parse(document.getElementById("lims-sync-runs").textContent);
+
+function syncStatusTone(status) {
+  if (status === "failed") return "var(--color-danger, #991b1b)";
+  if (status === "completed") return "#166534";
+  if (status === "running") return "#0f766e";
+  return "var(--color-text)";
+}
+
+function isActiveSyncRun(status) {
+  return ["pending", "running", "paused"].includes(status);
+}
+
+function renderSyncOverview(item) {
+  const current = item || {
+    status: "idle",
+    processed_count: 0,
+    failure_count: 0,
+    discovered_workload: 0,
+    progress_percent: 0,
+    remaining_count: 0,
+  };
+  const statusNode = document.querySelector("[data-sync-current-status]");
+  const processedNode = document.querySelector("[data-sync-current-processed]");
+  const failuresNode = document.querySelector("[data-sync-current-failures]");
+  const workloadNode = document.querySelector("[data-sync-current-workload]");
+  const progressNode = document.querySelector("[data-sync-current-progress]");
+  const remainingNode = document.querySelector("[data-sync-current-remaining]");
+  const progressBar = document.querySelector("[data-sync-progress-bar]");
+  if (statusNode) {
+    statusNode.textContent = current.status;
+    statusNode.style.color = syncStatusTone(current.status);
+  }
+  if (processedNode) processedNode.textContent = String(current.processed_count || 0);
+  if (failuresNode) failuresNode.textContent = String(current.failure_count || 0);
+  if (workloadNode) workloadNode.textContent = String(current.discovered_workload || 0);
+  if (progressNode) progressNode.textContent = String(current.progress_percent || 0) + "%";
+  if (remainingNode) remainingNode.textContent = String(current.remaining_count || 0);
+  if (progressBar) progressBar.style.width = String(current.progress_percent || 0) + "%";
+}
+
+function renderSyncRuns(items) {
+  const tableBody = document.querySelector("[data-sync-runs-table]");
+  if (!tableBody) {
+    return;
+  }
+  if (!items.length) {
+    tableBody.innerHTML = '<tr><td colspan="6">No sync runs yet.</td></tr>';
+    renderSyncOverview(null);
+    return;
+  }
+  renderSyncOverview(items[0]);
+  tableBody.innerHTML = items.map((item) => `
+    <tr style="${isActiveSyncRun(item.status) ? "background: rgba(2, 132, 199, 0.08); box-shadow: inset 4px 0 0 #0284c7;" : ""}">
+      <td>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <strong style="color:${limsEscapeHtml(syncStatusTone(item.status))}">${limsEscapeHtml(item.status)}</strong>
+          ${isActiveSyncRun(item.status) ? limsBadgeHtml("Active run", "active") : ""}
+        </div>
+      </td>
+      <td>${limsEscapeHtml(item.country_code || "TZ")}</td>
+      <td>${limsEscapeHtml(String(item.processed_count || 0))}</td>
+      <td>${limsEscapeHtml(String(item.failure_count || 0))}</td>
+      <td>${limsEscapeHtml(String(item.discovered_workload || 0))}</td>
+      <td>${limsEscapeHtml(String(item.progress_percent || 0))}%</td>
+    </tr>
+  `).join("");
+}
+
+async function refreshSyncRuns() {
+  try {
+    const response = await limsPortalRequest("/api/v1/lims/reference/address-sync-runs", null, "GET");
+    renderSyncRuns((response && response.items) || []);
+  } catch (_error) {}
+}
+
 async function startAddressSync() {
   await limsPortalAction("/api/v1/lims/reference/address-sync-runs", {}, "Address sync started");
 }
+
+renderSyncRuns(limsInitialSyncRuns || []);
+window.setInterval(refreshSyncRuns, 5000);
 {% endblock %}

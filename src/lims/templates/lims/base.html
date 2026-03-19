@@ -26,6 +26,33 @@
     <a href="/admin/logout/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">logout</span><span>Logout</span></a>
   </div>
 </details>
+<style>
+  .lims-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .lims-badge--info {
+    background: #e0f2fe;
+    color: #075985;
+  }
+
+  .lims-badge--neutral {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .lims-badge--active {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+</style>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -37,7 +64,7 @@ function limsFeedback(message, isError) {
 }
 
 function limsField(name) {
-  return document.querySelector('[data-lims-field="' + name + '"]');
+  return document.querySelector('[data-lims-field="' + name + '"]') || document.querySelector('[data-field="' + name + '"]');
 }
 
 function limsValue(name) {
@@ -80,6 +107,11 @@ function limsEscapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function limsBadgeHtml(label, tone) {
+  const badgeTone = ["info", "neutral", "active"].includes(tone) ? tone : "info";
+  return `<span class="lims-badge lims-badge--${badgeTone}">${limsEscapeHtml(label)}</span>`;
 }
 
 async function limsPortalRequest(url, payload, method) {

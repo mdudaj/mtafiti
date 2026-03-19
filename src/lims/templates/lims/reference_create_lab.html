@@ -5,11 +5,13 @@
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-lab-create">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Lab setup form" panel_description="Capture one tenant lab at a time." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Lab setup form" panel_description="Capture one tenant lab at a time, including its address." %}
   <div class="section-stack">
     <label class="field-group"><span class="field-label">Lab name</span><input class="input" data-lims-field="lab-name" /></label>
-    <label class="field-group"><span class="field-label">Lab code</span><input class="input" data-lims-field="lab-code" /></label>
+    <label class="field-group"><span class="field-label">Lab code</span><input class="input" data-lims-field="lab-code" placeholder="Auto-generated from lab name, but editable" /></label>
     <label class="field-group"><span class="field-label">Address line</span><input class="input" data-lims-field="lab-address" /></label>
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="street_id" hidden_data_field="lab-street-id" field_label="Street" endpoint_url="/api/v1/lims/reference/select-options?source=streets" placeholder="Search street, ward, district, or region" %}
+    <p class="muted">Selecting a street will automatically infer ward, district, region, country, and postcode when possible.</p>
     <div class="button-row">
       <button class="button" type="button" onclick="createLab()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_business</span><span>Create lab</span></button>
       <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
@@ -21,11 +23,37 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+function slugifyReferenceCode(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+(function initializeLabCodeSlug() {
+  const nameInput = document.querySelector('[data-lims-field="lab-name"]');
+  const codeInput = document.querySelector('[data-lims-field="lab-code"]');
+  if (!nameInput || !codeInput) {
+    return;
+  }
+  let manualEdit = false;
+  codeInput.addEventListener("input", () => {
+    manualEdit = codeInput.value.trim().length > 0;
+  });
+  nameInput.addEventListener("input", () => {
+    if (!manualEdit || !codeInput.value.trim()) {
+      codeInput.value = slugifyReferenceCode(nameInput.value);
+    }
+  });
+}());
+
 async function createLab() {
   await limsPortalAction("/api/v1/lims/reference/labs", {
     name: limsValue("lab-name"),
     code: limsValue("lab-code"),
     address_line: limsValue("lab-address"),
+    street_id: limsOptionalValue("lab-street-id"),
   }, "Lab created");
 }
 {% endblock %}

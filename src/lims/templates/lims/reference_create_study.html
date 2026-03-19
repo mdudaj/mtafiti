@@ -8,7 +8,7 @@
   {% include "core/ui/includes/panel_header.html" with panel_title="Study setup form" panel_description="Create one study and optionally link its lead lab." %}
   <div class="section-stack">
     <label class="field-group"><span class="field-label">Study name</span><input class="input" data-lims-field="study-name" /></label>
-    <label class="field-group"><span class="field-label">Study code</span><input class="input" data-lims-field="study-code" /></label>
+    <label class="field-group"><span class="field-label">Study code</span><input class="input" data-lims-field="study-code" placeholder="Auto-generated from study name, but editable" /></label>
     <label class="field-group">
       <span class="field-label">Lead lab</span>
       <select class="select" data-lims-field="study-lead-lab">
@@ -29,6 +29,31 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+function slugifyReferenceCode(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+(function initializeStudyCodeSlug() {
+  const nameInput = document.querySelector('[data-lims-field="study-name"]');
+  const codeInput = document.querySelector('[data-lims-field="study-code"]');
+  if (!nameInput || !codeInput) {
+    return;
+  }
+  let manualEdit = false;
+  codeInput.addEventListener("input", () => {
+    manualEdit = codeInput.value.trim().length > 0;
+  });
+  nameInput.addEventListener("input", () => {
+    if (!manualEdit || !codeInput.value.trim()) {
+      codeInput.value = slugifyReferenceCode(nameInput.value);
+    }
+  });
+}());
+
 async function createStudy() {
   await limsPortalAction("/api/v1/lims/reference/studies", {
     name: limsValue("study-name"),

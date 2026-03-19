@@ -16,6 +16,17 @@ class TimestampedUUIDModel(models.Model):
         abstract = True
 
 
+def _validate_address_hierarchy(*, country=None, region=None, district=None, ward=None, street=None) -> None:
+    if street and ward and street.ward_id != ward.id:
+        raise ValidationError({"street": "Selected street does not belong to the selected ward."})
+    if ward and district and ward.district_id != district.id:
+        raise ValidationError({"ward": "Selected ward does not belong to the selected district."})
+    if district and region and district.region_id != region.id:
+        raise ValidationError({"district": "Selected district does not belong to the selected region."})
+    if region and country and region.country_id != country.id:
+        raise ValidationError({"region": "Selected region does not belong to the selected country."})
+
+
 class Country(TimestampedUUIDModel):
     name = models.CharField(max_length=200, unique=True)
     code = models.CharField(max_length=8, unique=True)
@@ -213,6 +224,16 @@ class Lab(TimestampedUUIDModel):
     def __str__(self) -> str:
         return self.name
 
+    def clean(self) -> None:
+        super().clean()
+        _validate_address_hierarchy(
+            country=self.country,
+            region=self.region,
+            district=self.district,
+            ward=self.ward,
+            street=self.street,
+        )
+
 
 class Study(TimestampedUUIDModel):
     class Status(models.TextChoices):
@@ -254,6 +275,11 @@ class Site(TimestampedUUIDModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="sites",
+    )
+    studies = models.ManyToManyField(
+        Study,
+        blank=True,
+        related_name="linked_sites",
     )
     lab = models.ForeignKey(
         Lab,
@@ -310,6 +336,16 @@ class Site(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def clean(self) -> None:
+        super().clean()
+        _validate_address_hierarchy(
+            country=self.country,
+            region=self.region,
+            district=self.district,
+            ward=self.ward,
+            street=self.street,
+        )
 
 
 class TanzaniaAddressSyncRun(TimestampedUUIDModel):
