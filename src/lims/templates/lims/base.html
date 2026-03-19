@@ -1,0 +1,150 @@
+{% extends "core/ui/user_base.html" %}
+
+{% block title %}{{ payload.page.page_title }} · Mtafiti LIMS{% endblock %}
+
+{% block topbar_title %}{{ payload.page.topbar_title }}{% endblock %}
+
+{% block topbar_subtitle %}{{ payload.page.topbar_subtitle }}{% endblock %}
+
+{% block topbar_actions %}
+<span class="utility-chip">
+  <span class="icon-badge material-symbols-outlined" aria-hidden="true">science</span>
+  <span>{{ payload.page.section_label }}</span>
+</span>
+<span class="utility-chip">
+  <span class="icon-badge material-symbols-outlined" aria-hidden="true">apartment</span>
+  <span>{{ payload.tenant_schema }}</span>
+</span>
+<details class="account-menu">
+  <summary class="utility-button">
+    <span class="icon-badge material-symbols-outlined" aria-hidden="true">manage_accounts</span>
+    <span>Account</span>
+  </summary>
+  <div class="account-dropdown">
+    <a href="/admin/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">person</span><span>Profile / admin</span></a>
+    <a href="/admin/password_change/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">password</span><span>Change password</span></a>
+    <a href="/admin/logout/"><span class="icon-badge material-symbols-outlined" aria-hidden="true">logout</span><span>Logout</span></a>
+  </div>
+</details>
+<style>
+  .lims-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .lims-badge--info {
+    background: #e0f2fe;
+    color: #075985;
+  }
+
+  .lims-badge--neutral {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .lims-badge--active {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+function limsFeedback(message, isError) {
+  const current = new URL(window.location.href);
+  current.searchParams.set("ui_message", message);
+  current.searchParams.set("ui_error", isError ? "1" : "0");
+  window.location.assign(current.toString());
+}
+
+function limsField(name) {
+  return document.querySelector('[data-lims-field="' + name + '"]') || document.querySelector('[data-field="' + name + '"]');
+}
+
+function limsValue(name) {
+  const field = limsField(name);
+  return field ? field.value.trim() : "";
+}
+
+function limsOptionalValue(name) {
+  const value = limsValue(name);
+  return value || null;
+}
+
+function limsJsonValue(name, fallbackValue) {
+  const value = limsValue(name);
+  if (!value) {
+    return fallbackValue;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    throw new Error(name + " must be valid JSON");
+  }
+}
+
+function limsCsvValues(name) {
+  return limsValue(name)
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function limsSelectedOption(name) {
+  const field = limsField(name);
+  return field && field.selectedOptions.length ? field.selectedOptions[0] : null;
+}
+
+function limsEscapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function limsBadgeHtml(label, tone) {
+  const badgeTone = ["info", "neutral", "active"].includes(tone) ? tone : "info";
+  return `<span class="lims-badge lims-badge--${badgeTone}">${limsEscapeHtml(label)}</span>`;
+}
+
+async function limsPortalRequest(url, payload, method) {
+  const response = await fetch(url, {
+    method: method || "POST",
+    headers: {"Content-Type": "application/json"},
+    body: payload === undefined || payload === null ? undefined : JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let message = "Action failed";
+    try {
+      const data = await response.json();
+      message = data.error || message;
+    } catch (_error) {}
+    throw new Error(message);
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function limsPortalAction(url, payload, successMessage) {
+  try {
+    await limsPortalRequest(url, payload);
+  } catch (error) {
+    limsFeedback(error.message || "Action failed", true);
+    return;
+  }
+  limsFeedback(successMessage || "Action completed", false);
+}
+{% endblock %}

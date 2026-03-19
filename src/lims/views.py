@@ -1,15 +1,19 @@
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
+from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.text import slugify
 
-from core.identity import request_roles
+from core.identity import request_roles, roles_enforced
 
-from .permissions import permission_summary_for_roles, require_lims_permission
+from .permissions import has_lims_permission, permission_summary_for_roles, require_lims_permission
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
@@ -76,33 +80,590 @@ def _user_context(request) -> dict[str, object]:
     }
 
 
-def _dashboard_payload(request) -> dict[str, object]:
+def _ui_feedback_context(request) -> dict[str, object]:
+    message = (request.GET.get("ui_message") or "").strip()
+    error = (request.GET.get("ui_error") or "").strip()
     return {
-        'service_key': 'lims',
-        'tenant_schema': _user_context(request)['tenant_schema'],
-        'cards': {
-            'workflows': 0,
-            'queues': 0,
-            'instruments': 0,
-        },
-        'launchpad': [
-            {
-                'title': 'Reference data',
-                'description': 'Prepare lab, study, and site structures for tenant onboarding.',
-                'status': 'planned',
-            },
-            {
-                'title': 'Workflow configuration',
-                'description': 'Design draft/publish workflow templates and metadata schemas.',
-                'status': 'planned',
-            },
-            {
-                'title': 'Operator workspace',
-                'description': 'Provide inbox, receiving, QC, and storage entrypoints.',
-                'status': 'planned',
-            },
-        ],
+        "ui_message": message,
+        "ui_error": error.lower() in {"1", "true", "yes"},
     }
+
+
+def _can_view_operations(request) -> bool:
+    if not roles_enforced():
+        return True
+    return bool(
+        set(request_roles(request))
+        & {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin", "lims.operator", "lims.manager", "lims.qa", "lims.admin"}
+    )
+
+
+def _has_permission(request, permission_key: str) -> bool:
+    if not roles_enforced():
+        return True
+    return has_lims_permission(request_roles(request), permission_key)
+
+
+def _lims_navigation(request, active_key: str) -> dict[str, object]:
+    links = []
+    candidates = [
+        ("lims-dashboard", "Dashboard", "dashboard", "/lims/", "lims.dashboard.view"),
+        ("lims-reference", "Reference", "globe_location_pin", "/lims/reference/", "lims.reference.view"),
+        ("lims-metadata", "Metadata", "schema", "/lims/metadata/", "lims.metadata.view"),
+        ("lims-biospecimens", "Biospecimens", "biotech", "/lims/biospecimens/", "lims.artifact.view"),
+        ("lims-receiving", "Receiving", "inventory_2", "/lims/receiving/", "lims.artifact.view"),
+        ("lims-processing", "Processing", "science", "/lims/processing/", "lims.artifact.view"),
+    ]
+    for key, label, icon, href, permission_key in candidates:
+        if _has_permission(request, permission_key):
+            links.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "icon": icon,
+                    "href": href,
+                    "is_active": key == active_key,
+                }
+            )
+    return {
+        "can_view_operations": _can_view_operations(request),
+        "lims_links": links,
+    }
+
+
+def _page_payload_base(request, *, active_key: str, title: str, summary: str, kicker: str) -> dict[str, object]:
+    user_context = _user_context(request)
+    return {
+        "service_key": "lims",
+        "tenant_schema": user_context["tenant_schema"],
+        "user_context": user_context,
+        "navigation": _lims_navigation(request, active_key),
+        "capabilities": {
+            "can_view_reference": _has_permission(request, "lims.reference.view"),
+            "can_manage_reference": _has_permission(request, "lims.reference.manage"),
+            "can_view_metadata": _has_permission(request, "lims.metadata.view"),
+            "can_manage_metadata": _has_permission(request, "lims.metadata.manage"),
+            "can_view_artifacts": _has_permission(request, "lims.artifact.view"),
+            "can_manage_artifacts": _has_permission(request, "lims.artifact.manage"),
+            "can_execute_tasks": _has_permission(request, "lims.workflow.execute"),
+            "can_approve_tasks": _has_permission(request, "lims.workflow.approve"),
+        },
+        "page": {
+            "page_title": title,
+            "page_summary": summary,
+            "topbar_title": title,
+            "topbar_subtitle": summary,
+            "kicker": kicker,
+            "section_label": "LIMS",
+        },
+        "cards": {},
+    }
+
+
+def _page_context(request, *, active_nav: str, payload: dict[str, object]) -> dict[str, object]:
+    return {
+        "active_nav": active_nav,
+        "payload": payload,
+        **_ui_feedback_context(request),
+    }
+
+
+def _dashboard_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-dashboard",
+        title="Laboratory operations workspace",
+        summary="Use tenant-scoped reference, metadata, accessioning, and processing tools from one admin-style shell.",
+        kicker="LIMS overview",
+    )
+    labs_count = Lab.objects.count()
+    schema_count = MetadataSchema.objects.count()
+    specimen_count = Biospecimen.objects.count()
+    manifest_count = AccessioningManifest.objects.count()
+    batch_count = ProcessingBatch.objects.count()
+    payload["cards"] = {
+        "labs": labs_count,
+        "schemas": schema_count,
+        "biospecimens": specimen_count,
+        "manifests": manifest_count,
+        "batches": batch_count,
+    }
+    payload["launchpad"] = [
+        {
+            "title": "Reference data",
+            "description": "Manage labs, studies, sites, and address sync runs for the tenant.",
+            "href": "/lims/reference/",
+            "status": "ready" if payload["capabilities"]["can_view_reference"] else "restricted",
+        },
+        {
+            "title": "Metadata schemas",
+            "description": "Define vocabularies, fields, schemas, and published bindings for configurable forms.",
+            "href": "/lims/metadata/",
+            "status": "ready" if payload["capabilities"]["can_view_metadata"] else "restricted",
+        },
+        {
+            "title": "Biospecimens",
+            "description": "Register sample types, create specimens, and assemble pools for downstream workflow steps.",
+            "href": "/lims/biospecimens/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+        {
+            "title": "Receiving",
+            "description": "Receive single samples, track manifests, and capture discrepancy workflows.",
+            "href": "/lims/receiving/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+        {
+            "title": "Processing",
+            "description": "Create plate-based batches, review assignments, and trigger worksheet print jobs.",
+            "href": "/lims/processing/",
+            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+    ]
+    payload["recent_manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    payload["recent_batches"] = [
+        _processing_batch_to_dict(item)
+        for item in ProcessingBatch.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    payload["recent_specimens"] = [
+        _biospecimen_to_dict(item)
+        for item in Biospecimen.objects.select_related("sample_type").order_by("-created_at")[:5]
+    ]
+    return payload
+
+
+def _reference_launchpad_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Reference and geography",
+        summary="Choose a focused reference-data task, then complete it on a dedicated single-action page.",
+        kicker="Reference operations",
+    )
+    payload["cards"] = {
+        "labs": Lab.objects.count(),
+        "studies": Study.objects.count(),
+        "sites": Site.objects.count(),
+        "sync_runs": TanzaniaAddressSyncRun.objects.count(),
+    }
+    payload["labs"] = [_lab_to_dict(item) for item in Lab.objects.order_by("name")[:10]]
+    payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
+    payload["sites"] = [
+        _site_to_dict(item)
+        for item in Site.objects.select_related("study", "lab").prefetch_related("studies").order_by("name")[:10]
+    ]
+    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]]
+    payload["actions"] = [
+        {
+            "title": "Create lab",
+            "description": "Register one tenant lab at a time using a dedicated lab form.",
+            "href": "/lims/reference/labs/create/",
+            "icon": "add_business",
+        },
+        {
+            "title": "Create study",
+            "description": "Create one study and optionally attach its lead lab.",
+            "href": "/lims/reference/studies/create/",
+            "icon": "schema",
+        },
+        {
+            "title": "Create site",
+            "description": "Register one field or collection site and link it to study and lab selectors.",
+            "href": "/lims/reference/sites/create/",
+            "icon": "location_city",
+        },
+        {
+            "title": "Run geography sync",
+            "description": "Start the Tanzania-backed geography import from a single sync action page.",
+            "href": "/lims/reference/address-sync/",
+            "icon": "sync",
+        },
+    ]
+    return payload
+
+
+def _reference_create_lab_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create lab",
+        summary="Capture one tenant lab at a time without mixing this form with other setup actions.",
+        kicker="Reference setup",
+    )
+    payload["address_country"] = Country.objects.filter(code="TZ").first()
+    return payload
+
+
+def _reference_create_study_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create study",
+        summary="Create one study record and optionally assign a lead lab for routing and receiving defaults.",
+        kicker="Reference setup",
+    )
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    return payload
+
+
+def _reference_create_site_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Create site",
+        summary="Register one site at a time so downstream receiving and biospecimen forms stay focused.",
+        kicker="Reference setup",
+    )
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["address_country"] = Country.objects.filter(code="TZ").first()
+    return payload
+
+
+def _reference_address_sync_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Run geography sync",
+        summary="Queue one geography sync run at a time from a dedicated action page.",
+        kicker="Reference setup",
+    )
+    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:8]]
+    return payload
+
+
+def _metadata_launchpad_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Metadata configuration",
+        summary="Choose a focused metadata task, then complete it on a dedicated single-action page.",
+        kicker="Configurable metadata",
+    )
+    payload["cards"] = {
+        "vocabularies": MetadataVocabulary.objects.count(),
+        "fields": MetadataFieldDefinition.objects.count(),
+        "schemas": MetadataSchema.objects.count(),
+        "bindings": MetadataSchemaBinding.objects.count(),
+    }
+    payload["vocabularies"] = [_vocabulary_to_dict(item) for item in MetadataVocabulary.objects.prefetch_related("items").order_by("name")[:8]]
+    payload["field_definitions"] = [
+        _field_definition_to_dict(item)
+        for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")[:10]
+    ]
+    payload["schemas"] = [
+        _schema_to_dict(item)
+        for item in MetadataSchema.objects.prefetch_related(
+            "versions__fields__field_definition",
+            "versions__schema",
+        ).order_by("name")[:6]
+    ]
+    payload["bindings"] = [
+        _schema_binding_to_dict(item)
+        for item in MetadataSchemaBinding.objects.select_related("schema_version__schema").order_by("target_type", "target_key")[:10]
+    ]
+    payload["actions"] = [
+        {
+            "title": "Create vocabulary",
+            "description": "Seed one controlled vocabulary from a dedicated create form.",
+            "href": "/lims/metadata/vocabularies/create/",
+            "icon": "list_alt",
+        },
+        {
+            "title": "Create field definition",
+            "description": "Define one reusable metadata field and its wizard-step placement.",
+            "href": "/lims/metadata/fields/create/",
+            "icon": "data_object",
+        },
+        {
+            "title": "Create schema + version",
+            "description": "Compose one schema version with the visual builder on its own page.",
+            "href": "/lims/metadata/schemas/create/",
+            "icon": "schema",
+        },
+        {
+            "title": "Create binding",
+            "description": "Attach one published schema version to one sample type or workflow target.",
+            "href": "/lims/metadata/bindings/create/",
+            "icon": "link",
+        },
+        {
+            "title": "Publish version",
+            "description": "Promote one draft schema version without mixing publishing with binding creation.",
+            "href": "/lims/metadata/versions/publish/",
+            "icon": "publish",
+        },
+    ]
+    return payload
+
+
+def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
+    return _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create vocabulary",
+        summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
+        kicker="Metadata setup",
+    )
+
+
+def _metadata_create_field_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create field definition",
+        summary="Define one reusable field, including help text, placeholder, defaults, and wizard-step placement.",
+        kicker="Metadata setup",
+    )
+    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
+    payload["ui_step_options"] = [
+        {"value": "metadata", "label": "Wizard metadata step"},
+        {"value": "storage", "label": "Wizard storage step"},
+    ]
+    payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.order_by("name")]
+    return payload
+
+
+def _metadata_create_schema_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create schema and first version",
+        summary="Use the visual builder to assemble one schema version without mixing it with other metadata actions.",
+        kicker="Metadata setup",
+    )
+    payload["field_definition_catalog"] = [
+        _field_definition_to_dict(item)
+        for item in MetadataFieldDefinition.objects.select_related("vocabulary").prefetch_related("vocabulary__items").order_by("name")
+    ]
+    payload["field_definition_options"] = [_model_to_option(item) for item in MetadataFieldDefinition.objects.order_by("name")]
+    return payload
+
+
+def _metadata_create_binding_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create schema binding",
+        summary="Bind one schema version to one target from a dedicated attachment page.",
+        kicker="Metadata setup",
+    )
+    payload["binding_target_type_options"] = [
+        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+    ]
+    payload["schema_version_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.schema.code} v{item.version_number} ({item.status})",
+            "schema_id": str(item.schema_id),
+        }
+        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+    ]
+    return payload
+
+
+def _metadata_publish_version_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Publish schema version",
+        summary="Promote one draft schema version from a single publish form.",
+        kicker="Metadata setup",
+    )
+    payload["schema_version_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.schema.code} v{item.version_number} ({item.status})",
+            "schema_id": str(item.schema_id),
+        }
+        for item in MetadataSchemaVersion.objects.select_related("schema").order_by("schema__name", "-version_number")
+    ]
+    return payload
+
+
+def _biospecimens_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-biospecimens",
+        title="Biospecimen registry",
+        summary="Register sample types, create specimens, and monitor pool composition before receiving and batch processing.",
+        kicker="Specimen inventory",
+    )
+    payload["cards"] = {
+        "sample_types": BiospecimenType.objects.count(),
+        "specimens": Biospecimen.objects.count(),
+        "aliquots": Biospecimen.objects.filter(kind=Biospecimen.Kind.ALIQUOT).count(),
+        "pools": BiospecimenPool.objects.count(),
+    }
+    payload["sample_types"] = [_biospecimen_type_to_dict(item) for item in BiospecimenType.objects.order_by("name")[:10]]
+    payload["specimens"] = [
+        _biospecimen_to_dict(item)
+        for item in Biospecimen.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+    ]
+    payload["pools"] = [
+        _biospecimen_pool_to_dict(item)
+        for item in BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:8]
+    ]
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["specimen_options"] = [
+        {"value": str(item.id), "label": f"{item.sample_identifier} ({item.status})"}
+        for item in Biospecimen.objects.order_by("-created_at")[:50]
+    ]
+    return payload
+
+
+def _receiving_launchpad_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receiving and accessioning",
+        summary="Choose a focused receiving flow, then complete that task on a dedicated one-form page.",
+        kicker="Accessioning",
+    )
+    payload["cards"] = {
+        "manifests": AccessioningManifest.objects.count(),
+        "received_events": ReceivingEvent.objects.count(),
+        "discrepancies": ReceivingDiscrepancy.objects.count(),
+        "pending_items": AccessioningManifestItem.objects.filter(status=AccessioningManifestItem.Status.PENDING).count(),
+    }
+    payload["manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+    ]
+    payload["events"] = [
+        _receiving_event_to_dict(item)
+        for item in ReceivingEvent.objects.select_related("biospecimen").order_by("-received_at")[:8]
+    ]
+    payload["discrepancies"] = [
+        _receiving_discrepancy_to_dict(item)
+        for item in ReceivingDiscrepancy.objects.order_by("-created_at")[:8]
+    ]
+    payload["actions"] = [
+        {
+            "title": "Single sample receipt",
+            "description": "Capture intake metadata, record a QC accept/reject decision, then log storage or rejection details.",
+            "href": "/lims/receiving/single/",
+            "icon": "move_to_inbox",
+        },
+        {
+            "title": "Batch manifest receipt",
+            "description": "Download an Excel-friendly CSV template, complete receipt/QC/storage columns, and import the batch.",
+            "href": "/lims/receiving/batch/",
+            "icon": "upload_file",
+        },
+        {
+            "title": "Retrieve from EDC",
+            "description": "Specify the lab form, expected sample, and external ID, then process the imported record through QC.",
+            "href": "/lims/receiving/edc-import/",
+            "icon": "cloud_download",
+        },
+    ]
+    return payload
+
+
+def _receiving_single_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receive single specimen",
+        summary="Capture initial metadata, complete the first QC decision, then log storage or document a rejection.",
+        kicker="Single receipt",
+    )
+    payload["sample_type_options"] = [
+        {"value": str(item.id), "label": item.name, "key": item.key}
+        for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    return payload
+
+
+def _receiving_batch_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Receive batch manifest",
+        summary="Use one batch import form to load intake metadata, QC outcomes, and storage instructions from a template.",
+        kicker="Batch receipt",
+    )
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    payload["recent_manifests"] = [
+        _accessioning_manifest_to_dict(item)
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:8]
+    ]
+    return payload
+
+
+def _receiving_edc_import_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-receiving",
+        title="Retrieve metadata from EDC",
+        summary="Capture the lab form, expected sample, external ID import target, and QC/storage outcome in one flow.",
+        kicker="EDC intake",
+    )
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["discrepancy_code_options"] = [
+        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+    ]
+    payload["edc_source_options"] = [
+        {"value": "redcap", "label": "REDCap"},
+        {"value": "odk", "label": "ODK"},
+        {"value": "odk-central", "label": "ODK Central"},
+    ]
+    return payload
+
+
+def _processing_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-processing",
+        title="Batch and plate processing",
+        summary="Create processing batches, inspect plate layouts, and issue worksheet print jobs for downstream lab execution.",
+        kicker="Batch management",
+    )
+    payload["cards"] = {
+        "layouts": PlateLayoutTemplate.objects.count(),
+        "batches": ProcessingBatch.objects.count(),
+        "draft_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.DRAFT).count(),
+        "printed_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.PRINTED).count(),
+    }
+    payload["layouts"] = [_plate_layout_to_dict(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["batches"] = [
+        _processing_batch_to_dict(item, include_plates=True)
+        for item in ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab")
+        .prefetch_related("plates__layout_template", "plates__assignments__biospecimen")
+        .order_by("-created_at")[:8]
+    ]
+    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
+    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
+    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["layout_options"] = [_model_to_option(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["batch_options"] = [
+        {"value": str(item.id), "label": f"{item.batch_identifier} ({item.status})"}
+        for item in ProcessingBatch.objects.order_by("-created_at")[:50]
+    ]
+    return payload
 
 
 def _parse_json_body(request):
@@ -117,13 +678,59 @@ def _model_to_option(item, label_attr: str = "name") -> dict[str, str]:
     return {"value": str(item.id), "label": getattr(item, label_attr)}
 
 
+def _option(value: str, label: str, description: str = "") -> dict[str, str]:
+    payload = {"value": value, "label": label}
+    if description:
+        payload["description"] = description
+    return payload
+
+
+def _address_breadcrumb(*, country=None, region=None, district=None, ward=None, street=None, postcode: str = "", address_line: str = "") -> str:
+    parts = []
+    if address_line:
+        parts.append(address_line)
+    if street:
+        parts.append(street.name)
+    if ward:
+        parts.append(ward.name)
+    if district:
+        parts.append(district.name)
+    if region:
+        parts.append(region.name)
+    if country:
+        parts.append(country.name)
+    if postcode:
+        parts.append(postcode)
+    return " / ".join(parts)
+
+
+def _badge(label: str, tone: str = "info") -> dict[str, str]:
+    return {"label": label, "tone": tone}
+
+
 def _lab_to_dict(lab: Lab) -> dict[str, object]:
+    address_breadcrumb = _address_breadcrumb(
+        country=lab.country,
+        region=lab.region,
+        district=lab.district,
+        ward=lab.ward,
+        street=lab.street,
+        postcode=lab.postcode,
+        address_line=lab.address_line,
+    )
     return {
         "id": str(lab.id),
         "name": lab.name,
         "code": lab.code,
         "description": lab.description,
         "address_line": lab.address_line,
+        "country_label": lab.country.name if lab.country_id else "",
+        "region_label": lab.region.name if lab.region_id else "",
+        "district_label": lab.district.name if lab.district_id else "",
+        "ward_label": lab.ward.name if lab.ward_id else "",
+        "street_label": lab.street.name if lab.street_id else "",
+        "address_breadcrumb": address_breadcrumb,
+        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
         "country_id": str(lab.country_id) if lab.country_id else None,
         "region_id": str(lab.region_id) if lab.region_id else None,
         "district_id": str(lab.district_id) if lab.district_id else None,
@@ -142,19 +749,44 @@ def _study_to_dict(study: Study) -> dict[str, object]:
         "description": study.description,
         "sponsor": study.sponsor,
         "lead_lab_id": str(study.lead_lab_id) if study.lead_lab_id else None,
+        "lead_lab_name": study.lead_lab.name if study.lead_lab_id else "",
+        "lead_lab_badge": _badge(study.lead_lab.name, "neutral") if study.lead_lab_id else None,
         "status": study.status,
+        "status_badge": _badge(study.get_status_display(), "info"),
     }
 
 
 def _site_to_dict(site: Site) -> dict[str, object]:
+    studies = sorted(site.studies.all(), key=lambda item: item.name)
+    primary_study_id = str(site.study_id) if site.study_id else (str(studies[0].id) if studies else None)
+    address_breadcrumb = _address_breadcrumb(
+        country=site.country,
+        region=site.region,
+        district=site.district,
+        ward=site.ward,
+        street=site.street,
+        postcode=site.postcode,
+        address_line=site.address_line,
+    )
     return {
         "id": str(site.id),
         "name": site.name,
         "code": site.code,
         "description": site.description,
-        "study_id": str(site.study_id) if site.study_id else None,
+        "study_id": primary_study_id,
+        "study_ids": [str(item.id) for item in studies],
+        "study_labels": [item.name for item in studies],
+        "study_badges": [_badge(item.name, "info") for item in studies],
         "lab_id": str(site.lab_id) if site.lab_id else None,
+        "lab_name": site.lab.name if site.lab_id else "",
         "address_line": site.address_line,
+        "country_label": site.country.name if site.country_id else "",
+        "region_label": site.region.name if site.region_id else "",
+        "district_label": site.district.name if site.district_id else "",
+        "ward_label": site.ward.name if site.ward_id else "",
+        "street_label": site.street.name if site.street_id else "",
+        "address_breadcrumb": address_breadcrumb,
+        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
         "country_id": str(site.country_id) if site.country_id else None,
         "region_id": str(site.region_id) if site.region_id else None,
         "district_id": str(site.district_id) if site.district_id else None,
@@ -173,6 +805,19 @@ def _parse_decimal(value, *, field: str, default: str | None = None):
         return Decimal(str(raw)), None
     except (InvalidOperation, TypeError, ValueError):
         return None, JsonResponse({"error": f"invalid_{field}"}, status=400)
+
+
+def _parse_optional_received_at(value):
+    if value in (None, ""):
+        return None, None
+    raw = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(f"{raw}T00:00:00" if len(raw) == 10 else raw)
+    except ValueError:
+        return None, JsonResponse({"error": "invalid_received_at"}, status=400)
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed, None
 
 
 def _biospecimen_type_to_dict(item: BiospecimenType) -> dict[str, object]:
@@ -400,6 +1045,12 @@ def _vocabulary_to_dict(vocabulary: MetadataVocabulary) -> dict[str, object]:
 
 
 def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, object]:
+    vocabulary_items = []
+    if field.vocabulary_id:
+        vocabulary_items = [
+            {"label": item.label, "value": item.value}
+            for item in field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+        ]
     return {
         "id": str(field.id),
         "name": field.name,
@@ -409,6 +1060,7 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
         "help_text": field.help_text,
         "placeholder": field.placeholder,
         "vocabulary_id": str(field.vocabulary_id) if field.vocabulary_id else None,
+        "vocabulary_items": vocabulary_items,
         "default_value": field.default_value,
         "config": field.config,
         "is_active": field.is_active,
@@ -416,6 +1068,23 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
 
 
 def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
+    vocabulary_items = []
+    if field.field_definition.vocabulary_id:
+        vocabulary_items = [
+            {"label": item.label, "value": item.value}
+            for item in field.field_definition.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+        ]
+    formbuilder_type = {
+        MetadataFieldDefinition.FieldType.TEXT: "text",
+        MetadataFieldDefinition.FieldType.LONG_TEXT: "textarea",
+        MetadataFieldDefinition.FieldType.INTEGER: "number",
+        MetadataFieldDefinition.FieldType.DECIMAL: "number",
+        MetadataFieldDefinition.FieldType.BOOLEAN: "checkbox",
+        MetadataFieldDefinition.FieldType.DATE: "date",
+        MetadataFieldDefinition.FieldType.DATETIME: "text",
+        MetadataFieldDefinition.FieldType.CHOICE: "select",
+        MetadataFieldDefinition.FieldType.MULTI_CHOICE: "checkbox-group",
+    }[field.field_definition.field_type]
     return {
         "id": str(field.id),
         "field_definition_id": str(field.field_definition_id),
@@ -427,6 +1096,36 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
         "required": field.required,
         "validation_rules": dict(field.validation_rules or {}),
         "condition": dict(field.condition or {}),
+        "help_text": field.field_definition.help_text,
+        "placeholder": field.field_definition.placeholder,
+        "default_value": field.field_definition.default_value,
+        "config": dict(field.field_definition.config or {}),
+        "vocabulary_items": vocabulary_items,
+        "formbuilder": {
+            "name": field.field_key,
+            "label": field.field_definition.name,
+            "type": formbuilder_type,
+            "subtype": (
+                "textarea"
+                if field.field_definition.field_type == MetadataFieldDefinition.FieldType.LONG_TEXT
+                else (
+                    "integer"
+                    if field.field_definition.field_type == MetadataFieldDefinition.FieldType.INTEGER
+                    else (
+                        "datetime-local"
+                        if field.field_definition.field_type == MetadataFieldDefinition.FieldType.DATETIME
+                        else "text"
+                    )
+                )
+            ),
+            "required": field.required,
+            "placeholder": field.field_definition.placeholder,
+            "description": field.field_definition.help_text,
+            "multiple": field.field_definition.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+            "values": vocabulary_items,
+            "value": field.field_definition.default_value,
+            "ui_step": str(field.field_definition.config.get("ui_step") or "metadata"),
+        },
     }
 
 
@@ -475,6 +1174,63 @@ def _resolve_optional_fk(model, raw_id, error_code: str):
         return None, JsonResponse({"error": error_code}, status=404)
 
 
+def _resolve_optional_fk_list(model, raw_ids, error_code: str):
+    if raw_ids in (None, ""):
+        return [], None
+    if not isinstance(raw_ids, list):
+        return None, JsonResponse({"error": f"{error_code}_invalid"}, status=400)
+    resolved = []
+    seen = set()
+    for raw_id in raw_ids:
+        if not raw_id:
+            continue
+        obj, error = _resolve_optional_fk(model, raw_id, error_code)
+        if error:
+            return None, error
+        key = str(obj.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        resolved.append(obj)
+    return resolved, None
+
+
+def _normalize_code(name: str, raw_code: object) -> str:
+    return slugify(str(raw_code or "").strip() or name)
+
+
+def _expand_address_hierarchy(*, country, region, district, ward, street):
+    resolved_country = country
+    resolved_region = region
+    resolved_district = district
+    resolved_ward = ward
+    resolved_street = street
+
+    if resolved_street:
+        if resolved_ward and resolved_street.ward_id != resolved_ward.id:
+            return None, JsonResponse({"error": "street_ward_mismatch"}, status=400)
+        resolved_ward = resolved_street.ward
+    if resolved_ward:
+        if resolved_district and resolved_ward.district_id != resolved_district.id:
+            return None, JsonResponse({"error": "ward_district_mismatch"}, status=400)
+        resolved_district = resolved_ward.district
+    if resolved_district:
+        if resolved_region and resolved_district.region_id != resolved_region.id:
+            return None, JsonResponse({"error": "district_region_mismatch"}, status=400)
+        resolved_region = resolved_district.region
+    if resolved_region:
+        if resolved_country and resolved_region.country_id != resolved_country.id:
+            return None, JsonResponse({"error": "region_country_mismatch"}, status=400)
+        resolved_country = resolved_region.country
+    return {
+        "country": resolved_country,
+        "region": resolved_region,
+        "district": resolved_district,
+        "ward": resolved_ward,
+        "street": resolved_street,
+    }, None
+
+
 def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: Street | None):
     if raw_postcode_id:
         postcode, error = _resolve_optional_fk(Postcode, raw_postcode_id, "postcode_not_found")
@@ -482,6 +1238,10 @@ def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: S
             return None, error
         return (postcode.code if postcode else ""), None
     postcode_code = str(raw_postcode_code or "").strip()
+    if not postcode_code and street:
+        matches = list(Postcode.objects.filter(street=street).order_by("code")[:2])
+        if len(matches) == 1:
+            return matches[0].code, None
     if not postcode_code:
         return "", None
     queryset = Postcode.objects.filter(code=postcode_code)
@@ -511,22 +1271,35 @@ def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
     street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
     if error:
         return error
+    hierarchy, error = _expand_address_hierarchy(
+        country=country,
+        region=region,
+        district=district,
+        ward=ward,
+        street=street,
+    )
+    if error:
+        return error
     postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
 
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
 
-    lab.name = str(payload.get("name")).strip()
-    lab.code = str(payload.get("code") or "").strip()
+    lab.name = name
+    lab.code = code
     lab.description = str(payload.get("description") or "").strip()
     lab.address_line = str(payload.get("address_line") or "").strip()
-    lab.country = country
-    lab.region = region
-    lab.district = district
-    lab.ward = ward
-    lab.street = street
+    lab.country = hierarchy["country"]
+    lab.region = hierarchy["region"]
+    lab.district = hierarchy["district"]
+    lab.ward = hierarchy["ward"]
+    lab.street = hierarchy["street"]
     lab.postcode = postcode
     lab.is_active = bool(payload.get("is_active", True))
     return None
@@ -536,10 +1309,14 @@ def _build_study_from_payload(study: Study, payload: dict[str, object]):
     lead_lab, error = _resolve_optional_fk(Lab, payload.get("lead_lab_id"), "lab_not_found")
     if error:
         return error
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
-    study.name = str(payload.get("name")).strip()
-    study.code = str(payload.get("code") or "").strip()
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    study.name = name
+    study.code = code
     study.description = str(payload.get("description") or "").strip()
     study.sponsor = str(payload.get("sponsor") or "").strip()
     study.lead_lab = lead_lab
@@ -551,9 +1328,14 @@ def _build_study_from_payload(study: Study, payload: dict[str, object]):
 
 
 def _build_site_from_payload(site: Site, payload: dict[str, object]):
+    studies, error = _resolve_optional_fk_list(Study, payload.get("study_ids"), "study_not_found")
+    if error:
+        return error
     study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
     if error:
         return error
+    if study and all(str(item.id) != str(study.id) for item in studies):
+        studies = [study, *studies]
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
@@ -572,24 +1354,38 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
     if error:
         return error
+    hierarchy, error = _expand_address_hierarchy(
+        country=country,
+        region=region,
+        district=district,
+        ward=ward,
+        street=street,
+    )
+    if error:
+        return error
     postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
     if error:
         return error
-    if not payload.get("name"):
+    name = str(payload.get("name") or "").strip()
+    if not name:
         return JsonResponse({"error": "name is required"}, status=400)
-    site.name = str(payload.get("name")).strip()
-    site.code = str(payload.get("code") or "").strip()
+    code = _normalize_code(name, payload.get("code"))
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    site.name = name
+    site.code = code
     site.description = str(payload.get("description") or "").strip()
-    site.study = study
+    site.study = studies[0] if studies else study
     site.lab = lab
     site.address_line = str(payload.get("address_line") or "").strip()
-    site.country = country
-    site.region = region
-    site.district = district
-    site.ward = ward
-    site.street = street
+    site.country = hierarchy["country"]
+    site.region = hierarchy["region"]
+    site.district = hierarchy["district"]
+    site.ward = hierarchy["ward"]
+    site.street = hierarchy["street"]
     site.postcode = postcode
     site.is_active = bool(payload.get("is_active", True))
+    site._pending_studies = studies
     return None
 
 
@@ -601,6 +1397,17 @@ def _save_model(instance):
         return JsonResponse({"error": "validation_error"}, status=400)
     except IntegrityError:
         return JsonResponse({"error": "conflict"}, status=409)
+    return None
+
+
+def _save_site_model(site: Site):
+    error = _save_model(site)
+    if error:
+        return error
+    pending_studies = getattr(site, "_pending_studies", None)
+    if pending_studies is not None:
+        site.studies.set(pending_studies)
+        delattr(site, "_pending_studies")
     return None
 
 
@@ -705,14 +1512,244 @@ def lims_dashboard_page(request):
     forbidden = require_lims_permission(request, 'lims.dashboard.view')
     if forbidden:
         return forbidden
+    return render(request, 'lims/dashboard.html', _page_context(request, active_nav='lims-dashboard', payload=_dashboard_payload(request)))
+
+
+@csrf_exempt
+def lims_reference_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
     return render(
         request,
-        'lims/dashboard.html',
-        {
-            'active_nav': 'lims',
-            'payload': _dashboard_payload(request),
-            'user_context': _user_context(request),
-        },
+        'lims/reference.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_lab_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_lab.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_lab_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_study_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_study.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_study_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_create_site_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_create_site.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_create_site_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_address_sync_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_address_sync.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_address_sync_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_vocabulary_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_vocabulary.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_vocabulary_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_field_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_field.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_field_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_schema_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_schema.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_schema_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_create_binding_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_create_binding.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_binding_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_metadata_publish_version_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/metadata_publish_version.html',
+        _page_context(request, active_nav='lims-metadata', payload=_metadata_publish_version_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_biospecimens_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/biospecimens.html',
+        _page_context(request, active_nav='lims-biospecimens', payload=_biospecimens_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_single_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_single.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_single_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_batch_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_batch.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_batch_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_receiving_edc_import_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/receiving_edc_import.html',
+        _page_context(request, active_nav='lims-receiving', payload=_receiving_edc_import_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_processing_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/processing.html',
+        _page_context(request, active_nav='lims-processing', payload=_processing_page_payload(request)),
     )
 
 
@@ -732,7 +1769,10 @@ def lims_reference_labs(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [_lab_to_dict(item) for item in Lab.objects.select_related("region", "district", "ward", "street").order_by("name")]
+        items = [
+            _lab_to_dict(item)
+            for item in Lab.objects.select_related("country", "region", "district", "ward", "street").order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -840,7 +1880,12 @@ def lims_reference_sites(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [_site_to_dict(item) for item in Site.objects.select_related("study", "lab", "region", "district", "ward", "street").order_by("name")]
+        items = [
+            _site_to_dict(item)
+            for item in Site.objects.select_related("study", "lab", "country", "region", "district", "ward", "street")
+            .prefetch_related("studies")
+            .order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -853,7 +1898,7 @@ def lims_reference_sites(request):
         error = _build_site_from_payload(site, payload)
         if error:
             return error
-        error = _save_model(site)
+        error = _save_site_model(site)
         if error:
             return error
         return JsonResponse(_site_to_dict(site), status=201)
@@ -863,7 +1908,7 @@ def lims_reference_sites(request):
 @csrf_exempt
 def lims_reference_site_detail(request, site_id: str):
     try:
-        site = Site.objects.get(id=site_id)
+        site = Site.objects.prefetch_related("studies").get(id=site_id)
     except (ValidationError, Site.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -881,7 +1926,7 @@ def lims_reference_site_detail(request, site_id: str):
         error = _build_site_from_payload(site, payload)
         if error:
             return error
-        error = _save_model(site)
+        error = _save_site_model(site)
         if error:
             return error
         return JsonResponse(_site_to_dict(site))
@@ -898,65 +1943,84 @@ def lims_reference_select_options(request):
 
     source = (request.GET.get("source") or "").strip()
     query = (request.GET.get("q") or "").strip().lower()
+    try:
+        limit = max(1, min(int(request.GET.get("limit", "50")), 50))
+    except ValueError:
+        return JsonResponse({"error": "invalid_limit"}, status=400)
     items = []
     if source == "labs":
         queryset = Lab.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "studies":
         queryset = Study.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "sites":
         queryset = Site.objects.order_by("name")
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "countries":
         queryset = Country.objects.order_by("name")
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
     elif source == "regions":
-        queryset = Region.objects.order_by("name")
+        queryset = Region.objects.select_related("country").order_by("name")
         if request.GET.get("country_id"):
             queryset = queryset.filter(country_id=request.GET["country_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+        items = [_option(str(item.id), item.name, item.country.name) for item in queryset[:limit]]
     elif source == "districts":
-        queryset = District.objects.order_by("name")
+        queryset = District.objects.select_related("region", "region__country").order_by("name")
         if request.GET.get("region_id"):
             queryset = queryset.filter(region_id=request.GET["region_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(region__name__icontains=query))
+        items = [_option(str(item.id), item.name, item.region.name) for item in queryset[:limit]]
     elif source == "wards":
-        queryset = Ward.objects.order_by("name")
+        queryset = Ward.objects.select_related("district", "district__region").order_by("name")
         if request.GET.get("district_id"):
             queryset = queryset.filter(district_id=request.GET["district_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(Q(name__icontains=query) | Q(district__name__icontains=query))
+        items = [
+            _option(str(item.id), item.name, f"{item.district.name} / {item.district.region.name}")
+            for item in queryset[:limit]
+        ]
     elif source == "streets":
-        queryset = Street.objects.order_by("name")
+        queryset = Street.objects.select_related("ward", "ward__district", "ward__district__region").order_by("name")
         if request.GET.get("ward_id"):
             queryset = queryset.filter(ward_id=request.GET["ward_id"])
+        if request.GET.get("district_id"):
+            queryset = queryset.filter(ward__district_id=request.GET["district_id"])
+        if request.GET.get("region_id"):
+            queryset = queryset.filter(ward__district__region_id=request.GET["region_id"])
         if query:
-            queryset = queryset.filter(name__icontains=query)
-        items = [_model_to_option(item) for item in queryset[:50]]
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(ward__name__icontains=query)
+                | Q(ward__district__name__icontains=query)
+                | Q(ward__district__region__name__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, f"{item.ward.name} / {item.ward.district.name} / {item.ward.district.region.name}")
+            for item in queryset[:limit]
+        ]
     elif source == "postcodes":
-        queryset = Postcode.objects.order_by("code")
+        queryset = Postcode.objects.select_related("street", "street__ward", "street__ward__district").order_by("code")
         if request.GET.get("street_id"):
             queryset = queryset.filter(street_id=request.GET["street_id"])
         if query:
             queryset = queryset.filter(code__icontains=query)
-        items = [_model_to_option(item, label_attr="code") for item in queryset[:50]]
+        items = [_option(str(item.id), item.code, item.street.name) for item in queryset[:limit]]
     else:
         return JsonResponse({"error": "unsupported_source"}, status=400)
-    return JsonResponse({"source": source, "items": items})
+    return JsonResponse({"source": source, "items": items, "results": items})
 
 
 @csrf_exempt
@@ -1832,6 +2896,12 @@ def lims_accessioning_receive_single(request):
     metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
         return JsonResponse({"error": "metadata must be an object"}, status=400)
+    receipt_context = payload.get("receipt_context") or {}
+    if not isinstance(receipt_context, dict):
+        return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    received_at, error = _parse_optional_received_at(payload.get("received_at"))
+    if error:
+        return error
     try:
         specimen, event = receive_single_biospecimen(
             sample_type=sample_type,
@@ -1848,6 +2918,8 @@ def lims_accessioning_receive_single(request):
             barcode=str(payload.get("barcode") or "").strip(),
             scan_value=str(payload.get("scan_value") or "").strip(),
             notes=str(payload.get("notes") or "").strip(),
+            receipt_context=receipt_context,
+            received_at=received_at,
         )
     except AccessioningError as exc:
         return _accessioning_error_response(exc)
@@ -1983,6 +3055,12 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
         return JsonResponse({"error": "metadata must be an object"}, status=400)
+    receipt_context = payload.get("receipt_context") or {}
+    if not isinstance(receipt_context, dict):
+        return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    received_at, error = _parse_optional_received_at(payload.get("received_at"))
+    if error:
+        return error
     try:
         item, event = receive_manifest_item(
             item,
@@ -1990,6 +3068,8 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
             scan_value=str(payload.get("scan_value") or "").strip(),
             notes=str(payload.get("notes") or "").strip(),
             metadata=metadata,
+            receipt_context=receipt_context,
+            received_at=received_at,
         )
     except AccessioningError as exc:
         return _accessioning_error_response(exc)

@@ -1,0 +1,427 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url="/lims/receiving/" current_label="Single sample" %}
+
+{% if payload.capabilities.can_manage_artifacts %}
+<section class="panel" data-lims-action="receiving-single-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Single sample receipt wizard" panel_description="Step 1 captures the initial receipt + QC decision. Accepted samples continue to configured metadata and storage steps driven by the selected sample type." %}
+  <div class="section-stack">
+    <div class="cards" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+      <article class="card" data-lims-wizard-indicator="1">
+        <strong>Step 1 of 3</strong>
+        <p>Initial receipt + QC</p>
+      </article>
+      <article class="card" data-lims-wizard-indicator="2">
+        <strong>Step 2 of 3</strong>
+        <p>Configured metadata</p>
+      </article>
+      <article class="card" data-lims-wizard-indicator="3">
+        <strong>Step 3 of 3</strong>
+        <p>Configured storage</p>
+      </article>
+    </div>
+
+    <section class="panel" data-lims-wizard-step="1">
+      {% include "core/ui/includes/panel_header.html" with panel_title="Step 1 · Initial receipt and QC" panel_description="Provide the base identifiers, who brought the sample, the receipt date, and the first QC decision." %}
+      <div class="section-stack">
+        <div class="field-grid field-grid--wide">
+          <label class="field-group"><span class="field-label">Sample type</span><select class="select" data-lims-field="receive-sample-type">{% for option in payload.sample_type_options %}<option value="{{ option.value }}" data-sample-type-key="{{ option.key }}">{{ option.label }}</option>{% endfor %}</select></label>
+          <label class="field-group"><span class="field-label">Study</span><select class="select" data-lims-field="receive-study"><option value="">None</option>{% for option in payload.study_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+          <label class="field-group"><span class="field-label">Site</span><select class="select" data-lims-field="receive-site"><option value="">None</option>{% for option in payload.site_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+          <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="receive-lab"><option value="">None</option>{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+        </div>
+        <div class="field-grid field-grid--wide">
+          <label class="field-group"><span class="field-label">Receiving date</span><input class="input" type="date" data-lims-field="receive-date" /></label>
+          <label class="field-group"><span class="field-label">Brought by</span><input class="input" data-lims-field="receive-brought-by" placeholder="Courier, participant, site runner, etc." /></label>
+          <label class="field-group"><span class="field-label">Subject identifier</span><input class="input" data-lims-field="receive-subject" /></label>
+          <label class="field-group"><span class="field-label">External identifier</span><input class="input" data-lims-field="receive-external-id" /></label>
+        </div>
+        <div class="field-grid field-grid--wide">
+          <label class="field-group"><span class="field-label">Sample identifier (optional)</span><input class="input" data-lims-field="receive-sample-identifier" /></label>
+          <label class="field-group"><span class="field-label">Barcode (optional)</span><input class="input" data-lims-field="receive-barcode" /></label>
+          <label class="field-group"><span class="field-label">Quantity</span><input class="input" data-lims-field="receive-quantity" value="1.0" /></label>
+          <label class="field-group"><span class="field-label">Quantity unit</span><input class="input" data-lims-field="receive-quantity-unit" value="mL" /></label>
+        </div>
+        <div class="field-grid field-grid--wide">
+          <label class="field-group"><span class="field-label">Scan value</span><input class="input" data-lims-field="receive-scan-value" /></label>
+          <label class="field-group"><span class="field-label">Condition on arrival</span><input class="input" data-lims-field="receive-arrival-condition" placeholder="Ambient, chilled, damaged, etc." /></label>
+          <label class="field-group"><span class="field-label">QC decision</span><select class="select" data-lims-field="receive-qc-decision"><option value="accept">Accept</option><option value="reject">Reject</option></select></label>
+          <label class="field-group"><span class="field-label">QC notes</span><input class="input" data-lims-field="receive-qc-notes" placeholder="Observed quality, completeness, packaging, etc." /></label>
+        </div>
+        <div class="field-grid field-grid--wide">
+          <label class="field-group"><span class="field-label">Rejection code</span><select class="select" data-lims-field="receive-rejection-code">{% for option in payload.discrepancy_code_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+        </div>
+        <label class="field-group"><span class="field-label">Initial metadata JSON</span><textarea class="textarea" rows="6" data-lims-field="receive-metadata-json">{}</textarea></label>
+        <label class="field-group"><span class="field-label">Receipt notes</span><textarea class="textarea" rows="3" data-lims-field="receive-notes"></textarea></label>
+        <div class="button-row">
+          <button class="button" type="button" onclick="advanceSingleReceiptInitialStep()"><span class="material-symbols-outlined button-icon" aria-hidden="true">navigate_next</span><span>Continue</span></button>
+          <a class="button button-secondary" href="/lims/receiving/">Back to receiving</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-lims-wizard-step="2" hidden>
+      {% include "core/ui/includes/panel_header.html" with panel_title="Step 2 · Configured metadata" panel_description="This step renders metadata fields from the selected sample type schema using a formbuilder-compatible field model and the portal's own styled renderer." %}
+      <div class="section-stack">
+        <div class="field-grid" data-lims-dynamic-container="metadata"></div>
+        <p data-lims-dynamic-empty="metadata">No additional configured metadata is required for this sample type.</p>
+        <div class="button-row">
+          <button class="button button-secondary" type="button" onclick="showSingleReceiptStep(1)"><span class="material-symbols-outlined button-icon" aria-hidden="true">navigate_before</span><span>Back</span></button>
+          <button class="button" type="button" onclick="advanceSingleReceiptMetadataStep()"><span class="material-symbols-outlined button-icon" aria-hidden="true">navigate_next</span><span>Continue</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-lims-wizard-step="3" hidden>
+      {% include "core/ui/includes/panel_header.html" with panel_title="Step 3 · Configured storage fields" panel_description="This final page renders storage fields from the selected sample type configuration before the specimen is committed." %}
+      <div class="section-stack">
+        <div class="field-grid" data-lims-dynamic-container="storage"></div>
+        <p data-lims-dynamic-empty="storage">No configured storage fields are required for this sample type.</p>
+        <div class="button-row">
+          <button class="button button-secondary" type="button" onclick="goBackFromStorageStep()"><span class="material-symbols-outlined button-icon" aria-hidden="true">navigate_before</span><span>Back</span></button>
+          <button class="button" type="button" onclick="submitSingleReceiptWizard()"><span class="material-symbols-outlined button-icon" aria-hidden="true">move_to_inbox</span><span>Complete receipt</span></button>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="No artifact permissions" panel_description="You can view receiving status, but you cannot submit new receipts." %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsSingleReceiptWizard = {
+  schemaVersionId: null,
+  metadataFields: [],
+  storageFields: [],
+  metadataValues: {},
+  storageValues: {},
+};
+
+function limsEscapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function showSingleReceiptStep(stepNumber) {
+  document.querySelectorAll("[data-lims-wizard-step]").forEach((element) => {
+    element.hidden = element.getAttribute("data-lims-wizard-step") !== String(stepNumber);
+  });
+  document.querySelectorAll("[data-lims-wizard-indicator]").forEach((element) => {
+    element.style.borderColor = element.getAttribute("data-lims-wizard-indicator") === String(stepNumber) ? "var(--brand-primary)" : "";
+    element.style.boxShadow = element.getAttribute("data-lims-wizard-indicator") === String(stepNumber) ? "inset 0 0 0 1px var(--brand-primary)" : "";
+  });
+}
+
+function selectedSingleReceiptSampleTypeKey() {
+  const option = limsSelectedOption("receive-sample-type");
+  return option ? (option.dataset.sampleTypeKey || "") : "";
+}
+
+function singleReceiptInitialMetadata() {
+  return limsJsonValue("receive-metadata-json", {});
+}
+
+function singleReceiptReceiptContext() {
+  return {
+    receiving_date: limsValue("receive-date"),
+    brought_by: limsValue("receive-brought-by"),
+    arrival_condition: limsValue("receive-arrival-condition"),
+    qc: {
+      decision: limsValue("receive-qc-decision") || "accept",
+      notes: limsValue("receive-qc-notes"),
+    },
+  };
+}
+
+function dynamicFieldInputId(stepKey, fieldKey) {
+  return "single-" + stepKey + "-" + fieldKey;
+}
+
+function dynamicFieldActive(field, values) {
+  const condition = field.condition || {};
+  if (!condition.field) {
+    return true;
+  }
+  const lhs = values[condition.field];
+  const rhs = condition.value;
+  if (condition.operator === "equals" || !condition.operator) {
+    return lhs === rhs;
+  }
+  if (condition.operator === "not_equals") {
+    return lhs !== rhs;
+  }
+  if (condition.operator === "truthy") {
+    return Boolean(lhs);
+  }
+  if (condition.operator === "falsy") {
+    return !Boolean(lhs);
+  }
+  if (condition.operator === "in" && Array.isArray(rhs)) {
+    return rhs.includes(lhs);
+  }
+  if (condition.operator === "not_in" && Array.isArray(rhs)) {
+    return !rhs.includes(lhs);
+  }
+  return true;
+}
+
+function renderDynamicField(stepKey, field, value) {
+  const formField = field.formbuilder || {};
+  const inputId = dynamicFieldInputId(stepKey, field.field_key);
+  const helpText = field.help_text ? '<small>' + limsEscapeHtml(field.help_text) + '</small>' : '';
+  const requiredMarker = field.required ? ' *' : '';
+  const placeholder = limsEscapeHtml(field.placeholder || '');
+
+  if (field.field_type === "choice") {
+    const options = (field.vocabulary_items || []).map((item) => '<option value="' + limsEscapeHtml(item.value) + '"' + (String(value || "") === String(item.value) ? " selected" : "") + '>' + limsEscapeHtml(item.label) + "</option>").join("");
+    return '<label class="field-group"><span class="field-label">' + limsEscapeHtml(formField.label || field.field_definition_name) + requiredMarker + '</span><select class="select" id="' + inputId + '" data-lims-dynamic-step="' + stepKey + '" data-lims-dynamic-field="' + field.field_key + '">' + '<option value="">Select</option>' + options + "</select>" + helpText + "</label>";
+  }
+
+  if (field.field_type === "multi_choice") {
+    const selected = Array.isArray(value) ? value : [];
+    const choices = (field.vocabulary_items || []).map((item) => '<label style="display:flex; gap:0.5rem; align-items:center;"><input type="checkbox" data-lims-dynamic-step="' + stepKey + '" data-lims-dynamic-field="' + field.field_key + '" value="' + limsEscapeHtml(item.value) + '"' + (selected.includes(item.value) ? " checked" : "") + " />" + '<span>' + limsEscapeHtml(item.label) + "</span></label>").join("");
+    return '<div class="field-group"><span class="field-label">' + limsEscapeHtml(formField.label || field.field_definition_name) + requiredMarker + '</span><div class="section-stack">' + choices + '</div>' + helpText + "</div>";
+  }
+
+  if (field.field_type === "boolean") {
+    return '<label class="field-group" style="justify-content:center;"><span class="field-label">' + limsEscapeHtml(formField.label || field.field_definition_name) + requiredMarker + '</span><label style="display:flex; gap:0.5rem; align-items:center;"><input type="checkbox" id="' + inputId + '" data-lims-dynamic-step="' + stepKey + '" data-lims-dynamic-field="' + field.field_key + '"' + (value ? " checked" : "") + " /><span>" + limsEscapeHtml(field.help_text || "Enabled") + "</span></label></label>";
+  }
+
+  const tagName = field.field_type === "long_text" ? "textarea" : "input";
+  const inputType = field.field_type === "integer" || field.field_type === "decimal"
+    ? "number"
+    : (field.field_type === "date" ? "date" : (field.field_type === "datetime" ? "datetime-local" : "text"));
+  if (tagName === "textarea") {
+    return '<label class="field-group"><span class="field-label">' + limsEscapeHtml(formField.label || field.field_definition_name) + requiredMarker + '</span><textarea class="textarea" rows="4" id="' + inputId + '" data-lims-dynamic-step="' + stepKey + '" data-lims-dynamic-field="' + field.field_key + '" placeholder="' + placeholder + '">' + limsEscapeHtml(value || "") + "</textarea>" + helpText + "</label>";
+  }
+  return '<label class="field-group"><span class="field-label">' + limsEscapeHtml(formField.label || field.field_definition_name) + requiredMarker + '</span><input class="input" type="' + inputType + '" id="' + inputId + '" data-lims-dynamic-step="' + stepKey + '" data-lims-dynamic-field="' + field.field_key + '" value="' + limsEscapeHtml(value || "") + '" placeholder="' + placeholder + '" />' + helpText + "</label>";
+}
+
+function readDynamicStepValues(stepKey) {
+  const values = {};
+  document.querySelectorAll('[data-lims-dynamic-step="' + stepKey + '"]').forEach((field) => {
+    const fieldKey = field.getAttribute("data-lims-dynamic-field");
+    if (!fieldKey) {
+      return;
+    }
+    if (field.type === "checkbox") {
+      if (field.value && field.value !== "on") {
+        values[fieldKey] = Array.isArray(values[fieldKey]) ? values[fieldKey] : [];
+        if (field.checked) {
+          values[fieldKey].push(field.value);
+        }
+        return;
+      }
+      values[fieldKey] = field.checked;
+      return;
+    }
+    if (field.tagName === "SELECT" && field.multiple) {
+      values[fieldKey] = Array.from(field.selectedOptions).map((option) => option.value);
+      return;
+    }
+    const value = field.value.trim();
+    if (value) {
+      values[fieldKey] = value;
+    }
+  });
+  return values;
+}
+
+function validateDynamicRequiredFields(stepKey, fields, values) {
+  for (const field of fields) {
+    if (!dynamicFieldActive(field, values)) {
+      continue;
+    }
+    const value = values[field.field_key];
+    if (field.required && (value === undefined || value === "" || (Array.isArray(value) && !value.length) || value === false)) {
+      throw new Error((field.field_definition_name || field.field_key) + " is required");
+    }
+  }
+}
+
+function renderDynamicStep(stepKey, fields) {
+  const valueKey = stepKey === "metadata" ? "metadataValues" : "storageValues";
+  const container = document.querySelector('[data-lims-dynamic-container="' + stepKey + '"]');
+  const emptyMessage = document.querySelector('[data-lims-dynamic-empty="' + stepKey + '"]');
+  if (!container || !emptyMessage) {
+    return;
+  }
+  const values = limsSingleReceiptWizard[valueKey] || {};
+  const activeFields = fields.filter((field) => dynamicFieldActive(field, values));
+  emptyMessage.hidden = activeFields.length > 0;
+  container.innerHTML = activeFields.map((field) => renderDynamicField(stepKey, field, values[field.field_key] ?? field.default_value)).join("");
+  container.querySelectorAll("input, select, textarea").forEach((field) => {
+    field.addEventListener("change", () => {
+      limsSingleReceiptWizard[valueKey] = readDynamicStepValues(stepKey);
+      renderDynamicStep(stepKey, fields);
+    });
+  });
+}
+
+async function loadSingleReceiptConfiguredFields() {
+  const sampleTypeKey = selectedSingleReceiptSampleTypeKey();
+  limsSingleReceiptWizard.schemaVersionId = null;
+  limsSingleReceiptWizard.metadataFields = [];
+  limsSingleReceiptWizard.storageFields = [];
+  limsSingleReceiptWizard.metadataValues = {};
+  limsSingleReceiptWizard.storageValues = {};
+  if (!sampleTypeKey) {
+    return;
+  }
+  const bindings = await limsPortalRequest("/api/v1/lims/metadata/bindings?target_type=sample_type&target_key=" + encodeURIComponent(sampleTypeKey), null, "GET");
+  if (!bindings || !bindings.items || !bindings.items.length) {
+    return;
+  }
+  const binding = bindings.items[0];
+  const schema = await limsPortalRequest("/api/v1/lims/metadata/schemas/" + binding.schema_id, null, "GET");
+  const version = (schema.versions || []).find((item) => item.id === binding.schema_version_id);
+  if (!version) {
+    return;
+  }
+  limsSingleReceiptWizard.schemaVersionId = version.id;
+  (version.fields || []).forEach((field) => {
+    const uiStep = ((field.formbuilder || {}).ui_step || "metadata").toLowerCase();
+    if (uiStep === "storage") {
+      limsSingleReceiptWizard.storageFields.push(field);
+      return;
+    }
+    limsSingleReceiptWizard.metadataFields.push(field);
+  });
+}
+
+function singleReceiptBasePayload() {
+  return {
+    sample_type_id: limsValue("receive-sample-type"),
+    subject_identifier: limsValue("receive-subject"),
+    external_identifier: limsValue("receive-external-id"),
+    sample_identifier: limsValue("receive-sample-identifier"),
+    barcode: limsValue("receive-barcode"),
+    quantity: limsValue("receive-quantity"),
+    quantity_unit: limsValue("receive-quantity-unit") || "mL",
+    study_id: limsOptionalValue("receive-study"),
+    site_id: limsOptionalValue("receive-site"),
+    lab_id: limsOptionalValue("receive-lab"),
+    scan_value: limsValue("receive-scan-value"),
+    notes: limsValue("receive-notes"),
+    received_at: limsValue("receive-date"),
+    receipt_context: singleReceiptReceiptContext(),
+  };
+}
+
+async function submitSingleReceiptRejection(initialMetadata) {
+  const rejectionReason = limsValue("receive-qc-notes") || "Rejected during first QC review";
+  await limsPortalAction("/api/v1/lims/receiving/discrepancies", {
+    code: limsValue("receive-rejection-code") || "other",
+    notes: rejectionReason,
+    expected_data: {
+      sample_type_id: limsValue("receive-sample-type"),
+      subject_identifier: limsValue("receive-subject"),
+      sample_identifier: limsValue("receive-sample-identifier"),
+      barcode: limsValue("receive-barcode"),
+    },
+    actual_data: {
+      receiving_date: limsValue("receive-date"),
+      brought_by: limsValue("receive-brought-by"),
+      qc_decision: "reject",
+      qc_notes: limsValue("receive-qc-notes"),
+      metadata: initialMetadata,
+    },
+  }, "Receipt rejection logged");
+}
+
+async function advanceSingleReceiptInitialStep() {
+  let initialMetadata;
+  try {
+    initialMetadata = singleReceiptInitialMetadata();
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  if (!limsValue("receive-sample-type")) {
+    limsFeedback("Sample type is required", true);
+    return;
+  }
+  if (!limsValue("receive-date")) {
+    limsFeedback("Receiving date is required", true);
+    return;
+  }
+  if ((limsValue("receive-qc-decision") || "accept") === "reject") {
+    await submitSingleReceiptRejection(initialMetadata);
+    return;
+  }
+  try {
+    await loadSingleReceiptConfiguredFields();
+  } catch (error) {
+    limsFeedback(error.message || "Unable to load configured metadata", true);
+    return;
+  }
+  if (limsSingleReceiptWizard.metadataFields.length) {
+    renderDynamicStep("metadata", limsSingleReceiptWizard.metadataFields);
+    showSingleReceiptStep(2);
+    return;
+  }
+  if (limsSingleReceiptWizard.storageFields.length) {
+    renderDynamicStep("storage", limsSingleReceiptWizard.storageFields);
+    showSingleReceiptStep(3);
+    return;
+  }
+  await submitSingleReceiptWizard();
+}
+
+function advanceSingleReceiptMetadataStep() {
+  try {
+    limsSingleReceiptWizard.metadataValues = readDynamicStepValues("metadata");
+    validateDynamicRequiredFields("metadata", limsSingleReceiptWizard.metadataFields, limsSingleReceiptWizard.metadataValues);
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  if (limsSingleReceiptWizard.storageFields.length) {
+    renderDynamicStep("storage", limsSingleReceiptWizard.storageFields);
+    showSingleReceiptStep(3);
+    return;
+  }
+  submitSingleReceiptWizard();
+}
+
+function goBackFromStorageStep() {
+  if (limsSingleReceiptWizard.metadataFields.length) {
+    showSingleReceiptStep(2);
+    return;
+  }
+  showSingleReceiptStep(1);
+}
+
+async function submitSingleReceiptWizard() {
+  let initialMetadata;
+  try {
+    initialMetadata = singleReceiptInitialMetadata();
+    limsSingleReceiptWizard.metadataValues = readDynamicStepValues("metadata");
+    limsSingleReceiptWizard.storageValues = readDynamicStepValues("storage");
+    validateDynamicRequiredFields("metadata", limsSingleReceiptWizard.metadataFields, limsSingleReceiptWizard.metadataValues);
+    validateDynamicRequiredFields("storage", limsSingleReceiptWizard.storageFields, limsSingleReceiptWizard.storageValues);
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/accessioning/receive-single", {
+    ...singleReceiptBasePayload(),
+    metadata: {
+      ...initialMetadata,
+      ...limsSingleReceiptWizard.metadataValues,
+      ...limsSingleReceiptWizard.storageValues,
+    },
+  }, "Specimen received");
+}
+
+showSingleReceiptStep(1);
+{% endblock %}

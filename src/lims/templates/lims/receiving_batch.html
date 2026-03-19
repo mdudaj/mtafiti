@@ -1,0 +1,328 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url="/lims/receiving/" current_label="Batch manifest" %}
+
+{% if payload.capabilities.can_manage_artifacts %}
+<section class="panel" data-lims-action="receiving-manifest-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Batch manifest receipt" panel_description="Download the template, complete one row per sample with metadata, QC, and storage columns, then import the file." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Sample type</span><select class="select" data-lims-field="manifest-sample-type">{% for option in payload.sample_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Study</span><select class="select" data-lims-field="manifest-study"><option value="">None</option>{% for option in payload.study_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Site</span><select class="select" data-lims-field="manifest-site"><option value="">None</option>{% for option in payload.site_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="manifest-lab"><option value="">None</option>{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Source system</span><input class="input" data-lims-field="manifest-source-system" value="portal-ui" /></label>
+      <label class="field-group"><span class="field-label">Source reference</span><input class="input" data-lims-field="manifest-source-reference" /></label>
+    </div>
+    <section class="panel">
+      {% include "core/ui/includes/panel_header.html" with panel_title="Template import" panel_description="The CSV template opens in Excel and preserves one row per specimen. Fill the template, save as CSV, then import it here." %}
+      <div class="section-stack">
+        <div class="button-row">
+          <button class="button button-secondary" type="button" onclick="downloadBatchTemplate()"><span class="material-symbols-outlined button-icon" aria-hidden="true">download</span><span>Download CSV template</span></button>
+        </div>
+        <label class="field-group"><span class="field-label">Import CSV / Excel-saved CSV</span><input class="input" type="file" accept=".csv,text/csv,application/vnd.ms-excel" data-lims-field="manifest-import-file" onchange="loadBatchImportFile()" /></label>
+        <p id="manifest-import-summary">No file loaded yet.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Row</th><th>Subject</th><th>External ID</th><th>QC</th><th>Storage / reason</th></tr></thead>
+            <tbody data-lims-batch-preview-body><tr><td colspan="5">Load a template file to preview imported rows.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="4" data-lims-field="manifest-notes"></textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="importBatchManifest()"><span class="material-symbols-outlined button-icon" aria-hidden="true">upload_file</span><span>Import batch receipt</span></button>
+      <a class="button button-secondary" href="/lims/receiving/">Back to receiving</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent manifests" panel_description="Use recent drafts and submitted manifests as references while preparing batch intake." %}
+  <div class="table-wrap"><table><thead><tr><th>Manifest</th><th>Status</th><th>Items</th><th>Source</th></tr></thead><tbody>{% for item in payload.recent_manifests %}<tr><td>{{ item.manifest_identifier }}</td><td>{{ item.status }}</td><td>{{ item.item_count }}</td><td>{{ item.source_system|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">No manifests yet.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsBatchTemplateHeaders = [
+  "receiving_date",
+  "brought_by",
+  "subject_identifier",
+  "external_id",
+  "expected_sample_identifier",
+  "expected_barcode",
+  "quantity",
+  "quantity_unit",
+  "metadata_json",
+  "qc_decision",
+  "rejection_code",
+  "rejection_reason",
+  "storage_location",
+  "storage_box",
+  "storage_position",
+  "notes"
+];
+
+let limsBatchImportRows = [];
+
+function batchCsvEscape(value) {
+  const text = String(value ?? "");
+  if (text.includes(",") || text.includes("\"") || text.includes("\n")) {
+    return '"' + text.replaceAll('"', '""') + '"';
+  }
+  return text;
+}
+
+function downloadBatchTemplate() {
+  const sampleRow = {
+    receiving_date: "2026-03-18",
+    brought_by: "Courier Alpha",
+    subject_identifier: "SUBJ-001",
+    external_id: "EXT-001",
+    expected_sample_identifier: "CARD-001",
+    expected_barcode: "SCAN-001",
+    quantity: "1.0",
+    quantity_unit: "mL",
+    metadata_json: '{"tube_count": 2}',
+    qc_decision: "accept",
+    rejection_code: "",
+    rejection_reason: "",
+    storage_location: "Freezer A",
+    storage_box: "Rack 4 / Box 2",
+    storage_position: "A3",
+    notes: "arrived chilled",
+  };
+  const rows = [
+    limsBatchTemplateHeaders.join(","),
+    limsBatchTemplateHeaders.map((header) => batchCsvEscape(sampleRow[header])).join(","),
+  ].join("\n");
+  const blob = new Blob([rows], {type: "text/csv;charset=utf-8"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "mtafiti-batch-receipt-template.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+}
+
+function parseCsvText(text) {
+  const rows = [];
+  let current = "";
+  let row = [];
+  let inQuotes = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") {
+        index += 1;
+      }
+      row.push(current);
+      current = "";
+      if (row.some((cell) => cell.trim() !== "")) {
+        rows.push(row);
+      }
+      row = [];
+      continue;
+    }
+    current += char;
+  }
+  row.push(current);
+  if (row.some((cell) => cell.trim() !== "")) {
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseBatchRows(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) {
+    throw new Error("Import file is empty");
+  }
+  const headers = rows[0].map((header) => header.trim());
+  return rows.slice(1).map((cells, index) => {
+    const item = {position: index + 1};
+    headers.forEach((header, cellIndex) => {
+      item[header] = (cells[cellIndex] || "").trim();
+    });
+    return item;
+  }).filter((item) => Object.values(item).some((value) => String(value).trim() !== ""));
+}
+
+function renderBatchPreview(rows) {
+  const summary = document.getElementById("manifest-import-summary");
+  const previewBody = document.querySelector("[data-lims-batch-preview-body]");
+  if (summary) {
+    summary.textContent = rows.length ? rows.length + " row(s) ready for import." : "No file loaded yet.";
+  }
+  if (!previewBody) {
+    return;
+  }
+  if (!rows.length) {
+    previewBody.innerHTML = '<tr><td colspan="5">Load a template file to preview imported rows.</td></tr>';
+    return;
+  }
+  previewBody.innerHTML = rows.slice(0, 8).map((row) => {
+    const storageOrReason = (row.qc_decision || "accept") === "reject"
+      ? (row.rejection_reason || "-")
+      : [row.storage_location, row.storage_box, row.storage_position].filter(Boolean).join(" / ") || "-";
+    return "<tr>"
+      + "<td>" + row.position + "</td>"
+      + "<td>" + (row.subject_identifier || "-") + "</td>"
+      + "<td>" + (row.external_id || "-") + "</td>"
+      + "<td>" + ((row.qc_decision || "accept")) + "</td>"
+      + "<td>" + storageOrReason + "</td>"
+      + "</tr>";
+  }).join("");
+}
+
+async function loadBatchImportFile() {
+  const fileField = limsField("manifest-import-file");
+  const file = fileField && fileField.files ? fileField.files[0] : null;
+  if (!file) {
+    limsBatchImportRows = [];
+    renderBatchPreview([]);
+    return;
+  }
+  try {
+    limsBatchImportRows = parseBatchRows(await file.text());
+    renderBatchPreview(limsBatchImportRows);
+  } catch (error) {
+    limsBatchImportRows = [];
+    renderBatchPreview([]);
+    limsFeedback(error.message, true);
+  }
+}
+
+function normalizeBatchMetadata(row) {
+  const metadata = row.metadata_json ? JSON.parse(row.metadata_json) : {};
+  return {
+    ...metadata,
+    external_id: row.external_id || "",
+  };
+}
+
+async function importBatchManifest() {
+  if (!limsBatchImportRows.length) {
+    limsFeedback("Load a populated CSV template before importing", true);
+    return;
+  }
+  let manifest;
+  try {
+    manifest = await limsPortalRequest("/api/v1/lims/accessioning/manifests", {
+      sample_type_id: limsValue("manifest-sample-type"),
+      study_id: limsOptionalValue("manifest-study"),
+      site_id: limsOptionalValue("manifest-site"),
+      lab_id: limsOptionalValue("manifest-lab"),
+      source_system: limsValue("manifest-source-system"),
+      source_reference: limsValue("manifest-source-reference"),
+      notes: limsValue("manifest-notes"),
+      submit: true,
+      items: limsBatchImportRows.map((row, index) => ({
+        position: index + 1,
+        expected_subject_identifier: row.subject_identifier || "",
+        expected_sample_identifier: row.expected_sample_identifier || "",
+        expected_barcode: row.expected_barcode || "",
+        quantity: row.quantity || "0",
+        quantity_unit: row.quantity_unit || "mL",
+        notes: row.notes || "",
+        metadata: normalizeBatchMetadata(row),
+      })),
+    });
+  } catch (error) {
+    limsFeedback(error.message || "Batch import failed", true);
+    return;
+  }
+
+  let detail;
+  try {
+    detail = await limsPortalRequest("/api/v1/lims/accessioning/manifests/" + manifest.id, null, "GET");
+  } catch (error) {
+    limsFeedback(error.message || "Manifest detail lookup failed", true);
+    return;
+  }
+
+  let acceptedCount = 0;
+  let rejectedCount = 0;
+  try {
+    for (const row of limsBatchImportRows) {
+      const item = detail.items.find((candidate) => candidate.position === row.position);
+      if (!item) {
+        throw new Error("Imported row " + row.position + " could not be mapped to a manifest item");
+      }
+      const metadata = normalizeBatchMetadata(row);
+      const qcDecision = (row.qc_decision || "accept").toLowerCase();
+      if (qcDecision === "reject") {
+        if (!row.rejection_reason) {
+          throw new Error("Row " + row.position + " is rejected but has no rejection_reason");
+        }
+        await limsPortalRequest("/api/v1/lims/receiving/discrepancies", {
+          manifest_id: manifest.id,
+          manifest_item_id: item.id,
+          code: (row.rejection_code || "other").toLowerCase(),
+          notes: row.rejection_reason,
+          expected_data: {
+            expected_subject_identifier: row.subject_identifier || "",
+            expected_sample_identifier: row.expected_sample_identifier || "",
+            expected_barcode: row.expected_barcode || "",
+          },
+          actual_data: {
+            receiving_date: row.receiving_date || "",
+            brought_by: row.brought_by || "",
+            qc_decision: "reject",
+            metadata: metadata,
+            notes: row.notes || "",
+          },
+        });
+        rejectedCount += 1;
+        continue;
+      }
+      await limsPortalRequest("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+        scan_value: row.expected_barcode || "",
+        notes: row.notes || "",
+        received_at: row.receiving_date || null,
+        metadata: metadata,
+        receipt_context: {
+          brought_by: row.brought_by || "",
+          qc: {
+            decision: "accept",
+            notes: row.notes || "",
+          },
+          storage: {
+            location: row.storage_location || "",
+            container: row.storage_box || "",
+            position: row.storage_position || "",
+          },
+        },
+      });
+      acceptedCount += 1;
+    }
+  } catch (error) {
+    limsFeedback(error.message || "Batch processing failed", true);
+    return;
+  }
+
+  limsFeedback("Batch receipt processed: " + acceptedCount + " accepted, " + rejectedCount + " rejected", false);
+}
+{% endblock %}

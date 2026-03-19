@@ -1,0 +1,33 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Create binding" %}
+
+{% if payload.capabilities.can_manage_metadata %}
+<section class="panel" data-lims-action="metadata-binding-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Schema binding form" panel_description="Attach one schema version to one target." %}
+  <div class="section-stack">
+    <label class="field-group"><span class="field-label">Schema version</span><select class="select" data-lims-field="binding-version">{% for option in payload.schema_version_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <label class="field-group"><span class="field-label">Target type</span><select class="select" data-lims-field="binding-target-type">{% for option in payload.binding_target_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    <label class="field-group"><span class="field-label">Target key</span><input class="input" data-lims-field="binding-target-key" value="dbs" /></label>
+    <label class="field-group"><span class="field-label">Target label</span><input class="input" data-lims-field="binding-target-label" value="DBS" /></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createSchemaBinding()"><span class="material-symbols-outlined button-icon" aria-hidden="true">link</span><span>Create binding</span></button>
+      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createSchemaBinding() {
+  await limsPortalAction("/api/v1/lims/metadata/bindings", {
+    schema_version_id: limsValue("binding-version"),
+    target_type: limsValue("binding-target-type"),
+    target_key: limsValue("binding-target-key"),
+    target_label: limsValue("binding-target-label"),
+  }, "Schema binding created");
+}
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url="/lims/receiving/" current_label="EDC import" %}
+
+{% if payload.capabilities.can_manage_artifacts %}
+<section class="panel" data-lims-action="receiving-edc-import">
+  {% include "core/ui/includes/panel_header.html" with panel_title="EDC-linked intake" panel_description="Specify the lab form, expected sample, and external ID to import. The receipt still goes through QC and storage/rejection capture before completion." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">EDC source</span><select class="select" data-lims-field="edc-source-system">{% for option in payload.edc_source_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">External ID to import</span><input class="input" data-lims-field="edc-source-reference" placeholder="Record ID, submission ID, or encounter ref" /></label>
+      <label class="field-group"><span class="field-label">Lab form</span><input class="input" data-lims-field="edc-lab-form" placeholder="Form name or instrument worksheet" /></label>
+      <label class="field-group"><span class="field-label">Sample type</span><select class="select" data-lims-field="edc-sample-type">{% for option in payload.sample_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Receiving date</span><input class="input" type="date" data-lims-field="edc-receive-date" /></label>
+      <label class="field-group"><span class="field-label">Brought by</span><input class="input" data-lims-field="edc-brought-by" /></label>
+      <label class="field-group"><span class="field-label">Expected sample</span><input class="input" data-lims-field="edc-expected-sample" placeholder="Sample label or expected specimen identifier" /></label>
+      <label class="field-group"><span class="field-label">Subject identifier</span><input class="input" data-lims-field="edc-subject-identifier" /></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Study</span><select class="select" data-lims-field="edc-study"><option value="">None</option>{% for option in payload.study_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Site</span><select class="select" data-lims-field="edc-site"><option value="">None</option>{% for option in payload.site_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="edc-lab"><option value="">None</option>{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Expected quantity</span><input class="input" data-lims-field="edc-quantity" value="1.0" /></label>
+      <label class="field-group"><span class="field-label">Quantity unit</span><input class="input" data-lims-field="edc-quantity-unit" value="mL" /></label>
+      <label class="field-group"><span class="field-label">QC decision</span><select class="select" data-lims-field="edc-qc-decision" onchange="toggleEdcOutcome()"><option value="accept">Accept</option><option value="reject">Reject</option></select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Imported metadata JSON</span><textarea class="textarea" rows="10" data-lims-field="edc-metadata-json">{}</textarea></label>
+    <label class="field-group"><span class="field-label">QC notes</span><textarea class="textarea" rows="3" data-lims-field="edc-qc-notes"></textarea></label>
+    <section class="panel" data-lims-section="edc-storage">
+      {% include "core/ui/includes/panel_header.html" with panel_title="Storage logging" panel_description="If the imported specimen is accepted, capture the initial storage placement." %}
+      <div class="field-grid field-grid--wide">
+        <label class="field-group"><span class="field-label">Storage location</span><input class="input" data-lims-field="edc-storage-location" /></label>
+        <label class="field-group"><span class="field-label">Container / box</span><input class="input" data-lims-field="edc-storage-box" /></label>
+        <label class="field-group"><span class="field-label">Position</span><input class="input" data-lims-field="edc-storage-position" /></label>
+      </div>
+    </section>
+    <section class="panel" data-lims-section="edc-rejection" hidden>
+      {% include "core/ui/includes/panel_header.html" with panel_title="Rejection details" panel_description="If the imported specimen is rejected, capture the discrepancy code and reason." %}
+      <div class="section-stack">
+        <label class="field-group"><span class="field-label">Rejection code</span><select class="select" data-lims-field="edc-rejection-code">{% for option in payload.discrepancy_code_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+        <label class="field-group"><span class="field-label">Reason for rejection</span><textarea class="textarea" rows="4" data-lims-field="edc-rejection-reason"></textarea></label>
+      </div>
+    </section>
+    <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="4" data-lims-field="edc-notes"></textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="processEdcImportReceipt()"><span class="material-symbols-outlined button-icon" aria-hidden="true">cloud_download</span><span>Import and process receipt</span></button>
+      <a class="button button-secondary" href="/lims/receiving/">Back to receiving</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+function toggleEdcOutcome() {
+  const isAccepted = limsValue("edc-qc-decision") !== "reject";
+  const storagePanel = document.querySelector('[data-lims-section="edc-storage"]');
+  const rejectionPanel = document.querySelector('[data-lims-section="edc-rejection"]');
+  if (storagePanel) {
+    storagePanel.hidden = !isAccepted;
+  }
+  if (rejectionPanel) {
+    rejectionPanel.hidden = isAccepted;
+  }
+}
+
+async function processEdcImportReceipt() {
+  let metadata;
+  try {
+    metadata = limsJsonValue("edc-metadata-json", {});
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  const manifestMetadata = {
+    ...metadata,
+    edc_import: {
+      source_system: limsValue("edc-source-system"),
+      external_id: limsValue("edc-source-reference"),
+      lab_form: limsValue("edc-lab-form"),
+    },
+  };
+  let manifest;
+  try {
+    manifest = await limsPortalRequest("/api/v1/lims/accessioning/manifests", {
+      sample_type_id: limsValue("edc-sample-type"),
+      study_id: limsOptionalValue("edc-study"),
+      site_id: limsOptionalValue("edc-site"),
+      lab_id: limsOptionalValue("edc-lab"),
+      source_system: limsValue("edc-source-system"),
+      source_reference: limsValue("edc-source-reference"),
+      notes: limsValue("edc-notes"),
+      metadata: manifestMetadata,
+      submit: true,
+      items: [
+        {
+          position: 1,
+          expected_subject_identifier: limsValue("edc-subject-identifier"),
+          expected_sample_identifier: limsValue("edc-expected-sample"),
+          quantity: limsValue("edc-quantity"),
+          quantity_unit: limsValue("edc-quantity-unit") || "mL",
+          notes: limsValue("edc-notes"),
+          metadata: metadata,
+        }
+      ],
+    });
+  } catch (error) {
+    limsFeedback(error.message || "EDC import failed", true);
+    return;
+  }
+
+  let detail;
+  try {
+    detail = await limsPortalRequest("/api/v1/lims/accessioning/manifests/" + manifest.id, null, "GET");
+  } catch (error) {
+    limsFeedback(error.message || "EDC manifest lookup failed", true);
+    return;
+  }
+  const item = detail.items[0];
+  if (!item) {
+    limsFeedback("No manifest item was created for the EDC import", true);
+    return;
+  }
+
+  const qcDecision = limsValue("edc-qc-decision") || "accept";
+  if (qcDecision === "reject") {
+    const rejectionReason = limsValue("edc-rejection-reason");
+    if (!rejectionReason) {
+      limsFeedback("Reason for rejection is required", true);
+      return;
+    }
+    await limsPortalAction("/api/v1/lims/receiving/discrepancies", {
+      manifest_id: manifest.id,
+      manifest_item_id: item.id,
+      code: limsValue("edc-rejection-code") || "other",
+      notes: rejectionReason,
+      expected_data: {
+        external_id: limsValue("edc-source-reference"),
+        lab_form: limsValue("edc-lab-form"),
+        expected_sample: limsValue("edc-expected-sample"),
+      },
+      actual_data: {
+        receiving_date: limsValue("edc-receive-date"),
+        brought_by: limsValue("edc-brought-by"),
+        qc_decision: "reject",
+        qc_notes: limsValue("edc-qc-notes"),
+        metadata: manifestMetadata,
+      },
+    }, "EDC rejection logged");
+    return;
+  }
+
+  await limsPortalAction("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+    received_at: limsValue("edc-receive-date"),
+    notes: limsValue("edc-notes"),
+    metadata: metadata,
+    receipt_context: {
+      brought_by: limsValue("edc-brought-by"),
+      qc: {
+        decision: "accept",
+        notes: limsValue("edc-qc-notes"),
+      },
+      storage: {
+        location: limsValue("edc-storage-location"),
+        container: limsValue("edc-storage-box"),
+        position: limsValue("edc-storage-position"),
+      },
+    },
+  }, "EDC-linked receipt processed");
+}
+toggleEdcOutcome();
+{% endblock %}

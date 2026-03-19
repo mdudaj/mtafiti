@@ -47,6 +47,44 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-reference")
+    schema_name = client.get("/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.admin").json()["tenant_schema"]
+
+    with schema_context(schema_name):
+        country = Country.objects.get(code="TZ")
+        region = Region.objects.create(
+            country=country,
+            name="Kilimanjaro",
+            slug="kilimanjaro",
+            source_path="/kilimanjaro",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro",
+        )
+        district = District.objects.create(
+            region=region,
+            name="Moshi",
+            slug="moshi",
+            source_path="/kilimanjaro/moshi",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi",
+        )
+        ward = Ward.objects.create(
+            district=district,
+            name="Majengo",
+            slug="majengo",
+            source_path="/kilimanjaro/moshi/majengo",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo",
+        )
+        street = Street.objects.create(
+            ward=ward,
+            name="Sokoine Road",
+            slug="sokoine-road",
+            source_path="/kilimanjaro/moshi/majengo/sokoine-road",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo/sokoine-road",
+        )
+        Postcode.objects.create(
+            street=street,
+            code="25112",
+            source_path="/kilimanjaro/moshi/majengo/sokoine-road",
+            source_url="https://www.tanzaniapostcode.com/kilimanjaro/moshi/majengo/sokoine-road",
+        )
 
     denied_create = client.post(
         "/api/v1/lims/reference/labs",
@@ -59,7 +97,7 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
 
     created_lab = client.post(
         "/api/v1/lims/reference/labs",
-        data=json.dumps({"name": "Central Lab", "code": "LAB-001"}),
+        data=json.dumps({"name": "Central Lab", "street_id": str(street.id), "address_line": "Clocktower"}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -69,7 +107,7 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
 
     created_study = client.post(
         "/api/v1/lims/reference/studies",
-        data=json.dumps({"name": "DBS Pilot", "code": "STUDY-001", "lead_lab_id": lab_id}),
+        data=json.dumps({"name": "DBS Pilot", "lead_lab_id": lab_id}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -77,9 +115,29 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
     assert created_study.status_code == 201
     study_id = created_study.json()["id"]
 
+    created_study_two = client.post(
+        "/api/v1/lims/reference/studies",
+        data=json.dumps({"name": "DBS Extension", "lead_lab_id": lab_id}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert created_study_two.status_code == 201
+    study_two_id = created_study_two.json()["id"]
+
     created_site = client.post(
         "/api/v1/lims/reference/sites",
-        data=json.dumps({"name": "Moshi Site", "code": "SITE-001", "study_id": study_id, "lab_id": lab_id}),
+        data=json.dumps(
+            {
+                "name": "Moshi Site",
+                "study_ids": [study_id, study_two_id],
+                "lab_id": lab_id,
+                "district_id": str(district.id),
+                "ward_id": str(ward.id),
+                "street_id": str(street.id),
+                "address_line": "Majengo market",
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -94,6 +152,36 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
     )
     assert listed_labs.status_code == 200
     assert listed_labs.json()["items"][0]["name"] == "Central Lab"
+    assert listed_labs.json()["items"][0]["address_breadcrumb"] == "Clocktower / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112"
+    assert [badge["label"] for badge in listed_labs.json()["items"][0]["address_badges"]] == [
+        "Clocktower",
+        "Sokoine Road",
+        "Majengo",
+        "Moshi",
+        "Kilimanjaro",
+        "Tanzania",
+        "25112",
+    ]
+
+    listed_studies = client.get(
+        "/api/v1/lims/reference/studies",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert listed_studies.status_code == 200
+    assert listed_studies.json()["items"][0]["lead_lab_name"] == "Central Lab"
+    assert listed_studies.json()["items"][0]["lead_lab_badge"]["label"] == "Central Lab"
+    assert listed_studies.json()["items"][0]["status_badge"]["label"] == "Active"
+
+    listed_sites = client.get(
+        "/api/v1/lims/reference/sites",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert listed_sites.status_code == 200
+    assert listed_sites.json()["items"][0]["study_labels"] == ["DBS Extension", "DBS Pilot"]
+    assert [badge["label"] for badge in listed_sites.json()["items"][0]["study_badges"]] == ["DBS Extension", "DBS Pilot"]
+    assert listed_sites.json()["items"][0]["address_breadcrumb"] == "Majengo market / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112"
 
     detail_site = client.get(
         f"/api/v1/lims/reference/sites/{site_id}",
@@ -102,16 +190,27 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
     )
     assert detail_site.status_code == 200
     assert detail_site.json()["study_id"] == study_id
+    assert sorted(detail_site.json()["study_ids"]) == sorted([study_id, study_two_id])
+    assert detail_site.json()["code"] == "moshi-site"
+    assert detail_site.json()["country_id"] == str(country.id)
+    assert detail_site.json()["region_id"] == str(region.id)
+    assert detail_site.json()["district_id"] == str(district.id)
+    assert detail_site.json()["ward_id"] == str(ward.id)
+    assert detail_site.json()["street_id"] == str(street.id)
+    assert detail_site.json()["postcode"] == "25112"
+    assert [badge["label"] for badge in detail_site.json()["study_badges"]] == ["DBS Extension", "DBS Pilot"]
+    assert detail_site.json()["address_badges"][0]["label"] == "Majengo market"
 
     updated_site = client.put(
         f"/api/v1/lims/reference/sites/{site_id}",
-        data=json.dumps({"name": "Moshi Site", "code": "SITE-001", "study_id": study_id, "lab_id": lab_id}),
+        data=json.dumps({"name": "Moshi Site", "code": "SITE MAIN", "study_ids": [study_two_id], "lab_id": lab_id, "street_id": str(street.id)}),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.manager",
     )
     assert updated_site.status_code == 200
-    assert updated_site.json()["code"] == "SITE-001"
+    assert updated_site.json()["code"] == "site-main"
+    assert updated_site.json()["study_ids"] == [study_two_id]
 
     select_labs = client.get(
         "/api/v1/lims/reference/select-options?source=labs&q=central",
@@ -120,6 +219,7 @@ def test_lims_reference_crud_and_select_options(monkeypatch):
     )
     assert select_labs.status_code == 200
     assert select_labs.json()["items"][0]["label"] == "Central Lab"
+    assert select_labs.json()["results"][0]["description"] == "central-lab"
 
 
 @pytest.mark.django_db(transaction=True)

@@ -206,7 +206,13 @@ def test_lims_accessioning_supports_single_receive_with_metadata_validation(monk
                 "quantity_unit": "mL",
                 "scan_value": "DBSB-00001",
                 "barcode": "DBSB-00001",
+                "received_at": "2026-03-18",
                 "metadata": {"tube_count": 2},
+                "receipt_context": {
+                    "brought_by": "Courier Alpha",
+                    "qc": {"decision": "accept", "notes": "visual QC ok"},
+                    "storage": {"location": "Freezer A", "position": "A3"},
+                },
             }
         ),
         content_type="application/json",
@@ -216,6 +222,10 @@ def test_lims_accessioning_supports_single_receive_with_metadata_validation(monk
     assert received.status_code == 201
     assert received.json()["biospecimen"]["status"] == "received"
     assert received.json()["biospecimen"]["metadata"]["tube_count"] == 2
+    assert received.json()["biospecimen"]["received_at"].startswith("2026-03-18T00:00:00")
+    assert received.json()["event"]["metadata"]["receipt_context"]["qc"]["decision"] == "accept"
+    assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Courier Alpha"
+    assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
     assert received.json()["event"]["kind"] == "single"
 
 
@@ -285,13 +295,28 @@ def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(m
 
     received = client.post(
         f"/api/v1/lims/accessioning/manifests/{manifest_id}/items/{first_item_id}/receive",
-        data=json.dumps({"scan_value": "SCAN-001", "notes": "arrived chilled"}),
+        data=json.dumps(
+            {
+                "scan_value": "SCAN-001",
+                "notes": "arrived chilled",
+                "received_at": "2026-03-19",
+                "metadata": {"tube_count": 2},
+                "receipt_context": {
+                    "brought_by": "Site runner",
+                    "qc": {"decision": "accept", "notes": "visual QC ok"},
+                    "storage": {"location": "Freezer A", "position": "A3"},
+                },
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
     )
     assert received.status_code == 200
     assert received.json()["item"]["status"] == "received"
+    assert received.json()["item"]["received_at"].startswith("2026-03-19T00:00:00")
+    assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Site runner"
+    assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
     assert received.json()["event"]["kind"] == "manifest_item"
 
     discrepancy = client.post(

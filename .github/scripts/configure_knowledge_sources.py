@@ -779,6 +779,8 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
 - Prefer `ModelViewset` for the default list/create/update flow; add `DetailViewMixin` and `DeleteViewMixin` explicitly when the specification calls for dedicated detail or delete confirmation pages.
 - Keep list/detail/delete/create/update behavior on the viewset through `list_columns`, `list_filter_fields`, `form_layout`, `form_class`, `form_widgets`, `urlpatterns`, and page-action hooks before forking templates.
 - For non-model forms, mount `generic.FormView` or `generic.CreateView` inside an `Application` and reuse a shared form template such as `forms/form.html` so agents only provide the form, title, button text, and success URL.
+- Follow cookbook page separation: use launchpad/list pages to navigate, but route user-input work to a dedicated create/update/task page with one primary form or wizard instead of mixing several create panels and summary tables on one screen.
+- Use inline related-object cards or inline formsets on detail/edit pages only when they support the parent object transaction (for example, object-specific change actions or child records attached to one parent), not as a substitute for separate operator workflows.
 - Let the stock template fallback chain work first: `<app>/<model>_list.html`, `<app>/<model>_detail.html`, `<app>/<model>_form.html`, `<app>/<model>_delete.html`, then `viewflow/views/*.html`.
 - Use Material icons on the viewset (`Icon("group_work")`, `Icon("engineering")`, etc.) so list navigation, object actions, and app menus stay visually consistent.
 """.strip(),
@@ -1247,6 +1249,9 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
 - Add `Application(...)` instances to a top-level `Site(...)` to get navigation, theme colors, URL scoping, and menu generation.
 - Keep form customization in `form_layout`, `create_form_class`, `update_form_class`, `form_widgets`, filters, and list configuration before reaching for custom templates.
 - Define extra object routes on the viewset via `urlpatterns` when behavior truly needs bespoke endpoints.
+- Organize CRUD by object boundary: one viewset per core object/aggregate for list/create/update/delete/detail, with related-object maintenance exposed either as object-specific `urlpatterns` or inline cards on the parent detail page.
+- Keep workflow/operator actions that are not plain CRUD out of the object list screen; mount them as dedicated `FormView`/wizard routes inside the same `Application` so the user sees one primary task per page.
+- Treat dashboards as launchpads and status views, not as mixed CRUD workbenches.
 """.strip(),
                 },
                 {
@@ -1289,6 +1294,61 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                         {
                             "path": "cookbook/crud101/atlas/viewset.py",
                             "label": "Atlas CRUD example",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/lims-operator-ui-patterns",
+            "name": "lims-operator-ui-patterns",
+            "description": "Launchpad-plus-task-page patterns for operator/admin LIMS workflows built from CRUD and forms cookbook guidance.",
+            "tags": [
+                "viewflow",
+                "crud",
+                "forms",
+                "lims",
+                "operator-ui",
+                "application",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": [
+                "cookbook/crud101/config/urls.py",
+                "cookbook/crud101/atlas/viewset.py",
+                "cookbook/forms101/forms/viewset.py",
+            ],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Treat setup dashboards as launchpads: action cards plus status tables, not mixed multi-form workbenches.
+- Put each operator setup task on its own dedicated page with one primary submit action and a clear back link to the launchpad.
+- Organize CRUD by object boundary first, then expose non-CRUD operator flows as dedicated `FormView`/wizard routes inside the same `Application(...)`.
+- Keep list/detail/review screens separate from create/update forms so operators do not scan past unrelated tables while entering data.
+- Prefer declarative form configuration and shared shell/menu scaffolding over page-specific bespoke layouts.
+""".strip(),
+                },
+                {
+                    "title": "Cookbook assembly patterns",
+                    "sources": [
+                        {
+                            "path": "cookbook/crud101/config/urls.py",
+                            "start_line": 1,
+                            "end_line": 32,
+                            "label": "Site and Application assembly",
+                        },
+                        {
+                            "path": "cookbook/crud101/atlas/viewset.py",
+                            "start_line": 17,
+                            "end_line": 101,
+                            "label": "Object-scoped CRUD viewsets and app menu structure",
+                        },
+                        {
+                            "path": "cookbook/forms101/forms/viewset.py",
+                            "start_line": 23,
+                            "end_line": 153,
+                            "label": "Dedicated form pages mounted inside an Application",
                         },
                     ],
                 },

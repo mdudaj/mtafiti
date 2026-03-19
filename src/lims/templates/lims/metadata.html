@@ -1,0 +1,83 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Metadata" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Vocabularies" count_label="controlled lists" count_value=payload.cards.vocabularies %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Field definitions" count_label="reusable fields" count_value=payload.cards.fields %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="configurable forms" count_value=payload.cards.schemas %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Bindings" count_label="active attachments" count_value=payload.cards.bindings %}
+</div>
+
+{% if payload.capabilities.can_manage_metadata %}
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Choose a metadata workflow" panel_description="Keep the launchpad focused on navigation and review; complete each metadata action on its own page." %}
+  <div class="cards">
+    {% for item in payload.actions %}
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">{{ item.title }}</h2>
+          <p class="panel-description">{{ item.description }}</p>
+        </div>
+        <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+      </div>
+      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Vocabularies" panel_description="Controlled lists and seeded values." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Items</th></tr></thead><tbody>{% for item in payload.vocabularies %}<tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.items|length }}</td></tr>{% empty %}<tr><td colspan="3">No vocabularies yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Field definitions" panel_description="Reusable field building blocks for form schemas." %}
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Type</th></tr></thead><tbody>{% for item in payload.field_definitions %}<tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.field_type }}</td></tr>{% empty %}<tr><td colspan="3">No field definitions yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Schemas and versions" panel_description="Current schema versions with inline field counts for quick review." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Schema</th><th>Versions</th><th>Latest status</th></tr></thead>
+      <tbody>
+        {% for item in payload.schemas %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.versions|length }}</td>
+          <td>{% if item.versions %}{{ item.versions.0.status }}{% else %}-{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No schemas yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Schema bindings" panel_description="Published form attachments used by sample types and workflow steps." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Schema</th><th>Target</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for item in payload.bindings %}
+        <tr>
+          <td>{{ item.schema_code }} v{{ item.version_number }}</td>
+          <td>{{ item.target_type }} / {{ item.target_key }}</td>
+          <td>{% if item.is_active %}active{% else %}inactive{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No bindings yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
