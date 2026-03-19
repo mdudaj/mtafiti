@@ -1715,6 +1715,7 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                     "title": "Architecture rules",
                     "body": """
 - Treat workflow templates as declarative node/edge metadata that compile into a bounded set of supported Viewflow patterns: sequence, exclusive choice, split/join, multiple instances, role-based distribution, and guarded approvals.
+- Keep template design-time metadata separate from runtime `Process` / `Task` state so versioning, activation, and historical execution stay auditable.
 - Store task title, description, assignment, permission, and summary text as template metadata so lab-specific workflows can be configured without rewriting flow code for every study.
 - Use multiple-instance and split/join patterns for batch-oriented lab work such as aliquots, plates, parallel QC, and per-sample review branches.
 - Pair routing metadata with permission bundles so workflow designer choices stay compatible with guardian-backed object access and role-specific inboxes.
@@ -1758,6 +1759,119 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                             "label": "Shipment flow with process metadata, split/join coordination, Assign(...), and Permission(...)",
                         },
                     ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/viewflow-governed-workflow-definition-patterns",
+            "name": "viewflow-governed-workflow-definition-patterns",
+            "description": "Research-backed patterns for compiling governed operation/workflow templates into Viewflow flows with explicit process/task state, bounded nodes, assignment, and permissions.",
+            "tags": [
+                "viewflow",
+                "workflow",
+                "process",
+                "task",
+                "assignment",
+                "permissions",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": ["viewflow/README.md"],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Anchor runtime execution in explicit `Process` and `Task` state; do not bury workflow status inside arbitrary business records.
+- Keep configurable workflow builders bounded to supported Viewflow node families: `Start`, `StartHandle`, `View`, `Function`, `Handle`, `If`, `Switch`, `Split`, `SplitFirst`, `Join`, and `End`.
+- Put routing, ownership, and authorization on node metadata using `Assign(...)` and `Permission(...)` semantics rather than scattering them across view code.
+- Use `If` / `Switch` for exclusive routing, `Split` / `Join` for coordinated parallel work, and split data sources for repeated per-item tasks.
+- Register approved flows through `FlowAppViewset`, `Application`, and `Site` so workflow execution, inboxes, and operator navigation stay aligned.
+""".strip(),
+                },
+                {
+                    "title": "Quickstart and Process model baseline",
+                    "sources": [
+                        {
+                            "path": "viewflow/README.md",
+                            "start_line": 55,
+                            "end_line": 143,
+                            "label": "README quickstart with Process model, Flow, and Site registration",
+                        },
+                        {
+                            "path": "viewflow/viewflow/workflow/models.py",
+                            "start_line": 1,
+                            "end_line": 120,
+                            "label": "Process and Task base models",
+                        },
+                    ],
+                },
+                {
+                    "title": "Bounded node palette and task actions",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/workflow/flow/nodes.py",
+                            "start_line": 1,
+                            "end_line": 226,
+                            "label": "Start, StartHandle, View, If, and function/handle nodes",
+                        },
+                        {
+                            "path": "viewflow/viewflow/workflow/flow/nodes.py",
+                            "start_line": 280,
+                            "end_line": 430,
+                            "label": "Split, SplitFirst, Join, and Switch nodes",
+                        },
+                    ],
+                },
+                {
+                    "title": "Activation and permission behavior",
+                    "sources": [
+                        {
+                            "path": "viewflow/viewflow/workflow/activation.py",
+                            "start_line": 1,
+                            "end_line": 220,
+                            "label": "Activation lifecycle and status transitions",
+                        },
+                        {
+                            "path": "viewflow/tests/workflow/test_managers_perms.py",
+                            "start_line": 20,
+                            "end_line": 60,
+                            "label": "Assign and Permission examples in tests",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "entry_id": "knowledge-src/openclinica-odm-form-engine-patterns",
+            "name": "openclinica-odm-form-engine-patterns",
+            "description": "Research-backed form-engine patterns inspired by OpenClinica for spreadsheet-authored, versioned CRF/form packages with ODM-aligned artifacts.",
+            "tags": [
+                "openclinica",
+                "odm",
+                "cdisc",
+                "xlsx",
+                "form-engine",
+                "crf",
+                "local",
+                "knowledge-src",
+            ],
+            "requires": [],
+            "sections": [
+                {
+                    "title": "Architecture rules",
+                    "body": """
+- Treat authored forms as governed versioned packages; once a published version is in use, future changes create a new version rather than mutating the original.
+- Support both a visual designer path and a spreadsheet-template path, but keep the spreadsheet path available for advanced logic such as cascading selects, hard edit checks, and long controlled lists.
+- Model forms explicitly as package metadata plus sections/pages, item groups including repeats, items/questions, and choice lists with stable identifiers suitable for ODM/XML interchange.
+- Keep a canonical relational representation for runtime queryability, while generating lossless ODM/XML and XLSX artifacts for import/export and regulated interchange.
+- Preserve historical submissions against the exact published form version, including revision notes and stable identifiers, so rendering and audits remain reproducible.
+- Treat large choice sets and hierarchical choice filters as first-class design concerns instead of forcing every enumeration into a flat inline list.
+
+Reference research:
+- OpenClinica OC4 Using the Form Template: spreadsheet-based form definition with settings, choices, and survey sheets, plus advanced logic such as cascading selects and long-list files.
+- OpenClinica CRF specifications: each CRF version lives in its own spreadsheet/version definition and preserves historical version context.
+- OpenClinica XML import guidance: ODM 1.3 hierarchy around study event, form, item group, and item data supports interchange but does not require ODM XML to be the only application persistence model.
+""".strip(),
                 },
             ],
         },
