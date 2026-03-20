@@ -12,11 +12,13 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from core.identity import request_roles, roles_enforced
+from core.models import CollaborationDocument, CollaborationDocumentVersion
 
 from .permissions import has_lims_permission, permission_summary_for_roles, require_lims_permission
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
+    ApprovalRecord,
     Biospecimen,
     BiospecimenPool,
     BiospecimenType,
@@ -31,6 +33,10 @@ from .models import (
     MetadataVocabulary,
     MetadataVocabularyDomain,
     MetadataVocabularyItem,
+    MaterialUsageRecord,
+    OperationDefinition,
+    OperationRun,
+    OperationVersion,
     PlateLayoutTemplate,
     Postcode,
     ProcessingBatch,
@@ -44,6 +50,8 @@ from .models import (
     Ward,
     WorkflowEdgeTemplate,
     WorkflowNodeTemplate,
+    SubmissionRecord,
+    TaskRun,
     WorkflowStepBinding,
     WorkflowTemplate,
     WorkflowTemplateVersion,
@@ -51,6 +59,7 @@ from .models import (
 from .services import (
     accessioning_report,
     AccessioningError,
+    approve_task_run,
     allocate_biospecimen_identifiers,
     BatchPlateError,
     BiospecimenTransitionError,
@@ -66,12 +75,15 @@ from .services import (
     receive_manifest_item,
     receive_single_biospecimen,
     resolve_schema_version_for_binding,
+    start_operation_run,
     submit_manifest,
+    submit_task_run,
     sync_run_to_dict,
     transition_processing_batch,
     transition_biospecimen,
     transition_pool,
     validate_metadata_payload,
+    validate_operation_version,
     validate_workflow_template_version,
 )
 from .tasks import sync_tanzania_address_run
@@ -1324,6 +1336,150 @@ def _workflow_template_to_dict(template: WorkflowTemplate) -> dict[str, object]:
     }
 
 
+def _submission_record_to_dict(record: SubmissionRecord) -> dict[str, object]:
+    return {
+        "id": str(record.id),
+        "task_run_id": str(record.task_run_id),
+        "submission_index": record.submission_index,
+        "status": record.status,
+        "payload": dict(record.payload or {}),
+        "submitted_by": record.submitted_by,
+        "submitted_at": record.submitted_at.isoformat() if record.submitted_at else None,
+    }
+
+
+def _approval_record_to_dict(record: ApprovalRecord) -> dict[str, object]:
+    return {
+        "id": str(record.id),
+        "operation_run_id": str(record.operation_run_id),
+        "task_run_id": str(record.task_run_id) if record.task_run_id else None,
+        "outcome": record.outcome,
+        "meaning": record.meaning,
+        "approver_role": record.approver_role,
+        "approved_by": record.approved_by,
+        "comments": record.comments,
+        "approved_at": record.approved_at.isoformat() if record.approved_at else None,
+    }
+
+
+def _material_usage_record_to_dict(record: MaterialUsageRecord) -> dict[str, object]:
+    return {
+        "id": str(record.id),
+        "operation_run_id": str(record.operation_run_id),
+        "task_run_id": str(record.task_run_id) if record.task_run_id else None,
+        "biospecimen_id": str(record.biospecimen_id) if record.biospecimen_id else None,
+        "manifest_id": str(record.manifest_id) if record.manifest_id else None,
+        "manifest_item_id": str(record.manifest_item_id) if record.manifest_item_id else None,
+        "receiving_event_id": str(record.receiving_event_id) if record.receiving_event_id else None,
+        "discrepancy_id": str(record.discrepancy_id) if record.discrepancy_id else None,
+        "action": record.action,
+        "details": dict(record.details or {}),
+        "created_at": record.created_at.isoformat(),
+    }
+
+
+def _task_run_to_dict(task_run: TaskRun) -> dict[str, object]:
+    return {
+        "id": str(task_run.id),
+        "operation_run_id": str(task_run.operation_run_id),
+        "node_template_id": str(task_run.node_template_id),
+        "node_key": task_run.node_template.node_key,
+        "node_type": task_run.node_template.node_type,
+        "title": task_run.node_template.title,
+        "status": task_run.status,
+        "assignment_role": task_run.assignment_role,
+        "assignee": task_run.assignee,
+        "permission_key": task_run.permission_key,
+        "requires_approval": task_run.requires_approval,
+        "approval_role": task_run.approval_role,
+        "outcome": task_run.outcome,
+        "input_context": dict(task_run.input_context or {}),
+        "output_data": dict(task_run.output_data or {}),
+        "started_at": task_run.started_at.isoformat() if task_run.started_at else None,
+        "completed_at": task_run.completed_at.isoformat() if task_run.completed_at else None,
+        "submissions": [_submission_record_to_dict(item) for item in task_run.submissions.order_by("submission_index")],
+        "approvals": [_approval_record_to_dict(item) for item in task_run.approvals.order_by("approved_at", "created_at")],
+    }
+
+
+def _operation_run_to_dict(run: OperationRun) -> dict[str, object]:
+    return {
+        "id": str(run.id),
+        "operation_version_id": str(run.operation_version_id),
+        "operation_definition_id": str(run.operation_version.definition_id),
+        "operation_code": run.operation_version.definition.code,
+        "operation_name": run.operation_version.definition.name,
+        "operation_version_number": run.operation_version.version_number,
+        "workflow_version_id": str(run.workflow_version_id),
+        "workflow_template_id": str(run.workflow_version.template_id),
+        "workflow_template_code": run.workflow_version.template.code,
+        "workflow_version_number": run.workflow_version.version_number,
+        "status": run.status,
+        "source_mode": run.source_mode,
+        "source_reference": run.source_reference,
+        "subject_identifier": run.subject_identifier,
+        "external_identifier": run.external_identifier,
+        "initiated_by": run.initiated_by,
+        "biospecimen_id": str(run.biospecimen_id) if run.biospecimen_id else None,
+        "manifest_id": str(run.manifest_id) if run.manifest_id else None,
+        "manifest_item_id": str(run.manifest_item_id) if run.manifest_item_id else None,
+        "outcome": run.outcome,
+        "context": dict(run.context or {}),
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "tasks": [
+            _task_run_to_dict(item)
+            for item in run.tasks.prefetch_related("submissions", "approvals", "node_template").order_by(
+                "node_template__position", "created_at"
+            )
+        ],
+        "approvals": [_approval_record_to_dict(item) for item in run.approvals.order_by("approved_at", "created_at")],
+        "material_usages": [
+            _material_usage_record_to_dict(item) for item in run.material_usages.order_by("created_at")
+        ],
+    }
+
+
+def _operation_version_to_dict(version: OperationVersion) -> dict[str, object]:
+    return {
+        "id": str(version.id),
+        "definition_id": str(version.definition_id),
+        "definition_code": version.definition.code,
+        "definition_name": version.definition.name,
+        "module_scope": version.definition.module_scope,
+        "workflow_version_id": str(version.workflow_version_id),
+        "workflow_template_id": str(version.workflow_version.template_id),
+        "workflow_template_code": version.workflow_version.template.code,
+        "workflow_version_number": version.workflow_version.version_number,
+        "status": version.status,
+        "version_number": version.version_number,
+        "change_summary": version.change_summary,
+        "sop_document_id": str(version.sop_document_id) if version.sop_document_id else None,
+        "sop_document_version_id": str(version.sop_document_version_id) if version.sop_document_version_id else None,
+        "sop_version_label": version.sop_version_label,
+        "sop_effective_date": version.sop_effective_date.isoformat() if version.sop_effective_date else None,
+        "runtime_defaults": dict(version.runtime_defaults or {}),
+    }
+
+
+def _operation_definition_to_dict(definition: OperationDefinition) -> dict[str, object]:
+    versions = [_operation_version_to_dict(item) for item in definition.versions.order_by("-version_number")]
+    draft_version = next((item for item in versions if item["status"] == OperationVersion.Status.DRAFT), None)
+    published_version = next((item for item in versions if item["status"] == OperationVersion.Status.PUBLISHED), None)
+    return {
+        "id": str(definition.id),
+        "name": definition.name,
+        "code": definition.code,
+        "description": definition.description,
+        "purpose": definition.purpose,
+        "module_scope": definition.module_scope,
+        "is_active": definition.is_active,
+        "draft_version_id": draft_version["id"] if draft_version else None,
+        "published_version_id": published_version["id"] if published_version else None,
+        "versions": versions,
+    }
+
+
 def _schema_binding_to_dict(binding: MetadataSchemaBinding) -> dict[str, object]:
     return {
         "id": str(binding.id),
@@ -1712,6 +1868,87 @@ def _build_workflow_template_from_payload(template: WorkflowTemplate, payload: d
     return None
 
 
+def _build_operation_definition_from_payload(
+    definition: OperationDefinition,
+    payload: dict[str, object],
+) -> JsonResponse | None:
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+    code = str(payload.get("code") or "").strip()
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    module_scope = str(payload.get("module_scope") or OperationDefinition.ModuleScope.LIMS).strip()
+    if module_scope not in OperationDefinition.ModuleScope.values:
+        return JsonResponse({"error": "invalid_module_scope"}, status=400)
+    definition.name = name
+    definition.code = code
+    definition.description = str(payload.get("description") or "").strip()
+    definition.purpose = str(payload.get("purpose") or "").strip()
+    definition.module_scope = module_scope
+    definition.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _apply_operation_version_from_payload(
+    version: OperationVersion,
+    payload: dict[str, object],
+) -> JsonResponse | None:
+    if "workflow_version_id" in payload or not version.workflow_version_id:
+        workflow_version, error = _resolve_optional_fk(
+            WorkflowTemplateVersion,
+            payload.get("workflow_version_id"),
+            "workflow_version_not_found",
+        )
+        if error:
+            return error
+        if workflow_version is None:
+            return JsonResponse({"error": "workflow_version_id is required"}, status=400)
+        version.workflow_version = workflow_version
+    if "sop_document_id" in payload:
+        sop_document, error = _resolve_optional_fk(
+            CollaborationDocument,
+            payload.get("sop_document_id"),
+            "sop_document_not_found",
+        )
+        if error:
+            return error
+        version.sop_document = sop_document
+    if "sop_document_version_id" in payload:
+        sop_document_version, error = _resolve_optional_fk(
+            CollaborationDocumentVersion,
+            payload.get("sop_document_version_id"),
+            "sop_document_version_not_found",
+        )
+        if error:
+            return error
+        version.sop_document_version = sop_document_version
+    if version.sop_document_version_id and not version.sop_document_id:
+        version.sop_document = version.sop_document_version.document
+    if version.sop_document_id and version.sop_document_version_id:
+        if version.sop_document_version.document_id != version.sop_document_id:
+            return JsonResponse({"error": "sop_document_version_mismatch"}, status=400)
+    if "sop_version_label" in payload:
+        version.sop_version_label = str(payload.get("sop_version_label") or "").strip()
+    if "sop_effective_date" in payload:
+        raw_effective_date = payload.get("sop_effective_date")
+        if raw_effective_date in (None, ""):
+            version.sop_effective_date = None
+        else:
+            try:
+                version.sop_effective_date = datetime.fromisoformat(str(raw_effective_date)).date()
+            except ValueError:
+                return JsonResponse({"error": "invalid_sop_effective_date"}, status=400)
+    if "runtime_defaults" in payload:
+        runtime_defaults = payload.get("runtime_defaults") or {}
+        if not isinstance(runtime_defaults, dict):
+            return JsonResponse({"error": "runtime_defaults must be an object"}, status=400)
+        version.runtime_defaults = runtime_defaults
+    if "change_summary" in payload:
+        version.change_summary = str(payload.get("change_summary") or "").strip()
+    return None
+
+
 def _build_workflow_node_from_payload(
     node: WorkflowNodeTemplate,
     payload: dict[str, object],
@@ -1907,6 +2144,26 @@ def _clone_workflow_version_definition(
             priority=edge.priority,
             condition=dict(edge.condition or {}),
         )
+
+
+def _operation_definition_queryset():
+    return OperationDefinition.objects.prefetch_related("versions__workflow_version__template").order_by("name")
+
+
+def _operation_run_queryset():
+    return OperationRun.objects.select_related(
+        "operation_version__definition",
+        "workflow_version__template",
+        "biospecimen",
+        "manifest",
+        "manifest_item",
+    ).prefetch_related(
+        "tasks__node_template",
+        "tasks__submissions",
+        "tasks__approvals",
+        "approvals",
+        "material_usages",
+    )
 
 
 def _apply_field_definition_defaults(schema_field: MetadataSchemaField, field_definition: MetadataFieldDefinition) -> None:
@@ -2864,6 +3121,365 @@ def lims_metadata_field_definition_detail(request, definition_id: str):
             return error
         return JsonResponse(_field_definition_to_dict(field))
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operations(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation.view")
+        if forbidden:
+            return forbidden
+        items = [_operation_definition_to_dict(item) for item in _operation_definition_queryset()]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.operation.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        definition = OperationDefinition()
+        error = _build_operation_definition_from_payload(definition, payload)
+        if error:
+            return error
+        error = _save_model(definition)
+        if error:
+            return error
+        version = OperationVersion(
+            definition=definition,
+            version_number=1,
+            status=OperationVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+        )
+        error = _apply_operation_version_from_payload(version, payload)
+        if error:
+            definition.delete()
+            return error
+        error = _save_model(version)
+        if error:
+            definition.delete()
+            return error
+        definition.refresh_from_db()
+        return JsonResponse(_operation_definition_to_dict(definition), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_detail(request, operation_id: str):
+    try:
+        definition = _operation_definition_queryset().get(id=operation_id)
+    except (ValidationError, OperationDefinition.DoesNotExist):
+        return JsonResponse({"error": "operation_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_operation_definition_to_dict(definition))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.operation.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_operation_definition_from_payload(definition, payload)
+        if error:
+            return error
+        error = _save_model(definition)
+        if error:
+            return error
+        definition.refresh_from_db()
+        return JsonResponse(_operation_definition_to_dict(definition))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_versions(request, operation_id: str):
+    try:
+        definition = OperationDefinition.objects.get(id=operation_id)
+    except (ValidationError, OperationDefinition.DoesNotExist):
+        return JsonResponse({"error": "operation_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation.view")
+        if forbidden:
+            return forbidden
+        queryset = definition.versions.select_related("workflow_version__template").order_by("-version_number")
+        status_filter = str(request.GET.get("status") or "").strip()
+        if status_filter:
+            if status_filter not in OperationVersion.Status.values:
+                return JsonResponse({"error": "invalid_status"}, status=400)
+            queryset = queryset.filter(status=status_filter)
+        return JsonResponse({"items": [_operation_version_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.operation.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if definition.versions.filter(status=OperationVersion.Status.DRAFT).exists():
+            return JsonResponse({"error": "draft_version_already_exists"}, status=409)
+        source_version = None
+        if payload.get("source_version_id"):
+            try:
+                source_version = definition.versions.get(id=payload["source_version_id"])
+            except (ValidationError, OperationVersion.DoesNotExist):
+                return JsonResponse({"error": "source_version_not_found"}, status=404)
+        version_number = payload.get("version_number")
+        if version_number is None:
+            latest_version = definition.versions.order_by("-version_number").first()
+            version_number = (latest_version.version_number if latest_version else 0) + 1
+        try:
+            version_number = int(version_number)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "invalid_version_number"}, status=400)
+        version = OperationVersion(
+            definition=definition,
+            version_number=version_number,
+            status=OperationVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "").strip(),
+        )
+        if source_version is not None:
+            version.workflow_version = source_version.workflow_version
+            version.sop_document = source_version.sop_document
+            version.sop_document_version = source_version.sop_document_version
+            version.sop_version_label = source_version.sop_version_label
+            version.sop_effective_date = source_version.sop_effective_date
+            version.runtime_defaults = dict(source_version.runtime_defaults or {})
+        error = _apply_operation_version_from_payload(version, payload)
+        if error:
+            return error
+        error = _save_model(version)
+        if error:
+            return error
+        version.refresh_from_db()
+        return JsonResponse(_operation_version_to_dict(version), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_version_detail(request, operation_id: str, version_id: str):
+    try:
+        version = OperationVersion.objects.select_related(
+            "definition",
+            "workflow_version__template",
+            "sop_document",
+            "sop_document_version",
+        ).get(id=version_id, definition_id=operation_id)
+    except (ValidationError, OperationVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_operation_version_to_dict(version))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.operation.manage")
+        if forbidden:
+            return forbidden
+        if version.status != OperationVersion.Status.DRAFT:
+            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _apply_operation_version_from_payload(version, payload)
+        if error:
+            return error
+        error = _save_model(version)
+        if error:
+            return error
+        version.refresh_from_db()
+        return JsonResponse(_operation_version_to_dict(version))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_version_publish(request, operation_id: str, version_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.operation.manage")
+    if forbidden:
+        return forbidden
+    try:
+        version = OperationVersion.objects.select_related("definition", "workflow_version__template").get(
+            id=version_id,
+            definition_id=operation_id,
+        )
+    except (ValidationError, OperationVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if version.status != OperationVersion.Status.DRAFT:
+        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+    result = validate_operation_version(version)
+    if not result.valid:
+        return JsonResponse({"error": "operation_validation_failed", "details": result.errors}, status=400)
+    OperationVersion.objects.filter(
+        definition_id=operation_id,
+        status=OperationVersion.Status.PUBLISHED,
+    ).exclude(id=version.id).update(status=OperationVersion.Status.DEPRECATED)
+    version.status = OperationVersion.Status.PUBLISHED
+    version.save(update_fields=["status", "updated_at"])
+    version.refresh_from_db()
+    return JsonResponse(_operation_version_to_dict(version))
+
+
+@csrf_exempt
+def lims_operation_runs(request, operation_id: str):
+    try:
+        definition = OperationDefinition.objects.get(id=operation_id)
+    except (ValidationError, OperationDefinition.DoesNotExist):
+        return JsonResponse({"error": "operation_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation_run.view")
+        if forbidden:
+            return forbidden
+        queryset = _operation_run_queryset().filter(operation_version__definition_id=operation_id).order_by("-created_at")
+        status_filter = str(request.GET.get("status") or "").strip()
+        if status_filter:
+            if status_filter not in OperationRun.Status.values:
+                return JsonResponse({"error": "invalid_status"}, status=400)
+            queryset = queryset.filter(status=status_filter)
+        return JsonResponse({"items": [_operation_run_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.operation_run.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        operation_version = None
+        if payload.get("operation_version_id"):
+            try:
+                operation_version = definition.versions.select_related("workflow_version__template").get(
+                    id=payload["operation_version_id"]
+                )
+            except (ValidationError, OperationVersion.DoesNotExist):
+                return JsonResponse({"error": "operation_version_not_found"}, status=404)
+        else:
+            operation_version = definition.versions.select_related("workflow_version__template").filter(
+                status=OperationVersion.Status.PUBLISHED
+            ).order_by("-version_number").first()
+            if operation_version is None:
+                return JsonResponse({"error": "published_operation_version_not_found"}, status=404)
+        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+        if error:
+            return error
+        manifest, error = _resolve_optional_fk(AccessioningManifest, payload.get("manifest_id"), "manifest_not_found")
+        if error:
+            return error
+        manifest_item, error = _resolve_optional_fk(
+            AccessioningManifestItem,
+            payload.get("manifest_item_id"),
+            "manifest_item_not_found",
+        )
+        if error:
+            return error
+        context = payload.get("context") or {}
+        if not isinstance(context, dict):
+            return JsonResponse({"error": "context must be an object"}, status=400)
+        try:
+            result = start_operation_run(
+                operation_version,
+                initiated_by=(request.headers.get("X-User-Id") or "").strip(),
+                subject_identifier=str(payload.get("subject_identifier") or "").strip(),
+                external_identifier=str(payload.get("external_identifier") or "").strip(),
+                source_mode=str(payload.get("source_mode") or OperationRun.SourceMode.SINGLE).strip(),
+                source_reference=str(payload.get("source_reference") or "").strip(),
+                biospecimen=biospecimen,
+                manifest=manifest,
+                manifest_item=manifest_item,
+                context=context,
+            )
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        run = _operation_run_queryset().get(id=result.operation_run.id)
+        return JsonResponse(_operation_run_to_dict(run), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_run_detail(request, operation_id: str, run_id: str):
+    try:
+        run = _operation_run_queryset().get(id=run_id, operation_version__definition_id=operation_id)
+    except (ValidationError, OperationRun.DoesNotExist):
+        return JsonResponse({"error": "run_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.operation_run.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_operation_run_to_dict(run))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_task_submit(request, operation_id: str, run_id: str, task_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.workflow_task.execute")
+    if forbidden:
+        return forbidden
+    try:
+        task_run = TaskRun.objects.select_related(
+            "operation_run",
+            "node_template",
+        ).get(id=task_id, operation_run_id=run_id, operation_run__operation_version__definition_id=operation_id)
+    except (ValidationError, TaskRun.DoesNotExist):
+        return JsonResponse({"error": "task_run_not_found"}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    submission_payload = payload.get("payload")
+    if not isinstance(submission_payload, dict):
+        return JsonResponse({"error": "payload must be an object"}, status=400)
+    status = str(payload.get("status") or SubmissionRecord.Status.SUBMITTED).strip()
+    if status not in SubmissionRecord.Status.values:
+        return JsonResponse({"error": "invalid_submission_status"}, status=400)
+    try:
+        submit_task_run(
+            task_run,
+            payload=submission_payload,
+            submitted_by=(request.headers.get("X-User-Id") or "").strip(),
+            status=status,
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    run = _operation_run_queryset().get(id=run_id)
+    return JsonResponse(_operation_run_to_dict(run))
+
+
+@csrf_exempt
+def lims_operation_task_approve(request, operation_id: str, run_id: str, task_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.workflow_task.approve")
+    if forbidden:
+        return forbidden
+    try:
+        task_run = TaskRun.objects.select_related("operation_run", "node_template").get(
+            id=task_id,
+            operation_run_id=run_id,
+            operation_run__operation_version__definition_id=operation_id,
+        )
+    except (ValidationError, TaskRun.DoesNotExist):
+        return JsonResponse({"error": "task_run_not_found"}, status=404)
+    payload = _parse_json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    outcome = str(payload.get("outcome") or "").strip()
+    if outcome not in ApprovalRecord.Outcome.values:
+        return JsonResponse({"error": "invalid_outcome"}, status=400)
+    try:
+        approve_task_run(
+            task_run,
+            outcome=outcome,
+            approved_by=(request.headers.get("X-User-Id") or "").strip(),
+            approver_role=(request.headers.get("X-User-Roles") or "").split(",")[0].strip(),
+            meaning=str(payload.get("meaning") or "").strip(),
+            comments=str(payload.get("comments") or "").strip(),
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    run = _operation_run_queryset().get(id=run_id)
+    return JsonResponse(_operation_run_to_dict(run))
 
 
 @csrf_exempt

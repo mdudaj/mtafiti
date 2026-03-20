@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from core.models import CollaborationDocument, CollaborationDocumentVersion
+
 
 class TimestampedUUIDModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -827,6 +829,376 @@ class WorkflowStepBinding(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.node.node_key} -> {self.schema_version}"
+
+
+class OperationDefinition(TimestampedUUIDModel):
+    class ModuleScope(models.TextChoices):
+        LIMS = "lims"
+        EDCS = "edcs"
+
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    purpose = models.CharField(max_length=200, blank=True, default="")
+    module_scope = models.CharField(max_length=16, choices=ModuleScope.choices, default=ModuleScope.LIMS)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_op_definition_code_idx"),
+            models.Index(fields=["module_scope", "is_active"], name="lims_op_definition_scope_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class OperationVersion(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        PUBLISHED = "published"
+        DEPRECATED = "deprecated"
+
+    definition = models.ForeignKey(
+        OperationDefinition,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    workflow_version = models.ForeignKey(
+        WorkflowTemplateVersion,
+        on_delete=models.PROTECT,
+        related_name="operation_versions",
+    )
+    version_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    change_summary = models.CharField(max_length=255, blank=True, default="")
+    sop_document = models.ForeignKey(
+        CollaborationDocument,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="operation_versions",
+    )
+    sop_document_version = models.ForeignKey(
+        CollaborationDocumentVersion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="operation_versions",
+    )
+    sop_version_label = models.CharField(max_length=64, blank=True, default="")
+    sop_effective_date = models.DateField(null=True, blank=True)
+    runtime_defaults = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["definition__name", "-version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["definition", "version_number"],
+                name="uniq_lims_operation_version_number",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "-version_number"], name="lims_op_version_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.workflow_version_id and self.workflow_version.status != WorkflowTemplateVersion.Status.PUBLISHED:
+            raise ValidationError({"workflow_version": "workflow_version must be published"})
+        if self.sop_document_version_id and not self.sop_document_id:
+            self.sop_document = self.sop_document_version.document
+        if self.sop_document_version_id and self.sop_document_version.document_id != self.sop_document_id:
+            raise ValidationError(
+                {"sop_document_version": "sop_document_version must belong to sop_document"}
+            )
+        if not isinstance(self.runtime_defaults, dict):
+            raise ValidationError({"runtime_defaults": "runtime_defaults must be an object"})
+        sop_object_key = ""
+        if self.sop_document_version_id:
+            sop_object_key = self.sop_document_version.object_key
+        elif self.sop_document_id:
+            sop_object_key = self.sop_document.object_key
+        sop_content_type = ""
+        if self.sop_document_id:
+            sop_content_type = (self.sop_document.content_type or "").lower()
+        if self.sop_document_id and sop_content_type and "pdf" not in sop_content_type and not sop_object_key.lower().endswith(".pdf"):
+            raise ValidationError({"sop_document": "sop_document must reference a PDF asset"})
+
+    def __str__(self) -> str:
+        return f"{self.definition.code}:v{self.version_number}"
+
+
+class OperationRun(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        ACTIVE = "active"
+        PAUSED = "paused"
+        COMPLETED = "completed"
+        REJECTED = "rejected"
+        CANCELLED = "cancelled"
+
+    class SourceMode(models.TextChoices):
+        SINGLE = "single"
+        BATCH = "batch"
+        EDC_IMPORT = "edc_import"
+        MANUAL = "manual"
+
+    operation_version = models.ForeignKey(
+        OperationVersion,
+        on_delete=models.PROTECT,
+        related_name="runs",
+    )
+    workflow_version = models.ForeignKey(
+        WorkflowTemplateVersion,
+        on_delete=models.PROTECT,
+        related_name="operation_runs",
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    source_mode = models.CharField(max_length=16, choices=SourceMode.choices, default=SourceMode.SINGLE)
+    source_reference = models.CharField(max_length=100, blank=True, default="")
+    subject_identifier = models.CharField(max_length=100, blank=True, default="")
+    external_identifier = models.CharField(max_length=100, blank=True, default="")
+    initiated_by = models.CharField(max_length=200, blank=True, default="")
+    manifest = models.ForeignKey(
+        "AccessioningManifest",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="operation_runs",
+    )
+    manifest_item = models.ForeignKey(
+        "AccessioningManifestItem",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="operation_runs",
+    )
+    biospecimen = models.ForeignKey(
+        "Biospecimen",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="operation_runs",
+    )
+    outcome = models.CharField(max_length=64, blank=True, default="")
+    context = models.JSONField(default=dict, blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="lims_op_run_status_idx"),
+            models.Index(fields=["source_mode", "-created_at"], name="lims_op_run_source_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.operation_version_id and self.workflow_version_id:
+            if self.operation_version.workflow_version_id != self.workflow_version_id:
+                raise ValidationError({"workflow_version": "workflow_version must match operation_version"})
+        if self.manifest_id and self.manifest_item_id and self.manifest_item.manifest_id != self.manifest_id:
+            raise ValidationError({"manifest_item": "manifest_item must belong to manifest"})
+        if not isinstance(self.context, dict):
+            raise ValidationError({"context": "context must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.operation_version} / {self.id}"
+
+
+class TaskRun(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        OPEN = "open"
+        AWAITING_APPROVAL = "awaiting_approval"
+        COMPLETED = "completed"
+        SKIPPED = "skipped"
+        CANCELLED = "cancelled"
+
+    operation_run = models.ForeignKey(
+        OperationRun,
+        on_delete=models.CASCADE,
+        related_name="tasks",
+    )
+    node_template = models.ForeignKey(
+        WorkflowNodeTemplate,
+        on_delete=models.PROTECT,
+        related_name="task_runs",
+    )
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.OPEN)
+    assignment_role = models.CharField(max_length=100, blank=True, default="")
+    assignee = models.CharField(max_length=200, blank=True, default="")
+    permission_key = models.CharField(max_length=100, blank=True, default="")
+    requires_approval = models.BooleanField(default=False)
+    approval_role = models.CharField(max_length=100, blank=True, default="")
+    outcome = models.CharField(max_length=64, blank=True, default="")
+    input_context = models.JSONField(default=dict, blank=True)
+    output_data = models.JSONField(default=dict, blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["operation_run__created_at", "node_template__position", "created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["operation_run", "node_template"],
+                name="uniq_lims_task_run_node",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="lims_task_run_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.node_template_id and self.operation_run_id:
+            if self.node_template.workflow_version_id != self.operation_run.workflow_version_id:
+                raise ValidationError({"node_template": "node_template must belong to the operation run workflow"})
+        if not isinstance(self.input_context, dict):
+            raise ValidationError({"input_context": "input_context must be an object"})
+        if not isinstance(self.output_data, dict):
+            raise ValidationError({"output_data": "output_data must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.operation_run_id}:{self.node_template.node_key}"
+
+
+class SubmissionRecord(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        SUBMITTED = "submitted"
+        FINALIZED = "finalized"
+
+    task_run = models.ForeignKey(
+        TaskRun,
+        on_delete=models.CASCADE,
+        related_name="submissions",
+    )
+    submission_index = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.SUBMITTED)
+    payload = models.JSONField(default=dict, blank=True)
+    submitted_by = models.CharField(max_length=200, blank=True, default="")
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["task_run__created_at", "submission_index"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task_run", "submission_index"],
+                name="uniq_lims_submission_index",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.payload, dict):
+            raise ValidationError({"payload": "payload must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.task_run_id}:{self.submission_index}"
+
+
+class ApprovalRecord(TimestampedUUIDModel):
+    class Outcome(models.TextChoices):
+        APPROVED = "approved"
+        REJECTED = "rejected"
+
+    operation_run = models.ForeignKey(
+        OperationRun,
+        on_delete=models.CASCADE,
+        related_name="approvals",
+    )
+    task_run = models.ForeignKey(
+        TaskRun,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="approvals",
+    )
+    outcome = models.CharField(max_length=16, choices=Outcome.choices)
+    meaning = models.CharField(max_length=200, blank=True, default="")
+    approver_role = models.CharField(max_length=100, blank=True, default="")
+    approved_by = models.CharField(max_length=200, blank=True, default="")
+    comments = models.TextField(blank=True, default="")
+    approved_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["approved_at", "created_at"]
+        indexes = [
+            models.Index(fields=["outcome", "-approved_at"], name="lims_approval_outcome_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.task_run_id and self.task_run.operation_run_id != self.operation_run_id:
+            raise ValidationError({"task_run": "task_run must belong to operation_run"})
+
+
+class MaterialUsageRecord(TimestampedUUIDModel):
+    operation_run = models.ForeignKey(
+        OperationRun,
+        on_delete=models.CASCADE,
+        related_name="material_usages",
+    )
+    task_run = models.ForeignKey(
+        TaskRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    biospecimen = models.ForeignKey(
+        "Biospecimen",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    manifest = models.ForeignKey(
+        "AccessioningManifest",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    manifest_item = models.ForeignKey(
+        "AccessioningManifestItem",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    receiving_event = models.ForeignKey(
+        "ReceivingEvent",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    discrepancy = models.ForeignKey(
+        "ReceivingDiscrepancy",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="material_usages",
+    )
+    action = models.CharField(max_length=64)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["operation_run__created_at", "created_at"]
+        indexes = [
+            models.Index(fields=["action", "-created_at"], name="lims_material_usage_action_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.task_run_id and self.task_run.operation_run_id != self.operation_run_id:
+            raise ValidationError({"task_run": "task_run must belong to operation_run"})
+        if self.manifest_id and self.manifest_item_id and self.manifest_item.manifest_id != self.manifest_id:
+            raise ValidationError({"manifest_item": "manifest_item must belong to manifest"})
+        if not isinstance(self.details, dict):
+            raise ValidationError({"details": "details must be an object"})
 
 
 class BiospecimenType(TimestampedUUIDModel):
