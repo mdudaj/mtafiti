@@ -1393,7 +1393,12 @@ def validate_workflow_template_version(
     workflow_version: WorkflowTemplateVersion,
 ) -> WorkflowTemplateValidationResult:
     nodes = list(
-        workflow_version.nodes.prefetch_related("step_bindings__schema_version__fields").order_by("position", "node_key")
+        workflow_version.nodes.prefetch_related(
+            "step_bindings__form_package_version__package",
+            "step_bindings__form_package_version__sections",
+            "step_bindings__form_package_version__item_groups",
+            "step_bindings__form_package_version__items",
+        ).order_by("position", "node_key")
     )
     edges = list(
         workflow_version.edges.select_related("source_node", "target_node").order_by("priority", "source_node__node_key")
@@ -1438,6 +1443,7 @@ def validate_workflow_template_version(
         WorkflowNodeTemplate.NodeType.HANDLE,
         WorkflowNodeTemplate.NodeType.JOIN,
     }
+    available_condition_item_keys: set[str] = set()
 
     for node in nodes:
         node_id = str(node.id)
@@ -1462,15 +1468,78 @@ def validate_workflow_template_version(
                 errors.append({"field": f"nodes.{node.node_key}", "code": "linear_node_requires_one_outgoing_edge"})
 
         for binding in node.step_bindings.all():
-            if binding.binding_type == WorkflowStepBinding.BindingType.UI_STEP:
-                if not binding.schema_version.fields.filter(config__ui_step=binding.ui_step).exists():
-                    errors.append({"field": f"bindings.{node.node_key}", "code": "ui_step_not_found"})
-            elif binding.binding_type == WorkflowStepBinding.BindingType.FIELD_SET:
-                field_keys = set(
-                    binding.schema_version.fields.filter(field_key__in=binding.field_keys).values_list("field_key", flat=True)
-                )
-                if field_keys != set(binding.field_keys):
-                    errors.append({"field": f"bindings.{node.node_key}", "code": "field_keys_not_found"})
+            package_version = binding.form_package_version
+            if package_version is None:
+                errors.append({"field": f"bindings.{node.node_key}", "code": "form_package_version_required"})
+                continue
+            package_section_keys = {
+                item.section_key for item in package_version.sections.all()
+            }
+            package_group_keys = {
+                item.group_key for item in package_version.item_groups.all()
+            }
+            package_item_keys = {
+                item.item_key for item in package_version.items.all()
+            }
+            if binding.binding_type == WorkflowStepBinding.BindingType.SECTION_SET:
+                missing = sorted(set(binding.section_keys or []) - package_section_keys)
+                if missing:
+                    errors.append(
+                        {
+                            "field": f"bindings.{node.node_key}",
+                            "code": "section_keys_not_found",
+                            "detail": ",".join(missing),
+                        }
+                    )
+                else:
+                    selected_sections = set(binding.section_keys or [])
+                    available_condition_item_keys.update(
+                        item.item_key
+                        for item in package_version.items.all()
+                        if item.section.section_key in selected_sections
+                    )
+            elif binding.binding_type == WorkflowStepBinding.BindingType.GROUP_SET:
+                missing = sorted(set(binding.item_group_keys or []) - package_group_keys)
+                if missing:
+                    errors.append(
+                        {
+                            "field": f"bindings.{node.node_key}",
+                            "code": "item_group_keys_not_found",
+                            "detail": ",".join(missing),
+                        }
+                    )
+                else:
+                    selected_groups = set(binding.item_group_keys or [])
+                    available_condition_item_keys.update(
+                        item.item_key
+                        for item in package_version.items.all()
+                        if item.item_group_id and item.item_group.group_key in selected_groups
+                    )
+            elif binding.binding_type == WorkflowStepBinding.BindingType.ITEM_SET:
+                missing = sorted(set(binding.item_keys or []) - package_item_keys)
+                if missing:
+                    errors.append(
+                        {
+                            "field": f"bindings.{node.node_key}",
+                            "code": "item_keys_not_found",
+                            "detail": ",".join(missing),
+                        }
+                    )
+                else:
+                    available_condition_item_keys.update(binding.item_keys or [])
+            else:
+                available_condition_item_keys.update(package_item_keys)
+
+    for edge in edges:
+        condition_item_key = str(edge.condition.get("item_key") or "").strip() if isinstance(edge.condition, dict) else ""
+        if condition_item_key and condition_item_key not in available_condition_item_keys:
+            errors.append(
+                {
+                    "field": f"edges.{edge.source_node.node_key}->{edge.target_node.node_key}",
+                    "code": "condition_item_key_not_found",
+                    "detail": condition_item_key,
+                }
+            )
 
     if start_nodes:
         visited: set[str] = set()
@@ -1501,14 +1570,39 @@ def validate_workflow_template_version(
                 "permission_key": node.permission_key,
                 "requires_approval": node.requires_approval,
                 "approval_role": node.approval_role,
+                "assignment": {
+                    "role": node.assignment_role or None,
+                },
+                "permission": {
+                    "key": node.permission_key or None,
+                },
+                "approval": {
+                    "required": node.requires_approval,
+                    "role": node.approval_role or None,
+                },
                 "config": dict(node.config or {}),
                 "bindings": [
                     {
                         "id": str(binding.id),
-                        "schema_version_id": str(binding.schema_version_id),
+                        "form_package_version_id": (
+                            str(binding.form_package_version_id) if binding.form_package_version_id else None
+                        ),
+                        "form_package_id": (
+                            str(binding.form_package_version.package_id) if binding.form_package_version_id else None
+                        ),
+                        "form_package_code": (
+                            binding.form_package_version.package.code if binding.form_package_version_id else ""
+                        ),
+                        "form_package_name": (
+                            binding.form_package_version.package.name if binding.form_package_version_id else ""
+                        ),
+                        "version_number": (
+                            binding.form_package_version.version_number if binding.form_package_version_id else None
+                        ),
                         "binding_type": binding.binding_type,
-                        "ui_step": binding.ui_step,
-                        "field_keys": list(binding.field_keys or []),
+                        "section_keys": list(binding.section_keys or []),
+                        "item_group_keys": list(binding.item_group_keys or []),
+                        "item_keys": list(binding.item_keys or []),
                         "is_required": binding.is_required,
                     }
                     for binding in node.step_bindings.all()
@@ -1545,7 +1639,7 @@ def validate_operation_version(operation_version: OperationVersion) -> Operation
 def _evaluate_workflow_condition(condition: dict[str, object], payload: dict[str, object]) -> bool:
     if not condition:
         return True
-    field = str(condition.get("field") or "").strip()
+    field = str(condition.get("item_key") or condition.get("field") or "").strip()
     if not field:
         return True
     operator = str(condition.get("operator") or "equals").strip()

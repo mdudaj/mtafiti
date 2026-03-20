@@ -101,7 +101,36 @@ def _create_published_schema(client: Client, host: str) -> str:
     return version_id
 
 
-def _create_published_workflow(client: Client, host: str, schema_version_id: str) -> str:
+def _create_published_form_package(client: Client, host: str, schema_version_id: str) -> str:
+    created = client.post(
+        "/api/v1/lims/form-packages",
+        data=json.dumps(
+            {
+                "name": "Accession package",
+                "code": "runtime-accession-package",
+                "description": "Published package used for workflow runtime tests.",
+                "purpose": "Workflow task capture",
+                "change_summary": "Initial draft",
+                "source_schema_version_id": schema_version_id,
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert created.status_code == 201
+    package_id = created.json()["id"]
+    version_id = created.json()["draft_version_id"]
+    published = client.post(
+        f"/api/v1/lims/form-packages/{package_id}/versions/{version_id}/publish",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert published.status_code == 200
+    return version_id
+
+
+def _create_published_workflow(client: Client, host: str, form_package_version_id: str) -> str:
     created = client.post(
         "/api/v1/lims/workflow-config/templates",
         data=json.dumps(
@@ -135,9 +164,9 @@ def _create_published_workflow(client: Client, host: str, schema_version_id: str
                         "permission_key": "lims.workflow_task.execute",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "ui_step",
-                                "ui_step": "intake",
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "section_set",
+                                "section_keys": ["intake"],
                             }
                         ],
                     },
@@ -151,9 +180,9 @@ def _create_published_workflow(client: Client, host: str, schema_version_id: str
                         "approval_role": "lims.qa",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "field_set",
-                                "field_keys": ["qc_decision"],
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "item_set",
+                                "item_keys": ["qc_decision"],
                             }
                         ],
                     },
@@ -165,9 +194,9 @@ def _create_published_workflow(client: Client, host: str, schema_version_id: str
                         "permission_key": "lims.workflow_task.execute",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "ui_step",
-                                "ui_step": "storage",
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "section_set",
+                                "section_keys": ["storage"],
                             }
                         ],
                     },
@@ -181,13 +210,13 @@ def _create_published_workflow(client: Client, host: str, schema_version_id: str
                         "source_node_key": "qc_decision",
                         "target_node_key": "storage_logging",
                         "priority": 1,
-                        "condition": {"field": "qc_decision", "operator": "equals", "value": "accept"},
+                        "condition": {"item_key": "qc_decision", "operator": "equals", "value": "accept"},
                     },
                     {
                         "source_node_key": "qc_decision",
                         "target_node_key": "rejected_end",
                         "priority": 2,
-                        "condition": {"field": "qc_decision", "operator": "equals", "value": "reject"},
+                        "condition": {"item_key": "qc_decision", "operator": "equals", "value": "reject"},
                     },
                     {"source_node_key": "storage_logging", "target_node_key": "accepted_end"},
                 ],
@@ -244,7 +273,8 @@ def test_lims_workflow_runtime_executes_accept_and_reject_paths(monkeypatch):
     client = Client()
     host = _create_lims_host(client, "tenant-runtime")
     schema_version_id = _create_published_schema(client, host)
-    workflow_version_id = _create_published_workflow(client, host, schema_version_id)
+    form_package_version_id = _create_published_form_package(client, host, schema_version_id)
+    workflow_version_id = _create_published_workflow(client, host, form_package_version_id)
     operation_id, operation_version_id = _create_published_operation(client, host, workflow_version_id)
 
     created_run = client.post(

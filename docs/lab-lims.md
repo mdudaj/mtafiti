@@ -164,6 +164,8 @@ The emerging ODM-engine foundation now sits beside that transitional metadata re
 
 Those package versions carry canonical sections, item groups, items, choice lists, source-artifact provenance, compiler diagnostics, and compiled projections. A first bootstrap path can materialize a draft package version from an already published `MetadataSchemaVersion`, which keeps current runtime work moving while the compiler-owned package model becomes the long-term contract for workflow/runtime and UI consumers.
 
+The workflow-configuration layer now builds on that contract. Workflow template nodes continue to define bounded Viewflow-style topology plus assignment, permission, and approval metadata, but task capture bindings target published form-package outputs instead of raw metadata-schema versions. Capture scope can therefore be expressed as a whole package, section subsets, item-group subsets, or explicit item subsets while leaving canonical form semantics inside the compiler-owned package model.
+
 ## Biospecimen aggregate
 
 The current biospecimen slice introduces tenant-local specimen and pooling primitives for the first LIMS lifecycle workflows:

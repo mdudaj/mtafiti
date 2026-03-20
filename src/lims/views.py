@@ -1661,16 +1661,19 @@ def _schema_to_dict(schema: MetadataSchema) -> dict[str, object]:
 
 
 def _workflow_step_binding_to_dict(binding: WorkflowStepBinding) -> dict[str, object]:
+    package_version = binding.form_package_version
     return {
         "id": str(binding.id),
         "node_id": str(binding.node_id),
-        "schema_version_id": str(binding.schema_version_id),
-        "schema_id": str(binding.schema_version.schema_id),
-        "schema_code": binding.schema_version.schema.code,
-        "version_number": binding.schema_version.version_number,
+        "form_package_version_id": str(binding.form_package_version_id) if binding.form_package_version_id else None,
+        "form_package_id": str(package_version.package_id) if package_version else None,
+        "form_package_code": package_version.package.code if package_version else "",
+        "form_package_name": package_version.package.name if package_version else "",
+        "version_number": package_version.version_number if package_version else None,
         "binding_type": binding.binding_type,
-        "ui_step": binding.ui_step,
-        "field_keys": list(binding.field_keys or []),
+        "section_keys": list(binding.section_keys or []),
+        "item_group_keys": list(binding.item_group_keys or []),
+        "item_keys": list(binding.item_keys or []),
         "is_required": binding.is_required,
     }
 
@@ -1690,8 +1693,8 @@ def _workflow_node_to_dict(node: WorkflowNodeTemplate) -> dict[str, object]:
         "config": dict(node.config or {}),
         "step_bindings": [
             _workflow_step_binding_to_dict(binding)
-            for binding in node.step_bindings.select_related("schema_version", "schema_version__schema").order_by(
-                "schema_version__schema__name"
+            for binding in node.step_bindings.select_related("form_package_version", "form_package_version__package").order_by(
+                "form_package_version__package__name", "form_package_version__version_number"
             )
         ],
     }
@@ -1723,7 +1726,9 @@ def _workflow_template_version_to_dict(version: WorkflowTemplateVersion) -> dict
         "compiled_definition": dict(version.compiled_definition or {}),
         "nodes": [
             _workflow_node_to_dict(node)
-            for node in version.nodes.prefetch_related("step_bindings__schema_version__schema").order_by("position", "node_key")
+            for node in version.nodes.prefetch_related("step_bindings__form_package_version__package").order_by(
+                "position", "node_key"
+            )
         ],
         "edges": [
             _workflow_edge_to_dict(edge)
@@ -2951,23 +2956,33 @@ def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: o
                 return JsonResponse({"error": "workflow_step_binding_not_found"}, status=404)
         else:
             binding = WorkflowStepBinding(node=node)
-        schema_version, error = _resolve_optional_fk(
-            MetadataSchemaVersion,
-            binding_payload.get("schema_version_id"),
-            "schema_version_not_found",
+        form_package_version, error = _resolve_optional_fk(
+            FormPackageVersion,
+            binding_payload.get("form_package_version_id"),
+            "form_package_version_not_found",
         )
         if error:
             return error
-        if schema_version is None:
-            return JsonResponse({"error": "schema_version_id is required"}, status=400)
-        binding_type = str(binding_payload.get("binding_type") or WorkflowStepBinding.BindingType.FULL_SCHEMA).strip()
+        if form_package_version is None:
+            return JsonResponse({"error": "form_package_version_id is required"}, status=400)
+        binding_type = str(binding_payload.get("binding_type") or WorkflowStepBinding.BindingType.FULL_PACKAGE).strip()
         if binding_type not in WorkflowStepBinding.BindingType.values:
             return JsonResponse({"error": "invalid_binding_type"}, status=400)
-        field_keys = binding_payload.get("field_keys") or []
-        binding.schema_version = schema_version
+        section_keys = binding_payload.get("section_keys") or []
+        item_group_keys = binding_payload.get("item_group_keys") or []
+        item_keys = binding_payload.get("item_keys") or []
+        for field_name, value in (
+            ("section_keys", section_keys),
+            ("item_group_keys", item_group_keys),
+            ("item_keys", item_keys),
+        ):
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                return JsonResponse({"error": f"{field_name} must be a list of strings"}, status=400)
+        binding.form_package_version = form_package_version
         binding.binding_type = binding_type
-        binding.ui_step = str(binding_payload.get("ui_step") or "").strip()
-        binding.field_keys = field_keys
+        binding.section_keys = section_keys
+        binding.item_group_keys = item_group_keys
+        binding.item_keys = item_keys
         binding.is_required = bool(binding_payload.get("is_required", True))
         error = _save_model(binding)
         if error:
@@ -3083,10 +3098,11 @@ def _clone_workflow_version_definition(
         for binding in node.step_bindings.all():
             WorkflowStepBinding.objects.create(
                 node=cloned_node,
-                schema_version=binding.schema_version,
+                form_package_version=binding.form_package_version,
                 binding_type=binding.binding_type,
-                ui_step=binding.ui_step,
-                field_keys=list(binding.field_keys or []),
+                section_keys=list(binding.section_keys or []),
+                item_group_keys=list(binding.item_group_keys or []),
+                item_keys=list(binding.item_keys or []),
                 is_required=binding.is_required,
             )
     for edge in source_version.edges.select_related("source_node", "target_node").all().order_by("priority"):
@@ -4548,7 +4564,7 @@ def lims_workflow_templates(request):
         items = [
             _workflow_template_to_dict(item)
             for item in WorkflowTemplate.objects.prefetch_related(
-                "versions__nodes__step_bindings__schema_version__schema",
+                "versions__nodes__step_bindings__form_package_version__package",
                 "versions__edges__source_node",
                 "versions__edges__target_node",
             ).order_by("name")
@@ -4599,7 +4615,7 @@ def lims_workflow_templates(request):
 def lims_workflow_template_detail(request, template_id: str):
     try:
         template = WorkflowTemplate.objects.prefetch_related(
-            "versions__nodes__step_bindings__schema_version__schema",
+            "versions__nodes__step_bindings__form_package_version__package",
             "versions__edges__source_node",
             "versions__edges__target_node",
         ).get(id=template_id)
@@ -4638,7 +4654,7 @@ def lims_workflow_template_versions(request, template_id: str):
         if forbidden:
             return forbidden
         queryset = template.versions.prefetch_related(
-            "nodes__step_bindings__schema_version__schema",
+            "nodes__step_bindings__form_package_version__package",
             "edges__source_node",
             "edges__target_node",
         ).order_by("-version_number")
@@ -4706,7 +4722,7 @@ def lims_workflow_template_versions(request, template_id: str):
 def lims_workflow_template_version_detail(request, template_id: str, version_id: str):
     try:
         version = WorkflowTemplateVersion.objects.prefetch_related(
-            "nodes__step_bindings__schema_version__schema",
+            "nodes__step_bindings__form_package_version__package",
             "edges__source_node",
             "edges__target_node",
         ).get(id=version_id, template_id=template_id)
@@ -4753,7 +4769,10 @@ def lims_workflow_template_version_publish(request, template_id: str, version_id
         return forbidden
     try:
         version = WorkflowTemplateVersion.objects.prefetch_related(
-            "nodes__step_bindings__schema_version__fields",
+            "nodes__step_bindings__form_package_version__sections",
+            "nodes__step_bindings__form_package_version__item_groups",
+            "nodes__step_bindings__form_package_version__items",
+            "nodes__step_bindings__form_package_version__package",
             "edges__source_node",
             "edges__target_node",
         ).get(id=version_id, template_id=template_id)

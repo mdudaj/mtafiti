@@ -101,12 +101,42 @@ def _create_published_schema(client: Client, host: str) -> str:
     return version_id
 
 
+def _create_published_form_package(client: Client, host: str, schema_version_id: str) -> str:
+    created = client.post(
+        "/api/v1/lims/form-packages",
+        data=json.dumps(
+            {
+                "name": "Accession package",
+                "code": "accession-package",
+                "description": "Published package used for workflow-step binding tests.",
+                "purpose": "Workflow task capture",
+                "change_summary": "Initial draft",
+                "source_schema_version_id": schema_version_id,
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert created.status_code == 201
+    package_id = created.json()["id"]
+    version_id = created.json()["draft_version_id"]
+    published = client.post(
+        f"/api/v1/lims/form-packages/{package_id}/versions/{version_id}/publish",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert published.status_code == 200
+    return version_id
+
+
 @pytest.mark.django_db(transaction=True)
 def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkeypatch):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-workflow")
     schema_version_id = _create_published_schema(client, host)
+    form_package_version_id = _create_published_form_package(client, host, schema_version_id)
 
     denied = client.post(
         "/api/v1/lims/workflow-config/templates",
@@ -151,9 +181,9 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
                         "permission_key": "lims.workflow_task.execute",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "ui_step",
-                                "ui_step": "intake",
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "section_set",
+                                "section_keys": ["intake"],
                             }
                         ],
                     },
@@ -165,9 +195,9 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
                         "approval_role": "lims.qa",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "field_set",
-                                "field_keys": ["qc_decision"],
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "item_set",
+                                "item_keys": ["qc_decision"],
                             }
                         ],
                     },
@@ -177,9 +207,9 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
                         "title": "Storage logging",
                         "step_bindings": [
                             {
-                                "schema_version_id": schema_version_id,
-                                "binding_type": "ui_step",
-                                "ui_step": "storage",
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "section_set",
+                                "section_keys": ["storage"],
                             }
                         ],
                     },
@@ -193,13 +223,13 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
                         "source_node_key": "qc",
                         "target_node_key": "storage",
                         "priority": 1,
-                        "condition": {"field": "qc_decision", "operator": "equals", "value": "accept"},
+                        "condition": {"item_key": "qc_decision", "operator": "equals", "value": "accept"},
                     },
                     {
                         "source_node_key": "qc",
                         "target_node_key": "rejected_end",
                         "priority": 2,
-                        "condition": {"field": "qc_decision", "operator": "equals", "value": "reject"},
+                        "condition": {"item_key": "qc_decision", "operator": "equals", "value": "reject"},
                     },
                     {"source_node_key": "storage", "target_node_key": "accepted_end"},
                 ],
@@ -225,7 +255,9 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
     assert len(compiled["edges"]) == 5
     qc_node = next(item for item in compiled["nodes"] if item["node_key"] == "qc")
     assert qc_node["requires_approval"] is True
-    assert qc_node["bindings"][0]["binding_type"] == "field_set"
+    assert qc_node["bindings"][0]["binding_type"] == "item_set"
+    assert qc_node["bindings"][0]["form_package_version_id"] == form_package_version_id
+    assert qc_node["approval"]["role"] == "lims.qa"
 
     immutable = client.put(
         f"/api/v1/lims/workflow-config/templates/{template_id}/versions/{version_id}",
@@ -270,10 +302,23 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
             {
                 "nodes": [
                     {"node_key": "start", "node_type": "start", "title": "Start"},
-                    {"node_key": "dangling", "node_type": "view", "title": "Dangling"},
+                    {
+                        "node_key": "dangling",
+                        "node_type": "view",
+                        "title": "Dangling",
+                        "step_bindings": [
+                            {
+                                "form_package_version_id": form_package_version_id,
+                                "binding_type": "item_set",
+                                "item_keys": ["missing-item"],
+                            }
+                        ],
+                    },
+                    {"node_key": "orphan_end", "node_type": "end", "title": "Orphan end"},
                 ],
                 "edges": [
                     {"source_node_key": "start", "target_node_key": "dangling"},
+                    {"source_node_key": "dangling", "target_node_key": "orphan_end"},
                 ],
             }
         ),
@@ -289,4 +334,4 @@ def test_lims_workflow_config_supports_versioning_bindings_and_validation(monkey
     )
     assert invalid_publish.status_code == 400
     assert invalid_publish.json()["error"] == "workflow_validation_failed"
-    assert any(item["code"] == "requires_end_node" for item in invalid_publish.json()["details"])
+    assert any(item["code"] == "item_keys_not_found" for item in invalid_publish.json()["details"])
