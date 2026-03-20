@@ -638,6 +638,357 @@ class MetadataSchemaBinding(TimestampedUUIDModel):
         return f"{self.target_type}:{self.target_key}"
 
 
+class FormPackage(TimestampedUUIDModel):
+    class ModuleScope(models.TextChoices):
+        SHARED = "shared"
+        LIMS = "lims"
+        EDCS = "edcs"
+
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    purpose = models.CharField(max_length=200, blank=True, default="")
+    module_scope = models.CharField(max_length=16, choices=ModuleScope.choices, default=ModuleScope.SHARED)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_form_pkg_code_idx"),
+            models.Index(fields=["module_scope", "is_active"], name="lims_form_pkg_scope_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class FormPackageVersion(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        PUBLISHED = "published"
+        DEPRECATED = "deprecated"
+
+    package = models.ForeignKey(
+        FormPackage,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    version_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    change_summary = models.CharField(max_length=255, blank=True, default="")
+    source_schema_version = models.ForeignKey(
+        MetadataSchemaVersion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="form_package_versions",
+    )
+    compiler_context = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["package__name", "-version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["package", "version_number"],
+                name="uniq_lims_form_pkg_ver_no",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "-version_number"], name="lims_form_pkg_ver_stat_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.compiler_context, dict):
+            raise ValidationError({"compiler_context": "compiler_context must be an object"})
+        if self.source_schema_version_id and self.source_schema_version.status != MetadataSchemaVersion.Status.PUBLISHED:
+            raise ValidationError({"source_schema_version": "source_schema_version must be published"})
+
+    def __str__(self) -> str:
+        return f"{self.package.code}:v{self.version_number}"
+
+
+class FormPackageSection(TimestampedUUIDModel):
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    section_key = models.SlugField(max_length=100)
+    oid = models.CharField(max_length=160)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+    config = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["version__package__name", "version__version_number", "position", "section_key"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "section_key"], name="uniq_lims_form_sec_key"),
+            models.UniqueConstraint(fields=["version", "oid"], name="uniq_lims_form_sec_oid"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.section_key}"
+
+
+class FormPackageChoiceList(TimestampedUUIDModel):
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="choice_lists",
+    )
+    vocabulary = models.ForeignKey(
+        MetadataVocabulary,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="form_choice_lists",
+    )
+    list_key = models.SlugField(max_length=100)
+    oid = models.CharField(max_length=160)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["version__package__name", "position", "list_key"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "list_key"], name="uniq_lims_form_cl_key"),
+            models.UniqueConstraint(fields=["version", "oid"], name="uniq_lims_form_cl_oid"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.list_key}"
+
+
+class FormPackageChoice(TimestampedUUIDModel):
+    choice_list = models.ForeignKey(
+        FormPackageChoiceList,
+        on_delete=models.CASCADE,
+        related_name="choices",
+    )
+    value = models.CharField(max_length=100)
+    label = models.CharField(max_length=200)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["choice_list__title", "sort_order", "label"]
+        constraints = [
+            models.UniqueConstraint(fields=["choice_list", "value"], name="uniq_lims_form_choice_val"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.choice_list.title}: {self.label}"
+
+
+class FormPackageItemGroup(TimestampedUUIDModel):
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="item_groups",
+    )
+    section = models.ForeignKey(
+        FormPackageSection,
+        on_delete=models.CASCADE,
+        related_name="item_groups",
+    )
+    group_key = models.SlugField(max_length=100)
+    oid = models.CharField(max_length=160)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+    repeats = models.BooleanField(default=False)
+    config = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["version__package__name", "position", "group_key"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "group_key"], name="uniq_lims_form_grp_key"),
+            models.UniqueConstraint(fields=["version", "oid"], name="uniq_lims_form_grp_oid"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.section_id and self.section.version_id != self.version_id:
+            raise ValidationError({"section": "section must belong to version"})
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.group_key}"
+
+
+class FormPackageItem(TimestampedUUIDModel):
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    section = models.ForeignKey(
+        FormPackageSection,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    item_group = models.ForeignKey(
+        FormPackageItemGroup,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="items",
+    )
+    choice_list = models.ForeignKey(
+        FormPackageChoiceList,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="items",
+    )
+    item_key = models.SlugField(max_length=100)
+    oid = models.CharField(max_length=160)
+    question_text = models.CharField(max_length=200)
+    prompt_text = models.TextField(blank=True, default="")
+    field_type = models.CharField(max_length=32, choices=MetadataFieldDefinition.FieldType.choices)
+    help_text = models.CharField(max_length=255, blank=True, default="")
+    placeholder = models.CharField(max_length=255, blank=True, default="")
+    default_value = models.JSONField(null=True, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    required = models.BooleanField(default=False)
+    validation_rules = models.JSONField(default=dict, blank=True)
+    config = models.JSONField(default=dict, blank=True)
+    source_field_key = models.SlugField(max_length=100, blank=True, default="")
+
+    class Meta:
+        ordering = ["version__package__name", "section__position", "position", "item_key"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "item_key"], name="uniq_lims_form_item_key"),
+            models.UniqueConstraint(fields=["version", "oid"], name="uniq_lims_form_item_oid"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.section_id and self.section.version_id != self.version_id:
+            raise ValidationError({"section": "section must belong to version"})
+        if self.item_group_id:
+            if self.item_group.version_id != self.version_id:
+                raise ValidationError({"item_group": "item_group must belong to version"})
+            if self.item_group.section_id != self.section_id:
+                raise ValidationError({"item_group": "item_group must belong to section"})
+        if self.choice_list_id and self.choice_list.version_id != self.version_id:
+            raise ValidationError({"choice_list": "choice_list must belong to version"})
+        if not isinstance(self.validation_rules, dict):
+            raise ValidationError({"validation_rules": "validation_rules must be an object"})
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.item_key}"
+
+
+class FormPackageSourceArtifact(TimestampedUUIDModel):
+    class Role(models.TextChoices):
+        SOURCE = "source"
+        EXPORT = "export"
+
+    class ArtifactType(models.TextChoices):
+        XLSX = "xlsx"
+        ODM_XML = "odm_xml"
+        JSON = "json"
+
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="source_artifacts",
+    )
+    role = models.CharField(max_length=16, choices=Role.choices, default=Role.SOURCE)
+    artifact_type = models.CharField(max_length=16, choices=ArtifactType.choices)
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=120, blank=True, default="")
+    checksum = models.CharField(max_length=128, blank=True, default="")
+    storage_key = models.CharField(max_length=400, blank=True, default="")
+    artifact_metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["version__package__name", "created_at", "filename"]
+        indexes = [
+            models.Index(fields=["version", "role"], name="lims_form_art_ver_role_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.artifact_metadata, dict):
+            raise ValidationError({"artifact_metadata": "artifact_metadata must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.filename}"
+
+
+class FormPackageCompilerDiagnostic(TimestampedUUIDModel):
+    class Severity(models.TextChoices):
+        INFO = "info"
+        WARNING = "warning"
+        ERROR = "error"
+
+    class Stage(models.TextChoices):
+        INGEST = "ingest"
+        NORMALIZE = "normalize"
+        VALIDATE = "validate"
+        COMPILE = "compile"
+        EXPORT = "export"
+
+    version = models.ForeignKey(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="compiler_diagnostics",
+    )
+    severity = models.CharField(max_length=16, choices=Severity.choices)
+    stage = models.CharField(max_length=16, choices=Stage.choices)
+    code = models.CharField(max_length=64)
+    pointer = models.CharField(max_length=200, blank=True, default="")
+    message = models.TextField()
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["version__package__name", "created_at", "severity", "code"]
+        indexes = [
+            models.Index(fields=["version", "severity"], name="lims_form_diag_ver_sev_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.details, dict):
+            raise ValidationError({"details": "details must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / {self.code}"
+
+
+class FormPackageProjection(TimestampedUUIDModel):
+    version = models.OneToOneField(
+        FormPackageVersion,
+        on_delete=models.CASCADE,
+        related_name="compiled_projection",
+    )
+    projection = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["version__package__name"]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.projection, dict):
+            raise ValidationError({"projection": "projection must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.version} / projection"
+
+
 class WorkflowTemplate(TimestampedUUIDModel):
     name = models.CharField(max_length=200)
     code = models.SlugField(max_length=100, unique=True)

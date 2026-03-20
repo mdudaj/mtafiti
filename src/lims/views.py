@@ -25,6 +25,16 @@ from .models import (
     BiospecimenType,
     Country,
     District,
+    FormPackage,
+    FormPackageChoice,
+    FormPackageChoiceList,
+    FormPackageCompilerDiagnostic,
+    FormPackageItem,
+    FormPackageItemGroup,
+    FormPackageProjection,
+    FormPackageSection,
+    FormPackageSourceArtifact,
+    FormPackageVersion,
     InventoryLot,
     InventoryMaterial,
     InventoryTransaction,
@@ -68,7 +78,9 @@ from .services import (
     approve_task_run,
     allocate_biospecimen_identifiers,
     BatchPlateError,
+    bootstrap_form_package_version_from_schema_version,
     BiospecimenTransitionError,
+    clone_form_package_version,
     create_receiving_discrepancy,
     create_aliquots,
     create_inventory_lot,
@@ -82,6 +94,7 @@ from .services import (
     receive_manifest_item,
     receive_single_biospecimen,
     record_inventory_transaction,
+    publish_form_package_version,
     resolve_schema_version_for_binding,
     start_operation_run,
     submit_manifest,
@@ -94,6 +107,7 @@ from .services import (
     transition_pool,
     validate_metadata_payload,
     validate_operation_version,
+    validate_form_package_version,
     validate_workflow_template_version,
 )
 from .tasks import sync_tanzania_address_run
@@ -1911,6 +1925,172 @@ def _schema_binding_to_dict(binding: MetadataSchemaBinding) -> dict[str, object]
     }
 
 
+def _form_package_choice_to_dict(choice: FormPackageChoice) -> dict[str, object]:
+    return {
+        "id": str(choice.id),
+        "value": choice.value,
+        "label": choice.label,
+        "sort_order": choice.sort_order,
+        "is_active": choice.is_active,
+    }
+
+
+def _form_package_choice_list_to_dict(choice_list: FormPackageChoiceList) -> dict[str, object]:
+    return {
+        "id": str(choice_list.id),
+        "version_id": str(choice_list.version_id),
+        "vocabulary_id": str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None,
+        "list_key": choice_list.list_key,
+        "oid": choice_list.oid,
+        "title": choice_list.title,
+        "description": choice_list.description,
+        "position": choice_list.position,
+        "choices": [_form_package_choice_to_dict(choice) for choice in choice_list.choices.all().order_by("sort_order", "label")],
+    }
+
+
+def _form_package_section_to_dict(section: FormPackageSection) -> dict[str, object]:
+    return {
+        "id": str(section.id),
+        "version_id": str(section.version_id),
+        "section_key": section.section_key,
+        "oid": section.oid,
+        "title": section.title,
+        "description": section.description,
+        "position": section.position,
+        "config": dict(section.config or {}),
+    }
+
+
+def _form_package_item_group_to_dict(group: FormPackageItemGroup) -> dict[str, object]:
+    return {
+        "id": str(group.id),
+        "version_id": str(group.version_id),
+        "section_id": str(group.section_id),
+        "group_key": group.group_key,
+        "oid": group.oid,
+        "title": group.title,
+        "description": group.description,
+        "position": group.position,
+        "repeats": group.repeats,
+        "config": dict(group.config or {}),
+    }
+
+
+def _form_package_item_to_dict(item: FormPackageItem) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "version_id": str(item.version_id),
+        "section_id": str(item.section_id),
+        "item_group_id": str(item.item_group_id) if item.item_group_id else None,
+        "choice_list_id": str(item.choice_list_id) if item.choice_list_id else None,
+        "item_key": item.item_key,
+        "oid": item.oid,
+        "question_text": item.question_text,
+        "prompt_text": item.prompt_text,
+        "field_type": item.field_type,
+        "help_text": item.help_text,
+        "placeholder": item.placeholder,
+        "default_value": item.default_value,
+        "position": item.position,
+        "required": item.required,
+        "validation_rules": dict(item.validation_rules or {}),
+        "config": dict(item.config or {}),
+        "source_field_key": item.source_field_key or None,
+    }
+
+
+def _form_package_source_artifact_to_dict(artifact: FormPackageSourceArtifact) -> dict[str, object]:
+    return {
+        "id": str(artifact.id),
+        "version_id": str(artifact.version_id),
+        "role": artifact.role,
+        "artifact_type": artifact.artifact_type,
+        "filename": artifact.filename,
+        "content_type": artifact.content_type,
+        "checksum": artifact.checksum,
+        "storage_key": artifact.storage_key,
+        "artifact_metadata": dict(artifact.artifact_metadata or {}),
+    }
+
+
+def _form_package_diagnostic_to_dict(diagnostic: FormPackageCompilerDiagnostic) -> dict[str, object]:
+    return {
+        "id": str(diagnostic.id),
+        "version_id": str(diagnostic.version_id),
+        "severity": diagnostic.severity,
+        "stage": diagnostic.stage,
+        "code": diagnostic.code,
+        "pointer": diagnostic.pointer,
+        "message": diagnostic.message,
+        "details": dict(diagnostic.details or {}),
+    }
+
+
+def _form_package_version_to_dict(version: FormPackageVersion) -> dict[str, object]:
+    projection = None
+    try:
+        compiled_projection = version.compiled_projection
+    except FormPackageProjection.DoesNotExist:
+        compiled_projection = None
+    if compiled_projection is not None:
+        projection = dict(compiled_projection.projection or {})
+    return {
+        "id": str(version.id),
+        "package_id": str(version.package_id),
+        "package_name": version.package.name,
+        "package_code": version.package.code,
+        "version_number": version.version_number,
+        "status": version.status,
+        "is_editable": version.status == FormPackageVersion.Status.DRAFT,
+        "change_summary": version.change_summary,
+        "source_schema_version_id": str(version.source_schema_version_id) if version.source_schema_version_id else None,
+        "compiler_context": dict(version.compiler_context or {}),
+        "sections": [_form_package_section_to_dict(item) for item in version.sections.all().order_by("position", "section_key")],
+        "choice_lists": [
+            _form_package_choice_list_to_dict(item)
+            for item in version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key")
+        ],
+        "item_groups": [
+            _form_package_item_group_to_dict(item)
+            for item in version.item_groups.select_related("section").all().order_by("position", "group_key")
+        ],
+        "items": [
+            _form_package_item_to_dict(item)
+            for item in version.items.select_related("section", "item_group", "choice_list").all().order_by(
+                "section__position", "position", "item_key"
+            )
+        ],
+        "source_artifacts": [
+            _form_package_source_artifact_to_dict(item)
+            for item in version.source_artifacts.all().order_by("created_at", "filename")
+        ],
+        "compiler_diagnostics": [
+            _form_package_diagnostic_to_dict(item)
+            for item in version.compiler_diagnostics.all().order_by("created_at", "severity", "code")
+        ],
+        "compiled_projection": projection,
+    }
+
+
+def _form_package_to_dict(package: FormPackage) -> dict[str, object]:
+    versions = [_form_package_version_to_dict(item) for item in package.versions.order_by("-version_number")]
+    draft_version = next((item for item in versions if item["status"] == FormPackageVersion.Status.DRAFT), None)
+    published_version = next((item for item in versions if item["status"] == FormPackageVersion.Status.PUBLISHED), None)
+    return {
+        "id": str(package.id),
+        "name": package.name,
+        "code": package.code,
+        "description": package.description,
+        "purpose": package.purpose,
+        "module_scope": package.module_scope,
+        "is_active": package.is_active,
+        "draft_version_id": draft_version["id"] if draft_version else None,
+        "published_version_id": published_version["id"] if published_version else None,
+        "versions": versions,
+    }
+
+
 def _resolve_optional_fk(model, raw_id, error_code: str):
     if not raw_id:
         return None, None
@@ -2267,6 +2447,362 @@ def _build_schema_from_payload(schema: MetadataSchema, payload: dict[str, object
     schema.description = str(payload.get("description") or "").strip()
     schema.purpose = str(payload.get("purpose") or "").strip()
     schema.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _build_form_package_from_payload(package: FormPackage, payload: dict[str, object]) -> JsonResponse | None:
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+    code = str(payload.get("code") or "").strip()
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    module_scope = str(payload.get("module_scope") or FormPackage.ModuleScope.SHARED).strip()
+    if module_scope not in FormPackage.ModuleScope.values:
+        return JsonResponse({"error": "invalid_module_scope"}, status=400)
+    package.name = name
+    package.code = code
+    package.description = str(payload.get("description") or "").strip()
+    package.purpose = str(payload.get("purpose") or "").strip()
+    package.module_scope = module_scope
+    package.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _apply_form_package_version_from_payload(
+    version: FormPackageVersion,
+    payload: dict[str, object],
+) -> JsonResponse | None:
+    if "change_summary" in payload:
+        version.change_summary = str(payload.get("change_summary") or "").strip()
+    if "compiler_context" in payload:
+        compiler_context = payload.get("compiler_context") or {}
+        if not isinstance(compiler_context, dict):
+            return JsonResponse({"error": "compiler_context must be an object"}, status=400)
+        version.compiler_context = compiler_context
+    if "source_schema_version_id" in payload or not version.source_schema_version_id:
+        raw_source_schema_version_id = payload.get("source_schema_version_id")
+        if raw_source_schema_version_id:
+            source_schema_version, error = _resolve_optional_fk(
+                MetadataSchemaVersion,
+                raw_source_schema_version_id,
+                "source_schema_version_not_found",
+            )
+            if error:
+                return error
+            if source_schema_version is None:
+                return JsonResponse({"error": "source_schema_version_id is required"}, status=400)
+            version.source_schema_version = source_schema_version
+        elif "source_schema_version_id" in payload:
+            version.source_schema_version = None
+    return None
+
+
+def _sync_form_package_source_artifacts(version: FormPackageVersion, artifacts_payload: object) -> JsonResponse | None:
+    if artifacts_payload is None:
+        return None
+    if not isinstance(artifacts_payload, list):
+        return JsonResponse({"error": "source_artifacts must be a list"}, status=400)
+    retained_ids: list[str] = []
+    for artifact_payload in artifacts_payload:
+        if not isinstance(artifact_payload, dict):
+            return JsonResponse({"error": "source_artifact must be an object"}, status=400)
+        artifact_id = artifact_payload.get("id")
+        if artifact_id:
+            try:
+                artifact = FormPackageSourceArtifact.objects.get(id=artifact_id, version=version)
+            except (ValidationError, FormPackageSourceArtifact.DoesNotExist):
+                return JsonResponse({"error": "source_artifact_not_found"}, status=404)
+        else:
+            artifact = FormPackageSourceArtifact(version=version)
+        role = str(artifact_payload.get("role") or FormPackageSourceArtifact.Role.SOURCE).strip()
+        if role not in FormPackageSourceArtifact.Role.values:
+            return JsonResponse({"error": "invalid_source_artifact_role"}, status=400)
+        artifact_type = str(artifact_payload.get("artifact_type") or "").strip()
+        if artifact_type not in FormPackageSourceArtifact.ArtifactType.values:
+            return JsonResponse({"error": "invalid_source_artifact_type"}, status=400)
+        filename = str(artifact_payload.get("filename") or "").strip()
+        if not filename:
+            return JsonResponse({"error": "filename is required"}, status=400)
+        artifact_metadata = artifact_payload.get("artifact_metadata") or {}
+        if not isinstance(artifact_metadata, dict):
+            return JsonResponse({"error": "artifact_metadata must be an object"}, status=400)
+        artifact.role = role
+        artifact.artifact_type = artifact_type
+        artifact.filename = filename
+        artifact.content_type = str(artifact_payload.get("content_type") or "").strip()
+        artifact.checksum = str(artifact_payload.get("checksum") or "").strip()
+        artifact.storage_key = str(artifact_payload.get("storage_key") or "").strip()
+        artifact.artifact_metadata = artifact_metadata
+        error = _save_model(artifact)
+        if error:
+            return error
+        retained_ids.append(str(artifact.id))
+    FormPackageSourceArtifact.objects.filter(version=version).exclude(id__in=retained_ids).delete()
+    return None
+
+
+def _sync_form_package_version_definition(version: FormPackageVersion, payload: dict[str, object]) -> JsonResponse | None:
+    sections_payload = payload.get("sections")
+    choice_lists_payload = payload.get("choice_lists")
+    item_groups_payload = payload.get("item_groups")
+    items_payload = payload.get("items")
+    if sections_payload is None and choice_lists_payload is None and item_groups_payload is None and items_payload is None:
+        return None
+
+    if sections_payload is not None and not isinstance(sections_payload, list):
+        return JsonResponse({"error": "sections must be a list"}, status=400)
+    if choice_lists_payload is not None and not isinstance(choice_lists_payload, list):
+        return JsonResponse({"error": "choice_lists must be a list"}, status=400)
+    if item_groups_payload is not None and not isinstance(item_groups_payload, list):
+        return JsonResponse({"error": "item_groups must be a list"}, status=400)
+    if items_payload is not None and not isinstance(items_payload, list):
+        return JsonResponse({"error": "items must be a list"}, status=400)
+
+    section_map: dict[str, FormPackageSection] = {
+        item.section_key: item for item in version.sections.all()
+    }
+    retained_section_ids: list[str] = []
+    if sections_payload is not None:
+        section_map = {}
+        for index, section_payload in enumerate(sections_payload, start=1):
+            if not isinstance(section_payload, dict):
+                return JsonResponse({"error": "section must be an object"}, status=400)
+            section_id = section_payload.get("id")
+            if section_id:
+                try:
+                    section = FormPackageSection.objects.get(id=section_id, version=version)
+                except (ValidationError, FormPackageSection.DoesNotExist):
+                    return JsonResponse({"error": "form_package_section_not_found"}, status=404)
+            else:
+                section = FormPackageSection(version=version)
+            section_key = str(section_payload.get("section_key") or slugify(str(section_payload.get("title") or "")) or "").strip()
+            if not section_key:
+                return JsonResponse({"error": "section_key is required"}, status=400)
+            oid = str(section_payload.get("oid") or f"SEC.{section_key.replace('-', '_').upper()}").strip()
+            title = str(section_payload.get("title") or "").strip()
+            if not title:
+                return JsonResponse({"error": "section title is required"}, status=400)
+            config = section_payload.get("config") or {}
+            if not isinstance(config, dict):
+                return JsonResponse({"error": "section config must be an object"}, status=400)
+            section.section_key = section_key
+            section.oid = oid
+            section.title = title
+            section.description = str(section_payload.get("description") or "").strip()
+            section.position = int(section_payload.get("position") or index)
+            section.config = config
+            error = _save_model(section)
+            if error:
+                return error
+            retained_section_ids.append(str(section.id))
+            section_map[section.section_key] = section
+        FormPackageSection.objects.filter(version=version).exclude(id__in=retained_section_ids).delete()
+
+    choice_list_map: dict[str, FormPackageChoiceList] = {
+        item.list_key: item for item in version.choice_lists.all()
+    }
+    retained_choice_list_ids: list[str] = []
+    if choice_lists_payload is not None:
+        choice_list_map = {}
+        for index, choice_list_payload in enumerate(choice_lists_payload, start=1):
+            if not isinstance(choice_list_payload, dict):
+                return JsonResponse({"error": "choice_list must be an object"}, status=400)
+            choice_list_id = choice_list_payload.get("id")
+            if choice_list_id:
+                try:
+                    choice_list = FormPackageChoiceList.objects.get(id=choice_list_id, version=version)
+                except (ValidationError, FormPackageChoiceList.DoesNotExist):
+                    return JsonResponse({"error": "form_package_choice_list_not_found"}, status=404)
+            else:
+                choice_list = FormPackageChoiceList(version=version)
+            vocabulary, error = _resolve_optional_fk(
+                MetadataVocabulary,
+                choice_list_payload.get("vocabulary_id"),
+                "vocabulary_not_found",
+            )
+            if error:
+                return error
+            list_key = str(choice_list_payload.get("list_key") or slugify(str(choice_list_payload.get("title") or "")) or "").strip()
+            if not list_key:
+                return JsonResponse({"error": "list_key is required"}, status=400)
+            title = str(choice_list_payload.get("title") or "").strip()
+            if not title:
+                return JsonResponse({"error": "choice_list title is required"}, status=400)
+            choice_list.version = version
+            choice_list.vocabulary = vocabulary
+            choice_list.list_key = list_key
+            choice_list.oid = str(choice_list_payload.get("oid") or f"CL.{list_key.replace('-', '_').upper()}").strip()
+            choice_list.title = title
+            choice_list.description = str(choice_list_payload.get("description") or "").strip()
+            choice_list.position = int(choice_list_payload.get("position") or index)
+            error = _save_model(choice_list)
+            if error:
+                return error
+            retained_choice_list_ids.append(str(choice_list.id))
+            choice_list_map[choice_list.list_key] = choice_list
+            if "choices" in choice_list_payload:
+                choices_payload = choice_list_payload.get("choices") or []
+                if not isinstance(choices_payload, list):
+                    return JsonResponse({"error": "choices must be a list"}, status=400)
+                retained_choice_ids: list[str] = []
+                for choice_index, choice_payload in enumerate(choices_payload, start=1):
+                    if not isinstance(choice_payload, dict):
+                        return JsonResponse({"error": "choice must be an object"}, status=400)
+                    choice_id = choice_payload.get("id")
+                    if choice_id:
+                        try:
+                            choice = FormPackageChoice.objects.get(id=choice_id, choice_list=choice_list)
+                        except (ValidationError, FormPackageChoice.DoesNotExist):
+                            return JsonResponse({"error": "form_package_choice_not_found"}, status=404)
+                    else:
+                        choice = FormPackageChoice(choice_list=choice_list)
+                    value = str(choice_payload.get("value") or "").strip()
+                    label = str(choice_payload.get("label") or "").strip()
+                    if not value or not label:
+                        return JsonResponse({"error": "choice value and label are required"}, status=400)
+                    choice.value = value
+                    choice.label = label
+                    choice.sort_order = int(choice_payload.get("sort_order") or choice_index)
+                    choice.is_active = bool(choice_payload.get("is_active", True))
+                    error = _save_model(choice)
+                    if error:
+                        return error
+                    retained_choice_ids.append(str(choice.id))
+                FormPackageChoice.objects.filter(choice_list=choice_list).exclude(id__in=retained_choice_ids).delete()
+        FormPackageChoiceList.objects.filter(version=version).exclude(id__in=retained_choice_list_ids).delete()
+
+    group_map: dict[str, FormPackageItemGroup] = {
+        item.group_key: item for item in version.item_groups.all()
+    }
+    retained_group_ids: list[str] = []
+    if item_groups_payload is not None:
+        group_map = {}
+        for index, group_payload in enumerate(item_groups_payload, start=1):
+            if not isinstance(group_payload, dict):
+                return JsonResponse({"error": "item_group must be an object"}, status=400)
+            group_id = group_payload.get("id")
+            if group_id:
+                try:
+                    group = FormPackageItemGroup.objects.get(id=group_id, version=version)
+                except (ValidationError, FormPackageItemGroup.DoesNotExist):
+                    return JsonResponse({"error": "form_package_item_group_not_found"}, status=404)
+            else:
+                group = FormPackageItemGroup(version=version)
+            section = None
+            if group_payload.get("section_id"):
+                section, error = _resolve_optional_fk(FormPackageSection, group_payload.get("section_id"), "form_package_section_not_found")
+                if error:
+                    return error
+            else:
+                section = section_map.get(str(group_payload.get("section_key") or "").strip())
+            if section is None or section.version_id != version.id:
+                return JsonResponse({"error": "form_package_section_not_found"}, status=404)
+            group_key = str(group_payload.get("group_key") or slugify(str(group_payload.get("title") or "")) or "").strip()
+            if not group_key:
+                return JsonResponse({"error": "group_key is required"}, status=400)
+            title = str(group_payload.get("title") or "").strip()
+            if not title:
+                return JsonResponse({"error": "item_group title is required"}, status=400)
+            config = group_payload.get("config") or {}
+            if not isinstance(config, dict):
+                return JsonResponse({"error": "item_group config must be an object"}, status=400)
+            group.section = section
+            group.group_key = group_key
+            group.oid = str(group_payload.get("oid") or f"GRP.{group_key.replace('-', '_').upper()}").strip()
+            group.title = title
+            group.description = str(group_payload.get("description") or "").strip()
+            group.position = int(group_payload.get("position") or index)
+            group.repeats = bool(group_payload.get("repeats", False))
+            group.config = config
+            error = _save_model(group)
+            if error:
+                return error
+            retained_group_ids.append(str(group.id))
+            group_map[group.group_key] = group
+        FormPackageItemGroup.objects.filter(version=version).exclude(id__in=retained_group_ids).delete()
+
+    if items_payload is not None:
+        retained_item_ids: list[str] = []
+        for index, item_payload in enumerate(items_payload, start=1):
+            if not isinstance(item_payload, dict):
+                return JsonResponse({"error": "item must be an object"}, status=400)
+            item_id = item_payload.get("id")
+            if item_id:
+                try:
+                    item = FormPackageItem.objects.get(id=item_id, version=version)
+                except (ValidationError, FormPackageItem.DoesNotExist):
+                    return JsonResponse({"error": "form_package_item_not_found"}, status=404)
+            else:
+                item = FormPackageItem(version=version)
+            if item_payload.get("section_id"):
+                section, error = _resolve_optional_fk(FormPackageSection, item_payload.get("section_id"), "form_package_section_not_found")
+                if error:
+                    return error
+            else:
+                section = section_map.get(str(item_payload.get("section_key") or "").strip())
+            if section is None or section.version_id != version.id:
+                return JsonResponse({"error": "form_package_section_not_found"}, status=404)
+            item_group = None
+            raw_group_key = str(item_payload.get("group_key") or "").strip()
+            if item_payload.get("item_group_id"):
+                item_group, error = _resolve_optional_fk(
+                    FormPackageItemGroup,
+                    item_payload.get("item_group_id"),
+                    "form_package_item_group_not_found",
+                )
+                if error:
+                    return error
+            elif raw_group_key:
+                item_group = group_map.get(raw_group_key)
+            choice_list = None
+            raw_list_key = str(item_payload.get("choice_list_key") or "").strip()
+            if item_payload.get("choice_list_id"):
+                choice_list, error = _resolve_optional_fk(
+                    FormPackageChoiceList,
+                    item_payload.get("choice_list_id"),
+                    "form_package_choice_list_not_found",
+                )
+                if error:
+                    return error
+            elif raw_list_key:
+                choice_list = choice_list_map.get(raw_list_key)
+            item_key = str(item_payload.get("item_key") or slugify(str(item_payload.get("question_text") or "")) or "").strip()
+            if not item_key:
+                return JsonResponse({"error": "item_key is required"}, status=400)
+            field_type = str(item_payload.get("field_type") or "").strip()
+            if field_type not in MetadataFieldDefinition.FieldType.values:
+                return JsonResponse({"error": "invalid_field_type"}, status=400)
+            question_text = str(item_payload.get("question_text") or "").strip()
+            if not question_text:
+                return JsonResponse({"error": "question_text is required"}, status=400)
+            validation_rules = item_payload.get("validation_rules") or {}
+            config = item_payload.get("config") or {}
+            if not isinstance(validation_rules, dict):
+                return JsonResponse({"error": "validation_rules must be an object"}, status=400)
+            if not isinstance(config, dict):
+                return JsonResponse({"error": "config must be an object"}, status=400)
+            item.section = section
+            item.item_group = item_group
+            item.choice_list = choice_list
+            item.item_key = item_key
+            item.oid = str(item_payload.get("oid") or f"ITEM.{item_key.replace('-', '_').upper()}").strip()
+            item.question_text = question_text
+            item.prompt_text = str(item_payload.get("prompt_text") or "").strip()
+            item.field_type = field_type
+            item.help_text = str(item_payload.get("help_text") or "").strip()
+            item.placeholder = str(item_payload.get("placeholder") or "").strip()
+            item.default_value = item_payload.get("default_value")
+            item.position = int(item_payload.get("position") or index)
+            item.required = bool(item_payload.get("required", False))
+            item.validation_rules = validation_rules
+            item.config = config
+            item.source_field_key = str(item_payload.get("source_field_key") or "").strip()
+            error = _save_model(item)
+            if error:
+                return error
+            retained_item_ids.append(str(item.id))
+        FormPackageItem.objects.filter(version=version).exclude(id__in=retained_item_ids).delete()
     return None
 
 
@@ -4237,6 +4773,280 @@ def lims_workflow_template_version_publish(request, template_id: str, version_id
     version.save(update_fields=["status", "compiled_definition", "updated_at"])
     version.refresh_from_db()
     return JsonResponse(_workflow_template_version_to_dict(version))
+
+
+@csrf_exempt
+def lims_form_packages(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        items = [
+            _form_package_to_dict(item)
+            for item in FormPackage.objects.prefetch_related(
+                "versions__sections",
+                "versions__choice_lists__choices",
+                "versions__item_groups",
+                "versions__items",
+                "versions__source_artifacts",
+                "versions__compiler_diagnostics",
+                "versions__compiled_projection",
+            ).order_by("name")
+        ]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        package = FormPackage()
+        error = _build_form_package_from_payload(package, payload)
+        if error:
+            return error
+        error = _save_model(package)
+        if error:
+            return error
+        initial_version = FormPackageVersion(
+            package=package,
+            version_number=1,
+            status=FormPackageVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+        )
+        error = _apply_form_package_version_from_payload(initial_version, payload)
+        if error:
+            package.delete()
+            return error
+        error = _save_model(initial_version)
+        if error:
+            package.delete()
+            return error
+        if initial_version.source_schema_version_id:
+            bootstrap_form_package_version_from_schema_version(
+                schema_version=initial_version.source_schema_version,
+                target_version=initial_version,
+            )
+            FormPackageSourceArtifact.objects.create(
+                version=initial_version,
+                role=FormPackageSourceArtifact.Role.SOURCE,
+                artifact_type=FormPackageSourceArtifact.ArtifactType.JSON,
+                filename=f"{initial_version.source_schema_version.schema.code}-v{initial_version.source_schema_version.version_number}.json",
+                content_type="application/json",
+                artifact_metadata={
+                    "source_schema_id": str(initial_version.source_schema_version.schema_id),
+                    "source_schema_version_id": str(initial_version.source_schema_version_id),
+                    "source_kind": "metadata_schema_version",
+                },
+            )
+        else:
+            error = _sync_form_package_version_definition(initial_version, payload)
+            if error:
+                initial_version.delete()
+                package.delete()
+                return error
+            error = _sync_form_package_source_artifacts(initial_version, payload.get("source_artifacts"))
+            if error:
+                initial_version.delete()
+                package.delete()
+                return error
+        package.refresh_from_db()
+        return JsonResponse(_form_package_to_dict(package), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_form_package_detail(request, package_id: str):
+    try:
+        package = FormPackage.objects.prefetch_related(
+            "versions__sections",
+            "versions__choice_lists__choices",
+            "versions__item_groups",
+            "versions__items",
+            "versions__source_artifacts",
+            "versions__compiler_diagnostics",
+            "versions__compiled_projection",
+        ).get(id=package_id)
+    except (ValidationError, FormPackage.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_form_package_to_dict(package))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_form_package_from_payload(package, payload)
+        if error:
+            return error
+        error = _save_model(package)
+        if error:
+            return error
+        return JsonResponse(_form_package_to_dict(package))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_form_package_versions(request, package_id: str):
+    try:
+        package = FormPackage.objects.get(id=package_id)
+    except (ValidationError, FormPackage.DoesNotExist):
+        return JsonResponse({"error": "package_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        queryset = package.versions.prefetch_related(
+            "sections",
+            "choice_lists__choices",
+            "item_groups",
+            "items",
+            "source_artifacts",
+            "compiler_diagnostics",
+            "compiled_projection",
+        ).order_by("-version_number")
+        status_filter = str(request.GET.get("status") or "").strip()
+        if status_filter:
+            if status_filter not in FormPackageVersion.Status.values:
+                return JsonResponse({"error": "invalid_status"}, status=400)
+            queryset = queryset.filter(status=status_filter)
+        return JsonResponse({"items": [_form_package_version_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if package.versions.filter(status=FormPackageVersion.Status.DRAFT).exists():
+            return JsonResponse({"error": "draft_version_already_exists"}, status=409)
+        source_version = None
+        if payload.get("source_version_id"):
+            try:
+                source_version = FormPackageVersion.objects.get(id=payload["source_version_id"], package=package)
+            except (ValidationError, FormPackageVersion.DoesNotExist):
+                return JsonResponse({"error": "source_version_not_found"}, status=404)
+        version_number = payload.get("version_number")
+        if version_number is None:
+            latest_version = package.versions.order_by("-version_number").first()
+            version_number = (latest_version.version_number if latest_version else 0) + 1
+        try:
+            version_number = int(version_number)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "invalid_version_number"}, status=400)
+        version = FormPackageVersion(
+            package=package,
+            version_number=version_number,
+            status=FormPackageVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "").strip(),
+        )
+        error = _apply_form_package_version_from_payload(version, payload)
+        if error:
+            return error
+        error = _save_model(version)
+        if error:
+            return error
+        if source_version is not None:
+            clone_form_package_version(source_version=source_version, target_version=version)
+        elif version.source_schema_version_id:
+            bootstrap_form_package_version_from_schema_version(
+                schema_version=version.source_schema_version,
+                target_version=version,
+            )
+            FormPackageSourceArtifact.objects.create(
+                version=version,
+                role=FormPackageSourceArtifact.Role.SOURCE,
+                artifact_type=FormPackageSourceArtifact.ArtifactType.JSON,
+                filename=f"{version.source_schema_version.schema.code}-v{version.source_schema_version.version_number}.json",
+                content_type="application/json",
+                artifact_metadata={
+                    "source_schema_id": str(version.source_schema_version.schema_id),
+                    "source_schema_version_id": str(version.source_schema_version_id),
+                    "source_kind": "metadata_schema_version",
+                },
+            )
+        else:
+            error = _sync_form_package_version_definition(version, payload)
+            if error:
+                version.delete()
+                return error
+            error = _sync_form_package_source_artifacts(version, payload.get("source_artifacts"))
+            if error:
+                version.delete()
+                return error
+        version.refresh_from_db()
+        return JsonResponse(_form_package_version_to_dict(version), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_form_package_version_detail(request, package_id: str, version_id: str):
+    try:
+        version = FormPackageVersion.objects.prefetch_related(
+            "sections",
+            "choice_lists__choices",
+            "item_groups",
+            "items",
+            "source_artifacts",
+            "compiler_diagnostics",
+            "compiled_projection",
+        ).select_related("package", "source_schema_version", "source_schema_version__schema").get(id=version_id, package_id=package_id)
+    except (ValidationError, FormPackageVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.metadata.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_form_package_version_to_dict(version))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.metadata.manage")
+        if forbidden:
+            return forbidden
+        if version.status != FormPackageVersion.Status.DRAFT:
+            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _apply_form_package_version_from_payload(version, payload)
+        if error:
+            return error
+        error = _save_model(version)
+        if error:
+            return error
+        error = _sync_form_package_version_definition(version, payload)
+        if error:
+            return error
+        error = _sync_form_package_source_artifacts(version, payload.get("source_artifacts"))
+        if error:
+            return error
+        version.refresh_from_db()
+        return JsonResponse(_form_package_version_to_dict(version))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_form_package_version_publish(request, package_id: str, version_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.manage")
+    if forbidden:
+        return forbidden
+    try:
+        version = FormPackageVersion.objects.select_related("package").get(id=version_id, package_id=package_id)
+    except (ValidationError, FormPackageVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if version.status != FormPackageVersion.Status.DRAFT:
+        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+    result = publish_form_package_version(version)
+    if not result.valid:
+        return JsonResponse({"error": "form_package_validation_failed", "details": result.errors}, status=400)
+    version.refresh_from_db()
+    return JsonResponse(_form_package_version_to_dict(version))
 
 
 @csrf_exempt
