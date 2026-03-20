@@ -1,0 +1,77 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Record placement" %}
+
+{% if payload.capabilities.can_manage_storage %}
+<section class="panel" data-lims-action="storage-placement-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Record specimen placement" panel_description="Append an immutable storage history entry for either a biospecimen or a biospecimen pool." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Biospecimen</span><select class="select" data-lims-field="storage-placement-specimen"><option value="">None</option>{% for option in payload.specimen_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Biospecimen pool</span><select class="select" data-lims-field="storage-placement-pool"><option value="">None</option>{% for option in payload.pool_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Destination location</span><select class="select" data-lims-field="storage-placement-location">{% for option in payload.location_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Reason</span><select class="select" data-lims-field="storage-placement-reason">{% for option in payload.reason_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Quantity snapshot</span><input class="input" data-lims-field="storage-placement-quantity" value="0" /></label>
+      <label class="field-group"><span class="field-label">Quantity unit</span><input class="input" data-lims-field="storage-placement-unit" placeholder="mL / punches / tubes" /></label>
+      <label class="field-group"><span class="field-label">Placed by</span><input class="input" data-lims-field="storage-placement-by" placeholder="Operator name or badge" /></label>
+    </div>
+    <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="4" data-lims-field="storage-placement-notes"></textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="recordStoragePlacement()"><span class="material-symbols-outlined button-icon" aria-hidden="true">move_item</span><span>Record placement</span></button>
+      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent placement history" panel_description="Immutable storage history is shown here for quick admin review." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Artifact</th><th>Reason</th><th>Location</th><th>Quantity</th></tr></thead>
+      <tbody>
+        {% for item in payload.recent_records %}
+        <tr>
+          <td>{{ item.biospecimen_id|default:item.biospecimen_pool_id }}</td>
+          <td>{{ item.reason }}</td>
+          <td>{% for node in item.location.path %}{% if not forloop.first %} / {% endif %}{{ node.code }}{% endfor %}</td>
+          <td>{{ item.quantity_snapshot }} {{ item.quantity_unit }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No placement records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function recordStoragePlacement() {
+  const specimenId = limsOptionalValue("storage-placement-specimen");
+  const poolId = limsOptionalValue("storage-placement-pool");
+  if (!specimenId && !poolId) {
+    limsFeedback("Select a biospecimen or pool", true);
+    return;
+  }
+  if (specimenId && poolId) {
+    limsFeedback("Choose either biospecimen or pool, not both", true);
+    return;
+  }
+  const endpoint = specimenId
+    ? "/api/v1/lims/biospecimens/" + specimenId + "/storage-records"
+    : "/api/v1/lims/biospecimen-pools/" + poolId + "/storage-records";
+  await limsPortalAction(endpoint, {
+    location_id: limsValue("storage-placement-location"),
+    reason: limsValue("storage-placement-reason"),
+    quantity_snapshot: limsValue("storage-placement-quantity"),
+    quantity_unit: limsValue("storage-placement-unit"),
+    placed_by: limsValue("storage-placement-by"),
+    notes: limsValue("storage-placement-notes"),
+  }, "Placement recorded");
+}
+{% endblock %}

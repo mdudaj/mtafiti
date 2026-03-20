@@ -1,0 +1,78 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Receive lot" %}
+
+{% if payload.capabilities.can_manage_inventory %}
+<section class="panel" data-lims-action="inventory-lot-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Receive inventory lot" panel_description="Capture a lot receipt together with quantity, storage assignment, and expiry metadata." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Material</span><select class="select" data-lims-field="inventory-lot-material">{% for option in payload.material_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="inventory-lot-lab">{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Storage location</span><select class="select" data-lims-field="inventory-lot-location"><option value="">None</option>{% for option in payload.storage_location_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Lot number</span><input class="input" data-lims-field="inventory-lot-number" /></label>
+      <label class="field-group"><span class="field-label">Vendor</span><input class="input" data-lims-field="inventory-lot-vendor" /></label>
+      <label class="field-group"><span class="field-label">Received on</span><input class="input" type="date" data-lims-field="inventory-lot-received-on" /></label>
+      <label class="field-group"><span class="field-label">Expires on</span><input class="input" type="date" data-lims-field="inventory-lot-expires-on" /></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Initial quantity</span><input class="input" data-lims-field="inventory-lot-initial-quantity" value="0" /></label>
+      <label class="field-group"><span class="field-label">Unit of measure</span><input class="input" data-lims-field="inventory-lot-unit" placeholder="box / tube / mL" /></label>
+      <label class="field-group"><span class="field-label">Active</span><select class="select" data-lims-field="inventory-lot-active"><option value="true">Yes</option><option value="false">No</option></select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="3" data-lims-field="inventory-lot-notes"></textarea></label>
+    <label class="field-group"><span class="field-label">Metadata JSON</span><textarea class="textarea" rows="4" data-lims-field="inventory-lot-metadata">{}</textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createInventoryLot()"><span class="material-symbols-outlined button-icon" aria-hidden="true">local_shipping</span><span>Receive inventory lot</span></button>
+      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent lot receipts" panel_description="Newest lots recorded for this tenant." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Lot</th><th>Material</th><th>On hand</th><th>Received</th></tr></thead>
+      <tbody>
+        {% for item in payload.recent_lots %}
+        <tr><td>{{ item.lot_number }}</td><td>{{ item.material_id }}</td><td>{{ item.on_hand_quantity }} {{ item.unit_of_measure }}</td><td>{{ item.received_on|default:"-" }}</td></tr>
+        {% empty %}
+        <tr><td colspan="4">No lots yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createInventoryLot() {
+  let metadata;
+  try {
+    metadata = limsJsonValue("inventory-lot-metadata", {});
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/inventory-lots", {
+    material_id: limsValue("inventory-lot-material"),
+    lab_id: limsValue("inventory-lot-lab"),
+    storage_location_id: limsOptionalValue("inventory-lot-location"),
+    lot_number: limsValue("inventory-lot-number"),
+    vendor: limsValue("inventory-lot-vendor"),
+    received_on: limsOptionalValue("inventory-lot-received-on"),
+    expires_on: limsOptionalValue("inventory-lot-expires-on"),
+    notes: limsValue("inventory-lot-notes"),
+    initial_quantity: limsValue("inventory-lot-initial-quantity"),
+    unit_of_measure: limsValue("inventory-lot-unit"),
+    metadata: metadata,
+    is_active: limsValue("inventory-lot-active") === "true",
+  }, "Inventory lot created");
+}
+{% endblock %}

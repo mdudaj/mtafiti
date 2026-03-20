@@ -9,6 +9,7 @@
   {% include "core/ui/includes/count_stat_card.html" with card_title="Biospecimens" count_label="registered" count_value=payload.cards.biospecimens link_href="/lims/biospecimens/" link_label="Open biospecimens" %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Manifests" count_label="intake runs" count_value=payload.cards.manifests link_href="/lims/receiving/" link_label="Open receiving" %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Batches" count_label="processing sets" count_value=payload.cards.batches link_href="/lims/processing/" link_label="Open processing" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Storage nodes" count_label="tracked locations" count_value=payload.cards.storage_locations link_href="/lims/storage/" link_label="Open storage" %}
 </div>
 
 <section class="panel">

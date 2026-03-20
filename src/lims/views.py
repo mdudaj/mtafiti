@@ -144,6 +144,7 @@ def _lims_navigation(request, active_key: str) -> dict[str, object]:
         ("lims-biospecimens", "Biospecimens", "biotech", "/lims/biospecimens/", "lims.artifact.view"),
         ("lims-receiving", "Receiving", "inventory_2", "/lims/receiving/", "lims.artifact.view"),
         ("lims-processing", "Processing", "science", "/lims/processing/", "lims.artifact.view"),
+        ("lims-storage", "Storage", "inventory", "/lims/storage/", "lims.storage.view"),
     ]
     for key, label, icon, href, permission_key in candidates:
         if _has_permission(request, permission_key):
@@ -176,6 +177,10 @@ def _page_payload_base(request, *, active_key: str, title: str, summary: str, ki
             "can_manage_metadata": _has_permission(request, "lims.metadata.manage"),
             "can_view_artifacts": _has_permission(request, "lims.artifact.view"),
             "can_manage_artifacts": _has_permission(request, "lims.artifact.manage"),
+            "can_view_storage": _has_permission(request, "lims.storage.view"),
+            "can_manage_storage": _has_permission(request, "lims.storage.manage"),
+            "can_view_inventory": _has_permission(request, "lims.inventory.view"),
+            "can_manage_inventory": _has_permission(request, "lims.inventory.manage"),
             "can_execute_tasks": _has_permission(request, "lims.workflow.execute"),
             "can_approve_tasks": _has_permission(request, "lims.workflow.approve"),
         },
@@ -212,12 +217,14 @@ def _dashboard_payload(request) -> dict[str, object]:
     specimen_count = Biospecimen.objects.count()
     manifest_count = AccessioningManifest.objects.count()
     batch_count = ProcessingBatch.objects.count()
+    storage_location_count = StorageLocation.objects.count()
     payload["cards"] = {
         "labs": labs_count,
         "schemas": schema_count,
         "biospecimens": specimen_count,
         "manifests": manifest_count,
         "batches": batch_count,
+        "storage_locations": storage_location_count,
     }
     payload["launchpad"] = [
         {
@@ -249,6 +256,16 @@ def _dashboard_payload(request) -> dict[str, object]:
             "description": "Create plate-based batches, review assignments, and trigger worksheet print jobs.",
             "href": "/lims/processing/",
             "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
+        },
+        {
+            "title": "Storage and inventory",
+            "description": "Administer storage hierarchies, specimen placement, consumable materials, and stock-ledger activity.",
+            "href": "/lims/storage/",
+            "status": (
+                "ready"
+                if (payload["capabilities"]["can_view_storage"] or payload["capabilities"]["can_view_inventory"])
+                else "restricted"
+            ),
         },
     ]
     payload["recent_manifests"] = [
@@ -733,6 +750,259 @@ def _processing_page_payload(request) -> dict[str, object]:
     payload["batch_options"] = [
         {"value": str(item.id), "label": f"{item.batch_identifier} ({item.status})"}
         for item in ProcessingBatch.objects.order_by("-created_at")[:50]
+    ]
+    return payload
+
+
+def _storage_inventory_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Storage and inventory administration",
+        summary="Choose a focused storage or inventory administration task, then complete it from a dedicated page.",
+        kicker="Storage operations",
+    )
+    payload["cards"] = {
+        "locations": StorageLocation.objects.count(),
+        "storage_records": BiospecimenStorageRecord.objects.count(),
+        "materials": InventoryMaterial.objects.count(),
+        "active_lots": InventoryLot.objects.filter(is_active=True).count(),
+    }
+    payload["locations"] = [
+        _storage_location_to_dict(item)
+        for item in StorageLocation.objects.select_related(
+            "lab",
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "level", "name")[:10]
+    ]
+    payload["storage_records"] = [
+        _biospecimen_storage_record_to_dict(item)
+        for item in BiospecimenStorageRecord.objects.select_related(
+            "biospecimen",
+            "biospecimen_pool",
+            "location",
+            "location__parent",
+            "location__parent__parent",
+            "location__parent__parent__parent",
+            "location__parent__parent__parent__parent",
+        ).order_by("-created_at")[:8]
+    ]
+    payload["materials"] = [_inventory_material_to_dict(item) for item in InventoryMaterial.objects.order_by("name")[:8]]
+    payload["lots"] = [
+        _inventory_lot_to_dict(item)
+        for item in InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")[:8]
+    ]
+    payload["recent_transactions"] = [
+        _inventory_transaction_to_dict(item)
+        for item in InventoryTransaction.objects.select_related("lot", "lot__material", "location").order_by("-created_at")[:8]
+    ]
+    payload["actions"] = [
+        {
+            "title": "Create storage location",
+            "description": "Build the storage hierarchy one node at a time so facilities, equipment, containers, and positions stay valid.",
+            "href": "/lims/storage/locations/create/",
+            "icon": "add_home_work",
+            "enabled": payload["capabilities"]["can_manage_storage"],
+        },
+        {
+            "title": "Record specimen placement",
+            "description": "Log a biospecimen or pool placement event against the immutable storage history ledger.",
+            "href": "/lims/storage/placements/create/",
+            "icon": "move_item",
+            "enabled": payload["capabilities"]["can_manage_storage"],
+        },
+        {
+            "title": "Create inventory material",
+            "description": "Register consumables, kits, reagents, labels, and other reusable catalog entries.",
+            "href": "/lims/storage/materials/create/",
+            "icon": "inventory_2",
+            "enabled": payload["capabilities"]["can_manage_inventory"],
+        },
+        {
+            "title": "Receive inventory lot",
+            "description": "Capture lot receipt, storage, expiry, and opening stock in one dedicated lot form.",
+            "href": "/lims/storage/lots/create/",
+            "icon": "local_shipping",
+            "enabled": payload["capabilities"]["can_manage_inventory"],
+        },
+        {
+            "title": "Record stock transaction",
+            "description": "Post adjustments, reservations, releases, transfers, consumptions, and disposals to the lot ledger.",
+            "href": "/lims/storage/transactions/create/",
+            "icon": "sync_alt",
+            "enabled": payload["capabilities"]["can_manage_inventory"],
+        },
+    ]
+    return payload
+
+
+def _storage_location_create_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Create storage location",
+        summary="Add one storage node at a time so hierarchy validation, lab ownership, and level depth stay predictable.",
+        kicker="Storage setup",
+    )
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["parent_options"] = [
+        {
+            "value": str(item.id),
+            "label": " / ".join(node["code"] for node in _storage_location_path(item)),
+            "lab_id": str(item.lab_id),
+            "level": item.level,
+        }
+        for item in StorageLocation.objects.select_related(
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "level", "name")
+    ]
+    payload["level_options"] = [{"value": value, "label": label} for value, label in StorageLocation.Level.choices]
+    payload["temperature_zone_options"] = [{"value": "", "label": "None"}] + [
+        {"value": value, "label": label} for value, label in StorageLocation.TemperatureZone.choices
+    ]
+    return payload
+
+
+def _storage_placement_create_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Record specimen placement",
+        summary="Choose a biospecimen or pool, select the destination storage location, and append a new immutable placement record.",
+        kicker="Placement logging",
+    )
+    payload["specimen_options"] = [
+        {"value": str(item.id), "label": f"{item.sample_identifier} ({item.status})"}
+        for item in Biospecimen.objects.order_by("-created_at")[:100]
+    ]
+    payload["pool_options"] = [
+        {"value": str(item.id), "label": f"{item.pool_identifier} ({item.status})"}
+        for item in BiospecimenPool.objects.order_by("-created_at")[:100]
+    ]
+    payload["location_options"] = [
+        {
+            "value": str(item.id),
+            "label": " / ".join(node["code"] for node in _storage_location_path(item)),
+            "lab_id": str(item.lab_id),
+        }
+        for item in StorageLocation.objects.select_related(
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "level", "name")
+    ]
+    payload["reason_options"] = [{"value": value, "label": label} for value, label in BiospecimenStorageRecord.Reason.choices]
+    payload["recent_records"] = [
+        _biospecimen_storage_record_to_dict(item)
+        for item in BiospecimenStorageRecord.objects.select_related(
+            "biospecimen",
+            "biospecimen_pool",
+            "location",
+            "location__parent",
+            "location__parent__parent",
+            "location__parent__parent__parent",
+            "location__parent__parent__parent__parent",
+        ).order_by("-created_at")[:8]
+    ]
+    return payload
+
+
+def _inventory_material_create_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Create inventory material",
+        summary="Register one catalog material at a time so later lot receipt and stock transactions reuse the same controlled entry.",
+        kicker="Inventory catalog",
+    )
+    payload["category_options"] = [{"value": value, "label": label} for value, label in InventoryMaterial.Category.choices]
+    payload["recent_materials"] = [_inventory_material_to_dict(item) for item in InventoryMaterial.objects.order_by("name")[:10]]
+    return payload
+
+
+def _inventory_lot_create_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Receive inventory lot",
+        summary="Capture lot receipt, stock quantity, storage assignment, and expiry information from one focused inventory form.",
+        kicker="Lot receipt",
+    )
+    payload["material_options"] = [
+        {"value": str(item.id), "label": f"{item.name} ({item.code})"}
+        for item in InventoryMaterial.objects.order_by("name")
+    ]
+    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["storage_location_options"] = [
+        {
+            "value": str(item.id),
+            "label": " / ".join(node["code"] for node in _storage_location_path(item)),
+            "lab_id": str(item.lab_id),
+        }
+        for item in StorageLocation.objects.select_related(
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "level", "name")
+    ]
+    payload["recent_lots"] = [
+        _inventory_lot_to_dict(item)
+        for item in InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")[:8]
+    ]
+    return payload
+
+
+def _inventory_transaction_create_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-storage",
+        title="Record stock transaction",
+        summary="Post a transaction to an inventory lot so on-hand quantity changes remain auditable and tied to a single ledger entry.",
+        kicker="Inventory ledger",
+    )
+    payload["lot_options"] = [
+        {
+            "value": str(item.id),
+            "label": f"{item.material.name} · {item.lot_number} ({item.on_hand_quantity} {item.unit_of_measure or item.material.default_unit})",
+            "lab_id": str(item.lab_id),
+        }
+        for item in InventoryLot.objects.select_related("material").order_by("-created_at")[:100]
+    ]
+    payload["transaction_type_options"] = [
+        {"value": value, "label": label} for value, label in InventoryTransaction.TransactionType.choices
+    ]
+    payload["location_options"] = [
+        {
+            "value": str(item.id),
+            "label": " / ".join(node["code"] for node in _storage_location_path(item)),
+            "lab_id": str(item.lab_id),
+        }
+        for item in StorageLocation.objects.select_related(
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "level", "name")
+    ]
+    payload["specimen_options"] = [
+        {"value": str(item.id), "label": f"{item.sample_identifier} ({item.status})"}
+        for item in Biospecimen.objects.order_by("-created_at")[:100]
+    ]
+    payload["pool_options"] = [
+        {"value": str(item.id), "label": f"{item.pool_identifier} ({item.status})"}
+        for item in BiospecimenPool.objects.order_by("-created_at")[:100]
+    ]
+    payload["recent_transactions"] = [
+        _inventory_transaction_to_dict(item)
+        for item in InventoryTransaction.objects.select_related("lot", "lot__material", "location").order_by("-created_at")[:8]
     ]
     return payload
 
@@ -2690,6 +2960,89 @@ def lims_processing_page(request):
         request,
         'lims/processing.html',
         _page_context(request, active_nav='lims-processing', payload=_processing_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_inventory_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if not (_has_permission(request, 'lims.storage.view') or _has_permission(request, 'lims.inventory.view')):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+    return render(
+        request,
+        'lims/storage_inventory.html',
+        _page_context(request, active_nav='lims-storage', payload=_storage_inventory_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_create_location_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.storage.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/storage_create_location.html',
+        _page_context(request, active_nav='lims-storage', payload=_storage_location_create_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_create_placement_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.storage.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/storage_create_placement.html',
+        _page_context(request, active_nav='lims-storage', payload=_storage_placement_create_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_create_material_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/storage_create_material.html',
+        _page_context(request, active_nav='lims-storage', payload=_inventory_material_create_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_create_lot_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/storage_create_lot.html',
+        _page_context(request, active_nav='lims-storage', payload=_inventory_lot_create_page_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_storage_create_transaction_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/storage_create_transaction.html',
+        _page_context(request, active_nav='lims-storage', payload=_inventory_transaction_create_page_payload(request)),
     )
 
 

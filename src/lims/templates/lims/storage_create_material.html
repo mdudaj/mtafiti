@@ -1,0 +1,55 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Create material" %}
+
+{% if payload.capabilities.can_manage_inventory %}
+<section class="panel" data-lims-action="inventory-material-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Create inventory material" panel_description="Register one catalog entry for reagents, kits, consumables, labels, media, or other stock items." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Material name</span><input class="input" data-lims-field="inventory-material-name" /></label>
+      <label class="field-group"><span class="field-label">Material code</span><input class="input" data-lims-field="inventory-material-code" placeholder="Auto-generated when blank" /></label>
+      <label class="field-group"><span class="field-label">Category</span><select class="select" data-lims-field="inventory-material-category">{% for option in payload.category_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Default unit</span><input class="input" data-lims-field="inventory-material-unit" placeholder="tube / box / mL / test" /></label>
+    </div>
+    <label class="field-group"><span class="field-label">Description</span><textarea class="textarea" rows="4" data-lims-field="inventory-material-description"></textarea></label>
+    <label class="field-group"><span class="field-label">Active</span><select class="select" data-lims-field="inventory-material-active"><option value="true">Yes</option><option value="false">No</option></select></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createInventoryMaterial()"><span class="material-symbols-outlined button-icon" aria-hidden="true">inventory_2</span><span>Create inventory material</span></button>
+      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent catalog entries" panel_description="Newest material definitions available for lot receipt." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Code</th><th>Category</th><th>Unit</th></tr></thead>
+      <tbody>
+        {% for item in payload.recent_materials %}
+        <tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.category }}</td><td>{{ item.default_unit|default:"-" }}</td></tr>
+        {% empty %}
+        <tr><td colspan="4">No materials yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createInventoryMaterial() {
+  await limsPortalAction("/api/v1/lims/inventory-materials", {
+    name: limsValue("inventory-material-name"),
+    code: limsOptionalValue("inventory-material-code"),
+    category: limsValue("inventory-material-category"),
+    description: limsValue("inventory-material-description"),
+    default_unit: limsValue("inventory-material-unit"),
+    is_active: limsValue("inventory-material-active") === "true",
+  }, "Inventory material created");
+}
+{% endblock %}
