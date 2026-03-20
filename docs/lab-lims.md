@@ -154,6 +154,16 @@ Form authoring now follows a two-step flow: create the form definition under `/a
 
 The first HTML control surface for this slice is `/lims/metadata/`, which provides vocabulary, form, draft-version, publish, and binding actions for users with `lims.metadata.manage`. The form authoring page now supports loading an existing draft, cloning a new draft from a published version, editing version-owned fields, publishing the current draft, and activating a published version for a runtime target such as a biospecimen type.
 
+The emerging ODM-engine foundation now sits beside that transitional metadata registry rather than replacing it in one jump. Compiler-owned form packages are exposed under:
+
+- `/api/v1/lims/form-packages`
+- `/api/v1/lims/form-packages/<package_id>`
+- `/api/v1/lims/form-packages/<package_id>/versions`
+- `/api/v1/lims/form-packages/<package_id>/versions/<version_id>`
+- `/api/v1/lims/form-packages/<package_id>/versions/<version_id>/publish`
+
+Those package versions carry canonical sections, item groups, items, choice lists, source-artifact provenance, compiler diagnostics, and compiled projections. A first bootstrap path can materialize a draft package version from an already published `MetadataSchemaVersion`, which keeps current runtime work moving while the compiler-owned package model becomes the long-term contract for workflow/runtime and UI consumers.
+
 ## Biospecimen aggregate
 
 The current biospecimen slice introduces tenant-local specimen and pooling primitives for the first LIMS lifecycle workflows:

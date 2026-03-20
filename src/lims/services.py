@@ -34,6 +34,16 @@ from .models import (
     BiospecimenType,
     Country,
     District,
+    FormPackage,
+    FormPackageChoice,
+    FormPackageChoiceList,
+    FormPackageCompilerDiagnostic,
+    FormPackageItem,
+    FormPackageItemGroup,
+    FormPackageProjection,
+    FormPackageSection,
+    FormPackageSourceArtifact,
+    FormPackageVersion,
     InventoryLot,
     InventoryMaterial,
     InventoryTransaction,
@@ -729,6 +739,13 @@ class OperationVersionValidationResult:
 
 
 @dataclass
+class FormPackageValidationResult:
+    valid: bool
+    errors: list[dict[str, str]]
+    compiled_projection: dict[str, object]
+
+
+@dataclass
 class OperationTaskTransitionResult:
     task_run: TaskRun
     operation_run: OperationRun
@@ -772,6 +789,347 @@ def _condition_matches(condition: dict[str, object], payload: dict[str, object])
             return left_number < right_number
         return left_number <= right_number
     return False
+
+
+def _stable_oid(prefix: str, key: str) -> str:
+    normalized = slugify(key).replace("-", "_").upper()
+    if not normalized:
+        normalized = uuid.uuid4().hex[:12].upper()
+    return f"{prefix}.{normalized}"
+
+
+def bootstrap_form_package_version_from_schema_version(
+    *,
+    schema_version: MetadataSchemaVersion,
+    target_version: FormPackageVersion,
+) -> None:
+    section_map: dict[str, FormPackageSection] = {}
+    choice_list_map: dict[str, FormPackageChoiceList] = {}
+    fields = schema_version.fields.select_related("vocabulary").prefetch_related("vocabulary__items").order_by(
+        "position", "field_key"
+    )
+    for index, field in enumerate(fields, start=1):
+        ui_step = str((field.config or {}).get("ui_step") or "main").strip() or "main"
+        section_key = slugify(ui_step) or f"section-{index}"
+        if section_key not in section_map:
+            section_map[section_key] = FormPackageSection.objects.create(
+                version=target_version,
+                section_key=section_key,
+                oid=_stable_oid("SEC", section_key),
+                title=ui_step.replace("-", " ").replace("_", " ").title(),
+                description=f"Bootstrapped from metadata schema step '{ui_step}'.",
+                position=len(section_map) + 1,
+                config={"source_ui_step": ui_step},
+            )
+        choice_list = None
+        if field.vocabulary_id:
+            choice_list_key = slugify(field.vocabulary.code or field.field_key) or f"choices-{index}"
+            choice_list = choice_list_map.get(choice_list_key)
+            if choice_list is None:
+                choice_list = FormPackageChoiceList.objects.create(
+                    version=target_version,
+                    vocabulary=field.vocabulary,
+                    list_key=choice_list_key,
+                    oid=_stable_oid("CL", choice_list_key),
+                    title=field.vocabulary.name,
+                    description=field.vocabulary.description,
+                    position=len(choice_list_map) + 1,
+                )
+                choice_list_map[choice_list_key] = choice_list
+                for choice_index, vocabulary_item in enumerate(
+                    field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label"),
+                    start=1,
+                ):
+                    FormPackageChoice.objects.create(
+                        choice_list=choice_list,
+                        value=vocabulary_item.value,
+                        label=vocabulary_item.label,
+                        sort_order=choice_index,
+                        is_active=vocabulary_item.is_active,
+                    )
+        FormPackageItem.objects.create(
+            version=target_version,
+            section=section_map[section_key],
+            choice_list=choice_list,
+            item_key=field.field_key,
+            oid=_stable_oid("ITEM", field.field_key),
+            question_text=field.name,
+            prompt_text=field.description,
+            field_type=field.field_type,
+            help_text=field.help_text,
+            placeholder=field.placeholder,
+            default_value=field.default_value,
+            position=field.position or index,
+            required=field.required,
+            validation_rules=dict(field.validation_rules or {}),
+            config=dict(field.config or {}),
+            source_field_key=field.field_key,
+        )
+
+
+def clone_form_package_version(
+    *,
+    source_version: FormPackageVersion,
+    target_version: FormPackageVersion,
+) -> None:
+    section_map: dict[str, FormPackageSection] = {}
+    choice_list_map: dict[str, FormPackageChoiceList] = {}
+    item_group_map: dict[str, FormPackageItemGroup] = {}
+    for section in source_version.sections.all().order_by("position", "section_key"):
+        cloned_section = FormPackageSection.objects.create(
+            version=target_version,
+            section_key=section.section_key,
+            oid=section.oid,
+            title=section.title,
+            description=section.description,
+            position=section.position,
+            config=dict(section.config or {}),
+        )
+        section_map[str(section.id)] = cloned_section
+    for choice_list in source_version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key"):
+        cloned_choice_list = FormPackageChoiceList.objects.create(
+            version=target_version,
+            vocabulary=choice_list.vocabulary,
+            list_key=choice_list.list_key,
+            oid=choice_list.oid,
+            title=choice_list.title,
+            description=choice_list.description,
+            position=choice_list.position,
+        )
+        choice_list_map[str(choice_list.id)] = cloned_choice_list
+        for choice in choice_list.choices.all():
+            FormPackageChoice.objects.create(
+                choice_list=cloned_choice_list,
+                value=choice.value,
+                label=choice.label,
+                sort_order=choice.sort_order,
+                is_active=choice.is_active,
+            )
+    for group in source_version.item_groups.select_related("section").all().order_by("position", "group_key"):
+        cloned_group = FormPackageItemGroup.objects.create(
+            version=target_version,
+            section=section_map[str(group.section_id)],
+            group_key=group.group_key,
+            oid=group.oid,
+            title=group.title,
+            description=group.description,
+            position=group.position,
+            repeats=group.repeats,
+            config=dict(group.config or {}),
+        )
+        item_group_map[str(group.id)] = cloned_group
+    for item in source_version.items.select_related("section", "item_group", "choice_list").all().order_by(
+        "section__position", "position", "item_key"
+    ):
+        FormPackageItem.objects.create(
+            version=target_version,
+            section=section_map[str(item.section_id)],
+            item_group=item_group_map.get(str(item.item_group_id)) if item.item_group_id else None,
+            choice_list=choice_list_map.get(str(item.choice_list_id)) if item.choice_list_id else None,
+            item_key=item.item_key,
+            oid=item.oid,
+            question_text=item.question_text,
+            prompt_text=item.prompt_text,
+            field_type=item.field_type,
+            help_text=item.help_text,
+            placeholder=item.placeholder,
+            default_value=item.default_value,
+            position=item.position,
+            required=item.required,
+            validation_rules=dict(item.validation_rules or {}),
+            config=dict(item.config or {}),
+            source_field_key=item.source_field_key,
+        )
+    for artifact in source_version.source_artifacts.all().order_by("created_at", "filename"):
+        FormPackageSourceArtifact.objects.create(
+            version=target_version,
+            role=artifact.role,
+            artifact_type=artifact.artifact_type,
+            filename=artifact.filename,
+            content_type=artifact.content_type,
+            checksum=artifact.checksum,
+            storage_key=artifact.storage_key,
+            artifact_metadata=dict(artifact.artifact_metadata or {}),
+        )
+
+
+def validate_form_package_version(version: FormPackageVersion) -> FormPackageValidationResult:
+    sections = list(version.sections.all().order_by("position", "section_key"))
+    choice_lists = list(version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key"))
+    item_groups = list(version.item_groups.select_related("section").all().order_by("position", "group_key"))
+    items = list(
+        version.items.select_related("section", "item_group", "choice_list").all().order_by(
+            "section__position", "position", "item_key"
+        )
+    )
+    errors: list[dict[str, str]] = []
+
+    if not sections:
+        errors.append({"field": "sections", "code": "version_requires_sections"})
+    if not items:
+        errors.append({"field": "items", "code": "version_requires_items"})
+
+    seen_oids: dict[str, str] = {}
+    for prefix, collection in (
+        ("section", sections),
+        ("choice_list", choice_lists),
+        ("item_group", item_groups),
+        ("item", items),
+    ):
+        for item in collection:
+            key = getattr(item, "section_key", getattr(item, "list_key", getattr(item, "group_key", getattr(item, "item_key", "unknown"))))
+            if item.oid in seen_oids:
+                errors.append({"field": f"{prefix}s.{key}", "code": "duplicate_oid", "detail": item.oid})
+            else:
+                seen_oids[item.oid] = prefix
+
+    choice_types = {
+        MetadataFieldDefinition.FieldType.CHOICE,
+        MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+    }
+    for item in items:
+        if item.field_type in choice_types and not item.choice_list_id:
+            errors.append({"field": f"items.{item.item_key}", "code": "choice_list_required"})
+        if item.field_type not in choice_types and item.choice_list_id:
+            errors.append({"field": f"items.{item.item_key}", "code": "choice_list_not_allowed"})
+        if item.item_group_id and item.item_group.section_id != item.section_id:
+            errors.append({"field": f"items.{item.item_key}", "code": "item_group_section_mismatch"})
+
+    choice_projection = {
+        str(choice_list.id): {
+            "id": str(choice_list.id),
+            "list_key": choice_list.list_key,
+            "oid": choice_list.oid,
+            "title": choice_list.title,
+            "description": choice_list.description,
+            "vocabulary_id": str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None,
+            "choices": [
+                {
+                    "id": str(choice.id),
+                    "value": choice.value,
+                    "label": choice.label,
+                    "sort_order": choice.sort_order,
+                    "is_active": choice.is_active,
+                }
+                for choice in choice_list.choices.all().order_by("sort_order", "label")
+            ],
+        }
+        for choice_list in choice_lists
+    }
+    groups_by_section: dict[str, list[dict[str, object]]] = {str(section.id): [] for section in sections}
+    group_items: dict[str, list[dict[str, object]]] = {str(group.id): [] for group in item_groups}
+    section_items: dict[str, list[dict[str, object]]] = {str(section.id): [] for section in sections}
+
+    for item in items:
+        item_dict = {
+            "id": str(item.id),
+            "item_key": item.item_key,
+            "oid": item.oid,
+            "question_text": item.question_text,
+            "prompt_text": item.prompt_text,
+            "field_type": item.field_type,
+            "required": item.required,
+            "position": item.position,
+            "help_text": item.help_text,
+            "placeholder": item.placeholder,
+            "default_value": item.default_value,
+            "validation_rules": dict(item.validation_rules or {}),
+            "config": dict(item.config or {}),
+            "source_field_key": item.source_field_key or None,
+            "choice_list_id": str(item.choice_list_id) if item.choice_list_id else None,
+        }
+        if item.item_group_id:
+            group_items[str(item.item_group_id)].append(item_dict)
+        else:
+            section_items[str(item.section_id)].append(item_dict)
+
+    for group in item_groups:
+        groups_by_section[str(group.section_id)].append(
+            {
+                "id": str(group.id),
+                "group_key": group.group_key,
+                "oid": group.oid,
+                "title": group.title,
+                "description": group.description,
+                "position": group.position,
+                "repeats": group.repeats,
+                "config": dict(group.config or {}),
+                "items": group_items[str(group.id)],
+            }
+        )
+
+    compiled_projection = {
+        "package_id": str(version.package_id),
+        "package_code": version.package.code,
+        "package_name": version.package.name,
+        "version_id": str(version.id),
+        "version_number": version.version_number,
+        "source_schema_version_id": str(version.source_schema_version_id) if version.source_schema_version_id else None,
+        "sections": [
+            {
+                "id": str(section.id),
+                "section_key": section.section_key,
+                "oid": section.oid,
+                "title": section.title,
+                "description": section.description,
+                "position": section.position,
+                "config": dict(section.config or {}),
+                "items": section_items[str(section.id)],
+                "item_groups": groups_by_section[str(section.id)],
+            }
+            for section in sections
+        ],
+        "choice_lists": list(choice_projection.values()),
+        "compiler_context": dict(version.compiler_context or {}),
+    }
+    return FormPackageValidationResult(valid=not errors, errors=errors, compiled_projection=compiled_projection)
+
+
+def replace_form_package_diagnostics(
+    *,
+    version: FormPackageVersion,
+    errors: list[dict[str, str]],
+) -> None:
+    version.compiler_diagnostics.all().delete()
+    if errors:
+        for error in errors:
+            FormPackageCompilerDiagnostic.objects.create(
+                version=version,
+                severity=FormPackageCompilerDiagnostic.Severity.ERROR,
+                stage=FormPackageCompilerDiagnostic.Stage.VALIDATE,
+                code=str(error.get("code") or "validation_error"),
+                pointer=str(error.get("field") or ""),
+                message=str(error.get("detail") or error.get("code") or "Validation error"),
+                details=dict(error),
+            )
+        return
+    FormPackageCompilerDiagnostic.objects.create(
+        version=version,
+        severity=FormPackageCompilerDiagnostic.Severity.INFO,
+        stage=FormPackageCompilerDiagnostic.Stage.COMPILE,
+        code="compiled_projection_ready",
+        pointer="compiled_projection",
+        message="Compiled projection generated successfully.",
+        details={},
+    )
+
+
+def publish_form_package_version(version: FormPackageVersion) -> FormPackageValidationResult:
+    result = validate_form_package_version(version)
+    with transaction.atomic():
+        replace_form_package_diagnostics(version=version, errors=result.errors)
+        if result.valid:
+            FormPackageVersion.objects.filter(
+                package_id=version.package_id,
+                status=FormPackageVersion.Status.PUBLISHED,
+            ).exclude(id=version.id).update(status=FormPackageVersion.Status.DEPRECATED)
+            version.status = FormPackageVersion.Status.PUBLISHED
+            version.save(update_fields=["status", "updated_at"])
+            FormPackageProjection.objects.update_or_create(
+                version=version,
+                defaults={"projection": result.compiled_projection},
+            )
+    return result
 
 
 def _bool_from_value(value: object) -> bool:
