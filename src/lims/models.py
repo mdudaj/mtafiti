@@ -636,6 +636,199 @@ class MetadataSchemaBinding(TimestampedUUIDModel):
         return f"{self.target_type}:{self.target_key}"
 
 
+class WorkflowTemplate(TimestampedUUIDModel):
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    purpose = models.CharField(max_length=200, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["code"], name="lims_wf_template_code_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class WorkflowTemplateVersion(TimestampedUUIDModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft"
+        PUBLISHED = "published"
+        DEPRECATED = "deprecated"
+
+    template = models.ForeignKey(
+        WorkflowTemplate,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    version_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    change_summary = models.CharField(max_length=255, blank=True, default="")
+    compiled_definition = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["template__name", "-version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["template", "version_number"],
+                name="uniq_lims_wf_template_version_number",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.compiled_definition, dict):
+            raise ValidationError({"compiled_definition": "compiled_definition must be an object"})
+
+    def __str__(self) -> str:
+        return f"{self.template.code}:v{self.version_number}"
+
+
+class WorkflowNodeTemplate(TimestampedUUIDModel):
+    class NodeType(models.TextChoices):
+        START = "start"
+        START_HANDLE = "start_handle"
+        VIEW = "view"
+        FUNCTION = "function"
+        HANDLE = "handle"
+        IF = "if"
+        SWITCH = "switch"
+        SPLIT = "split"
+        SPLIT_FIRST = "split_first"
+        JOIN = "join"
+        END = "end"
+
+    workflow_version = models.ForeignKey(
+        WorkflowTemplateVersion,
+        on_delete=models.CASCADE,
+        related_name="nodes",
+    )
+    node_key = models.SlugField(max_length=100)
+    node_type = models.CharField(max_length=32, choices=NodeType.choices)
+    title = models.CharField(max_length=200)
+    summary = models.TextField(blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+    assignment_role = models.CharField(max_length=100, blank=True, default="")
+    permission_key = models.CharField(max_length=100, blank=True, default="")
+    requires_approval = models.BooleanField(default=False)
+    approval_role = models.CharField(max_length=100, blank=True, default="")
+    config = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["workflow_version__template__name", "position", "node_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow_version", "node_key"],
+                name="uniq_lims_wf_node_per_version",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.config, dict):
+            raise ValidationError({"config": "config must be an object"})
+        if self.requires_approval and not self.approval_role.strip():
+            raise ValidationError({"approval_role": "approval_role is required when requires_approval is true"})
+
+    def __str__(self) -> str:
+        return f"{self.workflow_version} / {self.node_key}"
+
+
+class WorkflowEdgeTemplate(TimestampedUUIDModel):
+    workflow_version = models.ForeignKey(
+        WorkflowTemplateVersion,
+        on_delete=models.CASCADE,
+        related_name="edges",
+    )
+    source_node = models.ForeignKey(
+        WorkflowNodeTemplate,
+        on_delete=models.CASCADE,
+        related_name="outgoing_edges",
+    )
+    target_node = models.ForeignKey(
+        WorkflowNodeTemplate,
+        on_delete=models.CASCADE,
+        related_name="incoming_edges",
+    )
+    priority = models.PositiveIntegerField(default=0)
+    condition = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["workflow_version__template__name", "priority", "source_node__node_key", "target_node__node_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow_version", "source_node", "target_node", "priority"],
+                name="uniq_lims_wf_edge_priority",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.condition, dict):
+            raise ValidationError({"condition": "condition must be an object"})
+        if self.source_node_id and self.source_node.workflow_version_id != self.workflow_version_id:
+            raise ValidationError({"source_node": "source_node must belong to the same workflow version"})
+        if self.target_node_id and self.target_node.workflow_version_id != self.workflow_version_id:
+            raise ValidationError({"target_node": "target_node must belong to the same workflow version"})
+        if self.source_node_id and self.target_node_id and self.source_node_id == self.target_node_id:
+            raise ValidationError({"target_node": "source_node and target_node must differ"})
+
+    def __str__(self) -> str:
+        return f"{self.source_node.node_key} -> {self.target_node.node_key}"
+
+
+class WorkflowStepBinding(TimestampedUUIDModel):
+    class BindingType(models.TextChoices):
+        FULL_SCHEMA = "full_schema"
+        UI_STEP = "ui_step"
+        FIELD_SET = "field_set"
+
+    node = models.ForeignKey(
+        WorkflowNodeTemplate,
+        on_delete=models.CASCADE,
+        related_name="step_bindings",
+    )
+    schema_version = models.ForeignKey(
+        MetadataSchemaVersion,
+        on_delete=models.CASCADE,
+        related_name="workflow_step_bindings",
+    )
+    binding_type = models.CharField(max_length=32, choices=BindingType.choices, default=BindingType.FULL_SCHEMA)
+    ui_step = models.SlugField(max_length=100, blank=True, default="")
+    field_keys = models.JSONField(default=list, blank=True)
+    is_required = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["node__workflow_version__template__name", "node__position", "schema_version__schema__name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["node", "schema_version", "binding_type", "ui_step"],
+                name="uniq_lims_wf_step_binding_scope",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.schema_version_id and self.schema_version.status != MetadataSchemaVersion.Status.PUBLISHED:
+            raise ValidationError({"schema_version": "schema_version must be published"})
+        if not isinstance(self.field_keys, list) or not all(isinstance(item, str) for item in self.field_keys):
+            raise ValidationError({"field_keys": "field_keys must be a list of strings"})
+        if self.binding_type == self.BindingType.UI_STEP and not self.ui_step:
+            raise ValidationError({"ui_step": "ui_step is required for ui_step bindings"})
+        if self.binding_type == self.BindingType.FIELD_SET and not self.field_keys:
+            raise ValidationError({"field_keys": "field_keys are required for field_set bindings"})
+        if self.binding_type == self.BindingType.FULL_SCHEMA and (self.ui_step or self.field_keys):
+            raise ValidationError({"binding_type": "full_schema bindings cannot set ui_step or field_keys"})
+        if self.binding_type == self.BindingType.UI_STEP and self.field_keys:
+            raise ValidationError({"field_keys": "ui_step bindings cannot set field_keys"})
+
+    def __str__(self) -> str:
+        return f"{self.node.node_key} -> {self.schema_version}"
+
+
 class BiospecimenType(TimestampedUUIDModel):
     name = models.CharField(max_length=200)
     key = models.SlugField(max_length=100, unique=True)

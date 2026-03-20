@@ -49,6 +49,11 @@ from .views import (
     lims_reference_studies,
     lims_reference_study_detail,
     lims_receiving_discrepancies,
+    lims_workflow_template_detail,
+    lims_workflow_template_version_detail,
+    lims_workflow_template_version_publish,
+    lims_workflow_template_versions,
+    lims_workflow_templates,
 )
 
 app_name = 'lims'
@@ -155,6 +160,23 @@ urlpatterns = [
         "metadata/vocabularies/<uuid:vocabulary_id>/items",
         lims_metadata_vocabulary_items,
         name="metadata_vocabulary_items",
+    ),
+    path("workflow-config/templates", lims_workflow_templates, name="workflow_templates"),
+    path("workflow-config/templates/<uuid:template_id>", lims_workflow_template_detail, name="workflow_template_detail"),
+    path(
+        "workflow-config/templates/<uuid:template_id>/versions",
+        lims_workflow_template_versions,
+        name="workflow_template_versions",
+    ),
+    path(
+        "workflow-config/templates/<uuid:template_id>/versions/<uuid:version_id>",
+        lims_workflow_template_version_detail,
+        name="workflow_template_version_detail",
+    ),
+    path(
+        "workflow-config/templates/<uuid:template_id>/versions/<uuid:version_id>/publish",
+        lims_workflow_template_version_publish,
+        name="workflow_template_version_publish",
     ),
     path("reference/address-sync-runs", lims_reference_address_sync_runs, name="reference_address_sync_runs"),
     path("reference/labs", lims_reference_labs, name="reference_labs"),
