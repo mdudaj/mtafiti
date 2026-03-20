@@ -570,6 +570,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:approvalrecord
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:assetversion
   -
     relationship: implements
@@ -678,6 +682,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:materialusagerecord
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:metadatafielddefinition
   -
     relationship: implements
@@ -719,6 +727,18 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:notebookworkspace
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:operationdefinition
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:operationrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:operationversion
   -
     relationship: implements
     from: module:core_models
@@ -842,7 +862,15 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:submissionrecord
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:tanzaniaaddresssyncrun
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:taskrun
   -
     relationship: implements
     from: module:core_models
@@ -1061,6 +1089,10 @@ edges:
     to: framework:django
   -
     relationship: uses
+    from: module:lims_models
+    to: module:core_models
+  -
+    relationship: uses
     from: module:lims_permissions
     to: framework:django
   -
@@ -1103,6 +1135,10 @@ edges:
     relationship: uses
     from: module:lims_views
     to: module:core_identity
+  -
+    relationship: uses
+    from: module:lims_views
+    to: module:core_models
   -
     relationship: uses
     from: module:tenants_admin

@@ -23,21 +23,28 @@ from core.printing_renderers import render_label_preview
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
+    ApprovalRecord,
     BatchPlate,
     BatchPlateAssignment,
     Biospecimen,
     BiospecimenPool,
     BiospecimenPoolMember,
+    MaterialUsageRecord,
     BiospecimenType,
     Country,
     District,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
+    OperationDefinition,
+    OperationRun,
+    OperationVersion,
     MetadataSchemaField,
     MetadataSchemaVersion,
     MetadataVocabulary,
     MetadataVocabularyDomain,
     MetadataVocabularyItem,
+    SubmissionRecord,
+    TaskRun,
     PlateLayoutTemplate,
     Postcode,
     ProcessingBatch,
@@ -709,6 +716,21 @@ class WorkflowTemplateValidationResult:
     compiled_definition: dict[str, object]
 
 
+@dataclass
+class OperationVersionValidationResult:
+    valid: bool
+    errors: list[dict[str, str]]
+
+
+@dataclass
+class OperationTaskTransitionResult:
+    task_run: TaskRun
+    operation_run: OperationRun
+    created_tasks: list[TaskRun]
+    submission: SubmissionRecord | None = None
+    approval: ApprovalRecord | None = None
+
+
 def _condition_matches(condition: dict[str, object], payload: dict[str, object]) -> bool:
     if not condition:
         return True
@@ -1142,6 +1164,269 @@ def validate_workflow_template_version(
         ],
     }
     return WorkflowTemplateValidationResult(valid=not errors, errors=errors, compiled_definition=compiled_definition)
+
+
+def validate_operation_version(operation_version: OperationVersion) -> OperationVersionValidationResult:
+    errors: list[dict[str, str]] = []
+    workflow_version = operation_version.workflow_version
+    if workflow_version.status != WorkflowTemplateVersion.Status.PUBLISHED:
+        errors.append({"field": "workflow_version", "code": "workflow_version_must_be_published"})
+    if not workflow_version.compiled_definition:
+        errors.append({"field": "workflow_version", "code": "workflow_version_must_be_compiled"})
+    if workflow_version.template.code != operation_version.definition.code:
+        errors.append({"field": "workflow_version", "code": "workflow_template_code_mismatch"})
+    return OperationVersionValidationResult(valid=not errors, errors=errors)
+
+
+def _evaluate_workflow_condition(condition: dict[str, object], payload: dict[str, object]) -> bool:
+    if not condition:
+        return True
+    field = str(condition.get("field") or "").strip()
+    if not field:
+        return True
+    operator = str(condition.get("operator") or "equals").strip()
+    actual = payload.get(field)
+    if operator == "equals":
+        return actual == condition.get("value")
+    if operator == "not_equals":
+        return actual != condition.get("value")
+    if operator == "in":
+        expected = condition.get("value") or []
+        return actual in expected if isinstance(expected, list) else False
+    if operator == "exists":
+        return actual not in (None, "", [])
+    if operator == "truthy":
+        return bool(actual)
+    return False
+
+
+def _select_outgoing_edges(node: WorkflowNodeTemplate, payload: dict[str, object]) -> list[WorkflowEdgeTemplate]:
+    outgoing_edges = list(node.outgoing_edges.all().order_by("priority", "target_node__node_key"))
+    matched_edges = [edge for edge in outgoing_edges if _evaluate_workflow_condition(dict(edge.condition or {}), payload)]
+    if node.node_type in {
+        WorkflowNodeTemplate.NodeType.IF,
+        WorkflowNodeTemplate.NodeType.SWITCH,
+        WorkflowNodeTemplate.NodeType.SPLIT_FIRST,
+    }:
+        return matched_edges[:1]
+    if node.node_type == WorkflowNodeTemplate.NodeType.SPLIT:
+        return matched_edges
+    return outgoing_edges[:1]
+
+
+def _create_task_run_for_node(operation_run: OperationRun, node: WorkflowNodeTemplate) -> TaskRun:
+    return TaskRun.objects.create(
+        operation_run=operation_run,
+        node_template=node,
+        status=TaskRun.Status.OPEN,
+        assignment_role=node.assignment_role,
+        permission_key=node.permission_key,
+        requires_approval=node.requires_approval,
+        approval_role=node.approval_role,
+        input_context=dict(node.config or {}),
+    )
+
+
+def _complete_operation_run(operation_run: OperationRun, *, payload: dict[str, object], terminal_node: WorkflowNodeTemplate) -> None:
+    outcome = str(payload.get("qc_decision") or "").strip().lower()
+    if outcome == "reject" or "reject" in terminal_node.node_key:
+        operation_run.status = OperationRun.Status.REJECTED
+        operation_run.outcome = "rejected"
+    else:
+        operation_run.status = OperationRun.Status.COMPLETED
+        operation_run.outcome = outcome or terminal_node.node_key
+    operation_run.completed_at = timezone.now()
+    operation_run.save(update_fields=["status", "outcome", "completed_at", "updated_at"])
+
+
+def _advance_task_run(task_run: TaskRun, payload: dict[str, object]) -> list[TaskRun]:
+    operation_run = task_run.operation_run
+    node = task_run.node_template
+    created_tasks: list[TaskRun] = []
+    for edge in _select_outgoing_edges(node, payload):
+        target_node = edge.target_node
+        if target_node.node_type == WorkflowNodeTemplate.NodeType.END:
+            _complete_operation_run(operation_run, payload=payload, terminal_node=target_node)
+            continue
+        created_tasks.append(_create_task_run_for_node(operation_run, target_node))
+    return created_tasks
+
+
+@transaction.atomic
+def start_operation_run(
+    operation_version: OperationVersion,
+    *,
+    initiated_by: str = "",
+    subject_identifier: str = "",
+    external_identifier: str = "",
+    source_mode: str = OperationRun.SourceMode.SINGLE,
+    source_reference: str = "",
+    biospecimen: Biospecimen | None = None,
+    manifest: AccessioningManifest | None = None,
+    manifest_item: AccessioningManifestItem | None = None,
+    context: dict[str, object] | None = None,
+) -> OperationTaskTransitionResult:
+    if operation_version.status != OperationVersion.Status.PUBLISHED:
+        raise ValueError("operation_version_must_be_published")
+    workflow_version = (
+        WorkflowTemplateVersion.objects.prefetch_related(
+            "nodes__outgoing_edges__target_node",
+            "edges__source_node",
+            "edges__target_node",
+        )
+        .get(id=operation_version.workflow_version_id)
+    )
+    operation_run = OperationRun.objects.create(
+        operation_version=operation_version,
+        workflow_version=workflow_version,
+        status=OperationRun.Status.ACTIVE,
+        source_mode=source_mode,
+        source_reference=source_reference,
+        subject_identifier=subject_identifier,
+        external_identifier=external_identifier,
+        initiated_by=initiated_by,
+        biospecimen=biospecimen,
+        manifest=manifest,
+        manifest_item=manifest_item,
+        context=dict(context or {}),
+    )
+    if biospecimen or manifest or manifest_item:
+        MaterialUsageRecord.objects.create(
+            operation_run=operation_run,
+            biospecimen=biospecimen,
+            manifest=manifest,
+            manifest_item=manifest_item,
+            action="bound",
+            details={"source_mode": source_mode},
+        )
+    start_node = workflow_version.nodes.get(node_type=WorkflowNodeTemplate.NodeType.START)
+    created_tasks: list[TaskRun] = []
+    for edge in start_node.outgoing_edges.all().order_by("priority", "target_node__node_key"):
+        if edge.target_node.node_type == WorkflowNodeTemplate.NodeType.END:
+            _complete_operation_run(operation_run, payload={}, terminal_node=edge.target_node)
+            continue
+        created_tasks.append(_create_task_run_for_node(operation_run, edge.target_node))
+    primary_task = created_tasks[0] if created_tasks else TaskRun(
+        operation_run=operation_run,
+        node_template=start_node,
+    )
+    return OperationTaskTransitionResult(task_run=primary_task, operation_run=operation_run, created_tasks=created_tasks)
+
+
+@transaction.atomic
+def submit_task_run(
+    task_run: TaskRun,
+    *,
+    payload: dict[str, object],
+    submitted_by: str = "",
+    status: str = SubmissionRecord.Status.SUBMITTED,
+) -> OperationTaskTransitionResult:
+    latest_index = (
+        task_run.submissions.order_by("-submission_index").values_list("submission_index", flat=True).first() or 0
+    )
+    submission = SubmissionRecord.objects.create(
+        task_run=task_run,
+        submission_index=latest_index + 1,
+        status=status,
+        payload=dict(payload or {}),
+        submitted_by=submitted_by,
+    )
+    task_run.output_data = dict(payload or {})
+    task_run.outcome = str(payload.get("qc_decision") or payload.get("outcome") or "").strip()
+    if task_run.requires_approval:
+        task_run.status = TaskRun.Status.AWAITING_APPROVAL
+        task_run.save(update_fields=["status", "output_data", "outcome", "updated_at"])
+        return OperationTaskTransitionResult(
+            task_run=task_run,
+            operation_run=task_run.operation_run,
+            created_tasks=[],
+            submission=submission,
+        )
+    task_run.status = TaskRun.Status.COMPLETED
+    task_run.completed_at = timezone.now()
+    task_run.save(update_fields=["status", "output_data", "outcome", "completed_at", "updated_at"])
+    created_tasks = _advance_task_run(task_run, dict(payload or {}))
+    if "storage_reference" in payload or "storage_slot" in payload:
+        MaterialUsageRecord.objects.create(
+            operation_run=task_run.operation_run,
+            task_run=task_run,
+            biospecimen=task_run.operation_run.biospecimen,
+            manifest=task_run.operation_run.manifest,
+            manifest_item=task_run.operation_run.manifest_item,
+            action="stored",
+            details={"storage_reference": payload.get("storage_reference") or payload.get("storage_slot") or ""},
+        )
+    if str(payload.get("qc_decision") or "").strip().lower() == "reject":
+        MaterialUsageRecord.objects.create(
+            operation_run=task_run.operation_run,
+            task_run=task_run,
+            biospecimen=task_run.operation_run.biospecimen,
+            manifest=task_run.operation_run.manifest,
+            manifest_item=task_run.operation_run.manifest_item,
+            action="rejected",
+            details={"reason": payload.get("reason") or payload.get("notes") or ""},
+        )
+    return OperationTaskTransitionResult(
+        task_run=task_run,
+        operation_run=task_run.operation_run,
+        created_tasks=created_tasks,
+        submission=submission,
+    )
+
+
+@transaction.atomic
+def approve_task_run(
+    task_run: TaskRun,
+    *,
+    outcome: str,
+    approved_by: str = "",
+    approver_role: str = "",
+    meaning: str = "",
+    comments: str = "",
+) -> OperationTaskTransitionResult:
+    if task_run.status != TaskRun.Status.AWAITING_APPROVAL:
+        raise ValueError("task_run_not_awaiting_approval")
+    approval = ApprovalRecord.objects.create(
+        operation_run=task_run.operation_run,
+        task_run=task_run,
+        outcome=outcome,
+        approved_by=approved_by,
+        approver_role=approver_role,
+        meaning=meaning,
+        comments=comments,
+    )
+    if outcome == ApprovalRecord.Outcome.REJECTED:
+        task_run.status = TaskRun.Status.OPEN
+        task_run.save(update_fields=["status", "updated_at"])
+        return OperationTaskTransitionResult(
+            task_run=task_run,
+            operation_run=task_run.operation_run,
+            created_tasks=[],
+            approval=approval,
+        )
+    latest_submission = task_run.submissions.order_by("-submission_index").first()
+    task_run.status = TaskRun.Status.COMPLETED
+    task_run.completed_at = timezone.now()
+    task_run.save(update_fields=["status", "completed_at", "updated_at"])
+    payload = dict(latest_submission.payload if latest_submission else {})
+    if str(payload.get("qc_decision") or "").strip().lower() == "reject":
+        MaterialUsageRecord.objects.create(
+            operation_run=task_run.operation_run,
+            task_run=task_run,
+            biospecimen=task_run.operation_run.biospecimen,
+            manifest=task_run.operation_run.manifest,
+            manifest_item=task_run.operation_run.manifest_item,
+            action="rejected",
+            details={"reason": payload.get("reason") or payload.get("notes") or ""},
+        )
+    created_tasks = _advance_task_run(task_run, payload)
+    return OperationTaskTransitionResult(
+        task_run=task_run,
+        operation_run=task_run.operation_run,
+        created_tasks=created_tasks,
+        submission=latest_submission,
+        approval=approval,
+    )
 
 
 ALLOWED_BIOSPECIMEN_TRANSITIONS = {

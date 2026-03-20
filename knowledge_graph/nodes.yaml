@@ -2316,6 +2316,22 @@ nodes:
       - workspace
     source: src/core/models.py:788
   -
+    id: datamodel:materialusagerecord
+    type: DataModel
+    name: MaterialUsageRecord
+    description: "Django model defined in lims.models."
+    fields:
+      - action
+      - biospecimen
+      - details
+      - discrepancy
+      - manifest
+      - manifest_item
+      - operation_run
+      - receiving_event
+      - task_run
+    source: src/lims/models.py:1137
+  -
     id: datamodel:receivingdiscrepancy
     type: DataModel
     name: ReceivingDiscrepancy
@@ -2330,7 +2346,7 @@ nodes:
       - notes
       - recorded_by
       - status
-    source: src/lims/models.py:1198
+    source: src/lims/models.py:1570
   -
     id: datamodel:site
     type: DataModel
@@ -2351,7 +2367,7 @@ nodes:
       - studies
       - study
       - ward
-    source: src/lims/models.py:268
+    source: src/lims/models.py:270
   -
     id: datamodel:lab
     type: DataModel
@@ -2369,7 +2385,27 @@ nodes:
       - region
       - street
       - ward
-    source: src/lims/models.py:174
+    source: src/lims/models.py:176
+  -
+    id: datamodel:taskrun
+    type: DataModel
+    name: TaskRun
+    description: "Django model defined in lims.models."
+    fields:
+      - approval_role
+      - assignee
+      - assignment_role
+      - completed_at
+      - input_context
+      - node_template
+      - operation_run
+      - outcome
+      - output_data
+      - permission_key
+      - requires_approval
+      - started_at
+      - status
+    source: src/lims/models.py:1010
   -
     id: datamodel:workflownodetemplate
     type: DataModel
@@ -2387,7 +2423,22 @@ nodes:
       - summary
       - title
       - workflow_version
-    source: src/lims/models.py:690
+    source: src/lims/models.py:692
+  -
+    id: datamodel:approvalrecord
+    type: DataModel
+    name: ApprovalRecord
+    description: "Django model defined in lims.models."
+    fields:
+      - approved_at
+      - approved_by
+      - approver_role
+      - comments
+      - meaning
+      - operation_run
+      - outcome
+      - task_run
+    source: src/lims/models.py:1101
   -
     id: datamodel:biospecimen
     type: DataModel
@@ -2412,7 +2463,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:861
+    source: src/lims/models.py:1233
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2430,7 +2481,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:956
+    source: src/lims/models.py:1328
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2445,7 +2496,7 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:832
+    source: src/lims/models.py:1204
   -
     id: datamodel:batchplate
     type: DataModel
@@ -2459,7 +2510,7 @@ nodes:
       - metadata
       - plate_identifier
       - sequence_number
-    source: src/lims/models.py:1342
+    source: src/lims/models.py:1714
   -
     id: datamodel:processingbatch
     type: DataModel
@@ -2475,7 +2526,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:1286
+    source: src/lims/models.py:1658
   -
     id: datamodel:workflowstepbinding
     type: DataModel
@@ -2488,7 +2539,7 @@ nodes:
       - node
       - schema_version
       - ui_step
-    source: src/lims/models.py:783
+    source: src/lims/models.py:785
   -
     id: datamodel:accessioningmanifestitem
     type: DataModel
@@ -2508,7 +2559,29 @@ nodes:
       - quantity_unit
       - received_at
       - status
-    source: src/lims/models.py:1102
+    source: src/lims/models.py:1474
+  -
+    id: datamodel:operationrun
+    type: DataModel
+    name: OperationRun
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - completed_at
+      - context
+      - external_identifier
+      - initiated_by
+      - manifest
+      - manifest_item
+      - operation_version
+      - outcome
+      - source_mode
+      - source_reference
+      - started_at
+      - status
+      - subject_identifier
+      - workflow_version
+    source: src/lims/models.py:933
   -
     id: datamodel:receivingevent
     type: DataModel
@@ -2524,7 +2597,7 @@ nodes:
       - received_at
       - received_by
       - scan_value
-    source: src/lims/models.py:1150
+    source: src/lims/models.py:1522
   -
     id: datamodel:batchplateassignment
     type: DataModel
@@ -2536,7 +2609,7 @@ nodes:
       - plate
       - position_index
       - well_label
-    source: src/lims/models.py:1377
+    source: src/lims/models.py:1749
   -
     id: datamodel:workflowtemplateversion
     type: DataModel
@@ -2548,7 +2621,24 @@ nodes:
       - status
       - template
       - version_number
-    source: src/lims/models.py:656
+    source: src/lims/models.py:658
+  -
+    id: datamodel:operationversion
+    type: DataModel
+    name: OperationVersion
+    description: "Django model defined in lims.models."
+    fields:
+      - change_summary
+      - definition
+      - runtime_defaults
+      - sop_document
+      - sop_document_version
+      - sop_effective_date
+      - sop_version_label
+      - status
+      - version_number
+      - workflow_version
+    source: src/lims/models.py:857
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2559,7 +2649,7 @@ nodes:
       - schema
       - status
       - version_number
-    source: src/lims/models.py:515
+    source: src/lims/models.py:517
   -
     id: datamodel:tanzaniaaddresssyncrun
     type: DataModel
@@ -2579,7 +2669,7 @@ nodes:
       - status
       - throttle_seconds
       - triggered_by
-    source: src/lims/models.py:351
+    source: src/lims/models.py:353
   -
     id: datamodel:metadatafielddefinition
     type: DataModel
@@ -2596,7 +2686,7 @@ nodes:
       - name
       - placeholder
       - vocabulary
-    source: src/lims/models.py:449
+    source: src/lims/models.py:451
   -
     id: datamodel:metadatavocabulary
     type: DataModel
@@ -2608,7 +2698,20 @@ nodes:
       - domain
       - is_active
       - name
-    source: src/lims/models.py:403
+    source: src/lims/models.py:405
+  -
+    id: datamodel:operationdefinition
+    type: DataModel
+    name: OperationDefinition
+    description: "Django model defined in lims.models."
+    fields:
+      - code
+      - description
+      - is_active
+      - module_scope
+      - name
+      - purpose
+    source: src/lims/models.py:834
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2620,7 +2723,7 @@ nodes:
       - is_active
       - name
       - purpose
-    source: src/lims/models.py:498
+    source: src/lims/models.py:500
   -
     id: datamodel:workflowtemplate
     type: DataModel
@@ -2632,7 +2735,7 @@ nodes:
       - is_active
       - name
       - purpose
-    source: src/lims/models.py:639
+    source: src/lims/models.py:641
   -
     id: datamodel:metadatavocabularydomain
     type: DataModel
@@ -2643,7 +2746,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:387
+    source: src/lims/models.py:389
   -
     id: datamodel:study
     type: DataModel
@@ -2656,7 +2759,7 @@ nodes:
       - name
       - sponsor
       - status
-    source: src/lims/models.py:238
+    source: src/lims/models.py:240
   -
     id: datamodel:country
     type: DataModel
@@ -2669,7 +2772,7 @@ nodes:
       - name
       - slug
       - source_url
-    source: src/lims/models.py:30
+    source: src/lims/models.py:32
   -
     id: datamodel:postcode
     type: DataModel
@@ -2682,7 +2785,7 @@ nodes:
       - source_path
       - source_url
       - street
-    source: src/lims/models.py:149
+    source: src/lims/models.py:151
   -
     id: datamodel:platelayouttemplate
     type: DataModel
@@ -2695,7 +2798,7 @@ nodes:
       - key
       - name
       - rows
-    source: src/lims/models.py:1258
+    source: src/lims/models.py:1630
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -2717,7 +2820,7 @@ nodes:
       - schema_version
       - validation_rules
       - vocabulary
-    source: src/lims/models.py:543
+    source: src/lims/models.py:545
   -
     id: datamodel:workflowedgetemplate
     type: DataModel
@@ -2729,7 +2832,7 @@ nodes:
       - source_node
       - target_node
       - workflow_version
-    source: src/lims/models.py:740
+    source: src/lims/models.py:742
   -
     id: datamodel:biospecimenpoolmember
     type: DataModel
@@ -2740,7 +2843,7 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:1012
+    source: src/lims/models.py:1384
   -
     id: datamodel:region
     type: DataModel
@@ -2754,7 +2857,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:45
+    source: src/lims/models.py:47
   -
     id: datamodel:timestampeduuidmodel
     type: DataModel
@@ -2764,7 +2867,7 @@ nodes:
       - created_at
       - id
       - updated_at
-    source: src/lims/models.py:10
+    source: src/lims/models.py:12
   -
     id: datamodel:accessioningmanifest
     type: DataModel
@@ -2783,7 +2886,7 @@ nodes:
       - source_system
       - status
       - study
-    source: src/lims/models.py:1044
+    source: src/lims/models.py:1416
   -
     id: datamodel:ward
     type: DataModel
@@ -2797,7 +2900,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:97
+    source: src/lims/models.py:99
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
@@ -2809,7 +2912,7 @@ nodes:
       - sort_order
       - value
       - vocabulary
-    source: src/lims/models.py:425
+    source: src/lims/models.py:427
   -
     id: datamodel:district
     type: DataModel
@@ -2823,7 +2926,7 @@ nodes:
       - slug
       - source_path
       - source_url
-    source: src/lims/models.py:71
+    source: src/lims/models.py:73
   -
     id: datamodel:street
     type: DataModel
@@ -2837,7 +2940,7 @@ nodes:
       - source_path
       - source_url
       - ward
-    source: src/lims/models.py:123
+    source: src/lims/models.py:125
   -
     id: datamodel:metadataschemabinding
     type: DataModel
@@ -2849,7 +2952,20 @@ nodes:
       - target_key
       - target_label
       - target_type
-    source: src/lims/models.py:608
+    source: src/lims/models.py:610
+  -
+    id: datamodel:submissionrecord
+    type: DataModel
+    name: SubmissionRecord
+    description: "Django model defined in lims.models."
+    fields:
+      - payload
+      - status
+      - submission_index
+      - submitted_at
+      - submitted_by
+      - task_run
+    source: src/lims/models.py:1066
   -
     id: datamodel:tenantserviceroute
     type: DataModel
