@@ -1135,51 +1135,74 @@ class WorkflowEdgeTemplate(TimestampedUUIDModel):
 
 class WorkflowStepBinding(TimestampedUUIDModel):
     class BindingType(models.TextChoices):
-        FULL_SCHEMA = "full_schema"
-        UI_STEP = "ui_step"
-        FIELD_SET = "field_set"
+        FULL_PACKAGE = "full_package"
+        SECTION_SET = "section_set"
+        GROUP_SET = "group_set"
+        ITEM_SET = "item_set"
 
     node = models.ForeignKey(
         WorkflowNodeTemplate,
         on_delete=models.CASCADE,
         related_name="step_bindings",
     )
-    schema_version = models.ForeignKey(
-        MetadataSchemaVersion,
-        on_delete=models.CASCADE,
+    form_package_version = models.ForeignKey(
+        FormPackageVersion,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
         related_name="workflow_step_bindings",
     )
-    binding_type = models.CharField(max_length=32, choices=BindingType.choices, default=BindingType.FULL_SCHEMA)
-    ui_step = models.SlugField(max_length=100, blank=True, default="")
-    field_keys = models.JSONField(default=list, blank=True)
+    binding_type = models.CharField(max_length=32, choices=BindingType.choices, default=BindingType.FULL_PACKAGE)
+    section_keys = models.JSONField(default=list, blank=True)
+    item_group_keys = models.JSONField(default=list, blank=True)
+    item_keys = models.JSONField(default=list, blank=True)
     is_required = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["node__workflow_version__template__name", "node__position", "schema_version__schema__name"]
+        ordering = [
+            "node__workflow_version__template__name",
+            "node__position",
+            "form_package_version__package__name",
+            "form_package_version__version_number",
+        ]
         constraints = [
             models.UniqueConstraint(
-                fields=["node", "schema_version", "binding_type", "ui_step"],
-                name="uniq_lims_wf_step_binding_scope",
+                fields=["node", "form_package_version", "binding_type"],
+                name="uniq_lims_wf_pkg_binding_scope",
             )
         ]
 
     def clean(self) -> None:
         super().clean()
-        if self.schema_version_id and self.schema_version.status != MetadataSchemaVersion.Status.PUBLISHED:
-            raise ValidationError({"schema_version": "schema_version must be published"})
-        if not isinstance(self.field_keys, list) or not all(isinstance(item, str) for item in self.field_keys):
-            raise ValidationError({"field_keys": "field_keys must be a list of strings"})
-        if self.binding_type == self.BindingType.UI_STEP and not self.ui_step:
-            raise ValidationError({"ui_step": "ui_step is required for ui_step bindings"})
-        if self.binding_type == self.BindingType.FIELD_SET and not self.field_keys:
-            raise ValidationError({"field_keys": "field_keys are required for field_set bindings"})
-        if self.binding_type == self.BindingType.FULL_SCHEMA and (self.ui_step or self.field_keys):
-            raise ValidationError({"binding_type": "full_schema bindings cannot set ui_step or field_keys"})
-        if self.binding_type == self.BindingType.UI_STEP and self.field_keys:
-            raise ValidationError({"field_keys": "ui_step bindings cannot set field_keys"})
+        if not self.form_package_version_id:
+            raise ValidationError({"form_package_version": "form_package_version is required"})
+        if self.form_package_version_id and self.form_package_version.status != FormPackageVersion.Status.PUBLISHED:
+            raise ValidationError({"form_package_version": "form_package_version must be published"})
+        for field_name in ("section_keys", "item_group_keys", "item_keys"):
+            value = getattr(self, field_name)
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                raise ValidationError({field_name: f"{field_name} must be a list of strings"})
+        if self.binding_type == self.BindingType.FULL_PACKAGE and (
+            self.section_keys or self.item_group_keys or self.item_keys
+        ):
+            raise ValidationError(
+                {"binding_type": "full_package bindings cannot set section_keys, item_group_keys, or item_keys"}
+            )
+        if self.binding_type == self.BindingType.SECTION_SET and not self.section_keys:
+            raise ValidationError({"section_keys": "section_keys are required for section_set bindings"})
+        if self.binding_type == self.BindingType.SECTION_SET and (self.item_group_keys or self.item_keys):
+            raise ValidationError({"binding_type": "section_set bindings cannot set item_group_keys or item_keys"})
+        if self.binding_type == self.BindingType.GROUP_SET and not self.item_group_keys:
+            raise ValidationError({"item_group_keys": "item_group_keys are required for group_set bindings"})
+        if self.binding_type == self.BindingType.GROUP_SET and (self.section_keys or self.item_keys):
+            raise ValidationError({"binding_type": "group_set bindings cannot set section_keys or item_keys"})
+        if self.binding_type == self.BindingType.ITEM_SET and not self.item_keys:
+            raise ValidationError({"item_keys": "item_keys are required for item_set bindings"})
+        if self.binding_type == self.BindingType.ITEM_SET and (self.section_keys or self.item_group_keys):
+            raise ValidationError({"binding_type": "item_set bindings cannot set section_keys or item_group_keys"})
 
     def __str__(self) -> str:
-        return f"{self.node.node_key} -> {self.schema_version}"
+        return f"{self.node.node_key} -> {self.form_package_version}"
 
 
 class OperationDefinition(TimestampedUUIDModel):

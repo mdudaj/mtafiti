@@ -2330,7 +2330,7 @@ nodes:
       - operation_run
       - receiving_event
       - task_run
-    source: src/lims/models.py:1545
+    source: src/lims/models.py:1568
   -
     id: datamodel:receivingdiscrepancy
     type: DataModel
@@ -2346,7 +2346,7 @@ nodes:
       - notes
       - recorded_by
       - status
-    source: src/lims/models.py:1978
+    source: src/lims/models.py:2001
   -
     id: datamodel:site
     type: DataModel
@@ -2405,7 +2405,7 @@ nodes:
       - requires_approval
       - started_at
       - status
-    source: src/lims/models.py:1361
+    source: src/lims/models.py:1384
   -
     id: datamodel:workflownodetemplate
     type: DataModel
@@ -2438,7 +2438,7 @@ nodes:
       - operation_run
       - outcome
       - task_run
-    source: src/lims/models.py:1509
+    source: src/lims/models.py:1532
   -
     id: datamodel:formpackagesourceartifact
     type: DataModel
@@ -2478,7 +2478,7 @@ nodes:
       - status
       - study
       - subject_identifier
-    source: src/lims/models.py:1641
+    source: src/lims/models.py:1664
   -
     id: datamodel:biospecimenpool
     type: DataModel
@@ -2496,7 +2496,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:1736
+    source: src/lims/models.py:1759
   -
     id: datamodel:biospecimentype
     type: DataModel
@@ -2511,7 +2511,7 @@ nodes:
       - name
       - next_sequence
       - sequence_padding
-    source: src/lims/models.py:1612
+    source: src/lims/models.py:1635
   -
     id: datamodel:batchplate
     type: DataModel
@@ -2525,7 +2525,7 @@ nodes:
       - metadata
       - plate_identifier
       - sequence_number
-    source: src/lims/models.py:2122
+    source: src/lims/models.py:2145
   -
     id: datamodel:processingbatch
     type: DataModel
@@ -2541,7 +2541,7 @@ nodes:
       - site
       - status
       - study
-    source: src/lims/models.py:2066
+    source: src/lims/models.py:2089
   -
     id: datamodel:workflowstepbinding
     type: DataModel
@@ -2549,11 +2549,12 @@ nodes:
     description: "Django model defined in lims.models."
     fields:
       - binding_type
-      - field_keys
+      - form_package_version
       - is_required
+      - item_group_keys
+      - item_keys
       - node
-      - schema_version
-      - ui_step
+      - section_keys
     source: src/lims/models.py:1136
   -
     id: datamodel:inventorytransaction
@@ -2574,7 +2575,7 @@ nodes:
       - submission_record
       - task_run
       - transaction_type
-    source: src/lims/models.py:2463
+    source: src/lims/models.py:2486
   -
     id: datamodel:biospecimenstoragerecord
     type: DataModel
@@ -2593,7 +2594,7 @@ nodes:
       - reason
       - submission_record
       - task_run
-    source: src/lims/models.py:2287
+    source: src/lims/models.py:2310
   -
     id: datamodel:accessioningmanifestitem
     type: DataModel
@@ -2613,7 +2614,7 @@ nodes:
       - quantity_unit
       - received_at
       - status
-    source: src/lims/models.py:1882
+    source: src/lims/models.py:1905
   -
     id: datamodel:operationrun
     type: DataModel
@@ -2635,7 +2636,7 @@ nodes:
       - status
       - subject_identifier
       - workflow_version
-    source: src/lims/models.py:1284
+    source: src/lims/models.py:1307
   -
     id: datamodel:receivingevent
     type: DataModel
@@ -2651,7 +2652,7 @@ nodes:
       - received_at
       - received_by
       - scan_value
-    source: src/lims/models.py:1930
+    source: src/lims/models.py:1953
   -
     id: datamodel:batchplateassignment
     type: DataModel
@@ -2663,7 +2664,7 @@ nodes:
       - plate
       - position_index
       - well_label
-    source: src/lims/models.py:2157
+    source: src/lims/models.py:2180
   -
     id: datamodel:storagelocation
     type: DataModel
@@ -2679,7 +2680,7 @@ nodes:
       - name
       - parent
       - temperature_zone
-    source: src/lims/models.py:2199
+    source: src/lims/models.py:2222
   -
     id: datamodel:inventorymaterial
     type: DataModel
@@ -2692,7 +2693,7 @@ nodes:
       - description
       - is_active
       - name
-    source: src/lims/models.py:2385
+    source: src/lims/models.py:2408
   -
     id: datamodel:workflowtemplateversion
     type: DataModel
@@ -2734,7 +2735,7 @@ nodes:
       - status
       - version_number
       - workflow_version
-    source: src/lims/models.py:1208
+    source: src/lims/models.py:1231
   -
     id: datamodel:metadataschemaversion
     type: DataModel
@@ -2856,7 +2857,7 @@ nodes:
       - module_scope
       - name
       - purpose
-    source: src/lims/models.py:1185
+    source: src/lims/models.py:1208
   -
     id: datamodel:metadataschema
     type: DataModel
@@ -2957,7 +2958,7 @@ nodes:
       - key
       - name
       - rows
-    source: src/lims/models.py:2038
+    source: src/lims/models.py:2061
   -
     id: datamodel:metadataschemafield
     type: DataModel
@@ -3032,7 +3033,7 @@ nodes:
       - contributed_unit
       - pool
       - specimen
-    source: src/lims/models.py:1792
+    source: src/lims/models.py:1815
   -
     id: datamodel:region
     type: DataModel
@@ -3075,7 +3076,7 @@ nodes:
       - source_system
       - status
       - study
-    source: src/lims/models.py:1824
+    source: src/lims/models.py:1847
   -
     id: datamodel:qcresult
     type: DataModel
@@ -3091,7 +3092,7 @@ nodes:
       - reviewed_at
       - submission_record
       - task_run
-    source: src/lims/models.py:1452
+    source: src/lims/models.py:1475
   -
     id: datamodel:formpackagechoicelist
     type: DataModel
@@ -3139,7 +3140,7 @@ nodes:
       - storage_location
       - unit_of_measure
       - vendor
-    source: src/lims/models.py:2411
+    source: src/lims/models.py:2434
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
@@ -3204,7 +3205,7 @@ nodes:
       - submitted_at
       - submitted_by
       - task_run
-    source: src/lims/models.py:1417
+    source: src/lims/models.py:1440
   -
     id: datamodel:formpackageprojection
     type: DataModel
