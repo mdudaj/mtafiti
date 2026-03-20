@@ -60,12 +60,16 @@ def test_lims_permission_model_supports_module_and_legacy_roles():
     assert 'lims.metadata.manage' in manager_permissions
     assert 'lims.operation.manage' in manager_permissions
     assert 'lims.operation_run.manage' in manager_permissions
+    assert 'lims.storage.manage' in manager_permissions
+    assert 'lims.inventory.manage' in manager_permissions
     assert 'lims.workflow_task.approve' not in manager_permissions
 
     legacy_permissions = permissions_for_roles({'catalog.editor', 'policy.admin'})
     assert 'lims.workflow_task.execute' in legacy_permissions
     assert 'lims.metadata.view' in legacy_permissions
     assert 'lims.operation.view' in legacy_permissions
+    assert 'lims.storage.view' in legacy_permissions
+    assert 'lims.inventory.view' in legacy_permissions
     assert 'lims.workflow_task.approve' in legacy_permissions
     assert has_lims_permission({'tenant.admin'}, 'lims.artifact.manage')
 
@@ -75,6 +79,8 @@ def test_lims_permission_summary_reports_effective_permissions():
     assert 'lims.artifact.manage' in summary['effective_permissions']
     assert 'lims.metadata.view' in summary['effective_permissions']
     assert 'lims.operation_run.view' in summary['effective_permissions']
+    assert 'lims.storage.view' in summary['effective_permissions']
+    assert 'lims.inventory.view' in summary['effective_permissions']
     assert summary['viewflow_task_permissions']['approve'] == 'lims.approve_workflow_task'
     assert any(item['role'] == 'lims.qa' for item in summary['role_bundles'])
     assert any(item['role'] == 'catalog.reader' for item in summary['legacy_role_compatibility'])

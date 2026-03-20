@@ -1843,3 +1843,361 @@ class BatchPlateAssignment(TimestampedUUIDModel):
 
     def __str__(self) -> str:
         return f"{self.plate.plate_identifier}:{self.well_label}"
+
+
+class StorageLocation(TimestampedUUIDModel):
+    class Level(models.TextChoices):
+        FACILITY = "facility"
+        AREA = "area"
+        EQUIPMENT = "equipment"
+        CONTAINER = "container"
+        POSITION = "position"
+
+    class TemperatureZone(models.TextChoices):
+        AMBIENT = "ambient"
+        COLD_ROOM = "cold_room"
+        FRIDGE = "fridge"
+        FREEZER_MINUS20 = "freezer_minus20"
+        FREEZER_MINUS80 = "freezer_minus80"
+        LIQUID_NITROGEN = "liquid_nitrogen"
+
+    LEVEL_RANK = {
+        Level.FACILITY: 1,
+        Level.AREA: 2,
+        Level.EQUIPMENT: 3,
+        Level.CONTAINER: 4,
+        Level.POSITION: 5,
+    }
+
+    lab = models.ForeignKey(
+        Lab,
+        on_delete=models.PROTECT,
+        related_name="storage_locations",
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="children",
+    )
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=120)
+    level = models.CharField(max_length=32, choices=Level.choices)
+    temperature_zone = models.CharField(max_length=32, choices=TemperatureZone.choices, blank=True, default="")
+    capacity = models.PositiveIntegerField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["lab__name", "level", "name"]
+        indexes = [
+            models.Index(fields=["lab", "level"], name="lims_storage_lab_level_idx"),
+            models.Index(fields=["parent", "name"], name="lims_storage_parent_name_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["parent", "code"], name="uniq_lims_storage_parent"),
+            models.UniqueConstraint(
+                fields=["lab", "code"],
+                condition=models.Q(parent__isnull=True),
+                name="uniq_lims_storage_top",
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+        if self.capacity is not None and self.capacity < 1:
+            raise ValidationError({"capacity": "capacity must be greater than zero"})
+        if self.parent_id:
+            if self.parent_id == self.id:
+                raise ValidationError({"parent": "parent cannot reference itself"})
+            if self.parent.lab_id != self.lab_id:
+                raise ValidationError({"parent": "parent must belong to the same lab"})
+            parent_rank = self.LEVEL_RANK[self.parent.level]
+            current_rank = self.LEVEL_RANK[self.level]
+            if current_rank <= parent_rank:
+                raise ValidationError({"level": "level must be deeper than the parent level"})
+            seen_ids = {self.id} if self.id else set()
+            ancestor = self.parent
+            while ancestor is not None:
+                if ancestor.id in seen_ids:
+                    raise ValidationError({"parent": "parent hierarchy cannot contain cycles"})
+                seen_ids.add(ancestor.id)
+                ancestor = ancestor.parent
+        elif self.level != self.Level.FACILITY:
+            raise ValidationError({"parent": "non-facility storage locations require a parent"})
+
+    def __str__(self) -> str:
+        return f"{self.lab.code}:{self.code}"
+
+
+class BiospecimenStorageRecord(TimestampedUUIDModel):
+    class Reason(models.TextChoices):
+        RECEIVED = "received"
+        PLACED = "placed"
+        MOVED = "moved"
+        RESERVED = "reserved"
+        RELEASED = "released"
+        RETRIEVED = "retrieved"
+        ARCHIVED = "archived"
+
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="storage_records",
+    )
+    biospecimen_pool = models.ForeignKey(
+        BiospecimenPool,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="storage_records",
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.PROTECT,
+        related_name="biospecimen_records",
+    )
+    previous_location = models.ForeignKey(
+        StorageLocation,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="next_biospecimen_records",
+    )
+    reason = models.CharField(max_length=32, choices=Reason.choices)
+    quantity_snapshot = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    quantity_unit = models.CharField(max_length=32, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    placed_by = models.CharField(max_length=200, blank=True, default="")
+    operation_run = models.ForeignKey(
+        OperationRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="storage_records",
+    )
+    task_run = models.ForeignKey(
+        TaskRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="storage_records",
+    )
+    submission_record = models.ForeignKey(
+        SubmissionRecord,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="storage_records",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["biospecimen", "-created_at"], name="lims_storage_specimen_idx"),
+            models.Index(fields=["biospecimen_pool", "-created_at"], name="lims_storage_pool_idx"),
+            models.Index(fields=["location", "-created_at"], name="lims_storage_location_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(biospecimen__isnull=False) & models.Q(biospecimen_pool__isnull=True))
+                    | (models.Q(biospecimen__isnull=True) & models.Q(biospecimen_pool__isnull=False))
+                ),
+                name="lims_storage_one_artifact",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.biospecimen_id and self.location.lab_id != self.biospecimen.lab_id:
+            raise ValidationError({"location": "location must belong to the same lab as the biospecimen"})
+        if self.biospecimen_pool_id and self.location.lab_id != self.biospecimen_pool.lab_id:
+            raise ValidationError({"location": "location must belong to the same lab as the biospecimen pool"})
+        if self.previous_location_id and self.previous_location.lab_id != self.location.lab_id:
+            raise ValidationError({"previous_location": "previous_location must belong to the same lab as location"})
+        if self.task_run_id and self.operation_run_id and self.task_run.operation_run_id != self.operation_run_id:
+            raise ValidationError({"task_run": "task_run must belong to operation_run"})
+        if self.submission_record_id and self.task_run_id and self.submission_record.task_run_id != self.task_run_id:
+            raise ValidationError({"submission_record": "submission_record must belong to task_run"})
+
+    def __str__(self) -> str:
+        artifact = self.biospecimen.sample_identifier if self.biospecimen_id else self.biospecimen_pool.pool_identifier
+        return f"{artifact}:{self.location.code}"
+
+
+class InventoryMaterial(TimestampedUUIDModel):
+    class Category(models.TextChoices):
+        REAGENT = "reagent"
+        KIT = "kit"
+        CONSUMABLE = "consumable"
+        MEDIA = "media"
+        LABEL = "label"
+        OTHER = "other"
+
+    name = models.CharField(max_length=200)
+    code = models.SlugField(max_length=120, unique=True)
+    category = models.CharField(max_length=32, choices=Category.choices, default=Category.CONSUMABLE)
+    description = models.TextField(blank=True, default="")
+    default_unit = models.CharField(max_length=32, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["category", "name"], name="lims_inv_mat_cat_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class InventoryLot(TimestampedUUIDModel):
+    material = models.ForeignKey(
+        InventoryMaterial,
+        on_delete=models.PROTECT,
+        related_name="lots",
+    )
+    lab = models.ForeignKey(
+        Lab,
+        on_delete=models.PROTECT,
+        related_name="inventory_lots",
+    )
+    storage_location = models.ForeignKey(
+        StorageLocation,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="inventory_lots",
+    )
+    lot_number = models.CharField(max_length=120)
+    vendor = models.CharField(max_length=200, blank=True, default="")
+    received_on = models.DateField(null=True, blank=True)
+    expires_on = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+    initial_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    on_hand_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    unit_of_measure = models.CharField(max_length=32, blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["material__name", "lot_number"]
+        indexes = [
+            models.Index(fields=["material", "lot_number"], name="lims_inv_lot_lookup_idx"),
+            models.Index(fields=["lab", "-created_at"], name="lims_inv_lot_lab_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["material", "lot_number"], name="uniq_lims_inv_lot"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({"metadata": "metadata must be an object"})
+        if self.storage_location_id and self.storage_location.lab_id != self.lab_id:
+            raise ValidationError({"storage_location": "storage_location must belong to the same lab"})
+        if self.on_hand_quantity < 0:
+            raise ValidationError({"on_hand_quantity": "on_hand_quantity cannot be negative"})
+
+    def __str__(self) -> str:
+        return f"{self.material.code}:{self.lot_number}"
+
+
+class InventoryTransaction(TimestampedUUIDModel):
+    class TransactionType(models.TextChoices):
+        RECEIPT = "receipt"
+        ADJUSTMENT = "adjustment"
+        RESERVATION = "reservation"
+        RELEASE = "release"
+        CONSUMPTION = "consumption"
+        TRANSFER = "transfer"
+        DISPOSAL = "disposal"
+        EXPIRY = "expiry"
+
+    lot = models.ForeignKey(
+        InventoryLot,
+        on_delete=models.PROTECT,
+        related_name="transactions",
+    )
+    transaction_type = models.CharField(max_length=32, choices=TransactionType.choices)
+    quantity_delta = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    resulting_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    location = models.ForeignKey(
+        StorageLocation,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="inventory_transactions",
+    )
+    biospecimen = models.ForeignKey(
+        Biospecimen,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    biospecimen_pool = models.ForeignKey(
+        BiospecimenPool,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    operation_run = models.ForeignKey(
+        OperationRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    task_run = models.ForeignKey(
+        TaskRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    submission_record = models.ForeignKey(
+        SubmissionRecord,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    material_usage_record = models.ForeignKey(
+        MaterialUsageRecord,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_transactions",
+    )
+    notes = models.TextField(blank=True, default="")
+    recorded_by = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["lot", "-created_at"], name="lims_inv_txn_lot_idx"),
+            models.Index(fields=["transaction_type", "-created_at"], name="lims_inv_txn_type_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.location_id and self.location.lab_id != self.lot.lab_id:
+            raise ValidationError({"location": "location must belong to the same lab as the lot"})
+        if self.task_run_id and self.operation_run_id and self.task_run.operation_run_id != self.operation_run_id:
+            raise ValidationError({"task_run": "task_run must belong to operation_run"})
+        if self.submission_record_id and self.task_run_id and self.submission_record.task_run_id != self.task_run_id:
+            raise ValidationError({"submission_record": "submission_record must belong to task_run"})
+        if self.material_usage_record_id and self.operation_run_id:
+            if self.material_usage_record.operation_run_id != self.operation_run_id:
+                raise ValidationError({"material_usage_record": "material_usage_record must belong to operation_run"})
+
+    def __str__(self) -> str:
+        return f"{self.lot.lot_number}:{self.transaction_type}:{self.quantity_delta}"

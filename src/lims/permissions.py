@@ -91,6 +91,26 @@ PERMISSION_DEFINITIONS = {
         'guardian_codename': 'manage_sensitive_artifact',
         'object_type': 'sensitive_artifact',
     },
+    'lims.storage.view': {
+        'description': 'View storage locations, placements, and inventory availability.',
+        'guardian_codename': 'view_storage_record',
+        'object_type': 'storage_record',
+    },
+    'lims.storage.manage': {
+        'description': 'Create storage hierarchies and record artifact placements or moves.',
+        'guardian_codename': 'manage_storage_record',
+        'object_type': 'storage_record',
+    },
+    'lims.inventory.view': {
+        'description': 'View material catalogs, lots, and inventory transactions.',
+        'guardian_codename': 'view_inventory_record',
+        'object_type': 'inventory_record',
+    },
+    'lims.inventory.manage': {
+        'description': 'Create material catalogs, receive lots, and record inventory transactions.',
+        'guardian_codename': 'manage_inventory_record',
+        'object_type': 'inventory_record',
+    },
 }
 
 ROLE_BUNDLES = {
@@ -106,6 +126,8 @@ ROLE_BUNDLES = {
             'lims.workflow_task.view',
             'lims.workflow_task.execute',
             'lims.artifact.view',
+            'lims.storage.view',
+            'lims.inventory.view',
         },
     },
     'lims.manager': {
@@ -126,6 +148,10 @@ ROLE_BUNDLES = {
             'lims.workflow_task.execute',
             'lims.workflow_task.assign',
             'lims.artifact.view',
+            'lims.storage.view',
+            'lims.storage.manage',
+            'lims.inventory.view',
+            'lims.inventory.manage',
         },
     },
     'lims.qa': {
@@ -141,6 +167,8 @@ ROLE_BUNDLES = {
             'lims.workflow_task.approve',
             'lims.artifact.view',
             'lims.artifact.manage',
+            'lims.storage.view',
+            'lims.inventory.view',
         },
     },
     'lims.admin': {
@@ -161,6 +189,8 @@ LEGACY_ROLE_BUNDLES = {
             'lims.operation_run.view',
             'lims.workflow_task.view',
             'lims.artifact.view',
+            'lims.storage.view',
+            'lims.inventory.view',
         },
     },
     'catalog.editor': {
@@ -180,6 +210,9 @@ LEGACY_ROLE_BUNDLES = {
             'lims.workflow_task.view',
             'lims.workflow_task.execute',
             'lims.artifact.view',
+            'lims.storage.view',
+            'lims.inventory.view',
+            'lims.inventory.manage',
         },
     },
     'policy.admin': {
@@ -195,6 +228,8 @@ LEGACY_ROLE_BUNDLES = {
             'lims.workflow_task.approve',
             'lims.artifact.view',
             'lims.artifact.manage',
+            'lims.storage.view',
+            'lims.inventory.view',
         },
     },
     'tenant.admin': {

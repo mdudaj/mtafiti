@@ -27,12 +27,16 @@ from .models import (
     BatchPlate,
     BatchPlateAssignment,
     Biospecimen,
+    BiospecimenStorageRecord,
     BiospecimenPool,
     BiospecimenPoolMember,
     MaterialUsageRecord,
     BiospecimenType,
     Country,
     District,
+    InventoryLot,
+    InventoryMaterial,
+    InventoryTransaction,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
     OperationDefinition,
@@ -45,6 +49,7 @@ from .models import (
     MetadataVocabularyItem,
     SubmissionRecord,
     QCResult,
+    StorageLocation,
     TaskRun,
     PlateLayoutTemplate,
     Postcode,
@@ -1567,6 +1572,10 @@ class BatchPlateError(ValueError):
     pass
 
 
+class StorageInventoryError(ValueError):
+    pass
+
+
 def _next_sequence_payload(sample_type_id: str) -> tuple[str, str, int]:
     locked = BiospecimenType.objects.select_for_update().get(id=sample_type_id)
     sequence_value = locked.next_sequence
@@ -1709,6 +1718,180 @@ def create_pool(
             specimen.full_clean()
             specimen.save(update_fields=["status", "updated_at"])
     return pool
+
+
+def _latest_storage_record_for_biospecimen(specimen: Biospecimen) -> BiospecimenStorageRecord | None:
+    return specimen.storage_records.select_related("location").order_by("-created_at").first()
+
+
+def _latest_storage_record_for_pool(pool: BiospecimenPool) -> BiospecimenStorageRecord | None:
+    return pool.storage_records.select_related("location").order_by("-created_at").first()
+
+
+@transaction.atomic
+def place_artifact_in_storage(
+    *,
+    location: StorageLocation,
+    placed_by: str,
+    reason: str,
+    biospecimen: Biospecimen | None = None,
+    biospecimen_pool: BiospecimenPool | None = None,
+    notes: str = "",
+    operation_run: OperationRun | None = None,
+    task_run: TaskRun | None = None,
+    submission_record: SubmissionRecord | None = None,
+) -> BiospecimenStorageRecord:
+    if (biospecimen is None) == (biospecimen_pool is None):
+        raise StorageInventoryError("artifact_required")
+    if submission_record and task_run is None:
+        task_run = submission_record.task_run
+    if task_run and operation_run is None:
+        operation_run = task_run.operation_run
+    artifact_lab_id = biospecimen.lab_id if biospecimen is not None else biospecimen_pool.lab_id
+    if artifact_lab_id != location.lab_id:
+        raise StorageInventoryError("location_lab_mismatch")
+    latest_record = (
+        _latest_storage_record_for_biospecimen(biospecimen)
+        if biospecimen is not None
+        else _latest_storage_record_for_pool(biospecimen_pool)
+    )
+    record = BiospecimenStorageRecord(
+        biospecimen=biospecimen,
+        biospecimen_pool=biospecimen_pool,
+        location=location,
+        previous_location=latest_record.location if latest_record else None,
+        reason=reason,
+        quantity_snapshot=(biospecimen.quantity if biospecimen is not None else biospecimen_pool.quantity),
+        quantity_unit=(biospecimen.quantity_unit if biospecimen is not None else biospecimen_pool.quantity_unit),
+        notes=notes.strip(),
+        placed_by=placed_by.strip(),
+        operation_run=operation_run,
+        task_run=task_run,
+        submission_record=submission_record,
+    )
+    record.full_clean()
+    record.save()
+    return record
+
+
+@transaction.atomic
+def create_inventory_lot(
+    *,
+    material: InventoryMaterial,
+    lab,
+    lot_number: str,
+    received_quantity: Decimal,
+    unit_of_measure: str,
+    recorded_by: str,
+    storage_location: StorageLocation | None = None,
+    vendor: str = "",
+    received_on: date | None = None,
+    expires_on: date | None = None,
+    notes: str = "",
+    metadata: dict[str, object] | None = None,
+) -> tuple[InventoryLot, InventoryTransaction]:
+    if received_quantity < 0:
+        raise StorageInventoryError("received_quantity_invalid")
+    lot = InventoryLot(
+        material=material,
+        lab=lab,
+        storage_location=storage_location,
+        lot_number=lot_number.strip(),
+        vendor=vendor.strip(),
+        received_on=received_on or timezone.localdate(),
+        expires_on=expires_on,
+        notes=notes.strip(),
+        initial_quantity=received_quantity,
+        on_hand_quantity=received_quantity,
+        unit_of_measure=unit_of_measure.strip() or material.default_unit,
+        metadata=dict(metadata or {}),
+    )
+    lot.full_clean()
+    lot.save()
+    transaction_record = InventoryTransaction(
+        lot=lot,
+        transaction_type=InventoryTransaction.TransactionType.RECEIPT,
+        quantity_delta=received_quantity,
+        resulting_quantity=received_quantity,
+        location=storage_location,
+        notes=notes.strip(),
+        recorded_by=recorded_by.strip(),
+    )
+    transaction_record.full_clean()
+    transaction_record.save()
+    return lot, transaction_record
+
+
+@transaction.atomic
+def record_inventory_transaction(
+    *,
+    lot: InventoryLot,
+    transaction_type: str,
+    quantity_delta: Decimal,
+    recorded_by: str,
+    location: StorageLocation | None = None,
+    notes: str = "",
+    biospecimen: Biospecimen | None = None,
+    biospecimen_pool: BiospecimenPool | None = None,
+    operation_run: OperationRun | None = None,
+    task_run: TaskRun | None = None,
+    submission_record: SubmissionRecord | None = None,
+    material_usage_record: MaterialUsageRecord | None = None,
+) -> InventoryTransaction:
+    if submission_record and task_run is None:
+        task_run = submission_record.task_run
+    if task_run and operation_run is None:
+        operation_run = task_run.operation_run
+    if material_usage_record and operation_run is None:
+        operation_run = material_usage_record.operation_run
+    if material_usage_record and task_run is None:
+        task_run = material_usage_record.task_run
+    if transaction_type not in InventoryTransaction.TransactionType.values:
+        raise StorageInventoryError("invalid_transaction_type")
+    if transaction_type == InventoryTransaction.TransactionType.TRANSFER and location is None:
+        raise StorageInventoryError("transfer_location_required")
+    if transaction_type in {
+        InventoryTransaction.TransactionType.RECEIPT,
+        InventoryTransaction.TransactionType.RELEASE,
+    } and quantity_delta <= 0:
+        raise StorageInventoryError("quantity_delta_must_be_positive")
+    if transaction_type in {
+        InventoryTransaction.TransactionType.RESERVATION,
+        InventoryTransaction.TransactionType.CONSUMPTION,
+        InventoryTransaction.TransactionType.DISPOSAL,
+        InventoryTransaction.TransactionType.EXPIRY,
+    } and quantity_delta >= 0:
+        raise StorageInventoryError("quantity_delta_must_be_negative")
+    if transaction_type == InventoryTransaction.TransactionType.ADJUSTMENT and quantity_delta == 0:
+        raise StorageInventoryError("quantity_delta_required")
+
+    locked_lot = InventoryLot.objects.select_for_update().get(id=lot.id)
+    resulting_quantity = locked_lot.on_hand_quantity + quantity_delta
+    if resulting_quantity < 0:
+        raise StorageInventoryError("insufficient_inventory")
+    locked_lot.on_hand_quantity = resulting_quantity
+    if location is not None:
+        locked_lot.storage_location = location
+    locked_lot.full_clean()
+    locked_lot.save(update_fields=["on_hand_quantity", "storage_location", "updated_at"])
+    transaction_record = InventoryTransaction(
+        lot=locked_lot,
+        transaction_type=transaction_type,
+        quantity_delta=quantity_delta,
+        resulting_quantity=resulting_quantity,
+        location=locked_lot.storage_location,
+        biospecimen=biospecimen,
+        biospecimen_pool=biospecimen_pool,
+        operation_run=operation_run,
+        task_run=task_run,
+        submission_record=submission_record,
+        material_usage_record=material_usage_record,
+        notes=notes.strip(),
+        recorded_by=recorded_by.strip(),
+    )
+    transaction_record.full_clean()
+    transaction_record.save()
+    return transaction_record
 
 
 def generate_manifest_identifier() -> str:
