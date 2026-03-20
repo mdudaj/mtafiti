@@ -654,6 +654,46 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:formpackage
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackagechoice
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackagechoicelist
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackagecompilerdiagnostic
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackageitem
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackageitemgroup
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackageprojection
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackagesection
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackagesourceartifact
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:formpackageversion
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:glossaryterm
   -
     relationship: implements
