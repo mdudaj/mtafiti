@@ -169,6 +169,10 @@ Current conventions:
 - aliquots are modeled as child `Biospecimen` records with `parent_specimen` and `lineage_root`
 - pools are modeled separately from single-parent lineage so one pool can reference many source specimens
 - artifact permissions (`lims.artifact.view` / `lims.artifact.manage`) guard the current biospecimen APIs
+- biospecimens remain the primary operational artifacts for LIMS workflows; workflow/task capture does not replace them with a graph-native persistence model
+- workflow execution should become the governed source of truth for sample quantity/volume acquisition, derivation, storage movement, reservation, and consumption history, with runtime submissions projected into the appropriate domain records
+
+This means the current knowledge graph remains an analysis and coding-assistance artifact, while operational sample, workflow, and inventory state stays in relational tenant-scoped Django/PostgreSQL models.
 
 The first API surface is exposed under:
 
@@ -222,6 +226,8 @@ The first API surface is exposed under:
 - `/api/v1/lims/receiving/discrepancies`
 
 Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine.
+
+More generally, workflow-administered forms capture task metadata first into runtime submission/audit records. When specific answers have domain meaning, they should then be projected into the corresponding governed models instead of leaving the workflow payload as the only source of truth.
 
 The receiving UX is now split so `/lims/receiving/` acts as a launchpad, while dedicated task pages carry the actual input work:
 
@@ -304,6 +310,22 @@ The first API surface is exposed under:
 Worksheet print jobs default to the shared `a4/batch-rows` template and `pdf` output so operators can generate A4-ready plate worksheets while still benefiting from the standard print preview metadata produced by the platform printing service.
 
 The companion page at `/lims/processing/` provides a first admin-style batch workspace with layout visibility, batch creation, and worksheet print-job triggers.
+
+## Storage and non-sample inventory direction
+
+The next storage/inventory slice should treat two related concerns explicitly:
+
+- sample storage and movement history for biospecimens, aliquots, pools, and derived artifacts
+- non-sample inventory for lab materials and consumables such as reagents, tubes, kits, media, and labels
+
+For non-sample inventory, the target model should remain relational and tenant-scoped, covering:
+
+- material/catalog identity
+- lot or batch tracking
+- unit-of-measure aware stock quantities
+- storage location and placement
+- receipt, adjustment, reservation, transfer, usage, expiry, and disposal transactions
+- workflow/task linkage when a consumable is used during execution
 
 ## Geography import and Tanzania sync
 

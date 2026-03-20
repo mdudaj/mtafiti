@@ -21,9 +21,13 @@ from .models import (
     ApprovalRecord,
     Biospecimen,
     BiospecimenPool,
+    BiospecimenStorageRecord,
     BiospecimenType,
     Country,
     District,
+    InventoryLot,
+    InventoryMaterial,
+    InventoryTransaction,
     Lab,
     MetadataFieldDefinition,
     MetadataSchema,
@@ -45,6 +49,7 @@ from .models import (
     ReceivingEvent,
     Region,
     Site,
+    StorageLocation,
     Street,
     Study,
     TanzaniaAddressSyncRun,
@@ -66,6 +71,7 @@ from .services import (
     BiospecimenTransitionError,
     create_receiving_discrepancy,
     create_aliquots,
+    create_inventory_lot,
     create_processing_batch,
     create_processing_batch_worksheet_job,
     create_pool,
@@ -75,11 +81,14 @@ from .services import (
     provision_default_metadata_vocabularies,
     receive_manifest_item,
     receive_single_biospecimen,
+    record_inventory_transaction,
     resolve_schema_version_for_binding,
     start_operation_run,
     submit_manifest,
     submit_task_run,
+    StorageInventoryError,
     sync_run_to_dict,
+    place_artifact_in_storage,
     transition_processing_batch,
     transition_biospecimen,
     transition_pool,
@@ -882,6 +891,16 @@ def _parse_optional_received_at(value):
     return parsed, None
 
 
+def _parse_optional_date(value, *, field: str):
+    if value in (None, ""):
+        return None, None
+    raw = str(value).strip()
+    try:
+        return datetime.fromisoformat(f"{raw}T00:00:00" if len(raw) == 10 else raw).date(), None
+    except ValueError:
+        return None, JsonResponse({"error": f"invalid_{field}"}, status=400)
+
+
 def _biospecimen_type_to_dict(item: BiospecimenType) -> dict[str, object]:
     return {
         "id": str(item.id),
@@ -897,6 +916,7 @@ def _biospecimen_type_to_dict(item: BiospecimenType) -> dict[str, object]:
 
 
 def _biospecimen_to_dict(item: Biospecimen) -> dict[str, object]:
+    latest_storage = item.storage_records.order_by("-created_at").first() if hasattr(item, "storage_records") else None
     return {
         "id": str(item.id),
         "sample_type_id": str(item.sample_type_id),
@@ -918,11 +938,13 @@ def _biospecimen_to_dict(item: Biospecimen) -> dict[str, object]:
         "received_at": item.received_at.isoformat() if item.received_at else None,
         "aliquot_ids": [str(child.id) for child in item.aliquots.all()],
         "pool_ids": [str(member.pool_id) for member in item.pool_memberships.all()],
+        "current_storage_location_id": str(latest_storage.location_id) if latest_storage else None,
         "is_active": item.is_active,
     }
 
 
 def _biospecimen_pool_to_dict(item: BiospecimenPool) -> dict[str, object]:
+    latest_storage = item.storage_records.order_by("-created_at").first() if hasattr(item, "storage_records") else None
     return {
         "id": str(item.id),
         "sample_type_id": str(item.sample_type_id),
@@ -936,6 +958,7 @@ def _biospecimen_pool_to_dict(item: BiospecimenPool) -> dict[str, object]:
         "quantity_unit": item.quantity_unit,
         "metadata": item.metadata,
         "member_ids": [str(member.specimen_id) for member in item.members.all()],
+        "current_storage_location_id": str(latest_storage.location_id) if latest_storage else None,
         "is_active": item.is_active,
     }
 
@@ -1005,6 +1028,113 @@ def _receiving_discrepancy_to_dict(item: ReceivingDiscrepancy) -> dict[str, obje
         "expected_data": item.expected_data,
         "actual_data": item.actual_data,
         "recorded_by": item.recorded_by,
+    }
+
+
+def _storage_location_path(item: StorageLocation) -> list[dict[str, object]]:
+    trail: list[dict[str, object]] = []
+    current = item
+    seen_ids: set[str] = set()
+    while current is not None:
+        current_id = str(current.id)
+        if current_id in seen_ids:
+            break
+        seen_ids.add(current_id)
+        trail.append(
+            {
+                "id": current_id,
+                "name": current.name,
+                "code": current.code,
+                "level": current.level,
+            }
+        )
+        current = current.parent
+    return list(reversed(trail))
+
+
+def _storage_location_to_dict(item: StorageLocation) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "lab_id": str(item.lab_id),
+        "parent_id": str(item.parent_id) if item.parent_id else None,
+        "name": item.name,
+        "code": item.code,
+        "level": item.level,
+        "temperature_zone": item.temperature_zone,
+        "capacity": item.capacity,
+        "metadata": item.metadata,
+        "path": _storage_location_path(item),
+        "is_active": item.is_active,
+    }
+
+
+def _biospecimen_storage_record_to_dict(item: BiospecimenStorageRecord) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+        "biospecimen_pool_id": str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None,
+        "location": _storage_location_to_dict(item.location),
+        "previous_location_id": str(item.previous_location_id) if item.previous_location_id else None,
+        "reason": item.reason,
+        "quantity_snapshot": str(item.quantity_snapshot),
+        "quantity_unit": item.quantity_unit,
+        "notes": item.notes,
+        "placed_by": item.placed_by,
+        "operation_run_id": str(item.operation_run_id) if item.operation_run_id else None,
+        "task_run_id": str(item.task_run_id) if item.task_run_id else None,
+        "submission_record_id": str(item.submission_record_id) if item.submission_record_id else None,
+        "created_at": item.created_at.isoformat(),
+    }
+
+
+def _inventory_material_to_dict(item: InventoryMaterial) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "name": item.name,
+        "code": item.code,
+        "category": item.category,
+        "description": item.description,
+        "default_unit": item.default_unit,
+        "is_active": item.is_active,
+    }
+
+
+def _inventory_lot_to_dict(item: InventoryLot) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "material_id": str(item.material_id),
+        "lab_id": str(item.lab_id),
+        "storage_location_id": str(item.storage_location_id) if item.storage_location_id else None,
+        "lot_number": item.lot_number,
+        "vendor": item.vendor,
+        "received_on": item.received_on.isoformat() if item.received_on else None,
+        "expires_on": item.expires_on.isoformat() if item.expires_on else None,
+        "notes": item.notes,
+        "initial_quantity": str(item.initial_quantity),
+        "on_hand_quantity": str(item.on_hand_quantity),
+        "unit_of_measure": item.unit_of_measure,
+        "metadata": item.metadata,
+        "is_active": item.is_active,
+    }
+
+
+def _inventory_transaction_to_dict(item: InventoryTransaction) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "lot_id": str(item.lot_id),
+        "transaction_type": item.transaction_type,
+        "quantity_delta": str(item.quantity_delta),
+        "resulting_quantity": str(item.resulting_quantity),
+        "location_id": str(item.location_id) if item.location_id else None,
+        "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+        "biospecimen_pool_id": str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None,
+        "operation_run_id": str(item.operation_run_id) if item.operation_run_id else None,
+        "task_run_id": str(item.task_run_id) if item.task_run_id else None,
+        "submission_record_id": str(item.submission_record_id) if item.submission_record_id else None,
+        "material_usage_record_id": str(item.material_usage_record_id) if item.material_usage_record_id else None,
+        "notes": item.notes,
+        "recorded_by": item.recorded_by,
+        "created_at": item.created_at.isoformat(),
     }
 
 
@@ -4198,6 +4328,67 @@ def _batch_plate_error_response(exc: BatchPlateError):
     return JsonResponse({"error": str(exc)}, status=400)
 
 
+def _storage_inventory_error_response(exc: StorageInventoryError):
+    return JsonResponse({"error": str(exc)}, status=400)
+
+
+def _build_storage_location_from_payload(location: StorageLocation, payload: dict[str, object]):
+    lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+    if error:
+        return error
+    if lab is None:
+        return JsonResponse({"error": "lab_id is required"}, status=400)
+    parent, error = _resolve_optional_fk(StorageLocation, payload.get("parent_id"), "parent_not_found")
+    if error:
+        return error
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+    level = str(payload.get("level") or "").strip()
+    if level not in StorageLocation.Level.values:
+        return JsonResponse({"error": "invalid_level"}, status=400)
+    temperature_zone = str(payload.get("temperature_zone") or "").strip()
+    if temperature_zone and temperature_zone not in StorageLocation.TemperatureZone.values:
+        return JsonResponse({"error": "invalid_temperature_zone"}, status=400)
+    capacity = payload.get("capacity")
+    if capacity in ("", None):
+        parsed_capacity = None
+    else:
+        try:
+            parsed_capacity = int(capacity)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "invalid_capacity"}, status=400)
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    location.lab = lab
+    location.parent = parent
+    location.name = name
+    location.code = _normalize_code(name, payload.get("code"))
+    location.level = level
+    location.temperature_zone = temperature_zone
+    location.capacity = parsed_capacity
+    location.metadata = metadata
+    location.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _build_inventory_material_from_payload(material: InventoryMaterial, payload: dict[str, object]):
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+    category = str(payload.get("category") or InventoryMaterial.Category.CONSUMABLE).strip()
+    if category not in InventoryMaterial.Category.values:
+        return JsonResponse({"error": "invalid_category"}, status=400)
+    material.name = name
+    material.code = _normalize_code(name, payload.get("code"))
+    material.category = category
+    material.description = str(payload.get("description") or "").strip()
+    material.default_unit = str(payload.get("default_unit") or "").strip()
+    material.is_active = bool(payload.get("is_active", True))
+    return None
+
+
 @csrf_exempt
 def lims_biospecimen_types(request):
     if request.method == "GET":
@@ -4260,7 +4451,7 @@ def lims_biospecimens(request):
             return forbidden
         queryset = Biospecimen.objects.select_related(
             "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
-        ).prefetch_related("aliquots", "pool_memberships").order_by("-created_at")
+        ).prefetch_related("aliquots", "pool_memberships", "storage_records__location").order_by("-created_at")
         if request.GET.get("sample_type_id"):
             queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
         if request.GET.get("status"):
@@ -4297,7 +4488,7 @@ def lims_biospecimen_detail(request, specimen_id: str):
     try:
         specimen = Biospecimen.objects.select_related(
             "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
-        ).prefetch_related("aliquots", "pool_memberships").get(id=specimen_id)
+        ).prefetch_related("aliquots", "pool_memberships", "storage_records__location").get(id=specimen_id)
     except (ValidationError, Biospecimen.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -4388,7 +4579,7 @@ def lims_biospecimen_pools(request):
         if forbidden:
             return forbidden
         queryset = BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "members"
+            "members", "storage_records__location"
         ).order_by("-created_at")
         if request.GET.get("sample_type_id"):
             queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
@@ -4452,7 +4643,7 @@ def lims_biospecimen_pools(request):
 def lims_biospecimen_pool_detail(request, pool_id: str):
     try:
         pool = BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "members"
+            "members", "storage_records__location"
         ).get(id=pool_id)
     except (ValidationError, BiospecimenPool.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
@@ -4487,6 +4678,423 @@ def lims_biospecimen_pool_transition(request, pool_id: str):
         return JsonResponse({"error": str(exc)}, status=400)
     pool.refresh_from_db()
     return JsonResponse(_biospecimen_pool_to_dict(pool))
+
+
+@csrf_exempt
+def lims_storage_locations(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.storage.view")
+        if forbidden:
+            return forbidden
+        queryset = StorageLocation.objects.select_related(
+            "lab",
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).order_by("lab__name", "name")
+        if request.GET.get("lab_id"):
+            queryset = queryset.filter(lab_id=request.GET["lab_id"])
+        if request.GET.get("parent_id"):
+            queryset = queryset.filter(parent_id=request.GET["parent_id"])
+        if request.GET.get("level"):
+            queryset = queryset.filter(level=request.GET["level"])
+        items = [_storage_location_to_dict(item) for item in queryset[:300]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.storage.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        location = StorageLocation()
+        error = _build_storage_location_from_payload(location, payload)
+        if error:
+            return error
+        error = _save_model(location)
+        if error:
+            return error
+        location.refresh_from_db()
+        return JsonResponse(_storage_location_to_dict(location), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_storage_location_detail(request, location_id: str):
+    try:
+        location = StorageLocation.objects.select_related(
+            "lab",
+            "parent",
+            "parent__parent",
+            "parent__parent__parent",
+            "parent__parent__parent__parent",
+        ).get(id=location_id)
+    except (ValidationError, StorageLocation.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.storage.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_storage_location_to_dict(location))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.storage.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_storage_location_from_payload(location, payload)
+        if error:
+            return error
+        error = _save_model(location)
+        if error:
+            return error
+        location.refresh_from_db()
+        return JsonResponse(_storage_location_to_dict(location))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_biospecimen_storage_records(request, specimen_id: str):
+    try:
+        specimen = Biospecimen.objects.get(id=specimen_id)
+    except (ValidationError, Biospecimen.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.storage.view")
+        if forbidden:
+            return forbidden
+        records = specimen.storage_records.select_related(
+            "location",
+            "location__parent",
+            "location__parent__parent",
+            "previous_location",
+        ).order_by("-created_at")
+        return JsonResponse({"items": [_biospecimen_storage_record_to_dict(item) for item in records]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.storage.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
+        if error:
+            return error
+        if location is None:
+            return JsonResponse({"error": "location_id is required"}, status=400)
+        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        if error:
+            return error
+        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        if error:
+            return error
+        submission_record, error = _resolve_optional_fk(
+            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+        )
+        if error:
+            return error
+        reason = str(payload.get("reason") or "").strip()
+        if reason not in BiospecimenStorageRecord.Reason.values:
+            return JsonResponse({"error": "invalid_reason"}, status=400)
+        try:
+            record = place_artifact_in_storage(
+                biospecimen=specimen,
+                location=location,
+                placed_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                reason=reason,
+                notes=str(payload.get("notes") or "").strip(),
+                operation_run=operation_run,
+                task_run=task_run,
+                submission_record=submission_record,
+            )
+        except StorageInventoryError as exc:
+            return _storage_inventory_error_response(exc)
+        record.refresh_from_db()
+        return JsonResponse(_biospecimen_storage_record_to_dict(record), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_biospecimen_pool_storage_records(request, pool_id: str):
+    try:
+        pool = BiospecimenPool.objects.get(id=pool_id)
+    except (ValidationError, BiospecimenPool.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.storage.view")
+        if forbidden:
+            return forbidden
+        records = pool.storage_records.select_related(
+            "location",
+            "location__parent",
+            "location__parent__parent",
+            "previous_location",
+        ).order_by("-created_at")
+        return JsonResponse({"items": [_biospecimen_storage_record_to_dict(item) for item in records]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.storage.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
+        if error:
+            return error
+        if location is None:
+            return JsonResponse({"error": "location_id is required"}, status=400)
+        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        if error:
+            return error
+        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        if error:
+            return error
+        submission_record, error = _resolve_optional_fk(
+            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+        )
+        if error:
+            return error
+        reason = str(payload.get("reason") or "").strip()
+        if reason not in BiospecimenStorageRecord.Reason.values:
+            return JsonResponse({"error": "invalid_reason"}, status=400)
+        try:
+            record = place_artifact_in_storage(
+                biospecimen_pool=pool,
+                location=location,
+                placed_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                reason=reason,
+                notes=str(payload.get("notes") or "").strip(),
+                operation_run=operation_run,
+                task_run=task_run,
+                submission_record=submission_record,
+            )
+        except StorageInventoryError as exc:
+            return _storage_inventory_error_response(exc)
+        record.refresh_from_db()
+        return JsonResponse(_biospecimen_storage_record_to_dict(record), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_inventory_materials(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.inventory.view")
+        if forbidden:
+            return forbidden
+        queryset = InventoryMaterial.objects.order_by("name")
+        if request.GET.get("category"):
+            queryset = queryset.filter(category=request.GET["category"])
+        items = [_inventory_material_to_dict(item) for item in queryset[:200]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.inventory.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        material = InventoryMaterial()
+        error = _build_inventory_material_from_payload(material, payload)
+        if error:
+            return error
+        error = _save_model(material)
+        if error:
+            return error
+        material.refresh_from_db()
+        return JsonResponse(_inventory_material_to_dict(material), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_inventory_material_detail(request, material_id: str):
+    try:
+        material = InventoryMaterial.objects.get(id=material_id)
+    except (ValidationError, InventoryMaterial.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.inventory.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_inventory_material_to_dict(material))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.inventory.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_inventory_material_from_payload(material, payload)
+        if error:
+            return error
+        error = _save_model(material)
+        if error:
+            return error
+        material.refresh_from_db()
+        return JsonResponse(_inventory_material_to_dict(material))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_inventory_lots(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.inventory.view")
+        if forbidden:
+            return forbidden
+        queryset = InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")
+        if request.GET.get("material_id"):
+            queryset = queryset.filter(material_id=request.GET["material_id"])
+        if request.GET.get("lab_id"):
+            queryset = queryset.filter(lab_id=request.GET["lab_id"])
+        if request.GET.get("storage_location_id"):
+            queryset = queryset.filter(storage_location_id=request.GET["storage_location_id"])
+        items = [_inventory_lot_to_dict(item) for item in queryset[:300]]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.inventory.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        material, error = _resolve_optional_fk(InventoryMaterial, payload.get("material_id"), "material_not_found")
+        if error:
+            return error
+        if material is None:
+            return JsonResponse({"error": "material_id is required"}, status=400)
+        lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
+        if error:
+            return error
+        if lab is None:
+            return JsonResponse({"error": "lab_id is required"}, status=400)
+        storage_location, error = _resolve_optional_fk(
+            StorageLocation, payload.get("storage_location_id"), "storage_location_not_found"
+        )
+        if error:
+            return error
+        received_quantity, error = _parse_decimal(payload.get("received_quantity"), field="received_quantity", default="0")
+        if error:
+            return error
+        received_on, error = _parse_optional_date(payload.get("received_on"), field="received_on")
+        if error:
+            return error
+        expires_on, error = _parse_optional_date(payload.get("expires_on"), field="expires_on")
+        if error:
+            return error
+        metadata = payload.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            return JsonResponse({"error": "metadata must be an object"}, status=400)
+        try:
+            lot, transaction = create_inventory_lot(
+                material=material,
+                lab=lab,
+                lot_number=str(payload.get("lot_number") or "").strip(),
+                received_quantity=received_quantity,
+                unit_of_measure=str(payload.get("unit_of_measure") or material.default_unit).strip(),
+                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                storage_location=storage_location,
+                vendor=str(payload.get("vendor") or "").strip(),
+                received_on=received_on,
+                expires_on=expires_on,
+                notes=str(payload.get("notes") or "").strip(),
+                metadata=metadata,
+            )
+        except StorageInventoryError as exc:
+            return _storage_inventory_error_response(exc)
+        lot.refresh_from_db()
+        return JsonResponse(
+            {"lot": _inventory_lot_to_dict(lot), "initial_transaction": _inventory_transaction_to_dict(transaction)},
+            status=201,
+        )
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_inventory_lot_detail(request, lot_id: str):
+    try:
+        lot = InventoryLot.objects.select_related("material", "lab", "storage_location").get(id=lot_id)
+    except (ValidationError, InventoryLot.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.inventory.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_inventory_lot_to_dict(lot))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_inventory_lot_transactions(request, lot_id: str):
+    try:
+        lot = InventoryLot.objects.select_related("material", "lab", "storage_location").get(id=lot_id)
+    except (ValidationError, InventoryLot.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.inventory.view")
+        if forbidden:
+            return forbidden
+        queryset = lot.transactions.select_related("location", "biospecimen", "biospecimen_pool").order_by("-created_at")
+        if request.GET.get("transaction_type"):
+            queryset = queryset.filter(transaction_type=request.GET["transaction_type"])
+        return JsonResponse({"items": [_inventory_transaction_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.inventory.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
+        if error:
+            return error
+        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+        if error:
+            return error
+        biospecimen_pool, error = _resolve_optional_fk(
+            BiospecimenPool, payload.get("biospecimen_pool_id"), "biospecimen_pool_not_found"
+        )
+        if error:
+            return error
+        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        if error:
+            return error
+        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        if error:
+            return error
+        submission_record, error = _resolve_optional_fk(
+            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+        )
+        if error:
+            return error
+        material_usage_record, error = _resolve_optional_fk(
+            MaterialUsageRecord, payload.get("material_usage_record_id"), "material_usage_record_not_found"
+        )
+        if error:
+            return error
+        quantity_delta, error = _parse_decimal(payload.get("quantity_delta"), field="quantity_delta", default="0")
+        if error:
+            return error
+        try:
+            transaction = record_inventory_transaction(
+                lot=lot,
+                transaction_type=str(payload.get("transaction_type") or "").strip(),
+                quantity_delta=quantity_delta,
+                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                location=location,
+                notes=str(payload.get("notes") or "").strip(),
+                biospecimen=biospecimen,
+                biospecimen_pool=biospecimen_pool,
+                operation_run=operation_run,
+                task_run=task_run,
+                submission_record=submission_record,
+                material_usage_record=material_usage_record,
+            )
+        except StorageInventoryError as exc:
+            return _storage_inventory_error_response(exc)
+        transaction.refresh_from_db()
+        return JsonResponse(_inventory_transaction_to_dict(transaction), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt

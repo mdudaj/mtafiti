@@ -598,6 +598,10 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:biospecimenstoragerecord
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:biospecimentype
   -
     relationship: implements
@@ -663,6 +667,18 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:ingestionrequest
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:inventorylot
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:inventorymaterial
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:inventorytransaction
   -
     relationship: implements
     from: module:core_models
@@ -855,6 +871,10 @@ edges:
     relationship: implements
     from: module:core_models
     to: datamodel:stewardshipitem
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:storagelocation
   -
     relationship: implements
     from: module:core_models

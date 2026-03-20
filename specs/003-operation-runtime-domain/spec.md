@@ -125,17 +125,18 @@ As a QA reviewer, I want approvals and signatures to be explicit runtime records
 
 ---
 
-### User Story 4 - Trace specimen and material usage through runtime (Priority: P2)
+### User Story 4 - Trace specimen volume and material usage through runtime (Priority: P2)
 
-As a laboratory manager, I want task execution to reference consumed and produced specimens or artifacts so chain-of-custody remains explicit.
+As a laboratory manager, I want task execution to reference consumed and produced specimens, their quantity/volume effects, and the non-sample materials used so chain-of-custody and inventory remain explicit.
 
-**Independent Test**: During sample accession or downstream processing, record an aliquot consumption event and verify the runtime links the source biospecimen, resulting artifact, task run, and action semantics.
+**Independent Test**: During sample accession or downstream processing, record an aliquot consumption event and a consumable usage event, then verify the runtime links the source biospecimen, resulting artifact, task run, quantity/volume semantics, and inventory usage semantics.
 
 **Acceptance Scenarios**:
 
-1. **Given** a task consumes a biospecimen, aliquot, or pool member, **When** the task is completed, **Then** a `MaterialUsageRecord` links the runtime action to the existing LIMS artifact records.
-2. **Given** a task produces a derivative or storage placement artifact, **When** the task completes, **Then** the runtime can reference the produced artifact without duplicating the source domain model.
-3. **Given** a discrepancy or rejection occurs, **When** runtime history is reviewed, **Then** material usage and decision records remain correlated.
+1. **Given** a task consumes a biospecimen, aliquot, or pool member, **When** the task is completed, **Then** a runtime-linked usage record links the action to the existing LIMS artifact records and records the governed quantity or volume effect.
+2. **Given** a task produces a derivative or storage placement artifact, **When** the task completes, **Then** the runtime can reference the produced artifact without duplicating the source domain model and can explain the resulting quantity/volume state.
+3. **Given** a task uses reagents, tubes, kits, or other consumables, **When** the task completes, **Then** the runtime can link that usage to inventory transactions instead of hiding it in free-text metadata only.
+4. **Given** a discrepancy or rejection occurs, **When** runtime history is reviewed, **Then** material usage, quantity effects, and decision records remain correlated.
 
 ---
 
@@ -158,6 +159,8 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - How are approvals invalidated or preserved if a task is reopened under controlled override rules?
 - How should the runtime represent tasks that render only a subset of a form package version?
 - How should material usage be recorded when a task consumes multiple aliquots or pool members and produces one derived artifact?
+- How should partial sample-volume reservations versus finalized consumption be represented for long-running workflows?
+- How should runtime capture distinguish sample-artifact usage from non-sample inventory/consumable usage while preserving one coherent audit trail?
 - How should subject context differ between LIMS specimens/batches and EDCS participants/visits without splitting the runtime model?
 
 ## Requirements *(mandatory)*
@@ -184,6 +187,11 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - **FR-018**: The system MUST support module-specific subject references without hard-coding the runtime model exclusively to LIMS specimens or EDCS visits.
 - **FR-019**: The runtime model MUST support role-gated assignment, execution, review, and approval actions consistent with tenant-aware permission checks.
 - **FR-020**: The system MUST remain compatible with a Viewflow-style runtime where orchestration state and task state are explicit and not hidden in free-form payloads.
+- **FR-021**: Runtime capture MUST remain backed by relational tenant-scoped models; graph-style knowledge artifacts may describe the system but MUST NOT replace runtime persistence or audit requirements.
+- **FR-022**: Workflow task submissions MUST be able to project governed values into domain models while still preserving the original submission/audit record for historical replay.
+- **FR-023**: For LIMS workflows, sample/biospecimen records and their derivatives MUST remain the primary operational artifacts referenced by runtime tasks.
+- **FR-024**: The runtime model MUST support explicit sample quantity/volume acquisition, derivation, reservation, and consumption records so workflow execution becomes the source of truth for sample usage history.
+- **FR-025**: The runtime model MUST support linkage from task execution to non-sample lab inventory transactions for materials and consumables such as reagents, tubes, kits, and labels.
 
 ### Non-Functional Requirements
 
@@ -239,4 +247,3 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - **Issue generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/003-operation-runtime-domain`
 - **PR generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py pr-body specs/003-operation-runtime-domain --issue-number 108`
 - **Branch naming**: `docs/operation-runtime-domain`
-

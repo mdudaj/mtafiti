@@ -179,6 +179,10 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **FR-018**: The system MUST support import/export and integration boundaries for EDC, instrument, and reporting workflows without tightly coupling runtime logic to a single external system.
 - **FR-019**: The system MUST support material or specimen usage linkage from workflow tasks to resulting artifacts where applicable.
 - **FR-020**: The system MUST preserve tenant isolation across operation definitions, form packages, workflow templates, vocabularies, runtime records, and analytics.
+- **FR-021**: Operational LIMS and EDCS data MUST remain relational, queryable tenant-scoped domain models in PostgreSQL/Django; the knowledge graph remains a separate documentation/agent-support artifact and MUST NOT replace the operational source of truth.
+- **FR-022**: Workflow task form capture MUST persist runtime submission/audit records first, then project domain-significant values into the appropriate governed relational models rather than treating arbitrary graph edges as the primary persistence mechanism.
+- **FR-023**: In LIMS, the primary operational artifact MUST be the sample/biospecimen and its derivatives; workflow execution records MUST provide the governed source of truth for sample acquisition, aliquoting, pooling, storage placement, and usage/consumption history.
+- **FR-024**: The platform MUST model inventory for non-sample lab materials and consumables, including catalog identity, lot/batch, unit of measure, stock transactions, storage location, and workflow-linked usage records.
 
 ### Non-Goals
 
@@ -187,6 +191,7 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - Replacing Viewflow with another workflow engine
 - Achieving full 21 CFR Part 11 certification in the first implementation slice
 - Treating ODM XML as the only canonical storage format in the first pass if a safer relational canonical model with lossless import/export is preferable
+- Rebuilding the operational persistence layer around PostgreSQL graph extensions such as Apache AGE for first-pass workflow/runtime storage
 
 ### Key Entities *(include if feature involves data)*
 
@@ -206,6 +211,9 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **Submission / Capture Record**: A record of data entered for a task or form segment, with version references and audit context.
 - **Signature / Approval Record**: A governed sign-off record linked to a task run or operation run.
 - **Material Usage Record**: A link between a runtime task and specimens, aliquots, batches, or derived artifacts consumed or produced.
+- **Sample Volume Ledger Entry**: A governed runtime-linked record that explains quantity acquisition, derivation, reservation, transfer, or consumption for a biospecimen or derivative.
+- **Inventory Item / Material Catalog**: A governed definition for a non-sample lab material or consumable such as tubes, reagents, kits, media, or labels.
+- **Inventory Stock Transaction**: A tenant-scoped record of receipt, adjustment, reservation, allocation, consumption, transfer, expiry, or disposal for a material/consumable lot.
 
 ## Success Criteria *(mandatory)*
 
@@ -214,6 +222,7 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **SC-003**: The form engine is specified as reusable by both LIMS and EDCS rather than being hard-coded to one module.
 - **SC-004**: The specification provides enough structure to generate a reviewable issue backlog for domain modeling, form packaging, workflow builder, and runtime execution.
 - **SC-005**: The design clearly explains that the already-merged metadata vocabulary/form work is useful but transitional, and must be redefined toward the governed ODM/OpenClinica-style package model instead of being treated as the final target.
+- **SC-006**: The specification makes explicit that operational workflow/sample/inventory state remains relational and runtime-governed rather than requiring a graph-first persistence redesign.
 
 ## Delivery Mapping *(mandatory)*
 

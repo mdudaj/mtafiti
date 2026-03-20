@@ -2541,6 +2541,45 @@ nodes:
       - ui_step
     source: src/lims/models.py:785
   -
+    id: datamodel:inventorytransaction
+    type: DataModel
+    name: InventoryTransaction
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - biospecimen_pool
+      - location
+      - lot
+      - material_usage_record
+      - notes
+      - operation_run
+      - quantity_delta
+      - recorded_by
+      - resulting_quantity
+      - submission_record
+      - task_run
+      - transaction_type
+    source: src/lims/models.py:2112
+  -
+    id: datamodel:biospecimenstoragerecord
+    type: DataModel
+    name: BiospecimenStorageRecord
+    description: "Django model defined in lims.models."
+    fields:
+      - biospecimen
+      - biospecimen_pool
+      - location
+      - notes
+      - operation_run
+      - placed_by
+      - previous_location
+      - quantity_snapshot
+      - quantity_unit
+      - reason
+      - submission_record
+      - task_run
+    source: src/lims/models.py:1936
+  -
     id: datamodel:accessioningmanifestitem
     type: DataModel
     name: AccessioningManifestItem
@@ -2610,6 +2649,35 @@ nodes:
       - position_index
       - well_label
     source: src/lims/models.py:1806
+  -
+    id: datamodel:storagelocation
+    type: DataModel
+    name: StorageLocation
+    description: "Django model defined in lims.models."
+    fields:
+      - capacity
+      - code
+      - is_active
+      - lab
+      - level
+      - metadata
+      - name
+      - parent
+      - temperature_zone
+    source: src/lims/models.py:1848
+  -
+    id: datamodel:inventorymaterial
+    type: DataModel
+    name: InventoryMaterial
+    description: "Django model defined in lims.models."
+    fields:
+      - category
+      - code
+      - default_unit
+      - description
+      - is_active
+      - name
+    source: src/lims/models.py:2034
   -
     id: datamodel:workflowtemplateversion
     type: DataModel
@@ -2917,6 +2985,26 @@ nodes:
       - source_path
       - source_url
     source: src/lims/models.py:99
+  -
+    id: datamodel:inventorylot
+    type: DataModel
+    name: InventoryLot
+    description: "Django model defined in lims.models."
+    fields:
+      - expires_on
+      - initial_quantity
+      - is_active
+      - lab
+      - lot_number
+      - material
+      - metadata
+      - notes
+      - on_hand_quantity
+      - received_on
+      - storage_location
+      - unit_of_measure
+      - vendor
+    source: src/lims/models.py:2060
   -
     id: datamodel:metadatavocabularyitem
     type: DataModel
