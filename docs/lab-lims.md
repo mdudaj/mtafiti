@@ -28,6 +28,7 @@ This document defines the target tenant-aware LIMS service exposed at:
   - `/lims/biospecimens/`
   - `/lims/receiving/`
   - `/lims/processing/`
+  - `/lims/storage/`
 - Service-aware routing via `TenantServiceRoute` records for `service_key="lims"`
 - Permission model helpers in `src/lims/permissions.py` define module roles, legacy-role compatibility, and guardian-compatible object permission names.
 - Reference-domain models and APIs now live directly in `src/lims/models.py` and `src/lims/views.py`.
@@ -263,7 +264,7 @@ The single-sample path has now moved one step closer to the intended cookbook-st
 
 Those dynamic steps are driven by the published sample-type metadata binding. Schema fields now expose a formbuilder-compatible field description in the metadata API, and the operator wizard uses a repository-native renderer so the controls stay aligned with the shared portal shell instead of introducing a separate frontend stack.
 
-The same launchpad-versus-task-page pattern now extends to reference and metadata setup:
+The same launchpad-versus-task-page pattern now extends to reference, metadata, and storage/inventory setup:
 
 - `/lims/reference/` stays an overview/launchpad for labs, studies, sites, and geography sync status
 - `/lims/reference/labs/create/`
@@ -276,6 +277,12 @@ The same launchpad-versus-task-page pattern now extends to reference and metadat
 - `/lims/metadata/schemas/create/`
 - `/lims/metadata/bindings/create/`
 - `/lims/metadata/versions/publish/`
+- `/lims/storage/` stays an overview/launchpad for storage hierarchy, placements, materials, lots, and ledger activity
+- `/lims/storage/locations/create/`
+- `/lims/storage/placements/create/`
+- `/lims/storage/materials/create/`
+- `/lims/storage/lots/create/`
+- `/lims/storage/transactions/create/`
 
 This keeps operator/admin pages closer to the CRUD cookbook direction: summary pages remain navigational, while each input page exposes one focused task with one primary submit action.
 
@@ -313,7 +320,7 @@ The companion page at `/lims/processing/` provides a first admin-style batch wor
 
 ## Storage and non-sample inventory direction
 
-The next storage/inventory slice should treat two related concerns explicitly:
+The current storage/inventory slice now treats two related concerns explicitly:
 
 - sample storage and movement history for biospecimens, aliquots, pools, and derived artifacts
 - non-sample inventory for lab materials and consumables such as reagents, tubes, kits, media, and labels
@@ -326,6 +333,8 @@ For non-sample inventory, the target model should remain relational and tenant-s
 - storage location and placement
 - receipt, adjustment, reservation, transfer, usage, expiry, and disposal transactions
 - workflow/task linkage when a consumable is used during execution
+
+The admin-style HTML surface now mirrors those concerns through `/lims/storage/` plus dedicated task pages for location creation, specimen placement, material setup, lot receipt, and stock-ledger transactions. Like receiving/reference/metadata, the launchpad stays navigational while each child page keeps one primary submit action tied to the existing JSON APIs.
 
 ## Geography import and Tanzania sync
 

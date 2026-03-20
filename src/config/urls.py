@@ -159,6 +159,12 @@ from lims.views import (
     lims_reference_create_site_page,
     lims_reference_create_study_page,
     lims_reference_page,
+    lims_storage_create_location_page,
+    lims_storage_create_lot_page,
+    lims_storage_create_material_page,
+    lims_storage_create_placement_page,
+    lims_storage_create_transaction_page,
+    lims_storage_inventory_page,
 )
 from tenants.views import tenant_services, tenants
 
@@ -189,6 +195,12 @@ urlpatterns = [
     path('lims/receiving/batch/', lims_receiving_batch_page, name='lims_receiving_batch_page'),
     path('lims/receiving/edc-import/', lims_receiving_edc_import_page, name='lims_receiving_edc_import_page'),
     path('lims/processing/', lims_processing_page, name='lims_processing_page'),
+    path('lims/storage/', lims_storage_inventory_page, name='lims_storage_inventory_page'),
+    path('lims/storage/locations/create/', lims_storage_create_location_page, name='lims_storage_create_location_page'),
+    path('lims/storage/placements/create/', lims_storage_create_placement_page, name='lims_storage_create_placement_page'),
+    path('lims/storage/materials/create/', lims_storage_create_material_page, name='lims_storage_create_material_page'),
+    path('lims/storage/lots/create/', lims_storage_create_lot_page, name='lims_storage_create_lot_page'),
+    path('lims/storage/transactions/create/', lims_storage_create_transaction_page, name='lims_storage_create_transaction_page'),
     path('api/v1/governance/policies', governance_policies, name='governance_policies'),
     path(
         'api/v1/governance/policies/<uuid:policy_id>',

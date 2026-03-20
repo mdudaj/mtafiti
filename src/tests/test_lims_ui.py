@@ -66,6 +66,12 @@ def test_lims_html_pages_render_with_role_aware_actions():
         ("/lims/receiving/batch/", b"Receive batch manifest", b'data-lims-action="receiving-manifest-create"'),
         ("/lims/receiving/edc-import/", b"Retrieve metadata from EDC", b'data-lims-action="receiving-edc-import"'),
         ("/lims/processing/", b"Batch and plate processing", b'data-lims-action="processing-batch-create"'),
+        ("/lims/storage/", b"Storage and inventory administration", b"Choose a storage or inventory workflow"),
+        ("/lims/storage/locations/create/", b"Create storage location", b'data-lims-action="storage-location-create"'),
+        ("/lims/storage/placements/create/", b"Record specimen placement", b'data-lims-action="storage-placement-create"'),
+        ("/lims/storage/materials/create/", b"Create inventory material", b'data-lims-action="inventory-material-create"'),
+        ("/lims/storage/lots/create/", b"Receive inventory lot", b'data-lims-action="inventory-lot-create"'),
+        ("/lims/storage/transactions/create/", b"Record stock transaction", b'data-lims-action="inventory-transaction-create"'),
     ]
 
     for path, title, action_marker in pages:
@@ -303,3 +309,40 @@ def test_receiving_pages_show_qc_storage_and_import_workflows():
     assert b"External ID to import" in edc_page.content
     assert b"Receiving date" in edc_page.content
     assert b"Brought by" in edc_page.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_storage_inventory_pages_show_admin_forms():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-storage")
+
+    launchpad = client.get("/lims/storage/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert launchpad.status_code == 200
+    assert b"Storage and inventory administration" in launchpad.content
+    assert b"Create storage location" in launchpad.content
+    assert b"Record stock transaction" in launchpad.content
+
+    location_page = client.get("/lims/storage/locations/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert location_page.status_code == 200
+    assert b"Temperature zone" in location_page.content
+    assert b"Metadata JSON" in location_page.content
+
+    placement_page = client.get("/lims/storage/placements/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert placement_page.status_code == 200
+    assert b"Immutable storage history" in placement_page.content
+    assert b"Quantity snapshot" in placement_page.content
+
+    material_page = client.get("/lims/storage/materials/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert material_page.status_code == 200
+    assert b"Default unit" in material_page.content
+    assert b"Create inventory material" in material_page.content
+
+    lot_page = client.get("/lims/storage/lots/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert lot_page.status_code == 200
+    assert b"Lot number" in lot_page.content
+    assert b"Initial quantity" in lot_page.content
+
+    transaction_page = client.get("/lims/storage/transactions/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert transaction_page.status_code == 200
+    assert b"Transaction type" in transaction_page.content
+    assert b"Linked biospecimen" in transaction_page.content

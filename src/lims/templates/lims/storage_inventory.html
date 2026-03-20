@@ -1,0 +1,124 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Storage" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Locations" count_label="storage nodes" count_value=payload.cards.locations %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Placements" count_label="history rows" count_value=payload.cards.storage_records %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Materials" count_label="catalog entries" count_value=payload.cards.materials %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Active lots" count_label="inventory batches" count_value=payload.cards.active_lots %}
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Choose a storage or inventory workflow" panel_description="Administration stays split into focused pages so hierarchy, placement, catalog, lot, and ledger actions are not mixed together." %}
+  <div class="cards">
+    {% for item in payload.actions %}
+    {% if item.enabled %}
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">{{ item.title }}</h2>
+          <p class="panel-description">{{ item.description }}</p>
+        </div>
+        <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+      </div>
+      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
+    </article>
+    {% endif %}
+    {% empty %}
+    <article class="card"><p>No storage or inventory admin actions are available for your current role.</p></article>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Storage hierarchy" panel_description="Recent storage nodes with their resolved breadcrumb path." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Location</th><th>Lab</th><th>Level</th><th>Path</th></tr></thead>
+        <tbody>
+          {% for item in payload.locations %}
+          <tr>
+            <td>{{ item.name }}</td>
+            <td>{{ item.lab_id }}</td>
+            <td>{{ item.level }}</td>
+            <td>{% for node in item.path %}{% if not forloop.first %} / {% endif %}{{ node.code }}{% endfor %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No storage locations yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent placements" panel_description="Latest specimen or pool placement events appended to the storage history." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Artifact</th><th>Reason</th><th>Location</th><th>Quantity</th></tr></thead>
+        <tbody>
+          {% for item in payload.storage_records %}
+          <tr>
+            <td>{{ item.biospecimen_id|default:item.biospecimen_pool_id }}</td>
+            <td>{{ item.reason }}</td>
+            <td>{% for node in item.location.path %}{% if not forloop.first %} / {% endif %}{{ node.code }}{% endfor %}</td>
+            <td>{{ item.quantity_snapshot }} {{ item.quantity_unit }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No placement history yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Inventory catalog" panel_description="Current materials available for lot receipt." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Material</th><th>Code</th><th>Category</th><th>Unit</th></tr></thead>
+        <tbody>
+          {% for item in payload.materials %}
+          <tr><td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.category }}</td><td>{{ item.default_unit|default:"-" }}</td></tr>
+          {% empty %}
+          <tr><td colspan="4">No materials yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Recent lots and transactions" panel_description="Newest lot receipts alongside the latest stock-ledger movements." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Lot</th><th>Material</th><th>On hand</th><th>Storage</th></tr></thead>
+        <tbody>
+          {% for item in payload.lots %}
+          <tr><td>{{ item.lot_number }}</td><td>{{ item.material_id }}</td><td>{{ item.on_hand_quantity }} {{ item.unit_of_measure }}</td><td>{{ item.storage_location_id|default:"-" }}</td></tr>
+          {% empty %}
+          <tr><td colspan="4">No lots yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap" style="margin-top: 1rem;">
+      <table>
+        <thead><tr><th>Lot</th><th>Type</th><th>Delta</th><th>Resulting</th></tr></thead>
+        <tbody>
+          {% for item in payload.recent_transactions %}
+          <tr><td>{{ item.lot_id }}</td><td>{{ item.transaction_type }}</td><td>{{ item.quantity_delta }}</td><td>{{ item.resulting_quantity }}</td></tr>
+          {% empty %}
+          <tr><td colspan="4">No inventory transactions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

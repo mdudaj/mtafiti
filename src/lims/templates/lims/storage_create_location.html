@@ -1,0 +1,54 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Create location" %}
+
+{% if payload.capabilities.can_manage_storage %}
+<section class="panel" data-lims-action="storage-location-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Create storage location" panel_description="Register one facility, area, equipment, container, or position node at a time." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Lab</span><select class="select" data-lims-field="storage-location-lab">{% for option in payload.lab_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Parent location</span><select class="select" data-lims-field="storage-location-parent"><option value="">None (top-level facility)</option>{% for option in payload.parent_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Level</span><select class="select" data-lims-field="storage-location-level">{% for option in payload.level_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Temperature zone</span><select class="select" data-lims-field="storage-location-temperature">{% for option in payload.temperature_zone_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Location name</span><input class="input" data-lims-field="storage-location-name" placeholder="Freezer A / Rack 1 / Box 4..." /></label>
+      <label class="field-group"><span class="field-label">Location code</span><input class="input" data-lims-field="storage-location-code" placeholder="Auto-generated when blank" /></label>
+      <label class="field-group"><span class="field-label">Capacity</span><input class="input" type="number" min="1" data-lims-field="storage-location-capacity" placeholder="Optional" /></label>
+      <label class="field-group"><span class="field-label">Active</span><select class="select" data-lims-field="storage-location-active"><option value="true">Yes</option><option value="false">No</option></select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Metadata JSON</span><textarea class="textarea" rows="5" data-lims-field="storage-location-metadata">{}</textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createStorageLocation()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_home_work</span><span>Create storage location</span></button>
+      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createStorageLocation() {
+  let metadata;
+  try {
+    metadata = limsJsonValue("storage-location-metadata", {});
+  } catch (error) {
+    limsFeedback(error.message, true);
+    return;
+  }
+  await limsPortalAction("/api/v1/lims/storage-locations", {
+    lab_id: limsValue("storage-location-lab"),
+    parent_id: limsOptionalValue("storage-location-parent"),
+    name: limsValue("storage-location-name"),
+    code: limsOptionalValue("storage-location-code"),
+    level: limsValue("storage-location-level"),
+    temperature_zone: limsOptionalValue("storage-location-temperature"),
+    capacity: limsOptionalValue("storage-location-capacity"),
+    is_active: limsValue("storage-location-active") === "true",
+    metadata: metadata,
+  }, "Storage location created");
+}
+{% endblock %}

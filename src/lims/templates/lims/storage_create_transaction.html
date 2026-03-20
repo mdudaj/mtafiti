@@ -1,0 +1,65 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Record transaction" %}
+
+{% if payload.capabilities.can_manage_inventory %}
+<section class="panel" data-lims-action="inventory-transaction-create">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Record stock transaction" panel_description="Apply a transaction directly to an inventory lot so the ledger stays explicit and auditable." %}
+  <div class="section-stack">
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Inventory lot</span><select class="select" data-lims-field="inventory-transaction-lot">{% for option in payload.lot_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Transaction type</span><select class="select" data-lims-field="inventory-transaction-type">{% for option in payload.transaction_type_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Quantity delta</span><input class="input" data-lims-field="inventory-transaction-delta" value="0" /></label>
+      <label class="field-group"><span class="field-label">Location</span><select class="select" data-lims-field="inventory-transaction-location"><option value="">None</option>{% for option in payload.location_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group"><span class="field-label">Linked biospecimen</span><select class="select" data-lims-field="inventory-transaction-specimen"><option value="">None</option>{% for option in payload.specimen_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+      <label class="field-group"><span class="field-label">Linked pool</span><select class="select" data-lims-field="inventory-transaction-pool"><option value="">None</option>{% for option in payload.pool_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+    </div>
+    <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="4" data-lims-field="inventory-transaction-notes"></textarea></label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="createInventoryTransaction()"><span class="material-symbols-outlined button-icon" aria-hidden="true">sync_alt</span><span>Record stock transaction</span></button>
+      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent stock-ledger entries" panel_description="Latest inventory movements posted against lots." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Lot</th><th>Type</th><th>Delta</th><th>Resulting quantity</th></tr></thead>
+      <tbody>
+        {% for item in payload.recent_transactions %}
+        <tr><td>{{ item.lot_id }}</td><td>{{ item.transaction_type }}</td><td>{{ item.quantity_delta }}</td><td>{{ item.resulting_quantity }}</td></tr>
+        {% empty %}
+        <tr><td colspan="4">No transactions yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+async function createInventoryTransaction() {
+  const specimenId = limsOptionalValue("inventory-transaction-specimen");
+  const poolId = limsOptionalValue("inventory-transaction-pool");
+  if (specimenId && poolId) {
+    limsFeedback("Choose either linked biospecimen or linked pool, not both", true);
+    return;
+  }
+  const lotId = limsValue("inventory-transaction-lot");
+  await limsPortalAction("/api/v1/lims/inventory-lots/" + lotId + "/transactions", {
+    transaction_type: limsValue("inventory-transaction-type"),
+    quantity_delta: limsValue("inventory-transaction-delta"),
+    location_id: limsOptionalValue("inventory-transaction-location"),
+    biospecimen_id: specimenId,
+    biospecimen_pool_id: poolId,
+    notes: limsValue("inventory-transaction-notes"),
+  }, "Inventory transaction recorded");
+}
+{% endblock %}
