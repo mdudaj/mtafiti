@@ -882,14 +882,6 @@ class FormPackageItem(TimestampedUUIDModel):
                 raise ValidationError({"item_group": "item_group must belong to section"})
         if self.choice_list_id and self.choice_list.version_id != self.version_id:
             raise ValidationError({"choice_list": "choice_list must belong to version"})
-        choice_types = {
-            MetadataFieldDefinition.FieldType.CHOICE,
-            MetadataFieldDefinition.FieldType.MULTI_CHOICE,
-        }
-        if self.field_type in choice_types and not self.choice_list_id:
-            raise ValidationError({"choice_list": "choice_list is required for choice fields"})
-        if self.field_type not in choice_types and self.choice_list_id:
-            raise ValidationError({"choice_list": "choice_list is only valid for choice fields"})
         if not isinstance(self.validation_rules, dict):
             raise ValidationError({"validation_rules": "validation_rules must be an object"})
         if not isinstance(self.config, dict):
