@@ -311,6 +311,9 @@ def test_lims_workflow_runtime_executes_accept_and_reject_paths(monkeypatch):
     assert qc_approved.status_code == 200
     storage_task = next(item for item in qc_approved.json()["tasks"] if item["node_key"] == "storage_logging")
     assert storage_task["status"] == "open"
+    accepted_qc = qc_approved.json()["qc_results"][0]
+    assert accepted_qc["decision"] == "accept"
+    assert accepted_qc["discrepancy_id"] is None
 
     storage_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{run_id}/tasks/{storage_task['id']}/submit",
@@ -376,3 +379,15 @@ def test_lims_workflow_runtime_executes_accept_and_reject_paths(monkeypatch):
     assert rejected_approved.status_code == 200
     assert rejected_approved.json()["status"] == "rejected"
     assert any(item["action"] == "rejected" for item in rejected_approved.json()["material_usages"])
+    rejected_qc_result = rejected_approved.json()["qc_results"][0]
+    assert rejected_qc_result["decision"] == "reject"
+    assert rejected_qc_result["discrepancy_id"] is not None
+    assert rejected_qc_result["notes"] == "damaged sample"
+
+    qc_results_response = client.get(
+        f"/api/v1/lims/operations/{operation_id}/runs/{rejected_run_id}/qc-results",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+    )
+    assert qc_results_response.status_code == 200
+    assert qc_results_response.json()["items"][0]["id"] == rejected_qc_result["id"]
