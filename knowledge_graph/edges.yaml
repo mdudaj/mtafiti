@@ -874,11 +874,31 @@ edges:
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:workflowedgetemplate
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflownodetemplate
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:workflowrun
   -
     relationship: implements
     from: module:core_models
+    to: datamodel:workflowstepbinding
+  -
+    relationship: implements
+    from: module:core_models
     to: datamodel:workflowtask
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflowtemplate
+  -
+    relationship: implements
+    from: module:core_models
+    to: datamodel:workflowtemplateversion
   -
     relationship: implements
     from: module:core_models

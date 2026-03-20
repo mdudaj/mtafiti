@@ -47,6 +47,10 @@ from .models import (
     Street,
     TanzaniaAddressSyncRun,
     Ward,
+    WorkflowEdgeTemplate,
+    WorkflowNodeTemplate,
+    WorkflowStepBinding,
+    WorkflowTemplateVersion,
 )
 
 TANZANIA_POSTCODE_ROOT_URL = "https://www.tanzaniapostcode.com/"
@@ -698,6 +702,13 @@ class MetadataValidationResult:
     normalized_data: dict[str, object]
 
 
+@dataclass
+class WorkflowTemplateValidationResult:
+    valid: bool
+    errors: list[dict[str, str]]
+    compiled_definition: dict[str, object]
+
+
 def _condition_matches(condition: dict[str, object], payload: dict[str, object]) -> bool:
     if not condition:
         return True
@@ -990,6 +1001,147 @@ def resolve_schema_version_for_binding(*, target_type: str, target_key: str) -> 
     if not binding:
         return None
     return binding.schema_version
+
+
+def validate_workflow_template_version(
+    workflow_version: WorkflowTemplateVersion,
+) -> WorkflowTemplateValidationResult:
+    nodes = list(
+        workflow_version.nodes.prefetch_related("step_bindings__schema_version__fields").order_by("position", "node_key")
+    )
+    edges = list(
+        workflow_version.edges.select_related("source_node", "target_node").order_by("priority", "source_node__node_key")
+    )
+    errors: list[dict[str, str]] = []
+
+    if not nodes:
+        errors.append({"field": "nodes", "code": "version_requires_nodes"})
+    if not edges:
+        errors.append({"field": "edges", "code": "version_requires_edges"})
+
+    node_by_id = {node.id: node for node in nodes}
+    start_nodes = [node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.START]
+    end_nodes = [node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.END]
+    if len(start_nodes) != 1:
+        errors.append({"field": "nodes", "code": "requires_exactly_one_start"})
+    if not end_nodes:
+        errors.append({"field": "nodes", "code": "requires_end_node"})
+
+    incoming: dict[str, list[WorkflowEdgeTemplate]] = {str(node.id): [] for node in nodes}
+    outgoing: dict[str, list[WorkflowEdgeTemplate]] = {str(node.id): [] for node in nodes}
+    for edge in edges:
+        source_key = str(edge.source_node_id)
+        target_key = str(edge.target_node_id)
+        if source_key not in outgoing or target_key not in incoming:
+            errors.append({"field": "edges", "code": "edge_references_unknown_node"})
+            continue
+        outgoing[source_key].append(edge)
+        incoming[target_key].append(edge)
+
+    branch_types = {
+        WorkflowNodeTemplate.NodeType.IF,
+        WorkflowNodeTemplate.NodeType.SWITCH,
+        WorkflowNodeTemplate.NodeType.SPLIT,
+        WorkflowNodeTemplate.NodeType.SPLIT_FIRST,
+    }
+    linear_types = {
+        WorkflowNodeTemplate.NodeType.START,
+        WorkflowNodeTemplate.NodeType.START_HANDLE,
+        WorkflowNodeTemplate.NodeType.VIEW,
+        WorkflowNodeTemplate.NodeType.FUNCTION,
+        WorkflowNodeTemplate.NodeType.HANDLE,
+        WorkflowNodeTemplate.NodeType.JOIN,
+    }
+
+    for node in nodes:
+        node_id = str(node.id)
+        inbound = incoming[node_id]
+        outbound = outgoing[node_id]
+        if node.node_type == WorkflowNodeTemplate.NodeType.START:
+            if inbound:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "start_cannot_have_incoming_edges"})
+            if len(outbound) != 1:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "start_requires_one_outgoing_edge"})
+        elif node.node_type == WorkflowNodeTemplate.NodeType.END:
+            if outbound:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "end_cannot_have_outgoing_edges"})
+            if not inbound:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "end_requires_incoming_edge"})
+        else:
+            if not inbound:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "node_requires_incoming_edge"})
+            if node.node_type in branch_types and len(outbound) < 2:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "branch_node_requires_multiple_outgoing_edges"})
+            if node.node_type in linear_types and len(outbound) != 1:
+                errors.append({"field": f"nodes.{node.node_key}", "code": "linear_node_requires_one_outgoing_edge"})
+
+        for binding in node.step_bindings.all():
+            if binding.binding_type == WorkflowStepBinding.BindingType.UI_STEP:
+                if not binding.schema_version.fields.filter(config__ui_step=binding.ui_step).exists():
+                    errors.append({"field": f"bindings.{node.node_key}", "code": "ui_step_not_found"})
+            elif binding.binding_type == WorkflowStepBinding.BindingType.FIELD_SET:
+                field_keys = set(
+                    binding.schema_version.fields.filter(field_key__in=binding.field_keys).values_list("field_key", flat=True)
+                )
+                if field_keys != set(binding.field_keys):
+                    errors.append({"field": f"bindings.{node.node_key}", "code": "field_keys_not_found"})
+
+    if start_nodes:
+        visited: set[str] = set()
+        pending = [str(start_nodes[0].id)]
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            pending.extend(str(edge.target_node_id) for edge in outgoing[current])
+        unreachable = [node.node_key for node in nodes if str(node.id) not in visited]
+        if unreachable:
+            errors.append({"field": "nodes", "code": "unreachable_nodes", "detail": ",".join(sorted(unreachable))})
+
+    compiled_definition = {
+        "template_id": str(workflow_version.template_id),
+        "workflow_version_id": str(workflow_version.id),
+        "version_number": workflow_version.version_number,
+        "nodes": [
+            {
+                "id": str(node.id),
+                "node_key": node.node_key,
+                "node_type": node.node_type,
+                "title": node.title,
+                "summary": node.summary,
+                "position": node.position,
+                "assignment_role": node.assignment_role,
+                "permission_key": node.permission_key,
+                "requires_approval": node.requires_approval,
+                "approval_role": node.approval_role,
+                "config": dict(node.config or {}),
+                "bindings": [
+                    {
+                        "id": str(binding.id),
+                        "schema_version_id": str(binding.schema_version_id),
+                        "binding_type": binding.binding_type,
+                        "ui_step": binding.ui_step,
+                        "field_keys": list(binding.field_keys or []),
+                        "is_required": binding.is_required,
+                    }
+                    for binding in node.step_bindings.all()
+                ],
+            }
+            for node in nodes
+        ],
+        "edges": [
+            {
+                "id": str(edge.id),
+                "source_node_key": edge.source_node.node_key,
+                "target_node_key": edge.target_node.node_key,
+                "priority": edge.priority,
+                "condition": dict(edge.condition or {}),
+            }
+            for edge in edges
+        ],
+    }
+    return WorkflowTemplateValidationResult(valid=not errors, errors=errors, compiled_definition=compiled_definition)
 
 
 ALLOWED_BIOSPECIMEN_TRANSITIONS = {

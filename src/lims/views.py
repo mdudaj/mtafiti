@@ -42,6 +42,11 @@ from .models import (
     Study,
     TanzaniaAddressSyncRun,
     Ward,
+    WorkflowEdgeTemplate,
+    WorkflowNodeTemplate,
+    WorkflowStepBinding,
+    WorkflowTemplate,
+    WorkflowTemplateVersion,
 )
 from .services import (
     accessioning_report,
@@ -67,6 +72,7 @@ from .services import (
     transition_biospecimen,
     transition_pool,
     validate_metadata_payload,
+    validate_workflow_template_version,
 )
 from .tasks import sync_tanzania_address_run
 
@@ -1227,6 +1233,97 @@ def _schema_to_dict(schema: MetadataSchema) -> dict[str, object]:
     }
 
 
+def _workflow_step_binding_to_dict(binding: WorkflowStepBinding) -> dict[str, object]:
+    return {
+        "id": str(binding.id),
+        "node_id": str(binding.node_id),
+        "schema_version_id": str(binding.schema_version_id),
+        "schema_id": str(binding.schema_version.schema_id),
+        "schema_code": binding.schema_version.schema.code,
+        "version_number": binding.schema_version.version_number,
+        "binding_type": binding.binding_type,
+        "ui_step": binding.ui_step,
+        "field_keys": list(binding.field_keys or []),
+        "is_required": binding.is_required,
+    }
+
+
+def _workflow_node_to_dict(node: WorkflowNodeTemplate) -> dict[str, object]:
+    return {
+        "id": str(node.id),
+        "node_key": node.node_key,
+        "node_type": node.node_type,
+        "title": node.title,
+        "summary": node.summary,
+        "position": node.position,
+        "assignment_role": node.assignment_role,
+        "permission_key": node.permission_key,
+        "requires_approval": node.requires_approval,
+        "approval_role": node.approval_role,
+        "config": dict(node.config or {}),
+        "step_bindings": [
+            _workflow_step_binding_to_dict(binding)
+            for binding in node.step_bindings.select_related("schema_version", "schema_version__schema").order_by(
+                "schema_version__schema__name"
+            )
+        ],
+    }
+
+
+def _workflow_edge_to_dict(edge: WorkflowEdgeTemplate) -> dict[str, object]:
+    return {
+        "id": str(edge.id),
+        "workflow_version_id": str(edge.workflow_version_id),
+        "source_node_id": str(edge.source_node_id),
+        "source_node_key": edge.source_node.node_key,
+        "target_node_id": str(edge.target_node_id),
+        "target_node_key": edge.target_node.node_key,
+        "priority": edge.priority,
+        "condition": dict(edge.condition or {}),
+    }
+
+
+def _workflow_template_version_to_dict(version: WorkflowTemplateVersion) -> dict[str, object]:
+    return {
+        "id": str(version.id),
+        "template_id": str(version.template_id),
+        "template_name": version.template.name,
+        "template_code": version.template.code,
+        "version_number": version.version_number,
+        "status": version.status,
+        "is_editable": version.status == WorkflowTemplateVersion.Status.DRAFT,
+        "change_summary": version.change_summary,
+        "compiled_definition": dict(version.compiled_definition or {}),
+        "nodes": [
+            _workflow_node_to_dict(node)
+            for node in version.nodes.prefetch_related("step_bindings__schema_version__schema").order_by("position", "node_key")
+        ],
+        "edges": [
+            _workflow_edge_to_dict(edge)
+            for edge in version.edges.select_related("source_node", "target_node").order_by(
+                "priority", "source_node__node_key", "target_node__node_key"
+            )
+        ],
+    }
+
+
+def _workflow_template_to_dict(template: WorkflowTemplate) -> dict[str, object]:
+    versions = [_workflow_template_version_to_dict(item) for item in template.versions.order_by("-version_number")]
+    draft_version = next((item for item in versions if item["status"] == WorkflowTemplateVersion.Status.DRAFT), None)
+    published_version = next((item for item in versions if item["status"] == WorkflowTemplateVersion.Status.PUBLISHED), None)
+    return {
+        "id": str(template.id),
+        "name": template.name,
+        "code": template.code,
+        "description": template.description,
+        "purpose": template.purpose,
+        "is_active": template.is_active,
+        "draft_version_id": draft_version["id"] if draft_version else None,
+        "published_version_id": published_version["id"] if published_version else None,
+        "versions": versions,
+    }
+
+
 def _schema_binding_to_dict(binding: MetadataSchemaBinding) -> dict[str, object]:
     return {
         "id": str(binding.id),
@@ -1598,6 +1695,218 @@ def _build_schema_from_payload(schema: MetadataSchema, payload: dict[str, object
     schema.purpose = str(payload.get("purpose") or "").strip()
     schema.is_active = bool(payload.get("is_active", True))
     return None
+
+
+def _build_workflow_template_from_payload(template: WorkflowTemplate, payload: dict[str, object]):
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+    code = str(payload.get("code") or "").strip()
+    if not code:
+        return JsonResponse({"error": "code is required"}, status=400)
+    template.name = name
+    template.code = code
+    template.description = str(payload.get("description") or "").strip()
+    template.purpose = str(payload.get("purpose") or "").strip()
+    template.is_active = bool(payload.get("is_active", True))
+    return None
+
+
+def _build_workflow_node_from_payload(
+    node: WorkflowNodeTemplate,
+    payload: dict[str, object],
+    *,
+    index: int,
+) -> JsonResponse | None:
+    node_key = str(payload.get("node_key") or slugify(str(payload.get("title") or "")) or "").strip()
+    if not node_key:
+        return JsonResponse({"error": "node_key is required"}, status=400)
+    node_type = str(payload.get("node_type") or "").strip()
+    if node_type not in WorkflowNodeTemplate.NodeType.values:
+        return JsonResponse({"error": "invalid_node_type"}, status=400)
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        return JsonResponse({"error": "title is required"}, status=400)
+    config = payload.get("config") or {}
+    if not isinstance(config, dict):
+        return JsonResponse({"error": "config must be an object"}, status=400)
+    node.node_key = node_key
+    node.node_type = node_type
+    node.title = title
+    node.summary = str(payload.get("summary") or "").strip()
+    node.position = int(payload.get("position") or index)
+    node.assignment_role = str(payload.get("assignment_role") or "").strip()
+    node.permission_key = str(payload.get("permission_key") or "").strip()
+    node.requires_approval = bool(payload.get("requires_approval", False))
+    node.approval_role = str(payload.get("approval_role") or "").strip()
+    node.config = config
+    return None
+
+
+def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: object) -> JsonResponse | None:
+    if bindings_payload is None:
+        WorkflowStepBinding.objects.filter(node=node).delete()
+        return None
+    if not isinstance(bindings_payload, list):
+        return JsonResponse({"error": "step_bindings must be a list"}, status=400)
+    retained_ids: list[str] = []
+    for binding_payload in bindings_payload:
+        if not isinstance(binding_payload, dict):
+            return JsonResponse({"error": "step_binding must be an object"}, status=400)
+        binding_id = binding_payload.get("id")
+        if binding_id:
+            try:
+                binding = WorkflowStepBinding.objects.get(id=binding_id, node=node)
+            except (ValidationError, WorkflowStepBinding.DoesNotExist):
+                return JsonResponse({"error": "workflow_step_binding_not_found"}, status=404)
+        else:
+            binding = WorkflowStepBinding(node=node)
+        schema_version, error = _resolve_optional_fk(
+            MetadataSchemaVersion,
+            binding_payload.get("schema_version_id"),
+            "schema_version_not_found",
+        )
+        if error:
+            return error
+        if schema_version is None:
+            return JsonResponse({"error": "schema_version_id is required"}, status=400)
+        binding_type = str(binding_payload.get("binding_type") or WorkflowStepBinding.BindingType.FULL_SCHEMA).strip()
+        if binding_type not in WorkflowStepBinding.BindingType.values:
+            return JsonResponse({"error": "invalid_binding_type"}, status=400)
+        field_keys = binding_payload.get("field_keys") or []
+        binding.schema_version = schema_version
+        binding.binding_type = binding_type
+        binding.ui_step = str(binding_payload.get("ui_step") or "").strip()
+        binding.field_keys = field_keys
+        binding.is_required = bool(binding_payload.get("is_required", True))
+        error = _save_model(binding)
+        if error:
+            return error
+        retained_ids.append(str(binding.id))
+    WorkflowStepBinding.objects.filter(node=node).exclude(id__in=retained_ids).delete()
+    return None
+
+
+def _sync_workflow_version_definition(
+    version: WorkflowTemplateVersion,
+    *,
+    nodes_payload: object,
+    edges_payload: object,
+) -> JsonResponse | None:
+    if not isinstance(nodes_payload, list):
+        return JsonResponse({"error": "nodes must be a list"}, status=400)
+    if not isinstance(edges_payload, list):
+        return JsonResponse({"error": "edges must be a list"}, status=400)
+
+    retained_node_ids: list[str] = []
+    node_by_key: dict[str, WorkflowNodeTemplate] = {}
+    for index, node_payload in enumerate(nodes_payload, start=1):
+        if not isinstance(node_payload, dict):
+            return JsonResponse({"error": "node must be an object"}, status=400)
+        node_id = node_payload.get("id")
+        if node_id:
+            try:
+                node = WorkflowNodeTemplate.objects.get(id=node_id, workflow_version=version)
+            except (ValidationError, WorkflowNodeTemplate.DoesNotExist):
+                return JsonResponse({"error": "workflow_node_not_found"}, status=404)
+        else:
+            node = WorkflowNodeTemplate(workflow_version=version)
+        error = _build_workflow_node_from_payload(node, node_payload, index=index)
+        if error:
+            return error
+        error = _save_model(node)
+        if error:
+            return error
+        error = _sync_workflow_step_bindings(node, node_payload.get("step_bindings"))
+        if error:
+            return error
+        retained_node_ids.append(str(node.id))
+        node_by_key[node.node_key] = node
+
+    WorkflowNodeTemplate.objects.filter(workflow_version=version).exclude(id__in=retained_node_ids).delete()
+
+    retained_edge_ids: list[str] = []
+    for index, edge_payload in enumerate(edges_payload, start=1):
+        if not isinstance(edge_payload, dict):
+            return JsonResponse({"error": "edge must be an object"}, status=400)
+        edge_id = edge_payload.get("id")
+        if edge_id:
+            try:
+                edge = WorkflowEdgeTemplate.objects.get(id=edge_id, workflow_version=version)
+            except (ValidationError, WorkflowEdgeTemplate.DoesNotExist):
+                return JsonResponse({"error": "workflow_edge_not_found"}, status=404)
+        else:
+            edge = WorkflowEdgeTemplate(workflow_version=version)
+        source_node = None
+        target_node = None
+        if edge_payload.get("source_node_id"):
+            source_node, error = _resolve_optional_fk(WorkflowNodeTemplate, edge_payload.get("source_node_id"), "source_node_not_found")
+            if error:
+                return error
+        else:
+            source_node = node_by_key.get(str(edge_payload.get("source_node_key") or "").strip())
+        if edge_payload.get("target_node_id"):
+            target_node, error = _resolve_optional_fk(WorkflowNodeTemplate, edge_payload.get("target_node_id"), "target_node_not_found")
+            if error:
+                return error
+        else:
+            target_node = node_by_key.get(str(edge_payload.get("target_node_key") or "").strip())
+        if source_node is None or source_node.workflow_version_id != version.id:
+            return JsonResponse({"error": "source_node_not_found"}, status=404)
+        if target_node is None or target_node.workflow_version_id != version.id:
+            return JsonResponse({"error": "target_node_not_found"}, status=404)
+        condition = edge_payload.get("condition") or {}
+        if not isinstance(condition, dict):
+            return JsonResponse({"error": "condition must be an object"}, status=400)
+        edge.source_node = source_node
+        edge.target_node = target_node
+        edge.priority = int(edge_payload.get("priority") or index)
+        edge.condition = condition
+        error = _save_model(edge)
+        if error:
+            return error
+        retained_edge_ids.append(str(edge.id))
+    WorkflowEdgeTemplate.objects.filter(workflow_version=version).exclude(id__in=retained_edge_ids).delete()
+    return None
+
+
+def _clone_workflow_version_definition(
+    source_version: WorkflowTemplateVersion,
+    target_version: WorkflowTemplateVersion,
+) -> None:
+    node_map: dict[str, WorkflowNodeTemplate] = {}
+    for node in source_version.nodes.prefetch_related("step_bindings").all().order_by("position", "node_key"):
+        cloned_node = WorkflowNodeTemplate.objects.create(
+            workflow_version=target_version,
+            node_key=node.node_key,
+            node_type=node.node_type,
+            title=node.title,
+            summary=node.summary,
+            position=node.position,
+            assignment_role=node.assignment_role,
+            permission_key=node.permission_key,
+            requires_approval=node.requires_approval,
+            approval_role=node.approval_role,
+            config=dict(node.config or {}),
+        )
+        node_map[str(node.id)] = cloned_node
+        for binding in node.step_bindings.all():
+            WorkflowStepBinding.objects.create(
+                node=cloned_node,
+                schema_version=binding.schema_version,
+                binding_type=binding.binding_type,
+                ui_step=binding.ui_step,
+                field_keys=list(binding.field_keys or []),
+                is_required=binding.is_required,
+            )
+    for edge in source_version.edges.select_related("source_node", "target_node").all().order_by("priority"):
+        WorkflowEdgeTemplate.objects.create(
+            workflow_version=target_version,
+            source_node=node_map[str(edge.source_node_id)],
+            target_node=node_map[str(edge.target_node_id)],
+            priority=edge.priority,
+            condition=dict(edge.condition or {}),
+        )
 
 
 def _apply_field_definition_defaults(schema_field: MetadataSchemaField, field_definition: MetadataFieldDefinition) -> None:
@@ -2555,6 +2864,242 @@ def lims_metadata_field_definition_detail(request, definition_id: str):
             return error
         return JsonResponse(_field_definition_to_dict(field))
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_workflow_templates(request):
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.workflow_config.view")
+        if forbidden:
+            return forbidden
+        items = [
+            _workflow_template_to_dict(item)
+            for item in WorkflowTemplate.objects.prefetch_related(
+                "versions__nodes__step_bindings__schema_version__schema",
+                "versions__edges__source_node",
+                "versions__edges__target_node",
+            ).order_by("name")
+        ]
+        return JsonResponse({"items": items})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.workflow_config.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        template = WorkflowTemplate()
+        error = _build_workflow_template_from_payload(template, payload)
+        if error:
+            return error
+        error = _save_model(template)
+        if error:
+            return error
+        initial_version = WorkflowTemplateVersion(
+            template=template,
+            version_number=1,
+            status=WorkflowTemplateVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+        )
+        error = _save_model(initial_version)
+        if error:
+            template.delete()
+            return error
+        nodes_payload = payload.get("nodes")
+        edges_payload = payload.get("edges")
+        if nodes_payload is not None or edges_payload is not None:
+            error = _sync_workflow_version_definition(
+                initial_version,
+                nodes_payload=nodes_payload or [],
+                edges_payload=edges_payload or [],
+            )
+            if error:
+                initial_version.delete()
+                template.delete()
+                return error
+        template.refresh_from_db()
+        return JsonResponse(_workflow_template_to_dict(template), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_workflow_template_detail(request, template_id: str):
+    try:
+        template = WorkflowTemplate.objects.prefetch_related(
+            "versions__nodes__step_bindings__schema_version__schema",
+            "versions__edges__source_node",
+            "versions__edges__target_node",
+        ).get(id=template_id)
+    except (ValidationError, WorkflowTemplate.DoesNotExist):
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.workflow_config.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_workflow_template_to_dict(template))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.workflow_config.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        error = _build_workflow_template_from_payload(template, payload)
+        if error:
+            return error
+        error = _save_model(template)
+        if error:
+            return error
+        return JsonResponse(_workflow_template_to_dict(template))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_workflow_template_versions(request, template_id: str):
+    try:
+        template = WorkflowTemplate.objects.get(id=template_id)
+    except (ValidationError, WorkflowTemplate.DoesNotExist):
+        return JsonResponse({"error": "template_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.workflow_config.view")
+        if forbidden:
+            return forbidden
+        queryset = template.versions.prefetch_related(
+            "nodes__step_bindings__schema_version__schema",
+            "edges__source_node",
+            "edges__target_node",
+        ).order_by("-version_number")
+        status_filter = str(request.GET.get("status") or "").strip()
+        if status_filter:
+            if status_filter not in WorkflowTemplateVersion.Status.values:
+                return JsonResponse({"error": "invalid_status"}, status=400)
+            queryset = queryset.filter(status=status_filter)
+        return JsonResponse({"items": [_workflow_template_version_to_dict(item) for item in queryset]})
+    if request.method == "POST":
+        forbidden = require_lims_permission(request, "lims.workflow_config.manage")
+        if forbidden:
+            return forbidden
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if template.versions.filter(status=WorkflowTemplateVersion.Status.DRAFT).exists():
+            return JsonResponse({"error": "draft_version_already_exists"}, status=409)
+        source_version = None
+        if payload.get("source_version_id"):
+            try:
+                source_version = WorkflowTemplateVersion.objects.prefetch_related(
+                    "nodes__step_bindings",
+                    "edges__source_node",
+                    "edges__target_node",
+                ).get(id=payload["source_version_id"], template=template)
+            except (ValidationError, WorkflowTemplateVersion.DoesNotExist):
+                return JsonResponse({"error": "source_version_not_found"}, status=404)
+        version_number = payload.get("version_number")
+        if version_number is None:
+            latest_version = template.versions.order_by("-version_number").first()
+            version_number = (latest_version.version_number if latest_version else 0) + 1
+        try:
+            version_number = int(version_number)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "invalid_version_number"}, status=400)
+        version = WorkflowTemplateVersion(
+            template=template,
+            version_number=version_number,
+            status=WorkflowTemplateVersion.Status.DRAFT,
+            change_summary=str(payload.get("change_summary") or "").strip(),
+        )
+        error = _save_model(version)
+        if error:
+            return error
+        nodes_payload = payload.get("nodes")
+        edges_payload = payload.get("edges")
+        if nodes_payload is not None or edges_payload is not None:
+            error = _sync_workflow_version_definition(
+                version,
+                nodes_payload=nodes_payload or [],
+                edges_payload=edges_payload or [],
+            )
+            if error:
+                version.delete()
+                return error
+        elif source_version is not None:
+            _clone_workflow_version_definition(source_version, version)
+        version.refresh_from_db()
+        return JsonResponse(_workflow_template_version_to_dict(version), status=201)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_workflow_template_version_detail(request, template_id: str, version_id: str):
+    try:
+        version = WorkflowTemplateVersion.objects.prefetch_related(
+            "nodes__step_bindings__schema_version__schema",
+            "edges__source_node",
+            "edges__target_node",
+        ).get(id=version_id, template_id=template_id)
+    except (ValidationError, WorkflowTemplateVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if request.method == "GET":
+        forbidden = require_lims_permission(request, "lims.workflow_config.view")
+        if forbidden:
+            return forbidden
+        return JsonResponse(_workflow_template_version_to_dict(version))
+    if request.method == "PUT":
+        forbidden = require_lims_permission(request, "lims.workflow_config.manage")
+        if forbidden:
+            return forbidden
+        if version.status != WorkflowTemplateVersion.Status.DRAFT:
+            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+        payload = _parse_json_body(request)
+        if payload is None:
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if "change_summary" in payload:
+            version.change_summary = str(payload.get("change_summary") or "").strip()
+            error = _save_model(version)
+            if error:
+                return error
+        if "nodes" in payload or "edges" in payload:
+            error = _sync_workflow_version_definition(
+                version,
+                nodes_payload=payload.get("nodes", [_workflow_node_to_dict(node) for node in version.nodes.all()]),
+                edges_payload=payload.get("edges", [_workflow_edge_to_dict(edge) for edge in version.edges.all()]),
+            )
+            if error:
+                return error
+        version.refresh_from_db()
+        return JsonResponse(_workflow_template_version_to_dict(version))
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_workflow_template_version_publish(request, template_id: str, version_id: str):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.workflow_config.manage")
+    if forbidden:
+        return forbidden
+    try:
+        version = WorkflowTemplateVersion.objects.prefetch_related(
+            "nodes__step_bindings__schema_version__fields",
+            "edges__source_node",
+            "edges__target_node",
+        ).get(id=version_id, template_id=template_id)
+    except (ValidationError, WorkflowTemplateVersion.DoesNotExist):
+        return JsonResponse({"error": "version_not_found"}, status=404)
+    if version.status != WorkflowTemplateVersion.Status.DRAFT:
+        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+    result = validate_workflow_template_version(version)
+    if not result.valid:
+        return JsonResponse({"error": "workflow_validation_failed", "details": result.errors}, status=400)
+    WorkflowTemplateVersion.objects.filter(
+        template_id=template_id,
+        status=WorkflowTemplateVersion.Status.PUBLISHED,
+    ).exclude(id=version.id).update(status=WorkflowTemplateVersion.Status.DEPRECATED)
+    version.status = WorkflowTemplateVersion.Status.PUBLISHED
+    version.compiled_definition = result.compiled_definition
+    version.save(update_fields=["status", "compiled_definition", "updated_at"])
+    version.refresh_from_db()
+    return JsonResponse(_workflow_template_version_to_dict(version))
 
 
 @csrf_exempt
