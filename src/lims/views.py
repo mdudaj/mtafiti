@@ -40,6 +40,7 @@ from .models import (
     PlateLayoutTemplate,
     Postcode,
     ProcessingBatch,
+    QCResult,
     ReceivingDiscrepancy,
     ReceivingEvent,
     Region,
@@ -1362,6 +1363,21 @@ def _approval_record_to_dict(record: ApprovalRecord) -> dict[str, object]:
     }
 
 
+def _qc_result_to_dict(record: QCResult) -> dict[str, object]:
+    return {
+        "id": str(record.id),
+        "operation_run_id": str(record.operation_run_id),
+        "task_run_id": str(record.task_run_id),
+        "submission_record_id": str(record.submission_record_id) if record.submission_record_id else None,
+        "discrepancy_id": str(record.discrepancy_id) if record.discrepancy_id else None,
+        "decision": record.decision,
+        "notes": record.notes,
+        "rejection_code": record.rejection_code,
+        "recorded_by": record.recorded_by,
+        "reviewed_at": record.reviewed_at.isoformat() if record.reviewed_at else None,
+    }
+
+
 def _material_usage_record_to_dict(record: MaterialUsageRecord) -> dict[str, object]:
     return {
         "id": str(record.id),
@@ -1434,6 +1450,7 @@ def _operation_run_to_dict(run: OperationRun) -> dict[str, object]:
             )
         ],
         "approvals": [_approval_record_to_dict(item) for item in run.approvals.order_by("approved_at", "created_at")],
+        "qc_results": [_qc_result_to_dict(item) for item in run.qc_results.order_by("-reviewed_at", "-created_at")],
         "material_usages": [
             _material_usage_record_to_dict(item) for item in run.material_usages.order_by("created_at")
         ],
@@ -2162,6 +2179,7 @@ def _operation_run_queryset():
         "tasks__submissions",
         "tasks__approvals",
         "approvals",
+        "qc_results",
         "material_usages",
     )
 
@@ -3408,6 +3426,26 @@ def lims_operation_run_detail(request, operation_id: str, run_id: str):
             return forbidden
         return JsonResponse(_operation_run_to_dict(run))
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+@csrf_exempt
+def lims_operation_run_qc_results(request, operation_id: str, run_id: str):
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.operation_run.view")
+    if forbidden:
+        return forbidden
+    try:
+        run = OperationRun.objects.get(id=run_id, operation_version__definition_id=operation_id)
+    except (ValidationError, OperationRun.DoesNotExist):
+        return JsonResponse({"error": "run_not_found"}, status=404)
+    items = [
+        _qc_result_to_dict(item)
+        for item in QCResult.objects.select_related("submission_record", "discrepancy").filter(
+            operation_run=run
+        ).order_by("-reviewed_at", "-created_at")
+    ]
+    return JsonResponse({"items": items})
 
 
 @csrf_exempt

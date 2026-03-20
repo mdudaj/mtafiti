@@ -1098,6 +1098,63 @@ class SubmissionRecord(TimestampedUUIDModel):
         return f"{self.task_run_id}:{self.submission_index}"
 
 
+class QCResult(TimestampedUUIDModel):
+    class Decision(models.TextChoices):
+        ACCEPT = "accept"
+        REJECT = "reject"
+
+    operation_run = models.ForeignKey(
+        OperationRun,
+        on_delete=models.CASCADE,
+        related_name="qc_results",
+    )
+    task_run = models.ForeignKey(
+        TaskRun,
+        on_delete=models.CASCADE,
+        related_name="qc_results",
+    )
+    submission_record = models.ForeignKey(
+        SubmissionRecord,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="qc_results",
+    )
+    discrepancy = models.ForeignKey(
+        "ReceivingDiscrepancy",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="qc_results",
+    )
+    decision = models.CharField(max_length=16, choices=Decision.choices)
+    notes = models.TextField(blank=True, default="")
+    rejection_code = models.CharField(max_length=32, blank=True, default="")
+    recorded_by = models.CharField(max_length=200, blank=True, default="")
+    reviewed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-reviewed_at", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task_run"],
+                name="uniq_lims_qc_result_task_run",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["decision", "-reviewed_at"], name="lims_qc_result_decision_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.task_run_id and self.task_run.operation_run_id != self.operation_run_id:
+            raise ValidationError({"task_run": "task_run must belong to operation_run"})
+        if self.submission_record_id and self.submission_record.task_run_id != self.task_run_id:
+            raise ValidationError({"submission_record": "submission_record must belong to task_run"})
+        if self.decision != self.Decision.REJECT and self.rejection_code:
+            raise ValidationError({"rejection_code": "rejection_code is only valid for rejected QC results"})
+
+
 class ApprovalRecord(TimestampedUUIDModel):
     class Outcome(models.TextChoices):
         APPROVED = "approved"

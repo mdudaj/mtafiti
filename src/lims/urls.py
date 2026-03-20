@@ -34,6 +34,7 @@ from .views import (
     lims_metadata_vocabularies,
     lims_operation_detail,
     lims_operation_run_detail,
+    lims_operation_run_qc_results,
     lims_operation_runs,
     lims_operation_task_approve,
     lims_operation_task_submit,
@@ -192,6 +193,11 @@ urlpatterns = [
         "operations/<uuid:operation_id>/runs/<uuid:run_id>",
         lims_operation_run_detail,
         name="operation_run_detail",
+    ),
+    path(
+        "operations/<uuid:operation_id>/runs/<uuid:run_id>/qc-results",
+        lims_operation_run_qc_results,
+        name="operation_run_qc_results",
     ),
     path(
         "operations/<uuid:operation_id>/runs/<uuid:run_id>/tasks/<uuid:task_id>/submit",

@@ -44,6 +44,7 @@ from .models import (
     MetadataVocabularyDomain,
     MetadataVocabularyItem,
     SubmissionRecord,
+    QCResult,
     TaskRun,
     PlateLayoutTemplate,
     Postcode,
@@ -1252,6 +1253,69 @@ def _advance_task_run(task_run: TaskRun, payload: dict[str, object]) -> list[Tas
     return created_tasks
 
 
+def _record_qc_result(
+    task_run: TaskRun,
+    *,
+    payload: dict[str, object],
+    submission: SubmissionRecord | None,
+    recorded_by: str,
+) -> QCResult | None:
+    if task_run.node_template.node_key != "qc_decision":
+        return None
+    decision = str(payload.get("qc_decision") or "").strip().lower()
+    if decision not in QCResult.Decision.values:
+        return None
+    existing = QCResult.objects.filter(task_run=task_run).select_related("discrepancy").first()
+    discrepancy = None
+    rejection_code = ""
+    if decision == QCResult.Decision.REJECT:
+        rejection_code = str(payload.get("rejection_code") or ReceivingDiscrepancy.Code.OTHER).strip()
+        if rejection_code not in ReceivingDiscrepancy.Code.values:
+            rejection_code = ReceivingDiscrepancy.Code.OTHER
+        discrepancy = existing.discrepancy if existing else None
+        if discrepancy is None:
+            discrepancy = create_receiving_discrepancy(
+                code=rejection_code,
+                recorded_by=recorded_by,
+                manifest=task_run.operation_run.manifest,
+                manifest_item=task_run.operation_run.manifest_item,
+                biospecimen=task_run.operation_run.biospecimen,
+                notes=str(payload.get("reason") or payload.get("notes") or "").strip(),
+                expected_data={},
+                actual_data=dict(payload or {}),
+            )
+    qc_result, _ = QCResult.objects.update_or_create(
+        task_run=task_run,
+        defaults={
+            "operation_run": task_run.operation_run,
+            "submission_record": submission,
+            "discrepancy": discrepancy,
+            "decision": decision,
+            "notes": str(payload.get("notes") or payload.get("reason") or "").strip(),
+            "rejection_code": rejection_code,
+            "recorded_by": recorded_by,
+            "reviewed_at": timezone.now(),
+        },
+    )
+    MaterialUsageRecord.objects.update_or_create(
+        operation_run=task_run.operation_run,
+        task_run=task_run,
+        action="rejected" if decision == QCResult.Decision.REJECT else "accepted",
+        defaults={
+            "biospecimen": task_run.operation_run.biospecimen,
+            "manifest": task_run.operation_run.manifest,
+            "manifest_item": task_run.operation_run.manifest_item,
+            "discrepancy": discrepancy,
+            "details": {
+                "decision": decision,
+                "reason": payload.get("reason") or payload.get("notes") or "",
+                "rejection_code": rejection_code,
+            },
+        },
+    )
+    return qc_result
+
+
 @transaction.atomic
 def start_operation_run(
     operation_version: OperationVersion,
@@ -1345,6 +1409,12 @@ def submit_task_run(
     task_run.status = TaskRun.Status.COMPLETED
     task_run.completed_at = timezone.now()
     task_run.save(update_fields=["status", "output_data", "outcome", "completed_at", "updated_at"])
+    _record_qc_result(
+        task_run,
+        payload=dict(payload or {}),
+        submission=submission,
+        recorded_by=submitted_by,
+    )
     created_tasks = _advance_task_run(task_run, dict(payload or {}))
     if "storage_reference" in payload or "storage_slot" in payload:
         MaterialUsageRecord.objects.create(
@@ -1355,16 +1425,6 @@ def submit_task_run(
             manifest_item=task_run.operation_run.manifest_item,
             action="stored",
             details={"storage_reference": payload.get("storage_reference") or payload.get("storage_slot") or ""},
-        )
-    if str(payload.get("qc_decision") or "").strip().lower() == "reject":
-        MaterialUsageRecord.objects.create(
-            operation_run=task_run.operation_run,
-            task_run=task_run,
-            biospecimen=task_run.operation_run.biospecimen,
-            manifest=task_run.operation_run.manifest,
-            manifest_item=task_run.operation_run.manifest_item,
-            action="rejected",
-            details={"reason": payload.get("reason") or payload.get("notes") or ""},
         )
     return OperationTaskTransitionResult(
         task_run=task_run,
@@ -1409,16 +1469,12 @@ def approve_task_run(
     task_run.completed_at = timezone.now()
     task_run.save(update_fields=["status", "completed_at", "updated_at"])
     payload = dict(latest_submission.payload if latest_submission else {})
-    if str(payload.get("qc_decision") or "").strip().lower() == "reject":
-        MaterialUsageRecord.objects.create(
-            operation_run=task_run.operation_run,
-            task_run=task_run,
-            biospecimen=task_run.operation_run.biospecimen,
-            manifest=task_run.operation_run.manifest,
-            manifest_item=task_run.operation_run.manifest_item,
-            action="rejected",
-            details={"reason": payload.get("reason") or payload.get("notes") or ""},
-        )
+    _record_qc_result(
+        task_run,
+        payload=payload,
+        submission=latest_submission,
+        recorded_by=approved_by,
+    )
     created_tasks = _advance_task_run(task_run, payload)
     return OperationTaskTransitionResult(
         task_run=task_run,
