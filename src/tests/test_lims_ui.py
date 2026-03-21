@@ -50,6 +50,7 @@ def test_lims_html_pages_render_with_role_aware_actions():
     pages = [
         ("/lims/", b"Laboratory operations workspace", None),
         ("/lims/reference/", b"Reference and geography", b"Choose a reference workflow"),
+        ("/lims/reference/operations/sample-accession/", b"Sample accession reference bundle", b'data-lims-action="reference-sample-accession-provision"'),
         ("/lims/reference/labs/create/", b"Create lab", b'data-lims-action="reference-lab-create"'),
         ("/lims/reference/studies/create/", b"Create study", b'data-lims-action="reference-study-create"'),
         ("/lims/reference/sites/create/", b"Create site", b'data-lims-action="reference-site-create"'),
@@ -251,6 +252,30 @@ def test_reference_page_shows_live_sync_progress_and_active_run_marker():
     assert b"Progress" in response.content
     assert b"Active run" in response.content
     assert b"lims-badge lims-badge--active" in response.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_reference_sample_accession_page_shows_bundle_status_after_provision():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-reference-sample-accession")
+
+    initial = client.get("/lims/reference/operations/sample-accession/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert initial.status_code == 200
+    assert b"Not provisioned" in initial.content
+    assert b"Governed runs" in initial.content
+
+    provisioned = client.post(
+        "/api/v1/lims/reference/operations/sample-accession/provision",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    assert provisioned.status_code == 200
+
+    page = client.get("/lims/reference/operations/sample-accession/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    assert page.status_code == 200
+    assert b"Published v1" in page.content
+    assert b"sample-accession-package" in page.content
+    assert b"single, batch, edc_import" in page.content
 
 
 @pytest.mark.django_db(transaction=True)

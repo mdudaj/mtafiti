@@ -1,0 +1,173 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Sample accession" %}
+{{ payload.reference_bundle|json_script:"lims-sample-accession-bundle" }}
+{{ payload.recent_runs|json_script:"lims-sample-accession-runs" }}
+
+{% if payload.capabilities.can_manage_operations %}
+<section class="panel" data-lims-action="reference-sample-accession-provision">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Provision reference bundle" panel_description="Create or repair the canonical sample-accession package, workflow, and published operation used by transitional receiving adapters." %}
+  <div class="button-row">
+    <button class="button" type="button" onclick="provisionSampleAccessionBundle()"><span class="material-symbols-outlined button-icon" aria-hidden="true">conversion_path</span><span>Provision sample accession bundle</span></button>
+    <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Current reference status" panel_description="Published bundle state and adapter activity update on demand after provisioning." %}
+  <div class="stat-grid">
+    <article class="card"><strong>Form package</strong><p data-sample-accession-package-status>{% if payload.reference_bundle %}Published v{{ payload.cards.package_version }}{% else %}Not provisioned{% endif %}</p></article>
+    <article class="card"><strong>Workflow</strong><p data-sample-accession-workflow-status>{% if payload.reference_bundle %}Published v{{ payload.cards.workflow_version }}{% else %}Not provisioned{% endif %}</p></article>
+    <article class="card"><strong>Operation</strong><p data-sample-accession-operation-status>{% if payload.reference_bundle %}Published v{{ payload.cards.operation_version }}{% else %}Not provisioned{% endif %}</p></article>
+    <article class="card"><strong>Governed runs</strong><p data-sample-accession-run-count>{{ payload.cards.runs }}</p></article>
+  </div>
+</section>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Reference contract" panel_description="Canonical codes, supported source modes, and transitional adapter targets." %}
+    <div data-sample-accession-contract>
+      {% if payload.reference_bundle %}
+      <div class="section-stack">
+        <p><strong>Package:</strong> {{ payload.reference_bundle.form_package.code }} · v{{ payload.reference_bundle.form_package_version.version_number }}</p>
+        <p><strong>Workflow:</strong> {{ payload.reference_bundle.workflow_template.code }} · v{{ payload.reference_bundle.workflow_version.version_number }}</p>
+        <p><strong>Operation:</strong> {{ payload.reference_bundle.operation_definition.code }} · v{{ payload.reference_bundle.operation_version.version_number }}</p>
+        <p><strong>Source modes:</strong> {{ payload.reference_bundle.operation_version.runtime_defaults.source_modes|join:", " }}</p>
+        <p><strong>Transitional adapters:</strong> {{ payload.reference_bundle.operation_version.runtime_defaults.transitional_adapters|join:" · " }}</p>
+      </div>
+      {% else %}
+      <p class="muted">The sample-accession reference bundle has not been provisioned for this tenant yet.</p>
+      {% endif %}
+    </div>
+  </section>
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Published task sections" panel_description="Capture scopes currently bound into the canonical workflow." %}
+    <div data-sample-accession-sections>
+      {% if payload.reference_bundle %}
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
+        {% for section in payload.reference_bundle.form_package_version.compiled_projection.sections %}
+        {% include "lims/includes/badge.html" with label=section.section_key tone="info" %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">Provision the bundle to inspect published sections.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent governed runs" panel_description="Latest operation runs created by the reference bundle, including transitional single, batch, and EDC import adapters." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Source mode</th><th>Subject</th><th>Reference</th><th>Outcome</th><th>Started</th></tr></thead>
+      <tbody data-sample-accession-runs-table>
+        {% for item in payload.recent_runs %}
+        <tr>
+          <td>{{ item.status }}</td>
+          <td>{{ item.source_mode }}</td>
+          <td>{{ item.subject_identifier|default:"-" }}</td>
+          <td>{{ item.source_reference|default:"-" }}</td>
+          <td>{{ item.outcome|default:"-" }}</td>
+          <td>{{ item.started_at|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No governed sample accession runs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsSampleAccessionBundle = JSON.parse(document.getElementById("lims-sample-accession-bundle").textContent);
+const limsSampleAccessionRuns = JSON.parse(document.getElementById("lims-sample-accession-runs").textContent);
+
+function renderSampleAccessionContract(bundle) {
+  const contractNode = document.querySelector("[data-sample-accession-contract]");
+  const sectionsNode = document.querySelector("[data-sample-accession-sections]");
+  const packageStatusNode = document.querySelector("[data-sample-accession-package-status]");
+  const workflowStatusNode = document.querySelector("[data-sample-accession-workflow-status]");
+  const operationStatusNode = document.querySelector("[data-sample-accession-operation-status]");
+  if (packageStatusNode) packageStatusNode.textContent = bundle ? `Published v${bundle.form_package_version.version_number}` : "Not provisioned";
+  if (workflowStatusNode) workflowStatusNode.textContent = bundle ? `Published v${bundle.workflow_version.version_number}` : "Not provisioned";
+  if (operationStatusNode) operationStatusNode.textContent = bundle ? `Published v${bundle.operation_version.version_number}` : "Not provisioned";
+  if (contractNode) {
+    if (!bundle) {
+      contractNode.innerHTML = '<p class="muted">The sample-accession reference bundle has not been provisioned for this tenant yet.</p>';
+    } else {
+      contractNode.innerHTML = `
+        <div class="section-stack">
+          <p><strong>Package:</strong> ${limsEscapeHtml(bundle.form_package.code)} · v${limsEscapeHtml(String(bundle.form_package_version.version_number))}</p>
+          <p><strong>Workflow:</strong> ${limsEscapeHtml(bundle.workflow_template.code)} · v${limsEscapeHtml(String(bundle.workflow_version.version_number))}</p>
+          <p><strong>Operation:</strong> ${limsEscapeHtml(bundle.operation_definition.code)} · v${limsEscapeHtml(String(bundle.operation_version.version_number))}</p>
+          <p><strong>Source modes:</strong> ${limsEscapeHtml((bundle.operation_version.runtime_defaults.source_modes || []).join(", "))}</p>
+          <p><strong>Transitional adapters:</strong> ${limsEscapeHtml((bundle.operation_version.runtime_defaults.transitional_adapters || []).join(" · "))}</p>
+        </div>
+      `;
+    }
+  }
+  if (sectionsNode) {
+    if (!bundle) {
+      sectionsNode.innerHTML = '<p class="muted">Provision the bundle to inspect published sections.</p>';
+    } else {
+      sectionsNode.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:0.35rem;">${(bundle.form_package_version.compiled_projection.sections || []).map((section) => limsBadgeHtml(section.section_key, "info")).join("")}</div>`;
+    }
+  }
+}
+
+function renderSampleAccessionRuns(items, totalCount) {
+  const countNode = document.querySelector("[data-sample-accession-run-count]");
+  const tableBody = document.querySelector("[data-sample-accession-runs-table]");
+  if (countNode && totalCount !== undefined) countNode.textContent = String(totalCount);
+  if (!tableBody) {
+    return;
+  }
+  if (!items || !items.length) {
+    tableBody.innerHTML = '<tr><td colspan="6">No governed sample accession runs yet.</td></tr>';
+    return;
+  }
+  tableBody.innerHTML = items.map((item) => `
+    <tr>
+      <td>${limsEscapeHtml(item.status || "-")}</td>
+      <td>${limsEscapeHtml(item.source_mode || "-")}</td>
+      <td>${limsEscapeHtml(item.subject_identifier || "-")}</td>
+      <td>${limsEscapeHtml(item.source_reference || "-")}</td>
+      <td>${limsEscapeHtml(item.outcome || "-")}</td>
+      <td>${limsEscapeHtml(item.started_at || "-")}</td>
+    </tr>
+  `).join("");
+}
+
+async function refreshSampleAccessionRuns(bundle) {
+  if (!bundle || !bundle.operation_definition || !bundle.operation_definition.id) {
+    renderSampleAccessionRuns([], 0);
+    return;
+  }
+  try {
+    const response = await limsPortalRequest(`/api/v1/lims/operations/${bundle.operation_definition.id}/runs`, null, "GET");
+    const items = (response && response.items) || [];
+    renderSampleAccessionRuns(items, items.length);
+  } catch (_error) {}
+}
+
+async function provisionSampleAccessionBundle() {
+  let bundle;
+  try {
+    bundle = await limsPortalRequest("/api/v1/lims/reference/operations/sample-accession/provision", {});
+  } catch (error) {
+    limsFeedback(error.message || "Sample accession provision failed", true);
+    return;
+  }
+  renderSampleAccessionContract(bundle);
+  await refreshSampleAccessionRuns(bundle);
+  limsFeedback(bundle.created ? "Sample accession reference bundle provisioned" : "Sample accession reference bundle already up to date", false);
+}
+
+renderSampleAccessionContract(limsSampleAccessionBundle);
+renderSampleAccessionRuns(limsSampleAccessionRuns || []);
+{% endblock %}

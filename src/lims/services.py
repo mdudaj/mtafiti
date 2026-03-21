@@ -73,6 +73,7 @@ from .models import (
     WorkflowEdgeTemplate,
     WorkflowNodeTemplate,
     WorkflowStepBinding,
+    WorkflowTemplate,
     WorkflowTemplateVersion,
 )
 
@@ -745,6 +746,33 @@ class FormPackageValidationResult:
     compiled_projection: dict[str, object]
 
 
+@dataclass(frozen=True)
+class ReferenceOperationProvisionError(Exception):
+    code: str
+    details: list[dict[str, str]] | None = None
+
+
+@dataclass(frozen=True)
+class SampleAccessionReferenceBundle:
+    form_package: FormPackage
+    form_package_version: FormPackageVersion
+    workflow_template: WorkflowTemplate
+    workflow_version: WorkflowTemplateVersion
+    operation_definition: OperationDefinition
+    operation_version: OperationVersion
+    created: bool
+
+
+@dataclass(frozen=True)
+class SampleAccessionAdapterResult:
+    operation_run: OperationRun
+    qc_result: QCResult | None
+    biospecimen: Biospecimen | None = None
+    event: ReceivingEvent | None = None
+    manifest_item: AccessioningManifestItem | None = None
+    discrepancy: ReceivingDiscrepancy | None = None
+
+
 @dataclass
 class OperationTaskTransitionResult:
     task_run: TaskRun
@@ -1130,6 +1158,816 @@ def publish_form_package_version(version: FormPackageVersion) -> FormPackageVali
                 defaults={"projection": result.compiled_projection},
             )
     return result
+
+
+def _publish_workflow_template_version(version: WorkflowTemplateVersion) -> WorkflowTemplateValidationResult:
+    result = validate_workflow_template_version(version)
+    if not result.valid:
+        raise ReferenceOperationProvisionError("workflow_validation_failed", result.errors)
+    WorkflowTemplateVersion.objects.filter(
+        template_id=version.template_id,
+        status=WorkflowTemplateVersion.Status.PUBLISHED,
+    ).exclude(id=version.id).update(status=WorkflowTemplateVersion.Status.DEPRECATED)
+    version.status = WorkflowTemplateVersion.Status.PUBLISHED
+    version.compiled_definition = result.compiled_definition
+    version.save(update_fields=["status", "compiled_definition", "updated_at"])
+    return result
+
+
+def _publish_operation_version(version: OperationVersion) -> OperationVersionValidationResult:
+    result = validate_operation_version(version)
+    if not result.valid:
+        raise ReferenceOperationProvisionError("operation_validation_failed", result.errors)
+    OperationVersion.objects.filter(
+        definition_id=version.definition_id,
+        status=OperationVersion.Status.PUBLISHED,
+    ).exclude(id=version.id).update(status=OperationVersion.Status.DEPRECATED)
+    version.status = OperationVersion.Status.PUBLISHED
+    version.save(update_fields=["status", "updated_at"])
+    return result
+
+
+def _create_sample_accession_form_package_version(*, package: FormPackage) -> FormPackageVersion:
+    version = FormPackageVersion.objects.create(
+        package=package,
+        version_number=(package.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0) + 1,
+        change_summary="Canonical sample accession reference package.",
+        compiler_context={
+            "reference_operation": "sample-accession",
+            "bundle_kind": "reference_operation",
+            "source_kind": "canonical_reference_bundle",
+        },
+    )
+    intake_section = FormPackageSection.objects.create(
+        version=version,
+        section_key="intake",
+        oid=_stable_oid("SEC", "sample-accession-intake"),
+        title="Intake",
+        description="Primary intake metadata captured when a sample first arrives.",
+        position=1,
+        config={"ui_step": "intake"},
+    )
+    qc_section = FormPackageSection.objects.create(
+        version=version,
+        section_key="qc",
+        oid=_stable_oid("SEC", "sample-accession-qc"),
+        title="QC decision",
+        description="Quality-control disposition captured before storage or rejection.",
+        position=2,
+        config={"ui_step": "qc"},
+    )
+    storage_section = FormPackageSection.objects.create(
+        version=version,
+        section_key="storage",
+        oid=_stable_oid("SEC", "sample-accession-storage"),
+        title="Storage",
+        description="Initial storage placement captured after acceptance.",
+        position=3,
+        config={"ui_step": "storage"},
+    )
+    rejection_section = FormPackageSection.objects.create(
+        version=version,
+        section_key="rejection",
+        oid=_stable_oid("SEC", "sample-accession-rejection"),
+        title="Rejection",
+        description="Explicit rejection reason and discrepancy coding for refused samples.",
+        position=4,
+        config={"ui_step": "rejection"},
+    )
+    qc_choice_list = FormPackageChoiceList.objects.create(
+        version=version,
+        list_key="qc-decision",
+        oid=_stable_oid("CL", "sample-accession-qc-decision"),
+        title="QC decision",
+        description="Canonical accession QC disposition.",
+        position=1,
+    )
+    FormPackageChoice.objects.bulk_create(
+        [
+            FormPackageChoice(choice_list=qc_choice_list, value="accept", label="Accept", sort_order=1),
+            FormPackageChoice(choice_list=qc_choice_list, value="reject", label="Reject", sort_order=2),
+        ]
+    )
+    FormPackageItem.objects.bulk_create(
+        [
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="subject_identifier",
+                oid=_stable_oid("ITEM", "sample-accession-subject-identifier"),
+                question_text="Subject identifier",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=1,
+                required=True,
+                config={"semantic_key": "subject_identifier"},
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="external_identifier",
+                oid=_stable_oid("ITEM", "sample-accession-external-identifier"),
+                question_text="External identifier",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=2,
+                required=False,
+                config={"semantic_key": "external_identifier"},
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="sample_identifier",
+                oid=_stable_oid("ITEM", "sample-accession-sample-identifier"),
+                question_text="Sample identifier",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=3,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="barcode",
+                oid=_stable_oid("ITEM", "sample-accession-barcode"),
+                question_text="Barcode",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=4,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="received_at",
+                oid=_stable_oid("ITEM", "sample-accession-received-at"),
+                question_text="Received at",
+                field_type=MetadataFieldDefinition.FieldType.DATE,
+                position=5,
+                required=True,
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="quantity",
+                oid=_stable_oid("ITEM", "sample-accession-quantity"),
+                question_text="Quantity",
+                field_type=MetadataFieldDefinition.FieldType.DECIMAL,
+                position=6,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="quantity_unit",
+                oid=_stable_oid("ITEM", "sample-accession-quantity-unit"),
+                question_text="Quantity unit",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=7,
+                required=False,
+                default_value="mL",
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="source_reference",
+                oid=_stable_oid("ITEM", "sample-accession-source-reference"),
+                question_text="Source reference",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=8,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=intake_section,
+                item_key="brought_by",
+                oid=_stable_oid("ITEM", "sample-accession-brought-by"),
+                question_text="Brought by",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=9,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=qc_section,
+                choice_list=qc_choice_list,
+                item_key="qc_decision",
+                oid=_stable_oid("ITEM", "sample-accession-qc-decision"),
+                question_text="QC decision",
+                field_type=MetadataFieldDefinition.FieldType.CHOICE,
+                position=1,
+                required=True,
+                config={"semantic_key": "qc_decision"},
+            ),
+            FormPackageItem(
+                version=version,
+                section=qc_section,
+                item_key="qc_notes",
+                oid=_stable_oid("ITEM", "sample-accession-qc-notes"),
+                question_text="QC notes",
+                field_type=MetadataFieldDefinition.FieldType.LONG_TEXT,
+                position=2,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=storage_section,
+                item_key="storage_reference",
+                oid=_stable_oid("ITEM", "sample-accession-storage-reference"),
+                question_text="Storage reference",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=1,
+                required=True,
+                config={"semantic_key": "storage_reference"},
+            ),
+            FormPackageItem(
+                version=version,
+                section=storage_section,
+                item_key="storage_notes",
+                oid=_stable_oid("ITEM", "sample-accession-storage-notes"),
+                question_text="Storage notes",
+                field_type=MetadataFieldDefinition.FieldType.LONG_TEXT,
+                position=2,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=rejection_section,
+                item_key="rejection_code",
+                oid=_stable_oid("ITEM", "sample-accession-rejection-code"),
+                question_text="Rejection code",
+                field_type=MetadataFieldDefinition.FieldType.TEXT,
+                position=1,
+                required=False,
+            ),
+            FormPackageItem(
+                version=version,
+                section=rejection_section,
+                item_key="reason",
+                oid=_stable_oid("ITEM", "sample-accession-reason"),
+                question_text="Rejection reason",
+                field_type=MetadataFieldDefinition.FieldType.LONG_TEXT,
+                position=2,
+                required=False,
+                config={"semantic_key": "rejection_reason"},
+            ),
+        ]
+    )
+    FormPackageSourceArtifact.objects.create(
+        version=version,
+        role=FormPackageSourceArtifact.Role.SOURCE,
+        artifact_type=FormPackageSourceArtifact.ArtifactType.JSON,
+        filename="sample-accession.reference.bundle.json",
+        content_type="application/json",
+        artifact_metadata={
+            "reference_operation": "sample-accession",
+            "source_kind": "canonical_reference_bundle",
+        },
+    )
+    result = publish_form_package_version(version)
+    if not result.valid:
+        raise ReferenceOperationProvisionError("form_package_validation_failed", result.errors)
+    version.refresh_from_db()
+    return version
+
+
+def _create_sample_accession_workflow_version(
+    *,
+    template: WorkflowTemplate,
+    form_package_version: FormPackageVersion,
+) -> WorkflowTemplateVersion:
+    version = WorkflowTemplateVersion.objects.create(
+        template=template,
+        version_number=(template.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0) + 1,
+        change_summary="Canonical sample accession reference workflow.",
+    )
+    start_node = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="start",
+        node_type=WorkflowNodeTemplate.NodeType.START,
+        title="Start",
+        position=1,
+    )
+    intake_node = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="intake_capture",
+        node_type=WorkflowNodeTemplate.NodeType.VIEW,
+        title="Intake capture",
+        summary="Capture initial accession metadata for the inbound sample.",
+        position=2,
+        assignment_role="lims.operator",
+        permission_key="lims.workflow_task.execute",
+        config={"source_modes": ["single", "batch", "edc_import"], "adapter_surface": "/lims/receiving/"},
+    )
+    qc_node = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="qc_decision",
+        node_type=WorkflowNodeTemplate.NodeType.IF,
+        title="QC decision",
+        summary="Record the first QC disposition and require QA confirmation.",
+        position=3,
+        assignment_role="lims.operator",
+        permission_key="lims.workflow_task.execute",
+        requires_approval=True,
+        approval_role="lims.qa",
+    )
+    storage_node = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="storage_logging",
+        node_type=WorkflowNodeTemplate.NodeType.VIEW,
+        title="Storage logging",
+        summary="Capture the first accepted storage placement.",
+        position=4,
+        assignment_role="lims.operator",
+        permission_key="lims.workflow_task.execute",
+    )
+    accepted_end = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="accepted_end",
+        node_type=WorkflowNodeTemplate.NodeType.END,
+        title="Accepted",
+        position=5,
+    )
+    rejected_end = WorkflowNodeTemplate.objects.create(
+        workflow_version=version,
+        node_key="rejected_end",
+        node_type=WorkflowNodeTemplate.NodeType.END,
+        title="Rejected",
+        position=6,
+    )
+    WorkflowStepBinding.objects.bulk_create(
+        [
+            WorkflowStepBinding(
+                node=intake_node,
+                form_package_version=form_package_version,
+                binding_type=WorkflowStepBinding.BindingType.SECTION_SET,
+                section_keys=["intake"],
+            ),
+            WorkflowStepBinding(
+                node=qc_node,
+                form_package_version=form_package_version,
+                binding_type=WorkflowStepBinding.BindingType.ITEM_SET,
+                item_keys=["qc_decision", "qc_notes", "rejection_code", "reason"],
+            ),
+            WorkflowStepBinding(
+                node=storage_node,
+                form_package_version=form_package_version,
+                binding_type=WorkflowStepBinding.BindingType.SECTION_SET,
+                section_keys=["storage"],
+            ),
+        ]
+    )
+    WorkflowEdgeTemplate.objects.bulk_create(
+        [
+            WorkflowEdgeTemplate(workflow_version=version, source_node=start_node, target_node=intake_node, priority=1),
+            WorkflowEdgeTemplate(workflow_version=version, source_node=intake_node, target_node=qc_node, priority=1),
+            WorkflowEdgeTemplate(
+                workflow_version=version,
+                source_node=qc_node,
+                target_node=storage_node,
+                priority=1,
+                condition={"item_key": "qc_decision", "operator": "equals", "value": "accept"},
+            ),
+            WorkflowEdgeTemplate(
+                workflow_version=version,
+                source_node=qc_node,
+                target_node=rejected_end,
+                priority=2,
+                condition={"item_key": "qc_decision", "operator": "equals", "value": "reject"},
+            ),
+            WorkflowEdgeTemplate(workflow_version=version, source_node=storage_node, target_node=accepted_end, priority=1),
+        ]
+    )
+    _publish_workflow_template_version(version)
+    version.refresh_from_db()
+    return version
+
+
+def _create_sample_accession_operation_version(
+    *,
+    definition: OperationDefinition,
+    workflow_version: WorkflowTemplateVersion,
+) -> OperationVersion:
+    version = OperationVersion.objects.create(
+        definition=definition,
+        workflow_version=workflow_version,
+        version_number=(definition.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0)
+        + 1,
+        change_summary="Canonical sample accession reference operation.",
+        runtime_defaults={
+            "reference_operation": "sample-accession",
+            "source_modes": ["single", "batch", "edc_import"],
+            "task_keys": {
+                "intake": "intake_capture",
+                "qc": "qc_decision",
+                "storage": "storage_logging",
+            },
+            "transitional_adapters": [
+                "/api/v1/lims/accessioning/receive-single",
+                "/api/v1/lims/accessioning/manifests/<manifest_id>/items/<item_id>/receive",
+            ],
+        },
+    )
+    _publish_operation_version(version)
+    version.refresh_from_db()
+    return version
+
+
+@transaction.atomic
+def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBundle:
+    created = False
+    form_package, package_created = FormPackage.objects.get_or_create(
+        code="sample-accession-package",
+        defaults={
+            "name": "Sample accession package",
+            "description": "Compiler-owned canonical form package for the sample accession reference operation.",
+            "purpose": "Reference sample accession capture contract",
+            "module_scope": FormPackage.ModuleScope.LIMS,
+            "is_active": True,
+        },
+    )
+    created = created or package_created
+    form_package_version = form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED).order_by("-version_number").first()
+    if form_package_version is None:
+        form_package_version = _create_sample_accession_form_package_version(package=form_package)
+        created = True
+
+    workflow_template, template_created = WorkflowTemplate.objects.get_or_create(
+        code="sample-accession",
+        defaults={
+            "name": "Sample accession",
+            "description": "Canonical sample accession reference workflow topology.",
+            "purpose": "Reference accessioning workflow",
+            "is_active": True,
+        },
+    )
+    created = created or template_created
+    workflow_version = (
+        workflow_template.versions.filter(status=WorkflowTemplateVersion.Status.PUBLISHED).order_by("-version_number").first()
+    )
+    if workflow_version is None:
+        workflow_version = _create_sample_accession_workflow_version(
+            template=workflow_template,
+            form_package_version=form_package_version,
+        )
+        created = True
+
+    operation_definition, definition_created = OperationDefinition.objects.get_or_create(
+        code="sample-accession",
+        defaults={
+            "name": "Sample accession",
+            "description": "Canonical sample accession reference operation.",
+            "purpose": "Reference accessioning operation",
+            "module_scope": OperationDefinition.ModuleScope.LIMS,
+            "is_active": True,
+        },
+    )
+    created = created or definition_created
+    operation_version = (
+        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED).order_by("-version_number").first()
+    )
+    if operation_version is None:
+        operation_version = _create_sample_accession_operation_version(
+            definition=operation_definition,
+            workflow_version=workflow_version,
+        )
+        created = True
+
+    return SampleAccessionReferenceBundle(
+        form_package=form_package,
+        form_package_version=form_package_version,
+        workflow_template=workflow_template,
+        workflow_version=workflow_version,
+        operation_definition=operation_definition,
+        operation_version=operation_version,
+        created=created,
+    )
+
+
+def _sample_accession_operation_version() -> OperationVersion:
+    bundle = provision_sample_accession_reference_bundle()
+    return bundle.operation_version
+
+
+def _task_for_node_key(tasks: list[TaskRun], node_key: str) -> TaskRun:
+    for task in tasks:
+        if task.node_template.node_key == node_key:
+            return task
+    raise ReferenceOperationProvisionError("workflow_task_not_found", [{"field": "node_key", "detail": node_key}])
+
+
+def _storage_reference_from_context(receipt_context: dict[str, object] | None) -> str:
+    storage = (receipt_context or {}).get("storage")
+    if not isinstance(storage, dict):
+        return ""
+    explicit_reference = str(storage.get("storage_reference") or storage.get("reference") or "").strip()
+    if explicit_reference:
+        return explicit_reference
+    parts = [
+        str(storage.get("location") or "").strip(),
+        str(storage.get("container") or storage.get("box") or "").strip(),
+        str(storage.get("position") or "").strip(),
+    ]
+    return " / ".join(part for part in parts if part)
+
+
+def _source_reference_for_single_receive(
+    *,
+    sample_identifier: str,
+    barcode: str,
+    external_identifier: str,
+) -> str:
+    for candidate in (sample_identifier.strip(), barcode.strip(), external_identifier.strip()):
+        if candidate:
+            return candidate
+    return ""
+
+
+def _drive_sample_accession_runtime(
+    *,
+    source_mode: str,
+    source_reference: str,
+    initiated_by: str,
+    subject_identifier: str,
+    external_identifier: str,
+    intake_payload: dict[str, object],
+    qc_payload: dict[str, object],
+    storage_payload: dict[str, object] | None = None,
+    context: dict[str, object] | None = None,
+    biospecimen: Biospecimen | None = None,
+    manifest: AccessioningManifest | None = None,
+    manifest_item: AccessioningManifestItem | None = None,
+) -> SampleAccessionAdapterResult:
+    operation_version = _sample_accession_operation_version()
+    started = start_operation_run(
+        operation_version,
+        initiated_by=initiated_by,
+        subject_identifier=subject_identifier,
+        external_identifier=external_identifier,
+        source_mode=source_mode,
+        source_reference=source_reference,
+        biospecimen=biospecimen,
+        manifest=manifest,
+        manifest_item=manifest_item,
+        context=context or {},
+    )
+    intake_task = _task_for_node_key(started.created_tasks, "intake_capture")
+    intake_result = submit_task_run(
+        intake_task,
+        payload=intake_payload,
+        submitted_by=initiated_by,
+    )
+    qc_task = _task_for_node_key(intake_result.created_tasks, "qc_decision")
+    qc_submit_result = submit_task_run(
+        qc_task,
+        payload=qc_payload,
+        submitted_by=initiated_by,
+    )
+    if qc_task.requires_approval:
+        qc_transition_result = approve_task_run(
+            qc_task,
+            outcome=ApprovalRecord.Outcome.APPROVED,
+            approved_by=initiated_by,
+            approver_role="transitional_adapter",
+            meaning="Transitional receiving adapter finalized the QC decision.",
+        )
+    else:
+        qc_transition_result = qc_submit_result
+    if str(qc_payload.get("qc_decision") or "").strip().lower() != QCResult.Decision.REJECT:
+        storage_task = _task_for_node_key(qc_transition_result.created_tasks, "storage_logging")
+        submit_task_run(
+            storage_task,
+            payload=storage_payload or {},
+            submitted_by=initiated_by,
+        )
+    operation_run = OperationRun.objects.get(id=started.operation_run.id)
+    qc_result = (
+        QCResult.objects.select_related("discrepancy")
+        .filter(operation_run=operation_run)
+        .order_by("-reviewed_at", "-created_at")
+        .first()
+    )
+    return SampleAccessionAdapterResult(
+        operation_run=operation_run,
+        qc_result=qc_result,
+        discrepancy=qc_result.discrepancy if qc_result and qc_result.discrepancy_id else None,
+        biospecimen=biospecimen,
+        manifest_item=manifest_item,
+    )
+
+
+def adapt_single_receive_to_sample_accession(
+    *,
+    sample_type: BiospecimenType,
+    study,
+    site,
+    lab,
+    subject_identifier: str,
+    external_identifier: str,
+    quantity: Decimal,
+    quantity_unit: str,
+    metadata: dict[str, object],
+    received_by: str,
+    sample_identifier: str = "",
+    barcode: str = "",
+    scan_value: str = "",
+    notes: str = "",
+    receipt_context: dict[str, object] | None = None,
+    received_at=None,
+    source_mode: str = OperationRun.SourceMode.SINGLE,
+    source_reference: str = "",
+) -> SampleAccessionAdapterResult:
+    qc = (receipt_context or {}).get("qc") if isinstance(receipt_context, dict) else {}
+    if not isinstance(qc, dict):
+        qc = {}
+    qc_decision = str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower() or QCResult.Decision.ACCEPT
+    if qc_decision not in QCResult.Decision.values:
+        qc_decision = QCResult.Decision.ACCEPT
+    normalized_metadata = _validate_sample_type_metadata(sample_type, metadata)
+    if scan_value and barcode and scan_value.strip() != barcode.strip():
+        raise AccessioningError("scan_mismatch")
+
+    specimen = None
+    event = None
+    if qc_decision != QCResult.Decision.REJECT:
+        specimen, event = receive_single_biospecimen(
+            sample_type=sample_type,
+            study=study,
+            site=site,
+            lab=lab,
+            subject_identifier=subject_identifier,
+            external_identifier=external_identifier,
+            quantity=quantity,
+            quantity_unit=quantity_unit,
+            metadata=normalized_metadata,
+            received_by=received_by,
+            sample_identifier=sample_identifier,
+            barcode=barcode,
+            scan_value=scan_value,
+            notes=notes,
+            receipt_context=receipt_context,
+            received_at=received_at,
+        )
+
+    resolved_source_reference = source_reference.strip() or _source_reference_for_single_receive(
+        sample_identifier=specimen.sample_identifier if specimen else sample_identifier,
+        barcode=specimen.barcode if specimen else barcode,
+        external_identifier=external_identifier,
+    )
+    intake_payload = {
+        "subject_identifier": subject_identifier.strip(),
+        "external_identifier": external_identifier.strip(),
+        "sample_identifier": specimen.sample_identifier if specimen else sample_identifier.strip(),
+        "barcode": specimen.barcode if specimen else barcode.strip(),
+        "received_at": received_at.isoformat() if received_at else None,
+        "quantity": str(quantity),
+        "quantity_unit": quantity_unit.strip(),
+        "brought_by": str((receipt_context or {}).get("brought_by") or "").strip(),
+        "source_reference": resolved_source_reference,
+    }
+    qc_payload = {
+        "qc_decision": qc_decision,
+        "notes": str(qc.get("notes") or notes or "").strip(),
+        "rejection_code": str(qc.get("rejection_code") or "").strip(),
+        "reason": str(qc.get("reason") or qc.get("notes") or notes or "").strip(),
+    }
+    storage_reference = _storage_reference_from_context(receipt_context)
+    storage_payload = {
+        "storage_reference": storage_reference,
+        "storage_notes": str(((receipt_context or {}).get("storage") or {}).get("notes") or "").strip()
+        if isinstance((receipt_context or {}).get("storage"), dict)
+        else "",
+    }
+    context = {
+        "adapter_kind": "single_receive",
+        "sample_type_id": str(sample_type.id),
+        "notes": notes,
+        "metadata": normalized_metadata,
+        "receipt_context": dict(receipt_context or {}),
+        "receiving_event_id": str(event.id) if event else None,
+    }
+    result = _drive_sample_accession_runtime(
+        source_mode=source_mode,
+        source_reference=resolved_source_reference,
+        initiated_by=received_by,
+        subject_identifier=subject_identifier.strip(),
+        external_identifier=external_identifier.strip(),
+        intake_payload=intake_payload,
+        qc_payload=qc_payload,
+        storage_payload=storage_payload,
+        context=context,
+        biospecimen=specimen,
+    )
+    return SampleAccessionAdapterResult(
+        operation_run=result.operation_run,
+        qc_result=result.qc_result,
+        biospecimen=specimen,
+        event=event,
+        discrepancy=result.discrepancy,
+    )
+
+
+def adapt_manifest_item_receive_to_sample_accession(
+    item: AccessioningManifestItem,
+    *,
+    received_by: str,
+    scan_value: str = "",
+    notes: str = "",
+    metadata: dict[str, object] | None = None,
+    receipt_context: dict[str, object] | None = None,
+    received_at=None,
+    source_mode: str = OperationRun.SourceMode.BATCH,
+    source_reference: str = "",
+) -> SampleAccessionAdapterResult:
+    if item.status == AccessioningManifestItem.Status.RECEIVED:
+        raise AccessioningError("item_already_received")
+    manifest = item.manifest
+    if manifest.status == AccessioningManifest.Status.DRAFT:
+        raise AccessioningError("manifest_not_submitted")
+    candidate_values = {
+        value.strip()
+        for value in [item.expected_sample_identifier, item.expected_barcode]
+        if isinstance(value, str) and value.strip()
+    }
+    if scan_value and candidate_values and scan_value.strip() not in candidate_values:
+        raise AccessioningError("scan_mismatch")
+    qc = (receipt_context or {}).get("qc") if isinstance(receipt_context, dict) else {}
+    if not isinstance(qc, dict):
+        qc = {}
+    qc_decision = str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower() or QCResult.Decision.ACCEPT
+    if qc_decision not in QCResult.Decision.values:
+        qc_decision = QCResult.Decision.ACCEPT
+    payload_metadata = dict(item.metadata or {})
+    payload_metadata.update(metadata or {})
+    normalized_metadata = _validate_sample_type_metadata(item.manifest.sample_type, payload_metadata)
+
+    updated_item = item
+    event = None
+    specimen = item.biospecimen
+    if qc_decision != QCResult.Decision.REJECT:
+        updated_item, event = receive_manifest_item(
+            item,
+            received_by=received_by,
+            scan_value=scan_value,
+            notes=notes,
+            metadata=normalized_metadata,
+            receipt_context=receipt_context,
+            received_at=received_at,
+        )
+        specimen = updated_item.biospecimen
+
+    resolved_source_reference = source_reference.strip() or manifest.source_reference or manifest.manifest_identifier
+    intake_payload = {
+        "subject_identifier": updated_item.expected_subject_identifier,
+        "external_identifier": str((normalized_metadata or {}).get("external_id") or "").strip(),
+        "sample_identifier": specimen.sample_identifier if specimen else updated_item.expected_sample_identifier,
+        "barcode": specimen.barcode if specimen else updated_item.expected_barcode,
+        "received_at": received_at.isoformat() if received_at else None,
+        "quantity": str(updated_item.quantity),
+        "quantity_unit": updated_item.quantity_unit,
+        "brought_by": str((receipt_context or {}).get("brought_by") or "").strip(),
+        "source_reference": resolved_source_reference,
+    }
+    qc_payload = {
+        "qc_decision": qc_decision,
+        "notes": str(qc.get("notes") or notes or "").strip(),
+        "rejection_code": str(qc.get("rejection_code") or "").strip(),
+        "reason": str(qc.get("reason") or qc.get("notes") or notes or "").strip(),
+    }
+    storage_reference = _storage_reference_from_context(receipt_context)
+    storage_payload = {
+        "storage_reference": storage_reference,
+        "storage_notes": str(((receipt_context or {}).get("storage") or {}).get("notes") or "").strip()
+        if isinstance((receipt_context or {}).get("storage"), dict)
+        else "",
+    }
+    context = {
+        "adapter_kind": "manifest_item_receive",
+        "manifest_id": str(manifest.id),
+        "manifest_item_id": str(updated_item.id),
+        "notes": notes,
+        "metadata": normalized_metadata,
+        "receipt_context": dict(receipt_context or {}),
+        "receiving_event_id": str(event.id) if event else None,
+    }
+    result = _drive_sample_accession_runtime(
+        source_mode=source_mode,
+        source_reference=resolved_source_reference,
+        initiated_by=received_by,
+        subject_identifier=updated_item.expected_subject_identifier,
+        external_identifier=str((normalized_metadata or {}).get("external_id") or "").strip(),
+        intake_payload=intake_payload,
+        qc_payload=qc_payload,
+        storage_payload=storage_payload,
+        context=context,
+        biospecimen=specimen,
+        manifest=manifest,
+        manifest_item=updated_item,
+    )
+    return SampleAccessionAdapterResult(
+        operation_run=result.operation_run,
+        qc_result=result.qc_result,
+        biospecimen=specimen,
+        event=event,
+        manifest_item=updated_item,
+        discrepancy=result.discrepancy,
+    )
 
 
 def _bool_from_value(value: object) -> bool:

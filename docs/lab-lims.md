@@ -166,6 +166,8 @@ Those package versions carry canonical sections, item groups, items, choice list
 
 The workflow-configuration layer now builds on that contract. Workflow template nodes continue to define bounded Viewflow-style topology plus assignment, permission, and approval metadata, but task capture bindings target published form-package outputs instead of raw metadata-schema versions. Capture scope can therefore be expressed as a whole package, section subsets, item-group subsets, or explicit item subsets while leaving canonical form semantics inside the compiler-owned package model.
 
+That foundation now has a first canonical tenant-local reference bundle: `POST /api/v1/lims/reference/operations/sample-accession/provision`. The endpoint idempotently provisions and publishes a compiler-owned `sample-accession-package`, a matching `sample-accession` workflow template/version, and a published `sample-accession` operation version whose runtime defaults declare the supported intake modes (`single`, `batch`, and `edc_import`). The same bundle now also has an admin-style portal page at `/lims/reference/operations/sample-accession/`, so operators and tenant admins can provision the bundle, inspect its published contract, and review recent governed runs from the same UI shell used by the other LIMS setup surfaces.
+
 ## Biospecimen aggregate
 
 The current biospecimen slice introduces tenant-local specimen and pooling primitives for the first LIMS lifecycle workflows:
@@ -238,7 +240,7 @@ The first API surface is exposed under:
 - `/api/v1/lims/accessioning/manifests/<manifest_id>/report`
 - `/api/v1/lims/receiving/discrepancies`
 
-Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine.
+Metadata validation for receiving continues to reuse the published metadata-schema binding for the relevant biospecimen type, so configurable sample-type intake requirements do not need a separate validation engine. Those legacy `/api/v1/lims/accessioning/receive-single` and `/api/v1/lims/accessioning/manifests/<manifest_id>/items/<item_id>/receive` endpoints now act as transitional adapters: they still project into biospecimen, manifest, receiving-event, and discrepancy records, but they also auto-drive the canonical `sample-accession` operation runtime so governed `OperationRun`, task submission, approval, QC, and material-usage history are created alongside the domain artifacts.
 
 More generally, workflow-administered forms capture task metadata first into runtime submission/audit records. When specific answers have domain meaning, they should then be projected into the corresponding governed models instead of leaving the workflow payload as the only source of truth.
 

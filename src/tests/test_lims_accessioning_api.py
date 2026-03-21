@@ -220,6 +220,57 @@ def test_lims_accessioning_supports_single_receive_with_metadata_validation(monk
     assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Courier Alpha"
     assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
     assert received.json()["event"]["kind"] == "single"
+    assert received.json()["operation_run"]["operation_code"] == "sample-accession"
+    assert received.json()["operation_run"]["source_mode"] == "single"
+    assert received.json()["operation_run"]["status"] == "completed"
+    assert received.json()["qc_result"]["decision"] == "accept"
+    assert received.json()["discrepancy"] is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_lims_accessioning_single_reject_creates_governed_operation_run(monkeypatch):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    client = Client()
+    host = _create_lims_host(client, "tenant-accessioning-single-reject")
+    lab_id, study_id, site_id = _create_reference_bundle(client, host)
+    sample_type_id = _create_sample_type(client, host)
+    _bind_sample_type_metadata_schema(client, host)
+
+    rejected = client.post(
+        "/api/v1/lims/accessioning/receive-single",
+        data=json.dumps(
+            {
+                "sample_type_id": sample_type_id,
+                "study_id": study_id,
+                "site_id": site_id,
+                "lab_id": lab_id,
+                "subject_identifier": "SUBJ-REJECT-001",
+                "quantity": "1.0",
+                "quantity_unit": "mL",
+                "received_at": "2026-03-18",
+                "metadata": {"tube_count": 1},
+                "receipt_context": {
+                    "brought_by": "Courier Alpha",
+                    "qc": {
+                        "decision": "reject",
+                        "notes": "tube leaked",
+                        "rejection_code": "other",
+                    },
+                },
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert rejected.status_code == 201
+    assert rejected.json()["biospecimen"] is None
+    assert rejected.json()["event"] is None
+    assert rejected.json()["operation_run"]["operation_code"] == "sample-accession"
+    assert rejected.json()["operation_run"]["status"] == "rejected"
+    assert rejected.json()["qc_result"]["decision"] == "reject"
+    assert rejected.json()["discrepancy"]["status"] == "open"
+    assert rejected.json()["discrepancy"]["notes"] == "tube leaked"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -311,6 +362,11 @@ def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(m
     assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Site runner"
     assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
     assert received.json()["event"]["kind"] == "manifest_item"
+    assert received.json()["operation_run"]["operation_code"] == "sample-accession"
+    assert received.json()["operation_run"]["source_mode"] == "batch"
+    assert received.json()["operation_run"]["status"] == "completed"
+    assert received.json()["qc_result"]["decision"] == "accept"
+    assert received.json()["discrepancy"] is None
 
     discrepancy = client.post(
         "/api/v1/lims/receiving/discrepancies",
@@ -341,3 +397,80 @@ def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(m
     assert report.json()["summary"]["received_items"] == 1
     assert report.json()["summary"]["discrepant_items"] == 1
     assert report.json()["summary"]["open_discrepancies"] == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_lims_accessioning_manifest_reject_path_uses_governed_operation_runtime(monkeypatch):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    client = Client()
+    host = _create_lims_host(client, "tenant-accessioning-manifest-reject")
+    lab_id, study_id, site_id = _create_reference_bundle(client, host)
+    sample_type_id = _create_sample_type(client, host)
+
+    manifest = client.post(
+        "/api/v1/lims/accessioning/manifests",
+        data=json.dumps(
+            {
+                "sample_type_id": sample_type_id,
+                "study_id": study_id,
+                "site_id": site_id,
+                "lab_id": lab_id,
+                "source_system": "edc-import",
+                "source_reference": "OPENCLINICA-001",
+                "submit": True,
+                "items": [
+                    {
+                        "position": 1,
+                        "expected_subject_identifier": "SUBJ-003",
+                        "expected_sample_identifier": "EXT-003",
+                        "expected_barcode": "SCAN-003",
+                        "quantity": "1.0",
+                        "metadata": {"tube_count": 1},
+                    }
+                ],
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert manifest.status_code == 201
+    manifest_id = manifest.json()["id"]
+    detail = client.get(
+        f"/api/v1/lims/accessioning/manifests/{manifest_id}",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
+    assert detail.status_code == 200
+    item_id = detail.json()["items"][0]["id"]
+
+    rejected = client.post(
+        f"/api/v1/lims/accessioning/manifests/{manifest_id}/items/{item_id}/receive",
+        data=json.dumps(
+            {
+                "source_mode": "edc_import",
+                "source_reference": "OPENCLINICA-001",
+                "received_at": "2026-03-19",
+                "metadata": {"tube_count": 1},
+                "receipt_context": {
+                    "brought_by": "EDC import",
+                    "qc": {
+                        "decision": "reject",
+                        "notes": "sample missing from shipment",
+                        "rejection_code": "missing_sample",
+                    },
+                },
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.admin",
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["item"]["status"] == "discrepant"
+    assert rejected.json()["event"] is None
+    assert rejected.json()["operation_run"]["operation_code"] == "sample-accession"
+    assert rejected.json()["operation_run"]["source_mode"] == "edc_import"
+    assert rejected.json()["operation_run"]["status"] == "rejected"
+    assert rejected.json()["qc_result"]["decision"] == "reject"
+    assert rejected.json()["discrepancy"]["code"] == "missing_sample"

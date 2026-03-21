@@ -133,28 +133,28 @@ async function processEdcImportReceipt() {
       limsFeedback("Reason for rejection is required", true);
       return;
     }
-    await limsPortalAction("/api/v1/lims/receiving/discrepancies", {
-      manifest_id: manifest.id,
-      manifest_item_id: item.id,
-      code: limsValue("edc-rejection-code") || "other",
-      notes: rejectionReason,
-      expected_data: {
-        external_id: limsValue("edc-source-reference"),
-        lab_form: limsValue("edc-lab-form"),
-        expected_sample: limsValue("edc-expected-sample"),
-      },
-      actual_data: {
-        receiving_date: limsValue("edc-receive-date"),
+    await limsPortalAction("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+      source_mode: "edc_import",
+      source_reference: limsValue("edc-source-reference"),
+      received_at: limsValue("edc-receive-date"),
+      notes: limsValue("edc-notes"),
+      metadata: metadata,
+      receipt_context: {
         brought_by: limsValue("edc-brought-by"),
-        qc_decision: "reject",
-        qc_notes: limsValue("edc-qc-notes"),
-        metadata: manifestMetadata,
+        qc: {
+          decision: "reject",
+          notes: rejectionReason,
+          rejection_code: limsValue("edc-rejection-code") || "other",
+        },
+        storage: {},
       },
     }, "EDC rejection logged");
     return;
   }
 
   await limsPortalAction("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+    source_mode: "edc_import",
+    source_reference: limsValue("edc-source-reference"),
     received_at: limsValue("edc-receive-date"),
     notes: limsValue("edc-notes"),
     metadata: metadata,

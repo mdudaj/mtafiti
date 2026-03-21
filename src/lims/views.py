@@ -74,6 +74,8 @@ from .models import (
 )
 from .services import (
     accessioning_report,
+    adapt_manifest_item_receive_to_sample_accession,
+    adapt_single_receive_to_sample_accession,
     AccessioningError,
     approve_task_run,
     allocate_biospecimen_identifiers,
@@ -90,9 +92,11 @@ from .services import (
     generate_manifest_identifier,
     get_default_metadata_vocabulary_domain,
     processing_batch_worksheet,
+    provision_sample_accession_reference_bundle,
     provision_default_metadata_vocabularies,
     receive_manifest_item,
     receive_single_biospecimen,
+    ReferenceOperationProvisionError,
     record_inventory_transaction,
     publish_form_package_version,
     resolve_schema_version_for_binding,
@@ -191,6 +195,10 @@ def _page_payload_base(request, *, active_key: str, title: str, summary: str, ki
             "can_manage_metadata": _has_permission(request, "lims.metadata.manage"),
             "can_view_artifacts": _has_permission(request, "lims.artifact.view"),
             "can_manage_artifacts": _has_permission(request, "lims.artifact.manage"),
+            "can_view_operations": _has_permission(request, "lims.operation.view"),
+            "can_manage_operations": _has_permission(request, "lims.operation.manage"),
+            "can_view_operation_runs": _has_permission(request, "lims.operation_run.view"),
+            "can_manage_operation_runs": _has_permission(request, "lims.operation_run.manage"),
             "can_view_storage": _has_permission(request, "lims.storage.view"),
             "can_manage_storage": _has_permission(request, "lims.storage.manage"),
             "can_view_inventory": _has_permission(request, "lims.inventory.view"),
@@ -310,6 +318,7 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
         "studies": Study.objects.count(),
         "sites": Site.objects.count(),
         "sync_runs": TanzaniaAddressSyncRun.objects.count(),
+        "sample_accession_runs": OperationRun.objects.filter(operation_version__definition__code="sample-accession").count(),
     }
     payload["labs"] = [_lab_to_dict(item) for item in Lab.objects.order_by("name")[:10]]
     payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
@@ -343,6 +352,85 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
             "href": "/lims/reference/address-sync/",
             "icon": "sync",
         },
+        {
+            "title": "Provision sample accession",
+            "description": "Provision and inspect the canonical sample accession reference bundle used by the receiving adapters.",
+            "href": "/lims/reference/operations/sample-accession/",
+            "icon": "conversion_path",
+        },
+    ]
+    return payload
+
+
+def _reference_sample_accession_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-reference",
+        title="Sample accession reference bundle",
+        summary="Provision and inspect the canonical form package, workflow, operation, and recent governed runs behind receiving adapters.",
+        kicker="Reference operation",
+    )
+    form_package = (
+        FormPackage.objects.prefetch_related(
+            "versions__sections",
+            "versions__choice_lists__choices",
+            "versions__item_groups",
+            "versions__items",
+            "versions__source_artifacts",
+            "versions__compiler_diagnostics",
+            "versions__compiled_projection",
+        )
+        .filter(code="sample-accession-package")
+        .first()
+    )
+    workflow_template = (
+        WorkflowTemplate.objects.prefetch_related(
+            "versions__nodes__step_bindings__form_package_version__package",
+            "versions__edges__source_node",
+            "versions__edges__target_node",
+        )
+        .filter(code="sample-accession")
+        .first()
+    )
+    operation_definition = (
+        OperationDefinition.objects.prefetch_related("versions__workflow_version__template")
+        .filter(code="sample-accession")
+        .first()
+    )
+    payload["reference_bundle"] = (
+        _sample_accession_reference_bundle_to_dict(
+            form_package=form_package,
+            workflow_template=workflow_template,
+            operation_definition=operation_definition,
+            created=False,
+        )
+        if form_package and workflow_template and operation_definition
+        else None
+    )
+    published_form_package_version = (
+        form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED).order_by("-version_number").first()
+        if form_package
+        else None
+    )
+    published_workflow_version = (
+        workflow_template.versions.filter(status=WorkflowTemplateVersion.Status.PUBLISHED).order_by("-version_number").first()
+        if workflow_template
+        else None
+    )
+    published_operation_version = (
+        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED).order_by("-version_number").first()
+        if operation_definition
+        else None
+    )
+    payload["cards"] = {
+        "package_version": published_form_package_version.version_number if published_form_package_version else "—",
+        "workflow_version": published_workflow_version.version_number if published_workflow_version else "—",
+        "operation_version": published_operation_version.version_number if published_operation_version else "—",
+        "runs": OperationRun.objects.filter(operation_version__definition__code="sample-accession").count(),
+    }
+    payload["recent_runs"] = [
+        _operation_run_to_dict(item)
+        for item in _operation_run_queryset().filter(operation_version__definition__code="sample-accession").order_by("-created_at")[:8]
     ]
     return payload
 
@@ -1916,6 +2004,45 @@ def _operation_definition_to_dict(definition: OperationDefinition) -> dict[str, 
     }
 
 
+def _sample_accession_reference_bundle_to_dict(
+    *,
+    form_package: FormPackage,
+    workflow_template: WorkflowTemplate,
+    operation_definition: OperationDefinition,
+    created: bool,
+) -> dict[str, object]:
+    published_form_package = next(
+        (item for item in form_package.versions.order_by("-version_number") if item.status == FormPackageVersion.Status.PUBLISHED),
+        None,
+    )
+    published_workflow = next(
+        (
+            item
+            for item in workflow_template.versions.order_by("-version_number")
+            if item.status == WorkflowTemplateVersion.Status.PUBLISHED
+        ),
+        None,
+    )
+    published_operation = next(
+        (
+            item
+            for item in operation_definition.versions.order_by("-version_number")
+            if item.status == OperationVersion.Status.PUBLISHED
+        ),
+        None,
+    )
+    return {
+        "reference_operation": "sample-accession",
+        "created": created,
+        "form_package": _form_package_to_dict(form_package),
+        "form_package_version": _form_package_version_to_dict(published_form_package) if published_form_package else None,
+        "workflow_template": _workflow_template_to_dict(workflow_template),
+        "workflow_version": _workflow_template_version_to_dict(published_workflow) if published_workflow else None,
+        "operation_definition": _operation_definition_to_dict(operation_definition),
+        "operation_version": _operation_version_to_dict(published_operation) if published_operation else None,
+    }
+
+
 def _schema_binding_to_dict(binding: MetadataSchemaBinding) -> dict[str, object]:
     return {
         "id": str(binding.id),
@@ -3288,6 +3415,20 @@ def lims_reference_page(request):
         request,
         'lims/reference.html',
         _page_context(request, active_nav='lims-reference', payload=_reference_launchpad_payload(request)),
+    )
+
+
+@csrf_exempt
+def lims_reference_sample_accession_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if forbidden:
+        return forbidden
+    return render(
+        request,
+        'lims/reference_sample_accession.html',
+        _page_context(request, active_nav='lims-reference', payload=_reference_sample_accession_page_payload(request)),
     )
 
 
@@ -6280,6 +6421,47 @@ def lims_inventory_lot_transactions(request, lot_id: str):
 
 
 @csrf_exempt
+def lims_reference_sample_accession_provision(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.operation.manage")
+    if forbidden:
+        return forbidden
+    try:
+        bundle = provision_sample_accession_reference_bundle()
+    except ReferenceOperationProvisionError as exc:
+        return JsonResponse(
+            {"error": exc.code, "details": exc.details or []},
+            status=400,
+        )
+    form_package = FormPackage.objects.prefetch_related(
+        "versions__sections",
+        "versions__choice_lists__choices",
+        "versions__item_groups",
+        "versions__items",
+        "versions__source_artifacts",
+        "versions__compiler_diagnostics",
+        "versions__compiled_projection",
+    ).get(id=bundle.form_package.id)
+    workflow_template = WorkflowTemplate.objects.prefetch_related(
+        "versions__nodes__step_bindings__form_package_version__package",
+        "versions__edges__source_node",
+        "versions__edges__target_node",
+    ).get(id=bundle.workflow_template.id)
+    operation_definition = OperationDefinition.objects.select_related().prefetch_related(
+        "versions__workflow_version__template"
+    ).get(id=bundle.operation_definition.id)
+    return JsonResponse(
+        _sample_accession_reference_bundle_to_dict(
+            form_package=form_package,
+            workflow_template=workflow_template,
+            operation_definition=operation_definition,
+            created=bundle.created,
+        )
+    )
+
+
+@csrf_exempt
 def lims_accessioning_receive_single(request):
     if request.method != "POST":
         return JsonResponse({"error": "method_not_allowed"}, status=405)
@@ -6312,11 +6494,14 @@ def lims_accessioning_receive_single(request):
     receipt_context = payload.get("receipt_context") or {}
     if not isinstance(receipt_context, dict):
         return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    source_mode = str(payload.get("source_mode") or OperationRun.SourceMode.SINGLE).strip()
+    if source_mode not in OperationRun.SourceMode.values:
+        return JsonResponse({"error": "invalid_source_mode"}, status=400)
     received_at, error = _parse_optional_received_at(payload.get("received_at"))
     if error:
         return error
     try:
-        specimen, event = receive_single_biospecimen(
+        result = adapt_single_receive_to_sample_accession(
             sample_type=sample_type,
             study=study,
             site=site,
@@ -6333,11 +6518,28 @@ def lims_accessioning_receive_single(request):
             notes=str(payload.get("notes") or "").strip(),
             receipt_context=receipt_context,
             received_at=received_at,
+            source_mode=source_mode,
+            source_reference=str(payload.get("source_reference") or "").strip(),
         )
-    except AccessioningError as exc:
+    except (AccessioningError, ReferenceOperationProvisionError) as exc:
+        if isinstance(exc, ReferenceOperationProvisionError):
+            return JsonResponse({"error": exc.code, "details": exc.details or []}, status=400)
         return _accessioning_error_response(exc)
-    specimen.refresh_from_db()
-    return JsonResponse({"biospecimen": _biospecimen_to_dict(specimen), "event": _receiving_event_to_dict(event)}, status=201)
+    run = _operation_run_queryset().get(id=result.operation_run.id)
+    specimen_payload = None
+    if result.biospecimen is not None:
+        result.biospecimen.refresh_from_db()
+        specimen_payload = _biospecimen_to_dict(result.biospecimen)
+    return JsonResponse(
+        {
+            "biospecimen": specimen_payload,
+            "event": _receiving_event_to_dict(result.event) if result.event else None,
+            "discrepancy": _receiving_discrepancy_to_dict(result.discrepancy) if result.discrepancy else None,
+            "qc_result": _qc_result_to_dict(result.qc_result) if result.qc_result else None,
+            "operation_run": _operation_run_to_dict(run),
+        },
+        status=201,
+    )
 
 
 @csrf_exempt
@@ -6471,11 +6673,14 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     receipt_context = payload.get("receipt_context") or {}
     if not isinstance(receipt_context, dict):
         return JsonResponse({"error": "receipt_context must be an object"}, status=400)
+    source_mode = str(payload.get("source_mode") or OperationRun.SourceMode.BATCH).strip()
+    if source_mode not in OperationRun.SourceMode.values:
+        return JsonResponse({"error": "invalid_source_mode"}, status=400)
     received_at, error = _parse_optional_received_at(payload.get("received_at"))
     if error:
         return error
     try:
-        item, event = receive_manifest_item(
+        result = adapt_manifest_item_receive_to_sample_accession(
             item,
             received_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
             scan_value=str(payload.get("scan_value") or "").strip(),
@@ -6483,11 +6688,24 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
             metadata=metadata,
             receipt_context=receipt_context,
             received_at=received_at,
+            source_mode=source_mode,
+            source_reference=str(payload.get("source_reference") or "").strip(),
         )
-    except AccessioningError as exc:
+    except (AccessioningError, ReferenceOperationProvisionError) as exc:
+        if isinstance(exc, ReferenceOperationProvisionError):
+            return JsonResponse({"error": exc.code, "details": exc.details or []}, status=400)
         return _accessioning_error_response(exc)
-    item.refresh_from_db()
-    return JsonResponse({"item": _manifest_item_to_dict(item), "event": _receiving_event_to_dict(event)})
+    result.manifest_item.refresh_from_db()
+    run = _operation_run_queryset().get(id=result.operation_run.id)
+    return JsonResponse(
+        {
+            "item": _manifest_item_to_dict(result.manifest_item),
+            "event": _receiving_event_to_dict(result.event) if result.event else None,
+            "discrepancy": _receiving_discrepancy_to_dict(result.discrepancy) if result.discrepancy else None,
+            "qc_result": _qc_result_to_dict(result.qc_result) if result.qc_result else None,
+            "operation_run": _operation_run_to_dict(run),
+        }
+    )
 
 
 @csrf_exempt
