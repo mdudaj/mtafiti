@@ -157,6 +157,7 @@ def _lims_navigation(request, active_key: str) -> dict[str, object]:
     links = []
     candidates = [
         ("lims-dashboard", "Dashboard", "dashboard", "/lims/", "lims.dashboard.view"),
+        ("lims-tasks", "Tasks", "task", "/lims/tasks/", "lims.workflow_task.view"),
         ("lims-reference", "Reference", "globe_location_pin", "/lims/reference/", "lims.reference.view"),
         ("lims-metadata", "Metadata", "schema", "/lims/metadata/", "lims.metadata.view"),
         ("lims-biospecimens", "Biospecimens", "biotech", "/lims/biospecimens/", "lims.artifact.view"),
@@ -199,12 +200,14 @@ def _page_payload_base(request, *, active_key: str, title: str, summary: str, ki
             "can_manage_operations": _has_permission(request, "lims.operation.manage"),
             "can_view_operation_runs": _has_permission(request, "lims.operation_run.view"),
             "can_manage_operation_runs": _has_permission(request, "lims.operation_run.manage"),
+            "can_view_tasks": _has_permission(request, "lims.workflow_task.view"),
+            "can_execute_tasks": _has_permission(request, "lims.workflow_task.execute"),
+            "can_assign_tasks": _has_permission(request, "lims.workflow_task.assign"),
+            "can_approve_tasks": _has_permission(request, "lims.workflow_task.approve"),
             "can_view_storage": _has_permission(request, "lims.storage.view"),
             "can_manage_storage": _has_permission(request, "lims.storage.manage"),
             "can_view_inventory": _has_permission(request, "lims.inventory.view"),
             "can_manage_inventory": _has_permission(request, "lims.inventory.manage"),
-            "can_execute_tasks": _has_permission(request, "lims.workflow.execute"),
-            "can_approve_tasks": _has_permission(request, "lims.workflow.approve"),
         },
         "page": {
             "page_title": title,
@@ -249,6 +252,12 @@ def _dashboard_payload(request) -> dict[str, object]:
         "storage_locations": storage_location_count,
     }
     payload["launchpad"] = [
+        {
+            "title": "Task inbox",
+            "description": "Review open runtime work, approval queues, and the next governed step for each operation run.",
+            "href": "/lims/tasks/",
+            "status": "ready" if payload["capabilities"]["can_view_tasks"] else "restricted",
+        },
         {
             "title": "Reference data",
             "description": "Manage labs, studies, sites, and address sync runs for the tenant.",
@@ -302,6 +311,192 @@ def _dashboard_payload(request) -> dict[str, object]:
         _biospecimen_to_dict(item)
         for item in Biospecimen.objects.select_related("sample_type").order_by("-created_at")[:5]
     ]
+    return payload
+
+
+def _task_run_queryset():
+    return TaskRun.objects.select_related(
+        "operation_run__operation_version__definition",
+        "operation_run__workflow_version__template",
+        "operation_run__biospecimen",
+        "operation_run__manifest",
+        "operation_run__manifest_item",
+        "node_template",
+    ).prefetch_related("submissions", "approvals")
+
+
+def _task_adapter_surface(task_run: TaskRun) -> str:
+    adapter_surface = str(task_run.node_template.config.get("adapter_surface") or "").strip()
+    if adapter_surface != "/lims/receiving/":
+        return adapter_surface
+    if task_run.operation_run.source_mode == OperationRun.SourceMode.BATCH:
+        return "/lims/receiving/batch/"
+    if task_run.operation_run.source_mode == OperationRun.SourceMode.EDC_IMPORT:
+        return "/lims/receiving/edc-import/"
+    return "/lims/receiving/single/"
+
+
+def _task_page_url(task_run: TaskRun) -> str:
+    return (
+        f"/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
+        f"{task_run.operation_run_id}/tasks/{task_run.id}/"
+    )
+
+
+def _can_execute_task(request, task_run: TaskRun, *, user_id: str) -> bool:
+    if task_run.status != TaskRun.Status.OPEN:
+        return False
+    permission_key = task_run.permission_key or "lims.workflow_task.execute"
+    if not _has_permission(request, permission_key):
+        return False
+    if task_run.assignee and task_run.assignee != user_id:
+        return _has_permission(request, "lims.workflow_task.assign") or _has_permission(request, "lims.operation_run.manage")
+    return True
+
+
+def _can_approve_task(request, task_run: TaskRun) -> bool:
+    if task_run.status != TaskRun.Status.AWAITING_APPROVAL:
+        return False
+    return _has_permission(request, "lims.workflow_task.approve")
+
+
+def _task_run_ui_dict(request, task_run: TaskRun, *, user_id: str) -> dict[str, object]:
+    latest_submission = task_run.submissions.order_by("-submission_index").first()
+    latest_approval = task_run.approvals.order_by("-approved_at", "-created_at").first()
+    can_submit = _can_execute_task(request, task_run, user_id=user_id)
+    can_approve = _can_approve_task(request, task_run)
+    action_mode = "approve" if can_approve else "submit" if can_submit else "view"
+    return {
+        "id": str(task_run.id),
+        "operation_run_id": str(task_run.operation_run_id),
+        "operation_definition_id": str(task_run.operation_run.operation_version.definition_id),
+        "operation_code": task_run.operation_run.operation_version.definition.code,
+        "operation_name": task_run.operation_run.operation_version.definition.name,
+        "operation_run_status": task_run.operation_run.status,
+        "workflow_template_code": task_run.operation_run.workflow_version.template.code,
+        "node_key": task_run.node_template.node_key,
+        "node_type": task_run.node_template.node_type,
+        "title": task_run.node_template.title,
+        "summary": task_run.node_template.summary,
+        "status": task_run.status,
+        "assignment_role": task_run.assignment_role,
+        "assignee": task_run.assignee,
+        "permission_key": task_run.permission_key,
+        "requires_approval": task_run.requires_approval,
+        "approval_role": task_run.approval_role,
+        "outcome": task_run.outcome,
+        "source_mode": task_run.operation_run.source_mode,
+        "source_reference": task_run.operation_run.source_reference,
+        "subject_identifier": task_run.operation_run.subject_identifier,
+        "external_identifier": task_run.operation_run.external_identifier,
+        "biospecimen_id": str(task_run.operation_run.biospecimen_id) if task_run.operation_run.biospecimen_id else None,
+        "manifest_id": str(task_run.operation_run.manifest_id) if task_run.operation_run.manifest_id else None,
+        "manifest_item_id": str(task_run.operation_run.manifest_item_id) if task_run.operation_run.manifest_item_id else None,
+        "started_at": task_run.started_at.isoformat() if task_run.started_at else None,
+        "completed_at": task_run.completed_at.isoformat() if task_run.completed_at else None,
+        "input_context": dict(task_run.input_context or {}),
+        "output_data": dict(task_run.output_data or {}),
+        "config": dict(task_run.node_template.config or {}),
+        "page_url": _task_page_url(task_run),
+        "submit_url": (
+            f"/api/v1/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
+            f"{task_run.operation_run_id}/tasks/{task_run.id}/submit"
+        ),
+        "approve_url": (
+            f"/api/v1/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
+            f"{task_run.operation_run_id}/tasks/{task_run.id}/approve"
+        ),
+        "adapter_surface": _task_adapter_surface(task_run),
+        "is_assigned_to_user": bool(user_id and task_run.assignee == user_id),
+        "can_submit": can_submit,
+        "can_approve": can_approve,
+        "action_mode": action_mode,
+        "action_label": "Review approval" if can_approve else "Open task" if can_submit else "View details",
+        "latest_submission": _submission_record_to_dict(latest_submission) if latest_submission else None,
+        "latest_approval": _approval_record_to_dict(latest_approval) if latest_approval else None,
+        "submissions": [_submission_record_to_dict(item) for item in task_run.submissions.order_by("submission_index")],
+        "approvals": [_approval_record_to_dict(item) for item in task_run.approvals.order_by("approved_at", "created_at")],
+    }
+
+
+def _task_inbox_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-tasks",
+        title="Workflow task inbox",
+        summary="Follow governed operation work from one inbox that separates executable tasks, approval queues, and recent outcomes.",
+        kicker="Operator task inbox",
+    )
+    user_id = str(_user_context(request)["user_id"])
+    task_items = [
+        _task_run_ui_dict(request, item, user_id=user_id)
+        for item in _task_run_queryset().filter(
+            status__in=[TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL]
+        ).order_by("-operation_run__created_at", "node_template__position", "created_at")[:50]
+    ]
+    open_tasks = [item for item in task_items if item["status"] == TaskRun.Status.OPEN and item["can_submit"]]
+    approval_tasks = [item for item in task_items if item["status"] == TaskRun.Status.AWAITING_APPROVAL and item["can_approve"]]
+    assigned_tasks = [item for item in open_tasks if item["is_assigned_to_user"]]
+    payload["cards"] = {
+        "open_tasks": len(open_tasks),
+        "approval_tasks": len(approval_tasks),
+        "assigned_tasks": len(assigned_tasks),
+        "recent_outcomes": OperationRun.objects.filter(
+            status__in=[OperationRun.Status.COMPLETED, OperationRun.Status.REJECTED, OperationRun.Status.CANCELLED]
+        ).count(),
+    }
+    payload["actions"] = [
+        {
+            "title": "Open receiving",
+            "description": "Use the receiving launchpad while accession intake remains a transitional task-entry surface.",
+            "href": "/lims/receiving/",
+            "icon": "inventory_2",
+        },
+        {
+            "title": "Inspect operations",
+            "description": "Review governed operation bundles and runtime history behind the current inbox items.",
+            "href": "/lims/reference/operations/sample-accession/",
+            "icon": "conversion_path",
+        },
+    ]
+    payload["open_tasks"] = open_tasks
+    payload["approval_tasks"] = approval_tasks
+    payload["recent_runs"] = [
+        _operation_run_to_dict(item)
+        for item in _operation_run_queryset().filter(
+            status__in=[OperationRun.Status.COMPLETED, OperationRun.Status.REJECTED, OperationRun.Status.CANCELLED]
+        ).order_by("-updated_at", "-created_at")[:8]
+    ]
+    return payload
+
+
+def _task_detail_page_payload(request, task_run: TaskRun) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-tasks",
+        title=task_run.node_template.title,
+        summary="Inspect the governed task context, prior submissions, and the next runtime-backed action for this workflow step.",
+        kicker="Workflow task",
+    )
+    user_id = str(_user_context(request)["user_id"])
+    task_payload = _task_run_ui_dict(request, task_run, user_id=user_id)
+    operation_run = _operation_run_queryset().get(id=task_run.operation_run_id)
+    payload["task"] = task_payload
+    payload["task_json"] = {
+        "id": task_payload["id"],
+        "page_url": task_payload["page_url"],
+        "submit_url": task_payload["submit_url"],
+        "approve_url": task_payload["approve_url"],
+        "source_mode": task_payload["source_mode"],
+        "adapter_surface": task_payload["adapter_surface"],
+        "current_status": task_payload["status"],
+        "default_submission_payload": task_payload["latest_submission"]["payload"] if task_payload["latest_submission"] else {},
+    }
+    payload["default_submission_json"] = json.dumps(payload["task_json"]["default_submission_payload"], indent=2, sort_keys=True)
+    payload["operation_run"] = _operation_run_to_dict(operation_run)
+    payload["current_task_count"] = len(
+        [item for item in payload["operation_run"]["tasks"] if item["status"] in {TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL}]
+    )
     return payload
 
 
@@ -3402,6 +3597,38 @@ def lims_dashboard_page(request):
     if forbidden:
         return forbidden
     return render(request, 'lims/dashboard.html', _page_context(request, active_nav='lims-dashboard', payload=_dashboard_payload(request)))
+
+
+@csrf_exempt
+def lims_task_inbox_page(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.workflow_task.view')
+    if forbidden:
+        return forbidden
+    return render(request, 'lims/task_inbox.html', _page_context(request, active_nav='lims-tasks', payload=_task_inbox_page_payload(request)))
+
+
+@csrf_exempt
+def lims_task_detail_page(request, operation_id: str, run_id: str, task_id: str):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    forbidden = require_lims_permission(request, 'lims.workflow_task.view')
+    if forbidden:
+        return forbidden
+    try:
+        task_run = _task_run_queryset().get(
+            id=task_id,
+            operation_run_id=run_id,
+            operation_run__operation_version__definition_id=operation_id,
+        )
+    except (ValidationError, TaskRun.DoesNotExist):
+        return JsonResponse({'error': 'task_run_not_found'}, status=404)
+    return render(
+        request,
+        'lims/task_detail.html',
+        _page_context(request, active_nav='lims-tasks', payload=_task_detail_page_payload(request, task_run)),
+    )
 
 
 @csrf_exempt

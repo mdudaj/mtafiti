@@ -42,6 +42,38 @@ def _create_lims_host(client: Client, route_slug: str) -> str:
     return created_route.json()["domain"]
 
 
+def _provision_sample_accession_bundle(client: Client, host: str) -> tuple[str, str]:
+    provisioned = client.post(
+        "/api/v1/lims/reference/operations/sample-accession/provision",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+    )
+    assert provisioned.status_code == 200
+    payload = provisioned.json()
+    return payload["operation_definition"]["id"], payload["operation_version"]["id"]
+
+
+def _start_sample_accession_run(client: Client, host: str, *, operation_id: str, operation_version_id: str) -> dict[str, object]:
+    created = client.post(
+        f"/api/v1/lims/operations/{operation_id}/runs",
+        data=json.dumps(
+            {
+                "operation_version_id": operation_version_id,
+                "source_mode": "single",
+                "subject_identifier": "SUBJ-UI-001",
+                "external_identifier": "EXT-UI-001",
+                "context": {"intake_mode": "bench"},
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+        HTTP_X_USER_ID="manager-1",
+    )
+    assert created.status_code == 201
+    return created.json()
+
+
 @pytest.mark.django_db(transaction=True)
 def test_lims_html_pages_render_with_role_aware_actions():
     client = Client()
@@ -49,6 +81,7 @@ def test_lims_html_pages_render_with_role_aware_actions():
 
     pages = [
         ("/lims/", b"Laboratory operations workspace", None),
+        ("/lims/tasks/", b"Workflow task inbox", b'data-lims-action="task-inbox"'),
         ("/lims/reference/", b"Reference and geography", b"Choose a reference workflow"),
         ("/lims/reference/operations/sample-accession/", b"Sample accession reference bundle", b'data-lims-action="reference-sample-accession-provision"'),
         ("/lims/reference/labs/create/", b"Create lab", b'data-lims-action="reference-lab-create"'),
@@ -276,6 +309,86 @@ def test_reference_sample_accession_page_shows_bundle_status_after_provision():
     assert b"Published v1" in page.content
     assert b"sample-accession-package" in page.content
     assert b"single, batch, edc_import" in page.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_task_inbox_lists_actionable_operator_work_and_links_to_runtime_detail(monkeypatch):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-task-inbox")
+    operation_id, operation_version_id = _provision_sample_accession_bundle(client, host)
+    run = _start_sample_accession_run(client, host, operation_id=operation_id, operation_version_id=operation_version_id)
+    intake_task = next(item for item in run["tasks"] if item["node_key"] == "intake_capture")
+
+    inbox = client.get("/lims/tasks/", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.operator", HTTP_X_USER_ID="operator-1")
+
+    assert inbox.status_code == 200
+    assert b"Workflow task inbox" in inbox.content
+    assert b"Intake capture" in inbox.content
+    assert b"SUBJ-UI-001" in inbox.content
+    assert f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/".encode() in inbox.content
+
+    detail = client.get(
+        f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+        HTTP_X_USER_ID="operator-1",
+    )
+
+    assert detail.status_code == 200
+    assert b"Submit runtime payload" in detail.content
+    assert b"/api/v1/lims/operations/" in detail.content
+    assert b"Open receiving single surface" in detail.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_task_inbox_shows_approval_queue_for_review_roles(monkeypatch):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-task-approvals")
+    operation_id, operation_version_id = _provision_sample_accession_bundle(client, host)
+    run = _start_sample_accession_run(client, host, operation_id=operation_id, operation_version_id=operation_version_id)
+    intake_task = next(item for item in run["tasks"] if item["node_key"] == "intake_capture")
+
+    intake_submitted = client.post(
+        f"/api/v1/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/submit",
+        data=json.dumps({"payload": {"subject_identifier": "SUBJ-UI-001", "received_at": "2026-03-21"}}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+        HTTP_X_USER_ID="operator-1",
+    )
+    assert intake_submitted.status_code == 200
+    qc_task = next(item for item in intake_submitted.json()["tasks"] if item["node_key"] == "qc_decision")
+
+    qc_submitted = client.post(
+        f"/api/v1/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/submit",
+        data=json.dumps({"payload": {"qc_decision": "accept", "qc_notes": "Looks good"}}),
+        content_type="application/json",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+        HTTP_X_USER_ID="operator-1",
+    )
+    assert qc_submitted.status_code == 200
+
+    inbox = client.get("/lims/tasks/", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.qa", HTTP_X_USER_ID="qa-1")
+
+    assert inbox.status_code == 200
+    assert b"Approval queue" in inbox.content
+    assert b"QC decision" in inbox.content
+    assert f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/".encode() in inbox.content
+
+    detail = client.get(
+        f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.qa",
+        HTTP_X_USER_ID="qa-1",
+    )
+
+    assert detail.status_code == 200
+    assert b"Approve or reopen task" in detail.content
+    assert b"Submit approval" in detail.content
+    assert b"Runtime approval endpoint" in detail.content
 
 
 @pytest.mark.django_db(transaction=True)

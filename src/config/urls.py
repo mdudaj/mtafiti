@@ -166,6 +166,8 @@ from lims.views import (
     lims_storage_create_placement_page,
     lims_storage_create_transaction_page,
     lims_storage_inventory_page,
+    lims_task_detail_page,
+    lims_task_inbox_page,
 )
 from tenants.views import tenant_services, tenants
 
@@ -179,6 +181,12 @@ urlpatterns = [
     path('api/v1/tenants/services', tenant_services, name='tenant_services'),
     path('api/v1/lims/', include(('lims.urls', 'lims'), namespace='lims')),
     path('lims/', lims_dashboard_page, name='lims_dashboard_page'),
+    path('lims/tasks/', lims_task_inbox_page, name='lims_task_inbox_page'),
+    path(
+        'lims/operations/<uuid:operation_id>/runs/<uuid:run_id>/tasks/<uuid:task_id>/',
+        lims_task_detail_page,
+        name='lims_task_detail_page',
+    ),
     path('lims/reference/', lims_reference_page, name='lims_reference_page'),
     path(
         'lims/reference/operations/sample-accession/',

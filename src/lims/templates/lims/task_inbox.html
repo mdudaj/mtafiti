@@ -1,0 +1,106 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Tasks" %}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Open tasks" count_label="ready to execute" count_value=payload.cards.open_tasks %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Approvals" count_label="awaiting review" count_value=payload.cards.approval_tasks %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Assigned to you" count_label="claimed items" count_value=payload.cards.assigned_tasks %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Recent outcomes" count_label="completed or closed runs" count_value=payload.cards.recent_outcomes %}
+</div>
+
+<section class="panel" data-lims-action="task-inbox">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Task inbox workflows" panel_description="Use the inbox as the main follow-up surface, while transitional receiving pages remain available for task entry when a node advertises an adapter surface." %}
+  <div class="cards">
+    {% for item in payload.actions %}
+    <article class="card">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">{{ item.title }}</h2>
+          <p class="panel-description">{{ item.description }}</p>
+        </div>
+        <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+      </div>
+      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Actionable tasks" panel_description="Open workflow work items you can execute now, including available items and any work already assigned to your user." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Operation</th><th>Subject</th><th>Source</th><th>Status</th><th>Assignment</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for item in payload.open_tasks %}
+        <tr>
+          <td>
+            <strong>{{ item.title }}</strong>
+            <div class="muted">{{ item.summary|default:item.node_key }}</div>
+          </td>
+          <td>{{ item.operation_name }}</td>
+          <td>{{ item.subject_identifier|default:"-" }}</td>
+          <td>{{ item.source_mode }}{% if item.source_reference %} · {{ item.source_reference }}{% endif %}</td>
+          <td>{{ item.status }}</td>
+          <td>{% if item.is_assigned_to_user %}Assigned to you{% elif item.assignee %}{{ item.assignee }}{% else %}Available{% endif %}</td>
+          <td><a href="{{ item.page_url }}">{{ item.action_label }} →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">No executable workflow tasks are currently available for your role.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Approval queue" panel_description="Tasks that have been submitted and are now waiting for QA or governance review." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Operation</th><th>Outcome</th><th>Approval role</th><th>Submitted by</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for item in payload.approval_tasks %}
+        <tr>
+          <td>
+            <strong>{{ item.title }}</strong>
+            <div class="muted">{{ item.summary|default:item.node_key }}</div>
+          </td>
+          <td>{{ item.operation_name }}</td>
+          <td>{{ item.outcome|default:"-" }}</td>
+          <td>{{ item.approval_role|default:"-" }}</td>
+          <td>{% if item.latest_submission %}{{ item.latest_submission.submitted_by|default:"-" }}{% else %}-{% endif %}</td>
+          <td><a href="{{ item.page_url }}">{{ item.action_label }} →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No approval tasks are waiting for your review.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Recent operation outcomes" panel_description="Latest completed, rejected, or cancelled runs so operators and managers can see what just finished." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Operation</th><th>Status</th><th>Source</th><th>Subject</th><th>Outcome</th><th>Started</th></tr></thead>
+      <tbody>
+        {% for item in payload.recent_runs %}
+        <tr>
+          <td>{{ item.operation_name }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.source_mode }}</td>
+          <td>{{ item.subject_identifier|default:"-" }}</td>
+          <td>{{ item.outcome|default:"-" }}</td>
+          <td>{{ item.started_at|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No completed or closed operation runs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
