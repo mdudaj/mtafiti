@@ -318,22 +318,17 @@ function singleReceiptBasePayload() {
 }
 
 async function submitSingleReceiptRejection(initialMetadata) {
-  const rejectionReason = limsValue("receive-qc-notes") || "Rejected during first QC review";
-  await limsPortalAction("/api/v1/lims/receiving/discrepancies", {
-    code: limsValue("receive-rejection-code") || "other",
-    notes: rejectionReason,
-    expected_data: {
-      sample_type_id: limsValue("receive-sample-type"),
-      subject_identifier: limsValue("receive-subject"),
-      sample_identifier: limsValue("receive-sample-identifier"),
-      barcode: limsValue("receive-barcode"),
-    },
-    actual_data: {
-      receiving_date: limsValue("receive-date"),
-      brought_by: limsValue("receive-brought-by"),
-      qc_decision: "reject",
-      qc_notes: limsValue("receive-qc-notes"),
-      metadata: initialMetadata,
+  await limsPortalAction("/api/v1/lims/accessioning/receive-single", {
+    ...singleReceiptBasePayload(),
+    source_mode: "single",
+    metadata: initialMetadata,
+    receipt_context: {
+      ...singleReceiptReceiptContext(),
+      qc: {
+        decision: "reject",
+        notes: limsValue("receive-qc-notes"),
+        rejection_code: limsValue("receive-rejection-code") || "other",
+      },
     },
   }, "Receipt rejection logged");
 }
@@ -415,12 +410,13 @@ async function submitSingleReceiptWizard() {
   }
   await limsPortalAction("/api/v1/lims/accessioning/receive-single", {
     ...singleReceiptBasePayload(),
+    source_mode: "single",
     metadata: {
       ...initialMetadata,
       ...limsSingleReceiptWizard.metadataValues,
       ...limsSingleReceiptWizard.storageValues,
     },
-  }, "Specimen received");
+  }, (limsValue("receive-qc-decision") || "accept") === "reject" ? "Receipt rejection logged" : "Specimen received");
 }
 
 showSingleReceiptStep(1);

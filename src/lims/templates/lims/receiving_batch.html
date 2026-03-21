@@ -277,28 +277,28 @@ async function importBatchManifest() {
         if (!row.rejection_reason) {
           throw new Error("Row " + row.position + " is rejected but has no rejection_reason");
         }
-        await limsPortalRequest("/api/v1/lims/receiving/discrepancies", {
-          manifest_id: manifest.id,
-          manifest_item_id: item.id,
-          code: (row.rejection_code || "other").toLowerCase(),
-          notes: row.rejection_reason,
-          expected_data: {
-            expected_subject_identifier: row.subject_identifier || "",
-            expected_sample_identifier: row.expected_sample_identifier || "",
-            expected_barcode: row.expected_barcode || "",
-          },
-          actual_data: {
-            receiving_date: row.receiving_date || "",
+        await limsPortalRequest("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+          source_mode: "batch",
+          source_reference: limsValue("manifest-source-reference"),
+          notes: row.notes || "",
+          received_at: row.receiving_date || null,
+          metadata: metadata,
+          receipt_context: {
             brought_by: row.brought_by || "",
-            qc_decision: "reject",
-            metadata: metadata,
-            notes: row.notes || "",
+            qc: {
+              decision: "reject",
+              notes: row.rejection_reason,
+              rejection_code: (row.rejection_code || "other").toLowerCase(),
+            },
+            storage: {},
           },
         });
         rejectedCount += 1;
         continue;
       }
       await limsPortalRequest("/api/v1/lims/accessioning/manifests/" + manifest.id + "/items/" + item.id + "/receive", {
+        source_mode: "batch",
+        source_reference: limsValue("manifest-source-reference"),
         scan_value: row.expected_barcode || "",
         notes: row.notes || "",
         received_at: row.receiving_date || null,
