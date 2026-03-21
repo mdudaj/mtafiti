@@ -1,0 +1,223 @@
+{% extends "lims/base.html" %}
+
+{% block content %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Tasks" parent_url="/lims/tasks/" current_label=payload.task.title %}
+{{ payload.task_json|json_script:"lims-task-runtime" }}
+
+<div class="stat-grid">
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Task status" count_label=payload.task.node_key count_value=payload.task.status %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Run status" count_label=payload.task.operation_name count_value=payload.task.operation_run_status %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Submissions" count_label="captured attempts" count_value=payload.task.submissions|length %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Approvals" count_label="review records" count_value=payload.task.approvals|length %}
+</div>
+
+<section class="panel" data-lims-action="task-detail">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Task context" panel_description="This page keeps the governed runtime identifiers, current source context, and the recommended task-entry surface together." %}
+  <div class="section-stack">
+    <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+      <article class="card">
+        <h2 class="panel-title">Operation</h2>
+        <p>{{ payload.task.operation_name }} · {{ payload.task.operation_code }}</p>
+        <p class="muted">Run {{ payload.task.operation_run_id }}</p>
+      </article>
+      <article class="card">
+        <h2 class="panel-title">Subject + source</h2>
+        <p>Subject: {{ payload.task.subject_identifier|default:"-" }}</p>
+        <p>Source: {{ payload.task.source_mode }}{% if payload.task.source_reference %} · {{ payload.task.source_reference }}{% endif %}</p>
+      </article>
+      <article class="card">
+        <h2 class="panel-title">Assignment</h2>
+        <p>Role: {{ payload.task.assignment_role|default:"-" }}</p>
+        <p>Assignee: {{ payload.task.assignee|default:"Available" }}</p>
+      </article>
+      <article class="card">
+        <h2 class="panel-title">Approval</h2>
+        <p>{% if payload.task.requires_approval %}Required · {{ payload.task.approval_role }}{% else %}Not required{% endif %}</p>
+        <p>Current outcome: {{ payload.task.outcome|default:"-" }}</p>
+      </article>
+    </div>
+    <div class="button-row">
+      <a class="button button-secondary" href="/lims/tasks/">Back to inbox</a>
+      {% if payload.task.adapter_surface %}
+      <a class="button button-secondary" href="{{ payload.task.adapter_surface }}">Open receiving {{ payload.task.source_mode|default:"workflow" }} surface</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% if payload.task.can_submit %}
+<section class="panel" data-lims-action="task-submit">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Submit runtime payload" panel_description="Use the governed task endpoint directly from the inbox. The textarea is prefilled from the latest submission when one exists." %}
+  <div class="section-stack">
+    <p class="muted">Runtime submit endpoint: <code>{{ payload.task.submit_url }}</code></p>
+    <label class="field-group">
+      <span class="field-label">Submission payload JSON</span>
+      <textarea class="textarea" rows="12" data-lims-field="task-submission-json">{{ payload.default_submission_json }}</textarea>
+    </label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="submitCurrentTask()"><span class="material-symbols-outlined button-icon" aria-hidden="true">task_alt</span><span>Submit task payload</span></button>
+      {% if payload.task.adapter_surface %}
+      <a class="button button-secondary" href="{{ payload.task.adapter_surface }}">Use transitional capture page</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if payload.task.can_approve %}
+<section class="panel" data-lims-action="task-approve">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Approve or reopen task" panel_description="QA and governance reviewers can approve the task to advance the run or reject it to reopen the step." %}
+  <div class="section-stack">
+    <p class="muted">Runtime approval endpoint: <code>{{ payload.task.approve_url }}</code></p>
+    <div class="field-grid field-grid--wide">
+      <label class="field-group">
+        <span class="field-label">Outcome</span>
+        <select class="select" data-lims-field="task-approval-outcome">
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </label>
+      <label class="field-group">
+        <span class="field-label">Meaning</span>
+        <input class="input" data-lims-field="task-approval-meaning" value="QA review completed" />
+      </label>
+    </div>
+    <label class="field-group">
+      <span class="field-label">Comments</span>
+      <textarea class="textarea" rows="4" data-lims-field="task-approval-comments"></textarea>
+    </label>
+    <div class="button-row">
+      <button class="button" type="button" onclick="approveCurrentTask()"><span class="material-symbols-outlined button-icon" aria-hidden="true">verified</span><span>Submit approval</span></button>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Submission history" panel_description="Every payload captured for this task in submission order." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Status</th><th>Submitted by</th><th>Payload</th></tr></thead>
+        <tbody>
+          {% for item in payload.task.submissions %}
+          <tr>
+            <td>{{ item.submission_index }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.submitted_by|default:"-" }}</td>
+            <td><code>{{ item.payload }}</code></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No submissions have been recorded for this task yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    {% include "core/ui/includes/panel_header.html" with panel_title="Approval history" panel_description="QA or governance decisions recorded against this workflow step." %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Outcome</th><th>Approver</th><th>Role</th><th>Meaning</th></tr></thead>
+        <tbody>
+          {% for item in payload.task.approvals %}
+          <tr>
+            <td>{{ item.outcome }}</td>
+            <td>{{ item.approved_by|default:"-" }}</td>
+            <td>{{ item.approver_role|default:"-" }}</td>
+            <td>{{ item.meaning|default:"-" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No approvals have been recorded for this task yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  {% include "core/ui/includes/panel_header.html" with panel_title="Current workflow state" panel_description="Sibling tasks in this operation run, including newly opened work created after each transition." %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Status</th><th>Outcome</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for item in payload.operation_run.tasks %}
+        <tr>
+          <td>{{ item.title }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.outcome|default:"-" }}</td>
+          <td>
+            {% if item.id == payload.task.id %}
+            Current task
+            {% elif item.status == "open" or item.status == "awaiting_approval" %}
+            <a href="/lims/operations/{{ payload.task.operation_definition_id }}/runs/{{ payload.task.operation_run_id }}/tasks/{{ item.id }}/">Open task →</a>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+const limsTaskRuntime = JSON.parse(document.getElementById("lims-task-runtime").textContent);
+
+function limsTaskRedirect(url, message, isError) {
+  const target = new URL(url, window.location.origin);
+  if (message) {
+    target.searchParams.set("ui_message", message);
+    target.searchParams.set("ui_error", isError ? "1" : "0");
+  }
+  window.location.assign(target.toString());
+}
+
+function limsNextTaskUrl(runPayload) {
+  const tasks = (runPayload && runPayload.tasks) || [];
+  const nextTask = tasks.find((item) => (item.status === "open" || item.status === "awaiting_approval") && item.id !== limsTaskRuntime.id);
+  if (!nextTask) {
+    return "";
+  }
+  return `/lims/operations/${runPayload.operation_definition_id}/runs/${runPayload.id}/tasks/${nextTask.id}/`;
+}
+
+async function submitCurrentTask() {
+  let payload;
+  try {
+    payload = JSON.parse(limsValue("task-submission-json") || "{}");
+  } catch (_error) {
+    limsFeedback("task-submission-json must be valid JSON", true);
+    return;
+  }
+  let runPayload;
+  try {
+    runPayload = await limsPortalRequest(limsTaskRuntime.submit_url, {payload}, "POST");
+  } catch (error) {
+    limsFeedback(error.message || "Task submission failed", true);
+    return;
+  }
+  limsTaskRedirect(limsNextTaskUrl(runPayload) || "/lims/tasks/", "Task submitted", false);
+}
+
+async function approveCurrentTask() {
+  const payload = {
+    outcome: limsValue("task-approval-outcome"),
+    meaning: limsValue("task-approval-meaning"),
+    comments: limsValue("task-approval-comments"),
+  };
+  let runPayload;
+  try {
+    runPayload = await limsPortalRequest(limsTaskRuntime.approve_url, payload, "POST");
+  } catch (error) {
+    limsFeedback(error.message || "Task approval failed", true);
+    return;
+  }
+  limsTaskRedirect(limsNextTaskUrl(runPayload) || "/lims/tasks/", "Task approval recorded", false);
+}
+{% endblock %}
