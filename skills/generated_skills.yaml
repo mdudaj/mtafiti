@@ -35,6 +35,24 @@ skills:
       - src/config/urls.py
       - src/core/views.py
   -
+    id: determine_repository_target_surface
+    name: "Determine Repository Target Surface"
+    description: "Identify the correct subsystem, abstraction layer, and explicit non-goals before implementation begins."
+    inputs:
+      - user_request
+      - candidate_surfaces
+      - repository_evidence
+    tools:
+      []
+    steps:
+      - "List the plausible repository surfaces that could satisfy the request."
+      - "Compare them against the user's objective and the available evidence."
+      - "Choose the smallest supported target surface and document rejected alternatives."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/COPILOT.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
     id: implement_schema_per_tenant_api
     name: "Implement Schema-per-Tenant API"
     description: "Scope models, requests, and background execution to tenant schemas using django-tenants."
@@ -143,3 +161,22 @@ skills:
       - docs/workflow-ui.md
       - https://github.com/viewflow/viewflow
       - https://github.com/viewflow/django-material
+  -
+    id: record_structured_agentic_lesson
+    name: "Record Structured Agentic Lesson"
+    description: "Capture wrong turns and successful corrections in a reusable lesson format that can steer future sessions."
+    inputs:
+      - affected_surface
+      - failure_signature
+      - root_cause
+      - verification_added
+    tools:
+      []
+    steps:
+      - "Classify the mistake using a small reusable taxonomy."
+      - "Record the missed evidence that would have prevented the mistake."
+      - "Store a preventive rule and associated verification evidence for future sessions."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/tasks/lessons.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml

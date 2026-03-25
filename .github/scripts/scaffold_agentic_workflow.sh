@@ -66,6 +66,7 @@ copy_file() {
 copy_file "$TEMPLATE_DIR/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
 copy_file "$TEMPLATE_DIR/COPILOT.md" "$TARGET_DIR/COPILOT.md"
 copy_file "$TEMPLATE_DIR/.github/copilot-instructions.md" "$TARGET_DIR/.github/copilot-instructions.md"
+copy_file "$TEMPLATE_DIR/.agentic/right-thing.yaml" "$TARGET_DIR/.agentic/right-thing.yaml"
 copy_file "$TEMPLATE_DIR/tasks/todo.md" "$TARGET_DIR/tasks/todo.md"
 copy_file "$TEMPLATE_DIR/tasks/lessons.md" "$TARGET_DIR/tasks/lessons.md"
 

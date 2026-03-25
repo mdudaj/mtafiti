@@ -3,13 +3,18 @@
 ## Work item
 
 * Objective:
+* Target surface:
 * Scope boundary:
+* Out of scope:
 * Dependencies:
 * Acceptance criteria:
+* Evidence reviewed:
+* Validation plan:
 
 ## Phase 1 — Plan
 
 - [ ] Break work into explicit, testable steps.
+- [ ] Confirm the correct target surface and reject wrong alternatives.
 - [ ] Identify risks and rollback path.
 - [ ] Select targeted checks for fast feedback.
 
@@ -24,6 +29,7 @@
 
 - [ ] Run targeted checks and record results
 - [ ] Run merge-gate checks and record results
+- [ ] Confirm the delivered change matches the chosen target surface
 - [ ] Document risk review and final outcome
 - [ ] Add lessons to `tasks/lessons.md`
 

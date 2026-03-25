@@ -12,6 +12,18 @@
 2. **Execute**: implement minimal, safe changes and update task status as you go.
 3. **Review**: verify outcomes, summarize risks, and record lessons in `tasks/lessons.md`.
 
+## Right-thing contract (required)
+
+Before implementation:
+
+* identify the exact target surface and abstraction layer,
+* note the evidence reviewed,
+* record non-goals and rejected alternatives when ambiguity exists,
+* choose the smallest evidence-backed change,
+* define verification before editing.
+
+If the current approach appears to target the wrong subsystem, stop, re-plan, and record the correction rather than forcing the original approach through.
+
 ## Completion gate
 
 A task is not complete until:
@@ -30,7 +42,10 @@ A task is not complete until:
 
 After each correction, add an entry to `tasks/lessons.md` with:
 
+* affected surface,
+* error class,
 * failure signature,
 * root cause,
+* missed evidence,
 * preventive rule,
 * verification added.

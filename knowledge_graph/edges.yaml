@@ -1860,6 +1860,14 @@ edges:
     from: uicomponent:stewardship_workbench
     to: framework:django_material
   -
+    relationship: depends_on
+    from: workflow:agentic_delivery_loop
+    to: skill:determine_repository_target_surface
+  -
+    relationship: depends_on
+    from: workflow:agentic_delivery_loop
+    to: skill:record_structured_agentic_lesson
+  -
     relationship: uses
     from: workflow:governance_policy_lifecycle
     to: framework:django

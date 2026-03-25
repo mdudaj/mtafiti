@@ -71,3 +71,6 @@ ontology:
     -
       question: "Find modules implementing workflows"
       command: "python .github/scripts/query_knowledge_graph.py --type Module --relationship implements --target workflow:workflow_lifecycle"
+    -
+      question: "Find agentic workflow skills for choosing the right target"
+      command: "python .github/scripts/query_knowledge_graph.py --type Skill --text target surface"

@@ -1496,6 +1496,26 @@ nodes:
       - docs/workflow-ui.md
       - src/core/views.py
   -
+    id: skill:record_structured_agentic_lesson
+    type: Skill
+    name: "Record Structured Agentic Lesson"
+    description: "Capture wrong turns and successful corrections in a reusable lesson format that can steer future sessions."
+    inputs:
+      - affected_surface
+      - failure_signature
+      - root_cause
+      - verification_added
+    tools:
+      []
+    steps:
+      - "Classify the mistake using a small reusable taxonomy."
+      - "Record the missed evidence that would have prevented the mistake."
+      - "Store a preventive rule and associated verification evidence for future sessions."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/tasks/lessons.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
     id: service:worker
     type: Service
     name: worker
@@ -3277,6 +3297,25 @@ nodes:
       - src/core/models.py
       - src/core/views.py
   -
+    id: skill:determine_repository_target_surface
+    type: Skill
+    name: "Determine Repository Target Surface"
+    description: "Identify the correct subsystem, abstraction layer, and explicit non-goals before implementation begins."
+    inputs:
+      - user_request
+      - candidate_surfaces
+      - repository_evidence
+    tools:
+      []
+    steps:
+      - "List the plausible repository surfaces that could satisfy the request."
+      - "Compare them against the user's objective and the available evidence."
+      - "Choose the smallest supported target surface and document rejected alternatives."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/COPILOT.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
     id: skill:implement_workflow_lifecycle
     type: Skill
     name: "Implement Workflow Lifecycle"
@@ -3295,6 +3334,11 @@ nodes:
       - src/core/models.py
       - src/core/views.py
       - src/tests/test_workflow_ui_api.py
+  -
+    id: workflow:agentic_delivery_loop
+    type: Workflow
+    name: "Agentic delivery loop"
+    description: "Plan, choose the right target surface, execute, verify, and record structured lessons for future sessions."
   -
     id: module:config_init
     type: Module

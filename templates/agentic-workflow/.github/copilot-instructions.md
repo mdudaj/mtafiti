@@ -4,6 +4,7 @@
 
 * Plan first for tasks with 3+ steps.
 * Use a 3-phase flow: Plan -> Execute -> Review.
+* Confirm the right target surface before making changes.
 * Track work items in `tasks/todo.md`; track lessons in `tasks/lessons.md`.
 
 ## Verification contract
@@ -17,6 +18,7 @@
 * Prefer minimal, behavior-safe changes.
 * Reuse existing patterns/helpers before adding new ones.
 * Avoid unrelated refactors while delivering a scoped fix.
+* Reject unsupported assumptions and gather evidence when multiple surfaces could satisfy the request.
 
 ## Parallel execution contract
 

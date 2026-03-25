@@ -1,0 +1,35 @@
+version: 1
+decision_contract:
+  required_fields:
+    - objective
+    - target_surface
+    - evidence_reviewed
+    - out_of_scope
+    - validation_plan
+  ambiguity_policy:
+    compare_candidates: true
+    minimum_candidate_count: 2
+    require_rejection_reasons: true
+  stop_conditions:
+    - conflicting_evidence
+    - no_supported_target_surface
+    - verification_missing
+  preferred_fix_strategy:
+    - choose_smallest_supported_change
+    - favor_existing_patterns
+    - avoid_cross_layer_edits_without_evidence
+feedback_loop:
+  lesson_fields:
+    - affected_surface
+    - error_class
+    - failure_signature
+    - root_cause
+    - missed_evidence
+    - preventive_rule
+    - verification_added
+  error_classes:
+    - wrong_target_surface
+    - wrong_abstraction_layer
+    - insufficient_evidence
+    - missing_verification
+    - overbroad_change

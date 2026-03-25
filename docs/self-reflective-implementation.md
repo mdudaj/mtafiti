@@ -58,6 +58,19 @@ Reflection edges:
 * `Integrator -> Planner` when scope or dependency assumptions fail.
 * `Failure triage -> Planner/Coder/QA` to prevent repeated blind retries.
 
+## Right-thing contract (new)
+
+Before any code change, the active lane must establish:
+
+1. **Objective**: what outcome is actually requested.
+2. **Target surface**: which subsystem, abstraction layer, or artifact should change.
+3. **Rejected alternatives**: what other plausible surfaces were considered and why they were rejected.
+4. **Evidence reviewed**: docs, code paths, tests, or generated artifacts examined before editing.
+5. **Non-goals**: what must not change.
+6. **Verification plan**: commands or checks that will prove the fix is correct.
+
+If multiple surfaces appear relevant, the lane should compare them explicitly before implementation instead of following the first keyword match. Wrong-target fixes should be treated as process defects and recorded in the lessons log.
+
 ## Per-phase contract
 
 Each handoff must include:
@@ -125,6 +138,18 @@ Do not use issue-number-only branches when a scoped feature/fix label is availab
 * Mandatory root-cause note before each retry.
 * Prefer smallest safe fix; avoid speculative broad rewrites.
 * Escalate to Planner when the same failure signature repeats.
+
+### Structured lesson taxonomy
+
+To make lessons reusable across sessions, capture the correction using a small taxonomy:
+
+* `wrong_target_surface`
+* `wrong_abstraction_layer`
+* `insufficient_evidence`
+* `missing_verification`
+* `overbroad_change`
+
+Each lesson should state the affected surface, missed evidence, preventive rule, and verification added.
 
 ## Fast feedback profile (new)
 

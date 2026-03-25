@@ -5,7 +5,7 @@ EnvironmentInventory:
       file_count: 164
     -
       name: YAML
-      file_count: 28
+      file_count: 29
     -
       name: Shell
       file_count: 3

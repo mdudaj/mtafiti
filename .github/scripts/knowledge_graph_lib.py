@@ -309,6 +309,10 @@ QUERY_EXAMPLES = [
         "question": "Find modules implementing workflows",
         "command": 'python .github/scripts/query_knowledge_graph.py --type Module --relationship implements --target workflow:workflow_lifecycle',
     },
+    {
+        "question": "Find agentic workflow skills for choosing the right target",
+        "command": 'python .github/scripts/query_knowledge_graph.py --type Skill --text target surface',
+    },
 ]
 
 
@@ -856,7 +860,16 @@ def build_environment_inventory(root: Path, modules: list[PythonModule], urlpatt
     }
 
 
-def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlpatterns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def has_agentic_workflow_template(root: Path) -> bool:
+    return (root / "templates" / "agentic-workflow" / "COPILOT.md").exists()
+
+
+def build_skills(
+    root: Path,
+    models: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+    urlpatterns: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     ui_paths = [item for item in urlpatterns if item["path"].startswith("/api/v1/ui/operations/")]
     has_lineage = any(item["name"] == "LineageEdge" for item in models)
     has_projects = any(item["name"] == "ProjectMembership" for item in models)
@@ -987,6 +1000,46 @@ def build_skills(models: list[dict[str, Any]], tasks: list[dict[str, Any]], urlp
             "evidence": ["docs/workflow-ui.md", "https://github.com/viewflow/viewflow", "https://github.com/viewflow/django-material"],
         }
     )
+
+    if has_agentic_workflow_template(root):
+        skills.extend(
+            [
+                {
+                    "id": "determine_repository_target_surface",
+                    "name": "Determine Repository Target Surface",
+                    "description": "Identify the correct subsystem, abstraction layer, and explicit non-goals before implementation begins.",
+                    "inputs": ["user_request", "candidate_surfaces", "repository_evidence"],
+                    "tools": [],
+                    "steps": [
+                        "List the plausible repository surfaces that could satisfy the request.",
+                        "Compare them against the user's objective and the available evidence.",
+                        "Choose the smallest supported target surface and document rejected alternatives.",
+                    ],
+                    "evidence": [
+                        "docs/self-reflective-implementation.md",
+                        "templates/agentic-workflow/COPILOT.md",
+                        "templates/agentic-workflow/.agentic/right-thing.yaml",
+                    ],
+                },
+                {
+                    "id": "record_structured_agentic_lesson",
+                    "name": "Record Structured Agentic Lesson",
+                    "description": "Capture wrong turns and successful corrections in a reusable lesson format that can steer future sessions.",
+                    "inputs": ["affected_surface", "failure_signature", "root_cause", "verification_added"],
+                    "tools": [],
+                    "steps": [
+                        "Classify the mistake using a small reusable taxonomy.",
+                        "Record the missed evidence that would have prevented the mistake.",
+                        "Store a preventive rule and associated verification evidence for future sessions.",
+                    ],
+                    "evidence": [
+                        "docs/self-reflective-implementation.md",
+                        "templates/agentic-workflow/tasks/lessons.md",
+                        "templates/agentic-workflow/.agentic/right-thing.yaml",
+                    ],
+                },
+            ]
+        )
 
     return sorted(skills, key=lambda item: item["id"])
 
@@ -1147,7 +1200,7 @@ def make_node(node_type: str, name: str, description: str, **metadata: Any) -> d
     }
 
 
-def build_workflows(models: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_workflows(root: Path, models: list[dict[str, Any]], tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     workflows: list[dict[str, Any]] = []
     if any(model["name"].startswith("Workflow") for model in models):
         workflows.append(
@@ -1174,6 +1227,15 @@ def build_workflows(models: list[dict[str, Any]], tasks: list[dict[str, Any]]) -
                 "name": "Retention execution",
                 "description": "Retention evaluation and archive/delete execution through Celery tasks.",
                 "frameworks": ["framework:django", "framework:celery"],
+            }
+        )
+    if has_agentic_workflow_template(root):
+        workflows.append(
+            {
+                "id": "workflow:agentic_delivery_loop",
+                "name": "Agentic delivery loop",
+                "description": "Plan, choose the right target surface, execute, verify, and record structured lessons for future sessions.",
+                "frameworks": [],
             }
         )
     return workflows
@@ -1209,7 +1271,7 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
     models = extract_models(modules)
     tasks = extract_tasks(modules)
     ui_components = build_ui_components(urlpatterns)
-    workflows = build_workflows(models, tasks)
+    workflows = build_workflows(root, models, tasks)
 
     for slug, profile in framework_knowledge.items():
         nodes.append(
@@ -1392,10 +1454,17 @@ def build_nodes_and_edges(root: Path, modules: list[PythonModule], urlpatterns: 
         edges.append(edge("implements", "module:core_models", f"datamodel:{slugify(model['name'])}"))
 
     for workflow in workflows:
-        edges.append(edge("implements", "module:core_views", workflow["id"]))
-        edges.append(edge("implements", "module:core_models", workflow["id"]))
+        if workflow["id"] != "workflow:agentic_delivery_loop":
+            edges.append(edge("implements", "module:core_views", workflow["id"]))
+            edges.append(edge("implements", "module:core_models", workflow["id"]))
         for framework_id in workflow["frameworks"]:
             edges.append(edge("uses", workflow["id"], framework_id))
+    if any(workflow["id"] == "workflow:agentic_delivery_loop" for workflow in workflows):
+        for skill_id in [
+            "skill:determine_repository_target_surface",
+            "skill:record_structured_agentic_lesson",
+        ]:
+            edges.append(edge("depends_on", "workflow:agentic_delivery_loop", skill_id))
 
     for component in ui_components:
         component_id = component["id"]
@@ -1501,7 +1570,7 @@ def build_bundle(root: Path) -> dict[str, Any]:
     framework_knowledge = build_framework_knowledge(root, settings)
     models = extract_models(modules)
     tasks = extract_tasks(modules)
-    skills = build_skills(models, tasks, urlpatterns)
+    skills = build_skills(root, models, tasks, urlpatterns)
     nodes, edges = build_nodes_and_edges(root, modules, urlpatterns, framework_knowledge, skills)
 
     return {
