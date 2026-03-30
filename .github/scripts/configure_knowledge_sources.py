@@ -8,8 +8,57 @@ import subprocess
 from datetime import date
 from pathlib import Path
 
-
 COMMUNITY_SOURCE = {"name": "community", "url": "https://cdn.aichub.org/v1"}
+FRAMEWORK_STACK_MANIFEST = {
+    "repositories": [
+        {
+            "name": "viewflow",
+            "clone": "git@github.com:viewflow/viewflow.git",
+            "type": "source",
+        },
+        {
+            "name": "django-material",
+            "clone": "git@github.com:viewflow/django-material.git",
+            "type": "source",
+        },
+        {
+            "name": "cookbook",
+            "clone": "git@github.com:viewflow/cookbook.git",
+            "type": "source",
+        },
+    ],
+    "behavioral_sources": [
+        {
+            "name": "viewflow-demo-site",
+            "url": "https://demo.viewflow.io/",
+            "type": "demo-site",
+            "frameworks": ["viewflow", "django-material"],
+            "capture_seed_paths": ["/"],
+            "same_origin_only": True,
+            "max_capture_pages": 25,
+            "preferred_capture_mode": "http",
+            "browser_dump_commands": [
+                "chromium --headless --dump-dom {url}",
+                "google-chrome --headless --dump-dom {url}",
+                "microsoft-edge --headless --dump-dom {url}",
+            ],
+            "playwright_browser_executables": [
+                "google-chrome",
+                "chromium",
+                "microsoft-edge",
+            ],
+            "playwright_wait_until": "networkidle",
+            "playwright_wait_ms": 1000,
+            "capture_expectations": [
+                "atlas-crud-ui",
+                "workflow-examples",
+                "hybrid-forms-and-flows",
+                "navigation-patterns",
+                "permission-driven-variations",
+            ],
+        }
+    ],
+}
 
 
 def read_text(path: Path) -> str:
@@ -19,6 +68,98 @@ def read_text(path: Path) -> str:
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def write_framework_stack_manifest(source_root: Path) -> Path:
+    manifest_path = source_root / ".mtafiti" / "viewflow-stack-manifest.json"
+    write_text(manifest_path, json.dumps(FRAMEWORK_STACK_MANIFEST, indent=2) + "\n")
+    return manifest_path
+
+
+def write_framework_stack_guide(source_root: Path) -> Path:
+    guide_path = source_root / ".mtafiti" / "VIEWFLOW_STACK.md"
+    guide = "\n".join(
+        [
+            "# Viewflow Stack Acquisition Guide",
+            "",
+            "Clone the required source repositories into the source root:",
+            "",
+            "```bash",
+            "git clone git@github.com:viewflow/viewflow.git viewflow",
+            "git clone git@github.com:viewflow/django-material.git django-material",
+            "git clone git@github.com:viewflow/cookbook.git cookbook",
+            "```",
+            "",
+            "Capture behavioral evidence from the demo site separately and store snapshots, route notes, or page models under a dedicated workspace folder before generating generalized skills.",
+            "",
+            "Demo site:",
+            "- https://demo.viewflow.io/",
+            "",
+            "Minimum demo coverage:",
+            "- Atlas CRUD/admin UI",
+            "- workflow examples",
+            "- hybrid UI mixing forms and flows",
+            "- navigation patterns",
+            "- permission-driven UI variations",
+            "",
+            "Capture the demo into normalized page models and reports with:",
+            "",
+            "```bash",
+            "python .github/scripts/capture_behavioral_sources.py \\",
+            "  --source-root <source-root> \\",
+            "  --source-name viewflow-demo-site",
+            "```",
+            "",
+            "The capture script reads `.mtafiti/viewflow-stack-manifest.json`, crawls same-origin demo routes, and writes raw HTML, normalized page-model JSON, a summary JSON file, and a markdown report under `.mtafiti/behavioral-captures/`.",
+            "Each capture also stores a timestamped run under `.mtafiti/behavioral-captures/<source>/runs/`, promotes page models into pattern and ontology-candidate artifacts, and keeps latest summary files at the source root for quick inspection.",
+            "",
+            "If the demo requires JavaScript rendering, request browser-backed capture:",
+            "",
+            "```bash",
+            "python .github/scripts/capture_behavioral_sources.py \\",
+            "  --source-root <source-root> \\",
+            "  --source-name viewflow-demo-site \\",
+            "  --fetch-mode browser",
+            "```",
+            "",
+            "For a richer JavaScript-aware capture path using Playwright and a real browser session, use:",
+            "",
+            "```bash",
+            "python .github/scripts/capture_behavioral_sources.py \\",
+            "  --source-root <source-root> \\",
+            "  --source-name viewflow-demo-site \\",
+            "  --fetch-mode playwright",
+            "```",
+            "",
+            "To diff two stored capture runs, use:",
+            "",
+            "```bash",
+            "python .github/scripts/capture_behavioral_sources.py diff \\",
+            "  --source-root <source-root> \\",
+            "  --source-name viewflow-demo-site \\",
+            "  --baseline-run <run-a> \\",
+            "  --candidate-run <run-b>",
+            "```",
+            "",
+            "To import the latest promoted patterns into the repository so the canonical generator can ingest them into committed ontology and skill outputs, use:",
+            "",
+            "```bash",
+            "python .github/scripts/capture_behavioral_sources.py import \\",
+            "  --source-root <source-root> \\",
+            "  --source-name viewflow-demo-site \\",
+            "  --repo-root <repo-root>",
+            "```",
+            "",
+            "After sources are present, run:",
+            "",
+            "```bash",
+            "python .github/scripts/configure_knowledge_sources.py --source-root <source-root>",
+            "```",
+            "",
+        ]
+    )
+    write_text(guide_path, guide)
+    return guide_path
 
 
 def yaml_quote(value: str) -> str:
@@ -44,7 +185,9 @@ def detect_version(repo_dir: Path, readme_text: str) -> str | None:
         if match:
             return match.group(1).strip()
 
-    readme_match = re.search(r"^##\s+(\d+\.\d+\.\d+)\b", readme_text, flags=re.MULTILINE)
+    readme_match = re.search(
+        r"^##\s+(\d+\.\d+\.\d+)\b", readme_text, flags=re.MULTILINE
+    )
     if readme_match:
         return readme_match.group(1)
 
@@ -75,7 +218,9 @@ def slugify(value: str) -> str:
 
 def build_doc(repo_name: str, readme_text: str, version: str, language: str) -> str:
     today = date.today().isoformat()
-    description = f"Local knowledge source generated from the {repo_name} repository README."
+    description = (
+        f"Local knowledge source generated from the {repo_name} repository README."
+    )
     tags = ",".join(filter(None, [repo_name, "local", "knowledge-src", "framework"]))
     frontmatter = "\n".join(
         [
@@ -137,7 +282,9 @@ def detect_fence(path: Path) -> str:
     }.get(suffix, "")
 
 
-def read_snippet(path: Path, start_line: int | None = None, end_line: int | None = None) -> str:
+def read_snippet(
+    path: Path, start_line: int | None = None, end_line: int | None = None
+) -> str:
     if not path.exists():
         return ""
     text = read_text(path)
@@ -197,7 +344,9 @@ def build_section_content(source_root: Path, section_spec: dict[str, object]) ->
     return "\n\n".join(parts).strip()
 
 
-def build_composite_skill(name: str, description: str, sections: list[tuple[str, str]], tags: list[str]) -> str:
+def build_composite_skill(
+    name: str, description: str, sections: list[tuple[str, str]], tags: list[str]
+) -> str:
     today = date.today().isoformat()
     frontmatter = "\n".join(
         [
@@ -222,7 +371,9 @@ def build_composite_skill(name: str, description: str, sections: list[tuple[str,
     return frontmatter + "\n\n".join(body_parts).strip() + "\n"
 
 
-def generate_cookbook_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+def generate_cookbook_entries(
+    source_root: Path, content_root: Path
+) -> list[dict[str, str]]:
     generated: list[dict[str, str]] = []
     cookbook_root = source_root / "cookbook"
     if not cookbook_root.exists():
@@ -252,7 +403,13 @@ def generate_cookbook_entries(source_root: Path, content_root: Path) -> list[dic
                 name=f"cookbook-{slugify(sample_dir.name)}",
                 description=f"Local cookbook sample for {sample_dir.name} generated from the Viewflow cookbook repository.",
                 sections=sections,
-                tags=["cookbook", sample_dir.name, "local", "knowledge-src", "viewflow"],
+                tags=[
+                    "cookbook",
+                    sample_dir.name,
+                    "local",
+                    "knowledge-src",
+                    "viewflow",
+                ],
             ),
         )
         generated.append(
@@ -296,7 +453,11 @@ def collect_representative_files(sample_dir: Path) -> list[Path]:
             rel = path.relative_to(sample_dir)
             if any(part.startswith(".") for part in rel.parts):
                 continue
-            if "migrations" in rel.parts or "__pycache__" in rel.parts or path in collected:
+            if (
+                "migrations" in rel.parts
+                or "__pycache__" in rel.parts
+                or path in collected
+            ):
                 continue
             collected.append(path)
             if len(collected) >= 12:
@@ -304,7 +465,9 @@ def collect_representative_files(sample_dir: Path) -> list[Path]:
     return collected[:12]
 
 
-def generate_django_material_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+def generate_django_material_entries(
+    source_root: Path, content_root: Path
+) -> list[dict[str, str]]:
     generated: list[dict[str, str]] = []
     material_root = source_root / "django-material"
     if not material_root.exists():
@@ -312,17 +475,33 @@ def generate_django_material_entries(source_root: Path, content_root: Path) -> l
 
     colors = material_root / "material" / "assets" / "colors.css"
     if colors.exists():
-        target = content_root / "knowledge-src" / "skills" / "django-material-theme-customization" / "SKILL.md"
+        target = (
+            content_root
+            / "knowledge-src"
+            / "skills"
+            / "django-material-theme-customization"
+            / "SKILL.md"
+        )
         write_text(
             target,
             build_composite_skill(
                 name="django-material-theme-customization",
                 description="Local theming skill generated from django-material design token sources.",
                 sections=[
-                    ("Theme customization guidance", read_text(material_root / "README.md")),
+                    (
+                        "Theme customization guidance",
+                        read_text(material_root / "README.md"),
+                    ),
                     ("Color token file", read_text(colors)),
                 ],
-                tags=["django-material", "theme", "colors", "design-tokens", "local", "knowledge-src"],
+                tags=[
+                    "django-material",
+                    "theme",
+                    "colors",
+                    "design-tokens",
+                    "local",
+                    "knowledge-src",
+                ],
             ),
         )
         generated.append(
@@ -335,7 +514,9 @@ def generate_django_material_entries(source_root: Path, content_root: Path) -> l
     return generated
 
 
-def generate_admin_shell_skill_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+def generate_admin_shell_skill_entries(
+    source_root: Path, content_root: Path
+) -> list[dict[str, str]]:
     generated: list[dict[str, str]] = []
     cookbook_root = source_root / "cookbook" / "crud101"
     material_root = source_root / "django-material"
@@ -396,14 +577,30 @@ When a floating action button is present, prefer an icon-first circular button. 
     if colors.exists():
         sections.append(("Blue theme token reference", read_text(colors)))
 
-    target = content_root / "knowledge-src" / "skills" / "crud-admin-shell-layout" / "SKILL.md"
+    target = (
+        content_root
+        / "knowledge-src"
+        / "skills"
+        / "crud-admin-shell-layout"
+        / "SKILL.md"
+    )
     write_text(
         target,
         build_composite_skill(
             name="crud-admin-shell-layout",
             description="Opinionated admin CRUD shell guidance derived from cookbook CRUD samples and django-material theme tokens.",
             sections=sections,
-            tags=["crud", "admin", "shell", "sidebar", "topbar", "fab", "local", "knowledge-src", "viewflow"],
+            tags=[
+                "crud",
+                "admin",
+                "shell",
+                "sidebar",
+                "topbar",
+                "fab",
+                "local",
+                "knowledge-src",
+                "viewflow",
+            ],
         ),
     )
     generated.append(
@@ -416,7 +613,9 @@ When a floating action button is present, prefer an icon-first circular button. 
     return generated
 
 
-def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list[dict[str, str]]:
+def generate_domain_skill_entries(
+    source_root: Path, content_root: Path
+) -> list[dict[str, str]]:
     generated: list[dict[str, str]] = []
     entries_root = content_root / "knowledge-src" / "skills"
 
@@ -449,7 +648,12 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                 {
                     "title": "Quickstart and registration",
                     "sources": [
-                        {"path": "viewflow/README.md", "start_line": 55, "end_line": 143, "label": "README quickstart"},
+                        {
+                            "path": "viewflow/README.md",
+                            "start_line": 55,
+                            "end_line": 143,
+                            "label": "README quickstart",
+                        },
                         {
                             "path": "viewflow/viewflow/urls/sites.py",
                             "start_line": 48,
@@ -630,7 +834,12 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                 {
                     "title": "Component and base-template primitives",
                     "sources": [
-                        {"path": "django-material/README.md", "start_line": 23, "end_line": 62, "label": "README usage and base template"},
+                        {
+                            "path": "django-material/README.md",
+                            "start_line": 23,
+                            "end_line": 62,
+                            "label": "README usage and base template",
+                        },
                         {
                             "path": "django-material/material/templates/cotton/CLAUDE.md",
                             "start_line": 1,
@@ -1240,7 +1449,10 @@ def generate_domain_skill_entries(source_root: Path, content_root: Path) -> list
                 "local",
                 "knowledge-src",
             ],
-            "requires": ["viewflow/viewflow/urls/model.py", "viewflow/viewflow/urls/sites.py"],
+            "requires": [
+                "viewflow/viewflow/urls/model.py",
+                "viewflow/viewflow/urls/sites.py",
+            ],
             "sections": [
                 {
                     "title": "Architecture rules",
@@ -1978,11 +2190,23 @@ def generate_content(source_root: Path, content_root: Path) -> list[dict[str, st
             language = detect_language(repo_name, readme_text)
             target = author_root / "docs" / repo_name / "DOC.md"
             write_text(target, build_doc(repo_name, readme_text, version, language))
-            generated.append({"repo": repo_dir.name, "entry_type": "doc", "entry_id": f"knowledge-src/{repo_name}"})
+            generated.append(
+                {
+                    "repo": repo_dir.name,
+                    "entry_type": "doc",
+                    "entry_id": f"knowledge-src/{repo_name}",
+                }
+            )
         else:
             target = author_root / "skills" / repo_name / "SKILL.md"
             write_text(target, build_skill(repo_name, readme_text))
-            generated.append({"repo": repo_dir.name, "entry_type": "skill", "entry_id": f"knowledge-src/{repo_name}"})
+            generated.append(
+                {
+                    "repo": repo_dir.name,
+                    "entry_type": "skill",
+                    "entry_id": f"knowledge-src/{repo_name}",
+                }
+            )
     generated.extend(generate_cookbook_entries(source_root, content_root))
     generated.extend(generate_django_material_entries(source_root, content_root))
     generated.extend(generate_admin_shell_skill_entries(source_root, content_root))
@@ -2016,24 +2240,91 @@ def write_chub_config(dist_root: Path, config_path: Path) -> None:
     write_text(config_path, config)
 
 
+def has_candidate_repositories(source_root: Path) -> bool:
+    return any(iter_repo_dirs(source_root))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source-root", required=True, help="Directory containing cloned knowledge repositories.")
-    parser.add_argument("--content-root", help="Generated Context Hub content root. Defaults to <source-root>/.chub/content")
-    parser.add_argument("--dist-root", help="Built Context Hub dist root. Defaults to <source-root>/.chub/dist")
-    parser.add_argument("--config-path", help="chub config file path. Defaults to ~/.chub/config.yaml")
+    parser.add_argument(
+        "--source-root",
+        required=True,
+        help="Directory containing cloned knowledge repositories.",
+    )
+    parser.add_argument(
+        "--content-root",
+        help="Generated Context Hub content root. Defaults to <source-root>/.chub/content",
+    )
+    parser.add_argument(
+        "--dist-root",
+        help="Built Context Hub dist root. Defaults to <source-root>/.chub/dist",
+    )
+    parser.add_argument(
+        "--config-path", help="chub config file path. Defaults to ~/.chub/config.yaml"
+    )
+    parser.add_argument(
+        "--bootstrap-viewflow-stack",
+        action="store_true",
+        help="Write a source-acquisition manifest and guide for the Viewflow, django-material, cookbook, and demo-site analysis stack.",
+    )
     args = parser.parse_args()
 
     source_root = Path(args.source_root).expanduser().resolve()
-    content_root = Path(args.content_root).expanduser().resolve() if args.content_root else source_root / ".chub" / "content"
-    dist_root = Path(args.dist_root).expanduser().resolve() if args.dist_root else source_root / ".chub" / "dist"
-    config_path = Path(args.config_path).expanduser().resolve() if args.config_path else Path.home() / ".chub" / "config.yaml"
+    content_root = (
+        Path(args.content_root).expanduser().resolve()
+        if args.content_root
+        else source_root / ".chub" / "content"
+    )
+    dist_root = (
+        Path(args.dist_root).expanduser().resolve()
+        if args.dist_root
+        else source_root / ".chub" / "dist"
+    )
+    config_path = (
+        Path(args.config_path).expanduser().resolve()
+        if args.config_path
+        else Path.home() / ".chub" / "config.yaml"
+    )
+
+    bootstrap_outputs: dict[str, str] = {}
+    if args.bootstrap_viewflow_stack:
+        bootstrap_outputs = {
+            "manifest": str(write_framework_stack_manifest(source_root)),
+            "guide": str(write_framework_stack_guide(source_root)),
+        }
+
+    if args.bootstrap_viewflow_stack and not has_candidate_repositories(source_root):
+        print(
+            json.dumps(
+                {
+                    "generated": [],
+                    "content_root": str(content_root),
+                    "dist_root": str(dist_root),
+                    "config_path": str(config_path),
+                    "bootstrap": bootstrap_outputs,
+                    "note": "Bootstrap artifacts written; skipping Context Hub generation because no source repositories were found.",
+                },
+                indent=2,
+            )
+        )
+        return 0
 
     generated = generate_content(source_root, content_root)
     run_chub_build(content_root, dist_root)
     write_chub_config(dist_root, config_path)
 
-    print(json.dumps({"generated": generated, "content_root": str(content_root), "dist_root": str(dist_root), "config_path": str(config_path)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "generated": generated,
+                "content_root": str(content_root),
+                "dist_root": str(dist_root),
+                "config_path": str(config_path),
+                "bootstrap": bootstrap_outputs,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

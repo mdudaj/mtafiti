@@ -33,3 +33,30 @@ feedback_loop:
     - insufficient_evidence
     - missing_verification
     - overbroad_change
+framework_analysis:
+  required_evidence_layers:
+    - ui_behavior
+    - source_code
+  ontology_layers:
+    - ui
+    - navigation
+    - workflow
+    - state
+    - permission
+    - cross_layer
+  confidence_policy:
+    high_confidence_requires:
+      - ui_behavior
+      - source_code
+    low_confidence_allowed_when_missing:
+      - ui_behavior
+      - source_code
+  skill_requirements:
+    - atomic_capability
+    - dependency_aware
+    - provenance_tracked
+  output_families:
+    - ontology
+    - skills
+    - patterns
+    - components

@@ -8,7 +8,7 @@
 
 ## Repository Context *(mandatory)*
 
-- **Service area**: shared `lims` / future `edcs` workflow configuration foundation
+- **Service area**: `lims` workflow configuration foundation consuming the shared form-engine standard
 - **Affected code paths**: `src/core/models.py`, `src/core/views.py`, `docs/workflow-ui.md`, future shared workflow-config app(s), future workflow-runtime app(s)
 - **Related design docs**: `specs/002-operation-driven-lims-edcs-foundation/spec.md`, `specs/003-operation-runtime-domain/spec.md`, `specs/004-odm-form-engine-foundation/spec.md`, `docs/workflow-ui.md`
 - **Prior checkpoints**: `022-architecture-spec-and-skills.md`, `019-reference-ux-and-routing.md`, `017-accession-wizard-and-metadata.md`
@@ -34,7 +34,7 @@ It must **not** become a shadow form compiler or an unconstrained graph engine.
 
 ## Goals
 
-- Define a bounded workflow-template model for operations using Viewflow-compatible semantics.
+- Define a bounded workflow-template model for LIMS operations using Viewflow-compatible semantics.
 - Define task/node, edge, branch-rule, assignment, permission, and approval configuration.
 - Define how workflow nodes bind to compiler-owned form package outputs rather than form authoring artifacts.
 - Define compilation constraints from authored workflow templates into runtime-ready topology.
@@ -132,6 +132,7 @@ This means:
 - task configuration can select full package, section subsets, group subsets, or explicit item subsets
 - workflow rules can reference compiler-owned stable identifiers and output values
 - the builder cannot invent fields or mutate published form semantics
+- task capture bindings should be able to address the standardized operational categories defined elsewhere in the architecture, including metadata, outcomes, storage-log entries, and disposition-log entries, by selecting the relevant compiler-owned subsets rather than inventing workflow-local fields
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -191,16 +192,16 @@ As a workflow designer, I want branching rules based on prior task outcomes or c
 
 ---
 
-### User Story 5 - Reuse the same builder across LIMS and EDCS (Priority: P2)
+### User Story 5 - Keep workflow configuration aligned to the shared form-engine standard (Priority: P2)
 
-As a platform architect, I want the workflow builder to support both LIMS and EDCS operational flows so the platform avoids two incompatible orchestration design systems.
+As a platform architect, I want the LIMS workflow builder to consume the same form-engine standard that EDCS uses, without assuming EDCS must also adopt the LIMS workflow-builder model.
 
-**Independent Test**: Model a LIMS accession workflow and an EDCS visit workflow using the same template concepts with different node bindings, roles, and subjects.
+**Independent Test**: Confirm a LIMS workflow template binds to the same published package standard that a future EDCS implementation could consume through a different execution model.
 
 **Acceptance Scenarios**:
 
-1. **Given** EDCS later defines visit workflows, **When** the builder is reused, **Then** the same node/edge/rule framework still applies.
-2. **Given** LIMS and EDCS differ in role mappings, **When** templates are configured, **Then** module-specific permission bundles can vary without changing the workflow-template model.
+1. **Given** EDCS later uses the same published package standard, **When** forms are bound there, **Then** the shared compiler-owned package semantics remain compatible without requiring the LIMS workflow builder.
+2. **Given** LIMS-specific workflow templates evolve, **When** the shared form-engine standard is reviewed, **Then** EDCS-facing form semantics remain reusable even if orchestration models differ.
 
 ## Edge Cases
 
@@ -229,8 +230,9 @@ As a platform architect, I want the workflow builder to support both LIMS and ED
 - **FR-012**: Branch rules that depend on form data MUST reference compiler-owned stable identifiers and runtime submission values.
 - **FR-013**: Published workflow templates MUST remain bound to the specific published form-engine outputs they were validated against.
 - **FR-014**: The builder MUST provide a compilation/validation step that emits runtime-ready workflow-template outputs.
-- **FR-015**: The builder MUST remain reusable across both LIMS and EDCS without embedding LIMS-only workflow assumptions.
+- **FR-015**: The builder MUST remain a LIMS-specific workflow-configuration layer while consuming form-engine outputs that EDCS can also reuse independently.
 - **FR-016**: The builder MUST preserve tenant isolation across workflow templates, rules, bindings, and published outputs.
+- **FR-017**: The builder MUST support task-level bindings that can isolate standardized operational capture subsets such as metadata, outcomes, storage-log fields, and disposition-log fields without redefining their semantics in workflow configuration.
 
 ### Non-Functional Requirements
 

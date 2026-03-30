@@ -1,0 +1,22 @@
+ontology:
+  name: permission
+  entities:
+    -
+      name: Permission
+      affects:
+        - MenuVisibility
+        - TaskAvailability
+        - ViewAccess
+    -
+      name: RoleVariant
+      fields:
+        - role
+        - visible_actions
+        - blocked_actions
+        - visible_navigation
+observed_patterns:
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /accounts/profile/
+    signal: "profile - django material admin /accounts/profile/"

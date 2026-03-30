@@ -6,6 +6,10 @@
 **Status**: Draft  
 **Input**: User description: "Revise metadata configuration before further implementation, starting with vocabularies organized per functionality and versioned configurable form schemas with draft/published versions."
 
+## Architectural Position
+
+This bundle is now best treated as **transitional foundation work** beneath the newer operation-driven architecture. Its vocabulary governance remains directly relevant, while its configurable form-schema model should be treated as migration prior art for the later compiler-owned `FormPackage` / `FormPackageVersion` direction rather than the final long-term target.
+
 ## Repository Context *(mandatory)*
 
 - **Service area**: `lims` metadata configuration
@@ -101,6 +105,8 @@ As an administrator, I want only published form versions to be bound to runtime 
 - **FR-008**: The system MUST allow only published form versions to be activated for runtime targets such as sample types or workflow steps.
 - **FR-009**: The system MUST preserve tenant isolation, permission boundaries, and auditable state transitions across vocabularies, form versions, and bindings.
 - **FR-010**: The system MUST return stable display-ready option payloads suitable for shared single-select and multi-select widgets.
+- **FR-011**: Controlled vocabularies defined in this slice MUST remain reusable by later operation definitions, form packages, workflow bindings, and runtime validation contracts.
+- **FR-012**: The configurable-form structures in this slice MUST be treated as transitional migration input for the later compiler-owned form-package architecture rather than the final long-term form-engine contract.
 
 ### Non-Goals
 
@@ -125,6 +131,7 @@ As an administrator, I want only published form versions to be bound to runtime 
 - **SC-002**: Shared select and multi-select widgets can load vocabulary options through paginated search APIs without needing full-list downloads.
 - **SC-003**: Metadata designers can create a form definition, author a draft version, publish it, and activate it for a runtime target through a clearly separated two-step workflow.
 - **SC-004**: Published form versions remain immutable while new draft versions can be created for future changes.
+- **SC-005**: The bundle clearly preserves vocabulary governance value while acknowledging that later compiler-owned form packages supersede the earlier metadata-schema model.
 
 ## Delivery Mapping *(mandatory)*
 

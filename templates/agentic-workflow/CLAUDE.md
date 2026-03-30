@@ -5,6 +5,7 @@
 * Run independent tasks in parallel sessions; keep one clear objective per session.
 * If work has 3+ steps, plan first before editing code.
 * Delegate exploration/research/analysis to subagents to keep the main session focused.
+* For framework-learning tasks, mine behavior and source separately before merging them into reusable patterns.
 
 ## 3-phase contract (required)
 
@@ -23,6 +24,16 @@ Before implementation:
 * define verification before editing.
 
 If the current approach appears to target the wrong subsystem, stop, re-plan, and record the correction rather than forcing the original approach through.
+
+## Framework-analysis mode
+
+When analyzing a framework, demo site, or reusable UI/workflow system:
+
+* treat the live/demo surface as behavioral evidence,
+* treat repositories as implementation evidence,
+* extract ontology across UI, navigation, workflow, state, permission, and cross-layer relations,
+* promote only stable, atomic capabilities into skills,
+* mark confidence based on whether UI behavior and source implementation agree.
 
 ## Completion gate
 

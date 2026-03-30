@@ -1,6 +1,9 @@
 ontology:
   node_types:
     -
+      name: BehavioralSource
+      description: "Imported external behavioral evidence source such as a demo site capture."
+    -
       name: Skill
       description: "Reusable engineering capability extracted from repository patterns or framework knowledge."
     -
@@ -18,6 +21,9 @@ ontology:
     -
       name: Module
       description: "Internal Python module or package implementing domain logic."
+    -
+      name: Pattern
+      description: "Behavior-first page, navigation, or interaction pattern imported from captured external evidence."
     -
       name: UIComponent
       description: "UI-facing contract or server-rendered component surface."

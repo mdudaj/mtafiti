@@ -1,0 +1,211 @@
+ontology:
+  name: state
+  entities:
+    -
+      name: State
+      belongs_to:
+        - ProcessInstance
+      transitions:
+        - triggered_by_action
+    -
+      name: ProcessState
+      fields:
+        - current_state
+        - available_actions
+        - terminal_state
+observed_patterns:
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /workflow/inbox/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /patterns/sequence/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /accounts/profile/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/Europe/change/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/121/delete/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/api/swagger/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/registration/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/signup/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/hospital/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/vf_stats/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/stocks/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/django_stats/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/ocean/
+    interaction_types:
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/sea/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/bank/
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation

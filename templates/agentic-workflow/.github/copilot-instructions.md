@@ -13,6 +13,15 @@
 * Run full repository merge-gate checks before handoff.
 * Treat tasks as incomplete until verification evidence is captured.
 
+## Framework mining contract
+
+When the task is to learn from a framework or demo application:
+
+* capture both behavioral evidence and source-code evidence,
+* model UI, navigation, workflow, state, and permission layers explicitly,
+* preserve provenance and confidence when promoting patterns into skills or components,
+* prefer atomic skills with declared dependencies over broad blended recipes.
+
 ## Code-change contract
 
 * Prefer minimal, behavior-safe changes.

@@ -80,6 +80,8 @@ The form engine should follow OpenClinica-style governed patterns:
 - spreadsheet authoring remains a first-class path for large choice lists and advanced logic
 - ODM/XML is a durable interchange/export contract
 - runtime rendering and execution must reference compiled published versions rather than free-form draft definitions
+- one governed package family may supply the full capture contract for an operation while individual workflow tasks bind only the relevant sections/groups/items
+- metadata fields, outcome fields, storage-log fields, disposition-log fields, and similar operational categories should be represented within the same governed package family rather than separate ungoverned entry structures
 
 ## Compiler / Validation Pipeline
 
@@ -217,6 +219,9 @@ As a system architect, I want Django/Viewflow/django-material to consume compile
 - **FR-014**: The engine MUST remain reusable across both LIMS and EDCS without embedding workflow-runtime-only or UI-only assumptions in the compiler core.
 - **FR-015**: The engine MUST support controlled vocabulary references as compiler-owned bindings, not only ad hoc UI widget metadata.
 - **FR-016**: The engine MUST provide explicit publication errors and validation diagnostics suitable for governed authoring workflows.
+- **FR-017**: The engine MUST support a unified governed capture contract in which one package family can represent metadata, outcome data, storage-log data, and disposition-log data for an operation while still allowing task-level subset bindings.
+- **FR-018**: Runtime and UI consumers MUST NOT introduce separate non-compiler data-entry structures for categories already modeled in the published package contract.
+- **FR-019**: The canonical compiler model MUST support field types, validation constraints, controlled choices, and conditional/relevance logic suitable for regulated or semi-regulated clinical and laboratory data capture.
 
 ### Non-Functional Requirements
 
@@ -263,6 +268,7 @@ As a system architect, I want Django/Viewflow/django-material to consume compile
 - **SC-003**: The spec explains how existing metadata models are reused as migration foundations without being mistaken for the final compiler.
 - **SC-004**: The spec provides enough structure to guide an implementation slice for parser/compiler/validator work.
 - **SC-005**: The spec keeps LIMS and EDCS as consumers of the same compiler-owned published package versions.
+- **SC-006**: The spec makes the form-centric capture principle explicit enough to prevent fragmented operational data-entry designs in later slices.
 
 ## Delivery Mapping *(mandatory)*
 

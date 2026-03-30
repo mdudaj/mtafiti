@@ -5,7 +5,7 @@
 
 ## Summary
 
-Define Sample Accession as the first concrete reference operation on the shared operation-driven foundation. This slice turns the existing receiving flow into a governed operation with explicit operation-version identity, compiler-owned form bindings, bounded workflow topology, auditable runtime records, and a clean mapping from current `/lims/receiving/*` entrypoints into the future operation runtime.
+Define Sample Accession as the first concrete reference operation on the LIMS-specific operation foundation. This slice turns the existing receiving flow into a governed operation with explicit operation-version identity, mandatory SOP context, compiler-owned form bindings, bounded workflow topology, auditable runtime records, and a clean mapping from current `/lims/receiving/*` entrypoints into the future operation runtime.
 
 ## Technical Context
 
@@ -13,14 +13,14 @@ Define Sample Accession as the first concrete reference operation on the shared 
 **Primary Dependencies**: Django, django-tenants, Viewflow runtime conventions, future ODM-engine compiler outputs, current LIMS accessioning/biospecimen models  
 **Storage**: PostgreSQL tenant schemas  
 **Testing**: `spec_kit_workflow.py validate`, `python -m pytest -q src/tests/test_spec_kit_workflow.py src/tests/test_knowledge_graph_generator.py`  
-**Target Platform**: `lims` reference operation on the shared operation/workflow/form-engine/runtime foundation  
+**Target Platform**: `lims` reference operation on the LIMS-specific operation/workflow/runtime foundation with a shared form-engine standard  
 **Project Type**: spec-first architecture/reference-operation slice  
 **Constraints**: preserve compiler/runtime/workflow separation, keep the reference operation implementation-ready, reuse current receiving behavior as transitional prior art, preserve tenant-safe auditability  
 **Scale/Scope**: architecture and issue-slicing for one concrete operation, not full runtime implementation
 
 ## Constitution Check
 
-- [x] The slice preserves the shared operation-driven architecture from `002`.
+- [x] The slice preserves the LIMS-specific operation architecture from `002` while remaining aligned to the shared form-engine standard.
 - [x] The slice uses the explicit runtime-version-freeze and governed runtime concepts from `003`.
 - [x] The slice keeps the ODM engine separate from orchestration and UI per `004`.
 - [x] The slice binds tasks to compiler-owned outputs and keeps the workflow builder separate from runtime per `005`.
@@ -52,7 +52,7 @@ Define Sample Accession as the first concrete reference operation on the shared 
 
 - define `sample-accession` as the first stable operation code
 - attach SOP/version context and lifecycle metadata
-- use it as the LIMS exemplar for later operations
+- use it as the LIMS exemplar and prerequisite entry point for later specimen-handling operations
 
 ### 2. One canonical accession workflow
 
@@ -60,7 +60,7 @@ Define Sample Accession as the first concrete reference operation on the shared 
   - intake capture
   - QC decision
   - accepted path to storage
-  - rejected path to discrepancy closure
+   - rejected path to discrepancy and disposition closure
 - publish this as the bounded workflow-template shape for the operation
 
 ### 3. Compiler-owned capture bindings
@@ -68,11 +68,13 @@ Define Sample Accession as the first concrete reference operation on the shared 
 - define one primary accession form package family
 - bind tasks to package sections/items instead of redefining fields in UI or workflow code
 - allow manifest and EDC intake to prefill values while preserving one canonical package contract
+- require metadata, outcomes, storage-log entries, and disposition-log entries to originate in task-bound governed submissions before projection into biospecimen and receiving-side models
 
 ### 4. Runtime evidence model
 
 - map accession execution to `OperationRun`, `TaskRun`, `SubmissionRecord`, `ApprovalRecord`, and `MaterialUsageRecord`
 - explicitly link runs to biospecimens, manifest items, receiving events, discrepancies, and future storage artifacts
+- preserve traceability from each captured value and branch decision back to specimen/intake context, operation version, SOP version context, form package version, and actor
 
 ### 5. Transitional migration path
 

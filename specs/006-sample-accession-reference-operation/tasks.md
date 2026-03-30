@@ -16,9 +16,9 @@ description: "Task list for the Sample Accession reference operation"
 
 ## Phase 1: Reference-operation ratification
 
-- [ ] T001 Confirm Sample Accession is the first governed reference operation on the shared foundation.
-- [ ] T002 Confirm the canonical workflow shape: intake -> QC -> (storage | rejection closure).
-- [ ] T003 Confirm task capture binds to compiler-owned package outputs instead of workflow- or UI-defined fields.
+- [ ] T001 Confirm Sample Accession is the first governed reference operation on the LIMS-specific operation foundation.
+- [ ] T002 Confirm the canonical workflow shape: intake -> QC -> (storage | disposition closure).
+- [ ] T003 Confirm task capture binds to compiler-owned package outputs instead of workflow- or UI-defined fields, and that metadata, outcomes, storage-log data, and disposition-log data are not split into ad hoc side-entry paths.
 - [ ] T004 Confirm single, batch, and EDC-linked intake are initiation modes of the same operation, not separate operation families.
 - [ ] T005 Generate the issue body with `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/006-sample-accession-reference-operation`.
 
@@ -29,10 +29,10 @@ description: "Task list for the Sample Accession reference operation"
 - [ ] T010 [US1] Define the stable `sample-accession` operation identity, SOP linkage, and version lifecycle.
 - [ ] T011 [US2] Define initiation semantics for single receipt, batch manifest, and EDC-linked intake.
 - [ ] T012 [US3] Define the bounded accession workflow and QC-driven branching contract.
-- [ ] T013 [US3] Define task-capture bindings for intake, QC, storage logging, and rejection closure.
-- [ ] T014 [US4] Define runtime run/task/submission/audit/material-link expectations for accession execution.
+- [ ] T013 [US3] Define task-capture bindings for intake, QC, storage logging, and disposition closure.
+- [ ] T014 [US4] Define runtime run/task/submission/audit/material-link expectations for accession execution, including specimen/SOP/form/actor traceability.
 - [ ] T015 [US4] Define the current-to-target mapping from receiving events, discrepancies, manifests, and biospecimens into governed runtime records.
-- [ ] T016 [US5] Define how future LIMS and EDCS operations should reuse this reference pattern.
+- [ ] T016 [US5] Define how future LIMS operations should reuse this reference pattern and how EDCS reuses only the shared form-engine standard, including accession-as-prerequisite rules for downstream specimen work.
 
 ---
 

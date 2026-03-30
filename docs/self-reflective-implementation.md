@@ -132,6 +132,87 @@ Do not use issue-number-only branches when a scoped feature/fix label is availab
 * Shared task graph with dependency and ownership status.
 * Clear repository conventions (patterns, guardrails, and no-go areas).
 
+## Behavioral ontology harness profile (new)
+
+Use this profile when the task is not a narrow repository fix, but a framework-learning or harness-enrichment request such as mining Viewflow, django-material, or a demo application for reusable implementation patterns.
+
+### Upgrade principle
+
+* Evolve the existing harness; do not replace it with a second disconnected system.
+* Keep the current execution controls (`right-thing`, 3-phase flow, lessons, merge gates) and add a behavior-mining layer on top.
+
+### Dual-source evidence contract
+
+For framework-pattern extraction, the agent should treat two evidence classes as mandatory:
+
+1. **Behavioral truth**
+   * demo sites, interactive screens, menus, task states, and permission-driven UI changes
+2. **Implementation truth**
+   * source repositories, templates, runtime classes, and framework primitives
+
+If a pattern is observed in both places, mark it **high confidence**. If it appears in only one place, keep it **low confidence** until confirmed.
+
+### Multi-layer ontology contract
+
+When mining a workflow/UI framework, capture at least these layers:
+
+* `ui`: shells, list/detail/form/dashboard/task views, actions, and layouts
+* `navigation`: menus, drawers, menu groups, visibility rules, route bindings
+* `workflow`: flows, nodes, tasks, decisions, end states, runtime bindings
+* `state`: process state, task state, action-triggered transitions
+* `permission`: role-based visibility, task availability, view access
+* `cross_layer`: links such as `MenuItem -> View -> WorkflowTask -> ProcessState -> Model`
+
+Do not treat these as separate notes only. They should form one connected graph.
+
+### Skill-graph contract
+
+Extract skills as atomic capabilities, not large blended recipes.
+
+Each skill should ideally record:
+
+* purpose
+* required inputs
+* evidence sources
+* dependency skills
+* confidence level
+* expected outputs or affected layer
+
+Prefer skill composition over large monolithic skills. For example, a workflow page should compose navigation, UI, workflow-binding, and permission skills instead of hiding all of them in one pattern blob.
+
+### Pattern extraction workflow
+
+Follow this order for behavior-mining tasks:
+
+1. map the visible application surface,
+2. record page models and user interactions,
+3. inspect source repositories for the runtime/template implementation,
+4. align UI observations with source-level abstractions,
+5. promote aligned patterns into ontology nodes and skills,
+6. record confidence and unresolved gaps,
+7. update reusable components only after ontology and skills are stable enough.
+
+### Expected artifact families
+
+When the harness grows into framework-mining mode, it should be able to persist outputs in families such as:
+
+* ontology
+* skills
+* patterns
+* components
+* confidence or provenance annotations
+
+The exact repository paths may vary, but the artifact split should remain explicit so mined behavior, generalized skills, and executable components are not collapsed into one file.
+
+### Self-learning refinement
+
+After each new implementation or newly observed pattern:
+
+* compare the implementation with the current ontology,
+* detect missing layers, overlapping skills, or wrong abstractions,
+* split or merge skills where overlap is discovered,
+* update provenance and confidence rather than silently rewriting prior assumptions.
+
 ## Anti-loop controls
 
 * Retry budget per task phase (for example: max 2 reattempts before escalation).

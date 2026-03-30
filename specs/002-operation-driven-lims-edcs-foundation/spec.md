@@ -1,14 +1,14 @@
-# Feature Specification: Operation-driven LIMS/EDCS foundation
+# Feature Specification: LIMS operation foundation with shared form-engine standard
 
 **Feature ID**: `002-operation-driven-lims-edcs-foundation`  
 **Execution Branch**: `feat/operation-driven-lims-edcs-foundation`  
 **Created**: 2026-03-19  
 **Status**: Draft  
-**Input**: User description: "Redefine LIMS architecture around configurable operations/activities, ODM-managed electronic forms, Viewflow workflow nodes/tasks, conditional rules, auditability, and shared reuse with EDCS."
+**Input**: User description: "Redefine LIMS architecture around configurable operations/activities, mandatory SOP-governed execution, ODM-managed electronic forms, Viewflow workflow nodes/tasks, conditional rules, auditability, strong traceability, and a shared form-engine standard that EDCS can also use."
 
 ## Repository Context *(mandatory)*
 
-- **Service area**: shared `lims` / `edcs` architecture foundation
+- **Service area**: `lims` operation architecture foundation with shared form-engine standards alignment for future `edcs`
 - **Affected code paths**: `src/lims/`, `src/core/models.py`, future `src/edcs/`, `docs/lab-lims.md`, `docs/edcs.md`, `docs/workflow-ui.md`
 - **Related design docs**: `docs/lab-lims.md`, `docs/edcs.md`, `docs/workflow-ui.md`, `docs/metadata-versioning.md`, `docs/spec-kit-workflow.md`
 - **Knowledge graph / skills evidence**: local skills include `viewflow-configurable-metadata-forms`, `viewflow-configurable-workflow-runtime-patterns`, `viewflow-assignment-permission-patterns`, and the broader Viewflow/django-material cookbook-derived skills
@@ -17,15 +17,26 @@
 
 ## Architectural Position
 
-This specification **supersedes the current metadata-first framing as the primary LIMS architecture direction**. The merged metadata/vocabulary work remains valuable, but it should now be treated as a **transitional lower-level subsystem** that must be **redefined toward an ODM/OpenClinica-style form-package model** inside a broader operation-driven foundation used by both `lims` and `edcs`.
+This specification **supersedes the current metadata-first framing as the primary LIMS architecture direction**. The merged metadata/vocabulary work remains valuable, but it should now be treated as a **transitional lower-level subsystem** that must be **redefined toward an ODM/OpenClinica-style form-package model** inside a broader LIMS operation foundation. The form-engine standard remains reusable by both `lims` and `edcs`, but the governed operation model defined here is LIMS-specific.
 
 In practical terms:
 
+- `operation` is the governed platform term for a reusable laboratory or clinical-data-management activity/procedure
 - controlled vocabularies remain reusable foundation primitives
+- every governed LIMS operation version requires explicit SOP linkage with version/effective-date context suitable for GCP/GCLP-aligned review and audit
 - the earlier versioned-form work is not the final target model; it should be evolved into OpenClinica-style governed form packages with sections, groups, items, stable identifiers, and ODM/XLSX artifacts
 - workflow binding moves up a level from "bind a form to a target key" toward "bind forms and rules to tasks inside a versioned operation/workflow template"
-- LIMS sample accession becomes the first reference operation proving the foundation
-- EDCS should later reuse the same form/version/rule/audit core for study visits, CRFs, and submission/review flows
+- LIMS Sample Accession becomes the mandatory first reference operation proving the foundation and establishing the required entry point for downstream specimen-handling activities
+- EDCS should later reuse the same form/version/rule/audit core for study visits, CRFs, and submission/review flows without inheriting the LIMS operation model wholesale
+- operational metadata, outcomes, storage-log entries, and disposition-log entries must first exist as task-bound governed form submissions, then be projected into domain-significant relational models
+
+## Clinical Data Management Alignment
+
+- SOP governance must be explicit at the operation-version layer so execution remains reviewable against approved procedures rather than implicit operator convention.
+- Controlled vocabularies must remain reusable across operation definitions and form packages so coded fields, decision values, and operational classifications stay consistent.
+- The canonical form-engine target remains CDISC ODM/OpenClinica-style package semantics with XLSX-compatible authoring/import flows, because regulated and semi-regulated clinical/laboratory operations need stable identifiers, import/export artifacts, edit checks, and historical rendering.
+- The platform should follow a form-centric capture model: metadata capture, outcome capture, storage-log capture, and disposition-log capture are governed package or task submissions rather than fragmented ad hoc entry surfaces.
+- Traceability must allow each captured value to be linked back to the sample or subject context, operation/activity version, SOP version, form version, task/run context, and actor.
 
 ## Research Anchors
 
@@ -129,18 +140,18 @@ As a QA officer or manager, I want operation execution to produce auditable task
 
 ---
 
-### User Story 5 - Reuse the same foundation for EDCS workflows (Priority: P2)
+### User Story 5 - Reuse the same form-engine standard for EDCS (Priority: P2)
 
-As a platform architect, I want LIMS and EDCS to share the same operation/form/workflow foundation so the system stays configurable and avoids parallel engines for closely related governed data-capture processes.
+As a platform architect, I want LIMS and EDCS to share the same form-engine standard so the system avoids parallel governed form systems even if their execution models differ.
 
-**Why this priority**: The user explicitly wants the form engine reusable for EDCS, so reuse is a design requirement rather than a possible future convenience.
+**Why this priority**: The cross-module requirement is form-engine reuse, not a shared operation/runtime model.
 
-**Independent Test**: The architecture can describe both a LIMS accession operation and an EDCS visit/CRF workflow using the same core entities with module-specific runtime policies layered on top.
+**Independent Test**: The architecture can describe a LIMS accession operation and an EDCS visit/CRF package using the same published form and vocabulary contracts even if their runtime models differ.
 
 **Acceptance Scenarios**:
 
-1. **Given** EDCS later defines a visit workflow, **When** the foundation models are reused, **Then** operation definitions, form packages, task templates, and runtime records do not require a second incompatible engine.
-2. **Given** LIMS and EDCS have different UI shells or permission bundles, **When** they use the shared foundation, **Then** shared entities stay consistent while module-specific navigation and policies remain separable.
+1. **Given** EDCS later defines visit or CRF capture flows, **When** the shared form-engine standard is reused, **Then** published form packages, identifiers, vocabularies, and validation contracts do not require a second incompatible compiler.
+2. **Given** LIMS and EDCS have different UI shells, permission bundles, or execution models, **When** they use the shared form-engine standard, **Then** form semantics stay consistent while module-specific orchestration and runtime policies remain separable.
 
 ## Edge Cases
 
@@ -183,6 +194,12 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 - **FR-022**: Workflow task form capture MUST persist runtime submission/audit records first, then project domain-significant values into the appropriate governed relational models rather than treating arbitrary graph edges as the primary persistence mechanism.
 - **FR-023**: In LIMS, the primary operational artifact MUST be the sample/biospecimen and its derivatives; workflow execution records MUST provide the governed source of truth for sample acquisition, aliquoting, pooling, storage placement, and usage/consumption history.
 - **FR-024**: The platform MUST model inventory for non-sample lab materials and consumables, including catalog identity, lot/batch, unit of measure, stock transactions, storage location, and workflow-linked usage records.
+- **FR-025**: The platform MUST treat `operation` as the shared governed term for configurable laboratory or clinical-data-management activities/procedures while preserving module-specific vocabulary in UI copy where useful.
+- **FR-026**: Each LIMS `OperationVersion` MUST be invalid without an associated SOP context that captures, at minimum, SOP identifier, version label or document version, effective date, and a compliance classification or equivalent governance marker.
+- **FR-027**: Sample Accession MUST be the mandatory base operation for specimens entering governed custody, and downstream specimen-handling operations MUST depend on completed or otherwise governed accession evidence.
+- **FR-028**: The platform MUST capture metadata, outcomes, storage-log entries, disposition-log entries, and comparable operational observations through operation-bound form submissions rather than parallel ad hoc data-entry mechanisms.
+- **FR-029**: Published form packages and workflow bindings MUST support controlled-vocabulary enforcement, validation rules, and conditional/relevance logic suitable for governed clinical and laboratory data capture.
+- **FR-030**: A visual workflow-designer experience MAY be added as a downstream orchestration/UI capability, but it MUST consume the same governed workflow-template contracts and MUST NOT collapse compiler, workflow-builder, and runtime boundaries.
 
 ### Non-Goals
 
@@ -219,14 +236,15 @@ As a platform architect, I want LIMS and EDCS to share the same operation/form/w
 
 - **SC-001**: The architecture clearly distinguishes design-time operation/form/workflow definitions from runtime execution records.
 - **SC-002**: Sample accession can be described end-to-end as a versioned operation with task-specific form capture and QC-driven branching.
-- **SC-003**: The form engine is specified as reusable by both LIMS and EDCS rather than being hard-coded to one module.
+- **SC-003**: The form engine is specified as reusable by both LIMS and EDCS while the operation model remains explicitly LIMS-specific.
 - **SC-004**: The specification provides enough structure to generate a reviewable issue backlog for domain modeling, form packaging, workflow builder, and runtime execution.
 - **SC-005**: The design clearly explains that the already-merged metadata vocabulary/form work is useful but transitional, and must be redefined toward the governed ODM/OpenClinica-style package model instead of being treated as the final target.
 - **SC-006**: The specification makes explicit that operational workflow/sample/inventory state remains relational and runtime-governed rather than requiring a graph-first persistence redesign.
+- **SC-007**: The specification makes SOP-centric execution, form-centric capture, and end-to-end traceability explicit enough to guide clinically credible implementation work.
 
 ## Delivery Mapping *(mandatory)*
 
-- **Primary issue title**: Define shared operation-driven LIMS/EDCS foundation
+- **Primary issue title**: Define LIMS operation foundation with shared form-engine standard
 - **Planned branch label**: `feat/operation-driven-lims-edcs-foundation`
 - **Expected PR scope**: specification-first architecture rewrite followed by domain-specific implementation slices
 - **Blocking dependencies**: existing metadata/vocabulary work is treated as reusable foundation; no new implementation should start until the architecture spec is reviewed

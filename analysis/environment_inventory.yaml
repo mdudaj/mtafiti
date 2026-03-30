@@ -2,16 +2,16 @@ EnvironmentInventory:
   programming_languages:
     -
       name: Python
-      file_count: 164
+      file_count: 166
     -
       name: YAML
-      file_count: 29
+      file_count: 35
     -
       name: Shell
-      file_count: 3
+      file_count: 4
     -
       name: Markdown
-      file_count: 83
+      file_count: 114
   frameworks:
     -
       name: Django
@@ -46,7 +46,7 @@ EnvironmentInventory:
       status: installed
     -
       name: psycopg
-      version: 3.1.18
+      version: 3.2.13
       status: installed
   frontend_libraries:
     -

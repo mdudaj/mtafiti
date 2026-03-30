@@ -1,9 +1,9 @@
 ---
 
-description: "Task list for the operation-driven LIMS/EDCS foundation"
+description: "Task list for the LIMS operation foundation with shared form-engine standard"
 ---
 
-# Tasks: Operation-driven LIMS/EDCS foundation
+# Tasks: LIMS operation foundation with shared form-engine standard
 
 **Input**: Design documents from `/specs/002-operation-driven-lims-edcs-foundation/`
 **Prerequisites**: `spec.md` and `plan.md`
@@ -17,9 +17,9 @@ description: "Task list for the operation-driven LIMS/EDCS foundation"
 ## Phase 1: Specification ratification
 
 - [ ] T001 Confirm that this bundle supersedes the metadata-first framing as the primary architecture direction while preserving merged metadata work as reusable primitives
-- [ ] T002 Confirm the shared-foundation scope across `lims` and `edcs`, with LIMS Sample Accession as the first reference operation
-- [ ] T003 Confirm the standards stance: canonical relational model plus ODM/XML and XLSX import/export artifacts
-- [ ] T004 Confirm Viewflow remains the workflow runtime target and that workflow templates compile into supported runtime patterns
+- [ ] T002 Confirm that this bundle defines a LIMS-specific operation model while keeping the form-engine standard reusable across `lims` and `edcs`
+- [ ] T003 Confirm the standards stance: canonical relational model plus ODM/XML and XLSX import/export artifacts, with SOP/version traceability aligned to governed clinical/laboratory execution
+- [ ] T004 Confirm Viewflow remains the workflow runtime target, Sample Accession is the mandatory first specimen activity, and operational capture originates in governed activity-bound forms rather than ad hoc entry paths
 - [ ] T005 Generate the initial GitHub issue body with `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/002-operation-driven-lims-edcs-foundation`
 
 ---
@@ -32,7 +32,8 @@ description: "Task list for the operation-driven LIMS/EDCS foundation"
 - [ ] T013 [US3] Define workflow template, node, edge, assignee, approval, and branch-rule models compatible with Viewflow execution and its supported node palette
 - [ ] T014 [US3] Specify task-level form rendering rules for full-form, section-based, group-based, and field-subset capture without duplicating version-owned items
 - [ ] T015 [US4] Define runtime entities for operation runs, task runs, submissions, approvals/signatures, audit events, and material usage
-- [ ] T016 [US5] Map the shared foundation to EDCS visit/CRF workflows without coupling EDCS to LIMS-specific runtime assumptions
+- [ ] T016 [US5] Map the shared form-engine standard to EDCS visit/CRF workflows without coupling EDCS to the LIMS-specific operation/runtime model
+- [ ] T017 [US2] Define reusable controlled-vocabulary governance for activity definitions, coded decisions, units, and form-package validation enforcement
 
 ---
 

@@ -1,5 +1,1455 @@
 nodes:
   -
+    id: skill:implement_workflow_lifecycle
+    type: Skill
+    name: "Implement Workflow Lifecycle"
+    description: "Use when modeling explicit workflow definitions, runs, tasks, and transition APIs with Django persistence and JSON endpoints."
+    layer: workflow
+    depends_on:
+      - define_django_json_api_endpoint
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - workflow_definition
+      - run_payload
+      - transition_action
+    tools:
+      - Django
+    steps:
+      - "Model definitions, runs, and tasks as persistent Django models."
+      - "Expose create/list/detail/transition endpoints under /api/v1/workflows."
+      - "Apply role checks and tenant-scoped task visibility rules."
+    evidence:
+      - src/core/models.py
+      - src/core/views.py
+      - src/tests/test_workflow_ui_api.py
+  -
+    id: skill:compose_operations_dashboard_contract
+    type: Skill
+    name: "Compose Operations Dashboard Contract"
+    description: "Use when composing operations dashboard summary cards, workbench payloads, and allowed-action responses for UI surfaces."
+    layer: ui
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - dashboard_panels
+      - tenant_scope
+      - project_filter
+    tools:
+      - Django
+      - django-material
+    steps:
+      - "Create API-focused UI endpoints under /api/v1/ui/operations."
+      - "Return summary widgets and allowed actions for each workbench item."
+      - "Preserve tenant scoping so future server-rendered dashboards stay isolated."
+    evidence:
+      - docs/workflow-ui.md
+      - src/core/views.py
+  -
+    id: skill:implement_schema_per_tenant_api
+    type: Skill
+    name: "Implement Schema-per-Tenant API"
+    description: "Use when implementing a Django API or service that must resolve tenants, run inside tenant schemas, and prevent cross-tenant access with django-tenants."
+    layer: permission
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - tenant_domain
+      - tenant_scoped_model
+      - request_context
+    tools:
+      - Django
+      - django-tenants
+    steps:
+      - "Register tenant and domain models in tenants.models."
+      - "Resolve tenants from the Host header with EDMPTenantMiddleware."
+      - "Execute ORM access inside tenant schemas and reject cross-tenant access."
+    evidence:
+      - src/tenants/models.py
+      - src/config/settings.py
+      - src/core/views.py
+  -
+    id: skill:model_lineage_graph_edges
+    type: Skill
+    name: "Model Lineage Graph Edges"
+    description: "Use when representing asset-to-asset lineage as directed graph edges backed by Django models and query or mutation APIs."
+    layer: state
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - from_asset
+      - to_asset
+      - edge_type
+    tools:
+      - Django
+    steps:
+      - "Store lineage relationships in a dedicated edge model."
+      - "Expose query and mutation APIs for lineage traversal."
+      - "Attach properties and metadata needed for downstream reasoning."
+    evidence:
+      - src/core/models.py
+      - docs/lineage.md
+  -
+    id: skill:implement_tenant_aware_background_task
+    type: Skill
+    name: "Implement Tenant-aware Background Task"
+    description: "Use when creating a Celery shared_task that must execute inside a tenant schema and emit audit or domain events."
+    layer: workflow
+    depends_on:
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - tenant_schema
+      - task_payload
+      - event_metadata
+    tools:
+      - Celery
+      - Django
+    steps:
+      - "Declare the task with shared_task(base=TenantTask)."
+      - "Load tenant-scoped models and perform the state transition."
+      - "Publish completion and audit events with correlation metadata."
+    evidence:
+      - src/core/tasks.py
+      - src/core/celery.py
+      - src/core/events.py
+  -
+    id: skill:manage_project_membership_lifecycle
+    type: Skill
+    name: "Manage Project Membership Lifecycle"
+    description: "Use when handling invitations, membership transitions, and tenant-local project workspace configuration."
+    layer: permission
+    depends_on:
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - project
+      - member_identity
+      - lifecycle_action
+    tools:
+      - Django
+    steps:
+      - "Persist membership and invitation state in project models."
+      - "Expose invitation and lifecycle APIs for member operations."
+      - "Emit notification and audit data for role or status changes."
+    evidence:
+      - src/core/models.py
+      - src/core/views.py
+  -
+    id: skill:define_django_json_api_endpoint
+    type: Skill
+    name: "Define Django JSON API Endpoint"
+    description: "Use when creating or updating a versioned Django JSON API endpoint with explicit URLconf routing, JsonResponse payloads, and tenant-aware request handling."
+    layer: ui
+    depends_on:
+      []
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
+    inputs:
+      - url_path
+      - request_methods
+      - serializer_logic
+    tools:
+      - Django
+    steps:
+      - "Add a path() entry in src/config/urls.py."
+      - "Implement request parsing and response shaping in core.views."
+      - "Enforce versioning, tenancy, and role checks consistently."
+    evidence:
+      - src/config/urls.py
+      - src/core/views.py
+  -
+    id: skill:plan_viewflow_material_workflow_ui
+    type: Skill
+    name: "Plan Viewflow + Material Workflow UI"
+    description: "Use when translating workflow UI design notes into a Viewflow and django-material implementation plan with bounded runtime semantics."
+    layer: workflow
+    depends_on:
+      - compose_operations_dashboard_contract
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - external_framework_docs
+    inputs:
+      - workflow_nodes
+      - material_components
+      - role_matrix
+    tools:
+      - Viewflow
+      - django-material
+    steps:
+      - "Map workflow states and actions to a bounded Viewflow Flow node palette with explicit Process/Task runtime state."
+      - "Map dashboards, cards, and menus to django-material components."
+      - "Keep server-side role enforcement, assignment, and tenant isolation aligned with backend APIs."
+    evidence:
+      - docs/workflow-ui.md
+      - https://github.com/viewflow/viewflow
+      - https://github.com/viewflow/django-material
+  -
+    id: skill:record_structured_agentic_lesson
+    type: Skill
+    name: "Record Structured Agentic Lesson"
+    description: "Use when capturing a wrong turn or successful correction in a reusable lesson format that should steer future sessions."
+    layer: meta
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - affected_surface
+      - failure_signature
+      - root_cause
+      - verification_added
+    tools:
+      []
+    steps:
+      - "Classify the mistake using a small reusable taxonomy."
+      - "Record the missed evidence that would have prevented the mistake."
+      - "Store a preventive rule and associated verification evidence for future sessions."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/tasks/lessons.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
+    id: skill:determine_repository_target_surface
+    type: Skill
+    name: "Determine Repository Target Surface"
+    description: "Use when deciding which repository subsystem, abstraction layer, and non-goals should own an implementation before editing code."
+    layer: meta
+    depends_on:
+      []
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - user_request
+      - candidate_surfaces
+      - repository_evidence
+    tools:
+      []
+    steps:
+      - "List the plausible repository surfaces that could satisfy the request."
+      - "Compare them against the user's objective and the available evidence."
+      - "Choose the smallest supported target surface and document rejected alternatives."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/COPILOT.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
+    id: skill:observe_viewflow-demo-site_form_pattern
+    type: Skill
+    name: "Observe Viewflow Demo Site Form Pattern"
+    description: "Use when reviewing captured form behavior from viewflow-demo-site before merging it with source-code evidence into a stable pattern or skill."
+    layer: ui
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Review the captured form routes imported for viewflow-demo-site."
+      - "Compare layout structure, visible components, and interaction hints across the captured page models."
+      - "Merge the behavioral observations with source-code evidence before promoting them into stable implementation-facing skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+  -
+    id: skill:observe_viewflow-demo-site_navigation_pattern
+    type: Skill
+    name: "Observe Viewflow Demo Site Navigation Pattern"
+    description: "Use when reviewing captured navigation behavior from viewflow-demo-site before aligning it with source-code route and menu implementations."
+    layer: navigation
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - source_route
+      - target_route
+    tools:
+      []
+    steps:
+      - "Review the imported navigation edges and route transitions from the behavioral capture."
+      - "Compare them with source-defined menu, URL, and task-routing implementations."
+      - "Promote only stable route and navigation behaviors into committed ontology or reusable skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+  -
+    id: skill:observe_viewflow-demo-site_workflow_form_pattern
+    type: Skill
+    name: "Observe Viewflow Demo Site Workflow Form Pattern"
+    description: "Use when reviewing captured workflow form behavior from viewflow-demo-site before merging it with source-code evidence into a stable pattern or skill."
+    layer: workflow
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Review the captured workflow form routes imported for viewflow-demo-site."
+      - "Compare layout structure, visible components, and interaction hints across the captured page models."
+      - "Merge the behavioral observations with source-code evidence before promoting them into stable implementation-facing skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+  -
+    id: pattern:viewflow_demo_site_accounts_profile_form
+    type: Pattern
+    name: "viewflow-demo-site /accounts/profile/"
+    description: "Captured behavioral pattern for route /accounts/profile/ with layout type form."
+    source: viewflow-demo-site
+    route: /accounts/profile/
+    layout_type: form
+    visible_components:
+      - form
+      - header
+      - main
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/password_change/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_city_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/city/"
+    description: "Captured behavioral pattern for route /atlas/city/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/city/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/city/2049/detail/
+      - /atlas/city/2093/detail/
+      - /atlas/city/2122/detail/
+      - /atlas/city/2218/detail/
+      - /atlas/city/2226/detail/
+      - /atlas/city/2356/detail/
+      - /atlas/city/2357/detail/
+      - /atlas/city/2552/detail/
+      - /atlas/city/2566/detail/
+      - /atlas/city/2649/detail/
+      - /atlas/city/2653/detail/
+      - /atlas/city/2692/detail/
+      - /atlas/city/2707/detail/
+      - /atlas/city/2841/detail/
+      - /atlas/city/2890/detail/
+      - /atlas/city/2949/detail/
+      - /atlas/city/3591/detail/
+      - /atlas/city/3639/detail/
+      - /atlas/city/3718/detail/
+      - /atlas/city/3773/detail/
+      - /atlas/city/3796/detail/
+      - /atlas/city/3938/detail/
+      - /atlas/city/3953/detail/
+      - /atlas/city/3991/detail/
+      - /atlas/city/4058/detail/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_continent_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/continent/"
+    description: "Captured behavioral pattern for route /atlas/continent/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/continent/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/
+      - /atlas/continent/Africa/change/
+      - /atlas/continent/Antarctica/change/
+      - /atlas/continent/Asia/change/
+      - /atlas/continent/Australia/change/
+      - /atlas/continent/Europe/change/
+      - "/atlas/continent/North%20America/change/"
+      - "/atlas/continent/South%20America/change/"
+      - /atlas/country/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/continent/Europe/change/"
+    description: "Captured behavioral pattern for route /atlas/continent/Europe/change/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/continent/Europe/change/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_country_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/country/"
+    description: "Captured behavioral pattern for route /atlas/country/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/country/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/country/10/change/
+      - /atlas/country/11/change/
+      - /atlas/country/118/change/
+      - /atlas/country/121/change/
+      - /atlas/country/122/change/
+      - /atlas/country/160/change/
+      - /atlas/country/161/change/
+      - /atlas/country/168/change/
+      - /atlas/country/169/change/
+      - /atlas/country/176/change/
+      - /atlas/country/177/change/
+      - /atlas/country/192/change/
+      - /atlas/country/193/change/
+      - /atlas/country/206/change/
+      - /atlas/country/36/change/
+      - /atlas/country/52/change/
+      - /atlas/country/60/change/
+      - /atlas/country/68/change/
+      - /atlas/country/71/change/
+      - /atlas/country/72/change/
+      - /atlas/country/8/change/
+      - /atlas/country/84/change/
+      - /atlas/country/85/change/
+      - /atlas/country/9/change/
+      - /atlas/country/94/change/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/country/121/delete/"
+    description: "Captured behavioral pattern for route /atlas/country/121/delete/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/country/121/delete/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/city/2058/detail/
+      - /atlas/city/2059/detail/
+      - /atlas/city/2060/detail/
+      - /atlas/city/2061/detail/
+      - /atlas/city/2062/detail/
+      - /atlas/city/2063/detail/
+      - /atlas/city/2064/detail/
+      - /atlas/city/2065/detail/
+      - /atlas/city/2066/detail/
+      - /atlas/city/2067/detail/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/country/121/change/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/forms/bank/"
+    description: "Captured behavioral pattern for route /atlas/forms/bank/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/forms/bank/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/forms/bank/
+      - /atlas/forms/checkout/
+      - /atlas/forms/contact/
+      - /atlas/forms/hospital/
+      - /atlas/forms/login/
+      - /atlas/forms/profile/
+      - /atlas/forms/registration/
+      - /atlas/forms/signup/
+      - /atlas/forms/wizard/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/forms/hospital/"
+    description: "Captured behavioral pattern for route /atlas/forms/hospital/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/forms/hospital/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/forms/bank/
+      - /atlas/forms/checkout/
+      - /atlas/forms/contact/
+      - /atlas/forms/hospital/
+      - /atlas/forms/login/
+      - /atlas/forms/profile/
+      - /atlas/forms/registration/
+      - /atlas/forms/signup/
+      - /atlas/forms/wizard/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/forms/registration/"
+    description: "Captured behavioral pattern for route /atlas/forms/registration/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/forms/registration/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/forms/bank/
+      - /atlas/forms/checkout/
+      - /atlas/forms/contact/
+      - /atlas/forms/hospital/
+      - /atlas/forms/login/
+      - /atlas/forms/profile/
+      - /atlas/forms/registration/
+      - /atlas/forms/signup/
+      - /atlas/forms/wizard/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/forms/signup/"
+    description: "Captured behavioral pattern for route /atlas/forms/signup/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/forms/signup/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/forms/bank/
+      - /atlas/forms/checkout/
+      - /atlas/forms/contact/
+      - /atlas/forms/hospital/
+      - /atlas/forms/login/
+      - /atlas/forms/profile/
+      - /atlas/forms/registration/
+      - /atlas/forms/signup/
+      - /atlas/forms/wizard/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_ocean_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/ocean/"
+    description: "Captured behavioral pattern for route /atlas/ocean/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/ocean/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/ocean/Arctic/detail/
+      - /atlas/ocean/Atlantic/detail/
+      - /atlas/ocean/Indian/detail/
+      - /atlas/ocean/Pacific/detail/
+      - /atlas/ocean/Southern/detail/
+      - /atlas/sea/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_atlas_sea_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /atlas/sea/"
+    description: "Captured behavioral pattern for route /atlas/sea/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /atlas/sea/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/
+      - /atlas/country/
+      - /atlas/forms/
+      - /atlas/ocean/
+      - /atlas/sea/
+      - /atlas/sea/1/change/
+      - /atlas/sea/11/change/
+      - /atlas/sea/12/change/
+      - /atlas/sea/13/change/
+      - /atlas/sea/14/change/
+      - /atlas/sea/15/change/
+      - /atlas/sea/2/change/
+      - /atlas/sea/21/change/
+      - /atlas/sea/22/change/
+      - /atlas/sea/23/change/
+      - /atlas/sea/24/change/
+      - /atlas/sea/25/change/
+      - /atlas/sea/26/change/
+      - /atlas/sea/27/change/
+      - /atlas/sea/28/change/
+      - /atlas/sea/29/change/
+      - /atlas/sea/3/change/
+      - /atlas/sea/30/change/
+      - /atlas/sea/31/change/
+      - /atlas/sea/32/change/
+      - /atlas/sea/33/change/
+      - /atlas/sea/34/change/
+      - /atlas/sea/35/change/
+      - /atlas/sea/4/change/
+      - /atlas/sea/7/change/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /dashboard/django_stats/"
+    description: "Captured behavioral pattern for route /dashboard/django_stats/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /dashboard/django_stats/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /dashboard/django_stats/
+      - /dashboard/oilngas/
+      - /dashboard/stocks/
+      - /intro/
+      - /intro/vf_stats/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /dashboard/oilngas/"
+    description: "Captured behavioral pattern for route /dashboard/oilngas/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /dashboard/oilngas/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /dashboard/django_stats/
+      - /dashboard/oilngas/
+      - /dashboard/stocks/
+      - /intro/
+      - /intro/vf_stats/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /dashboard/stocks/"
+    description: "Captured behavioral pattern for route /dashboard/stocks/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /dashboard/stocks/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /dashboard/django_stats/
+      - /dashboard/oilngas/
+      - /dashboard/stocks/
+      - /intro/
+      - /intro/vf_stats/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_intro_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /intro/"
+    description: "Captured behavioral pattern for route /intro/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /intro/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /admin/review/review/
+      - /api/
+      - /atlas/
+      - /atlas/city/
+      - /atlas/continent/Europe/change/
+      - /atlas/country/121/delete/
+      - /atlas/forms/comment/
+      - /atlas/forms/hospital/
+      - /atlas/forms/registration/
+      - /atlas/forms/signup/
+      - /dashboard/
+      - /intro/
+      - /intro/vf_stats/
+      - /patterns/
+      - /review/
+      - /review/api/swagger/
+      - /review/review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /intro/vf_stats/"
+    description: "Captured behavioral pattern for route /intro/vf_stats/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /intro/vf_stats/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_patterns_sequence_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /patterns/sequence/"
+    description: "Captured behavioral pattern for route /patterns/sequence/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /patterns/sequence/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /patterns/cancelingpartialjoin/
+      - /patterns/defferedchoice/
+      - /patterns/exclusivechoice/
+      - /patterns/loop/
+      - /patterns/multimerge/
+      - /patterns/multipleinstances/
+      - /patterns/parallelsplit/
+      - /patterns/partialjoin/
+      - /patterns/resource_allocation/
+      - /patterns/sequence/
+      - /patterns/sequence/7079/input_user_details/238528/assign/
+      - /patterns/sequence/7083/input_user_details/238552/assign/
+      - /patterns/sequence/7092/input_user_details/238598/execute/
+      - /patterns/sequence/7094/
+      - /patterns/sequence/7115/input_user_details/238731/assign/
+      - /patterns/sequence/7126/input_user_details/238974/assign/
+      - /patterns/sequence/7127/input_user_details/238976/execute/
+      - /patterns/sequence/7135/input_user_details/239007/assign/
+      - /patterns/sequence/7143/
+      - /patterns/sequence/7145/input_user_details/239057/assign/
+      - /patterns/sequence/7157/input_user_details/239119/assign/
+      - /patterns/sequence/7168/
+      - /patterns/sequence/7177/
+      - /patterns/sequence/7180/
+      - /patterns/sequence/7185/
+      - /patterns/sequence/7187/
+      - /patterns/sequence/7189/
+      - /patterns/sequence/7194/
+      - /patterns/sequence/7196/input_user_details/239363/assign/
+      - /patterns/sequence/7199/input_user_details/239372/assign/
+      - /patterns/sequence/7203/input_user_details/239390/execute/
+      - /patterns/sequence/7215/input_user_details/239490/assign/
+      - /patterns/sequence/7216/input_user_details/239492/assign/
+      - /patterns/sequence/7217/input_user_details/239496/assign/
+      - /patterns/sequence/7220/input_user_details/239547/assign/
+      - /patterns/sequence/7225/
+      - /patterns/sequence/7226/
+      - /patterns/sequence/7228/
+      - /patterns/sequence/7229/input_user_details/239582/assign/
+      - /patterns/sequence/7230/input_user_details/239584/assign/
+      - /patterns/sequence/7231/input_user_details/239588/execute/
+      - /patterns/sequence/7233/
+      - /patterns/sequence/7234/
+      - /patterns/sequence/7235/
+      - /patterns/sequence/7236/
+      - /patterns/sequence/7237/
+      - /patterns/sequence/7251/
+      - /patterns/sequence/7252/
+      - /patterns/sequence/7253/input_user_details/239742/assign/
+      - /patterns/sequence/7254/
+      - /patterns/sequence/7255/
+      - /patterns/sequence/7258/input_user_details/239759/assign/
+      - /patterns/sequence/7259/input_user_details/239761/execute/
+      - /patterns/sequence/7260/
+      - /patterns/sequence/7264/
+      - /patterns/sequence/7267/
+      - /patterns/sequence/7271/
+      - /patterns/sequence/7282/input_user_details/239890/execute/
+      - /patterns/sequence/7284/input_user_details/239895/assign/
+      - /patterns/sequence/7285/input_user_details/239897/assign/
+      - /patterns/sequence/flows/
+      - /patterns/sequence/start/
+      - /patterns/sequence/tasks/
+      - /review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_review_api_swagger_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /review/api/swagger/"
+    description: "Captured behavioral pattern for route /review/api/swagger/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /review/api/swagger/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+    interaction_types:
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /admin/review/review/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /review/api/swagger/
+      - /review/review/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_review_review_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /review/review/"
+    description: "Captured behavioral pattern for route /review/review/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /review/review/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /admin/review/review/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /review/api/swagger/
+      - /review/review/
+      - /review/review/751/detail/
+      - /review/review/770/detail/
+      - /review/review/778/detail/
+      - /review/review/801/detail/
+      - /review/review/822/detail/
+      - /review/review/826/detail/
+      - /review/review/828/detail/
+      - /review/review/842/detail/
+      - /review/review/845/detail/
+      - /review/review/849/detail/
+      - /review/review/851/detail/
+      - /workflow/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: pattern:viewflow_demo_site_workflow_inbox_workflow_form
+    type: Pattern
+    name: "viewflow-demo-site /workflow/inbox/"
+    description: "Captured behavioral pattern for route /workflow/inbox/ with layout type workflow_form."
+    source: viewflow-demo-site
+    route: /workflow/inbox/
+    layout_type: workflow_form
+    visible_components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+    interaction_types:
+      - form-submit
+      - form-submit
+      - form-submit
+      - link-navigation
+    internal_navigation:
+      - /accounts/profile/
+      - /api/
+      - /atlas/
+      - /dashboard/
+      - /intro/
+      - /patterns/
+      - /review/
+      - /workflow/
+      - /workflow/archive/
+      - /workflow/flows/
+      - /workflow/flows/dynamicsplit/start/
+      - /workflow/flows/helloworld/start/
+      - /workflow/flows/shipment/start/
+      - /workflow/inbox/
+      - /workflow/queue/
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+  -
+    id: skill:extract_pattern_from_code
+    type: Skill
+    name: "Extract Pattern From Code"
+    description: "Use when locating the source-level implementation behind a reusable UI, workflow, navigation, or permission behavior."
+    layer: meta
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - behavior_signature
+      - candidate_modules
+      - framework_surface
+    tools:
+      []
+    steps:
+      - "Locate the template, module, class, or configuration surface implementing the observed behavior."
+      - "Extract the smallest source snippet that explains the behavior."
+      - "Record provenance so later skills stay tied to concrete implementation evidence."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
+    id: skill:merge_patterns
+    type: Skill
+    name: "Merge Patterns"
+    description: "Use when combining behavioral evidence and source-code evidence into a single reusable ontology or skill candidate with explicit confidence."
+    layer: cross_layer
+    depends_on:
+      - extract_pattern_from_ui
+      - extract_pattern_from_code
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - ui_pattern
+      - code_pattern
+      - confidence_rule
+    tools:
+      []
+    steps:
+      - "Compare the behavioral and implementation patterns for semantic alignment."
+      - "Promote matching patterns as high confidence and isolate unmatched ones as lower confidence."
+      - "Persist the merged pattern with cross-layer links instead of duplicating the same fact in multiple places."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
+    id: skill:generalize_to_skill
+    type: Skill
+    name: "Generalize To Skill"
+    description: "Use when promoting a stable, repeated pattern into an atomic skill with dependencies, provenance, and a clear target layer."
+    layer: meta
+    depends_on:
+      - merge_patterns
+      - record_structured_agentic_lesson
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - pattern_candidate
+      - target_layer
+      - dependency_set
+    tools:
+      []
+    steps:
+      - "Split the pattern into the smallest useful capability that still stands on its own."
+      - "Record dependency skills and target layer instead of embedding everything in one recipe."
+      - "Publish the skill with provenance and confidence so later automation can compose it safely."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/tasks/lessons.md
+  -
+    id: skill:extract_pattern_from_ui
+    type: Skill
+    name: "Extract Pattern From UI"
+    description: "Use when mining page layouts, actions, interactions, and visible state changes from a demo surface before generalizing them into reusable ontology nodes or skills."
+    layer: ui
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Capture the page shell, visible components, actions, and route context."
+      - "Record interaction flows and any visible state or permission changes."
+      - "Promote the stable observations into page or interaction patterns instead of raw screenshots only."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/COPILOT.md
+  -
     id: framework:django
     type: Framework
     name: Django
@@ -290,7 +1740,7 @@ nodes:
     type: Library
     name: psycopg
     description: "PostgreSQL driver used by Django and operational scripts."
-    version: 3.1.18
+    version: 3.2.13
     context_hub:
       available: false
       install_command: "npm install -g @aisuite/chub"
@@ -1477,87 +2927,10 @@ nodes:
       - GET
       - POST
   -
-    id: skill:compose_operations_dashboard_contract
-    type: Skill
-    name: "Compose Operations Dashboard Contract"
-    description: "Aggregate operational summary cards and workbench payloads for dashboard-style UI surfaces."
-    inputs:
-      - dashboard_panels
-      - tenant_scope
-      - project_filter
-    tools:
-      - Django
-      - django-material
-    steps:
-      - "Create API-focused UI endpoints under /api/v1/ui/operations."
-      - "Return summary widgets and allowed actions for each workbench item."
-      - "Preserve tenant scoping so future server-rendered dashboards stay isolated."
-    evidence:
-      - docs/workflow-ui.md
-      - src/core/views.py
-  -
-    id: skill:record_structured_agentic_lesson
-    type: Skill
-    name: "Record Structured Agentic Lesson"
-    description: "Capture wrong turns and successful corrections in a reusable lesson format that can steer future sessions."
-    inputs:
-      - affected_surface
-      - failure_signature
-      - root_cause
-      - verification_added
-    tools:
-      []
-    steps:
-      - "Classify the mistake using a small reusable taxonomy."
-      - "Record the missed evidence that would have prevented the mistake."
-      - "Store a preventive rule and associated verification evidence for future sessions."
-    evidence:
-      - docs/self-reflective-implementation.md
-      - templates/agentic-workflow/tasks/lessons.md
-      - templates/agentic-workflow/.agentic/right-thing.yaml
-  -
     id: service:worker
     type: Service
     name: worker
     description: "Celery worker service."
-  -
-    id: skill:implement_tenant_aware_background_task
-    type: Skill
-    name: "Implement Tenant-aware Background Task"
-    description: "Create a Celery shared_task that runs inside a tenant schema and emits audit or domain events."
-    inputs:
-      - tenant_schema
-      - task_payload
-      - event_metadata
-    tools:
-      - Celery
-      - Django
-    steps:
-      - "Declare the task with shared_task(base=TenantTask)."
-      - "Load tenant-scoped models and perform the state transition."
-      - "Publish completion and audit events with correlation metadata."
-    evidence:
-      - src/core/tasks.py
-      - src/core/celery.py
-      - src/core/events.py
-  -
-    id: skill:define_django_json_api_endpoint
-    type: Skill
-    name: "Define Django JSON API Endpoint"
-    description: "Create a versioned Django function-based endpoint backed by explicit URLconf routing and JsonResponse payloads."
-    inputs:
-      - url_path
-      - request_methods
-      - serializer_logic
-    tools:
-      - Django
-    steps:
-      - "Add a path() entry in src/config/urls.py."
-      - "Implement request parsing and response shaping in core.views."
-      - "Enforce versioning, tenancy, and role checks consistently."
-    evidence:
-      - src/config/urls.py
-      - src/core/views.py
   -
     id: uicomponent:operations_dashboard
     type: UIComponent
@@ -3279,61 +4652,14 @@ nodes:
     name: "Context Hub"
     description: "External API documentation retrieval for coding agents via chub search/get."
   -
-    id: skill:manage_project_membership_lifecycle
-    type: Skill
-    name: "Manage Project Membership Lifecycle"
-    description: "Handle invitations, membership transitions, and workspace configuration for tenant-local projects."
-    inputs:
-      - project
-      - member_identity
-      - lifecycle_action
-    tools:
-      - Django
-    steps:
-      - "Persist membership and invitation state in project models."
-      - "Expose invitation and lifecycle APIs for member operations."
-      - "Emit notification and audit data for role or status changes."
-    evidence:
-      - src/core/models.py
-      - src/core/views.py
-  -
-    id: skill:determine_repository_target_surface
-    type: Skill
-    name: "Determine Repository Target Surface"
-    description: "Identify the correct subsystem, abstraction layer, and explicit non-goals before implementation begins."
-    inputs:
-      - user_request
-      - candidate_surfaces
-      - repository_evidence
-    tools:
-      []
-    steps:
-      - "List the plausible repository surfaces that could satisfy the request."
-      - "Compare them against the user's objective and the available evidence."
-      - "Choose the smallest supported target surface and document rejected alternatives."
-    evidence:
-      - docs/self-reflective-implementation.md
-      - templates/agentic-workflow/COPILOT.md
-      - templates/agentic-workflow/.agentic/right-thing.yaml
-  -
-    id: skill:implement_workflow_lifecycle
-    type: Skill
-    name: "Implement Workflow Lifecycle"
-    description: "Model explicit workflow definition, run, task, and transition lifecycles using Django models and JSON APIs."
-    inputs:
-      - workflow_definition
-      - run_payload
-      - transition_action
-    tools:
-      - Django
-    steps:
-      - "Model definitions, runs, and tasks as persistent Django models."
-      - "Expose create/list/detail/transition endpoints under /api/v1/workflows."
-      - "Apply role checks and tenant-scoped task visibility rules."
-    evidence:
-      - src/core/models.py
-      - src/core/views.py
-      - src/tests/test_workflow_ui_api.py
+    id: behavioralsource:viewflow-demo-site
+    type: BehavioralSource
+    name: viewflow-demo-site
+    description: "Imported behavioral evidence for viewflow-demo-site."
+    source_type: demo-site
+    source_url: https://demo.viewflow.io/
+    latest_run: 20260330T044020Z
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/source-manifest.json
   -
     id: workflow:agentic_delivery_loop
     type: Workflow
@@ -3514,68 +4840,10 @@ nodes:
     description: "Python module at src/tenants/views.py."
     path: src/tenants/views.py
   -
-    id: skill:model_lineage_graph_edges
-    type: Skill
-    name: "Model Lineage Graph Edges"
-    description: "Represent asset-to-asset lineage as directed graph edges backed by Django models and APIs."
-    inputs:
-      - from_asset
-      - to_asset
-      - edge_type
-    tools:
-      - Django
-    steps:
-      - "Store lineage relationships in a dedicated edge model."
-      - "Expose query and mutation APIs for lineage traversal."
-      - "Attach properties and metadata needed for downstream reasoning."
-    evidence:
-      - src/core/models.py
-      - docs/lineage.md
-  -
     id: workflow:retention_execution
     type: Workflow
     name: "Retention execution"
     description: "Retention evaluation and archive/delete execution through Celery tasks."
-  -
-    id: skill:implement_schema_per_tenant_api
-    type: Skill
-    name: "Implement Schema-per-Tenant API"
-    description: "Scope models, requests, and background execution to tenant schemas using django-tenants."
-    inputs:
-      - tenant_domain
-      - tenant_scoped_model
-      - request_context
-    tools:
-      - Django
-      - django-tenants
-    steps:
-      - "Register tenant and domain models in tenants.models."
-      - "Resolve tenants from the Host header with EDMPTenantMiddleware."
-      - "Execute ORM access inside tenant schemas and reject cross-tenant access."
-    evidence:
-      - src/tenants/models.py
-      - src/config/settings.py
-      - src/core/views.py
-  -
-    id: skill:plan_viewflow_material_workflow_ui
-    type: Skill
-    name: "Plan Viewflow + Material Workflow UI"
-    description: "Translate workflow UI design notes into a future Viewflow and django-material implementation plan."
-    inputs:
-      - workflow_nodes
-      - material_components
-      - role_matrix
-    tools:
-      - Viewflow
-      - django-material
-    steps:
-      - "Map workflow states and actions to a bounded Viewflow Flow node palette with explicit Process/Task runtime state."
-      - "Map dashboards, cards, and menus to django-material components."
-      - "Keep server-side role enforcement, assignment, and tenant isolation aligned with backend APIs."
-    evidence:
-      - docs/workflow-ui.md
-      - https://github.com/viewflow/viewflow
-      - https://github.com/viewflow/django-material
   -
     id: uicomponent:agent_monitor
     type: UIComponent

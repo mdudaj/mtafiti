@@ -5,6 +5,7 @@
 * Run independent work in parallel lanes/sessions; keep one objective per lane.
 * If work has 3+ steps, start in plan mode before implementation.
 * Use subagents/tools for exploration and batch verification to keep context clean.
+* For framework-analysis tasks, separate behavioral evidence from source-code evidence before generalizing patterns.
 
 ## 3-phase contract (required)
 
@@ -23,6 +24,16 @@ Before editing:
 * define verification before implementation.
 
 If more than one subsystem looks plausible, compare candidate surfaces first and state why the chosen one best matches the request. Do not anchor on the first matching keyword.
+
+## Framework-analysis mode
+
+When the task is harness enrichment or framework mining:
+
+* model UI, navigation, workflow, state, permission, and cross-layer links explicitly,
+* capture page models and interaction flows from the visible application surface,
+* validate extracted patterns against source repositories before promoting them into reusable skills,
+* keep skills atomic and composable, with dependencies where needed,
+* record confidence as high only when behavior and source implementation align.
 
 ## Completion gate
 

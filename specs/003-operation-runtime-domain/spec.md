@@ -8,7 +8,7 @@
 
 ## Repository Context *(mandatory)*
 
-- **Service area**: shared `lims` / future `edcs` runtime foundation
+- **Service area**: `lims` operation runtime foundation
 - **Affected code paths**: `src/core/models.py`, `src/core/views.py`, `src/lims/models.py`, future shared operation/runtime app(s), `docs/lab-lims.md`, `docs/workflow-ui.md`
 - **Related design docs**: `specs/002-operation-driven-lims-edcs-foundation/spec.md`, `specs/002-operation-driven-lims-edcs-foundation/plan.md`, `docs/lab-lims.md`, `docs/workflow-ui.md`
 - **Prior checkpoints**: `022-architecture-spec-and-skills.md`, `017-accession-wizard-and-metadata.md`, `016-preview-and-receiving-refactor.md`
@@ -27,11 +27,11 @@ The merged foundation spec establishes that operations, form packages, workflow 
 - auditable material/specimen usage
 - in-flight behavior when a newer operation version is published
 
-Without this slice, implementation risks either overloading the generic `core` workflow scaffold or embedding LIMS-specific runtime assumptions that EDCS cannot reuse.
+Without this slice, implementation risks either overloading the generic `core` workflow scaffold or leaving the LIMS runtime boundary underspecified.
 
 ## Goals
 
-- Define first-class `OperationDefinition` and `OperationVersion` semantics for shared LIMS/EDCS use.
+- Define first-class `OperationDefinition` and `OperationVersion` semantics for LIMS use.
 - Define runtime entities that preserve immutable references to the exact operation, workflow, and form versions used for execution.
 - Define approval, signature, audit, and material-usage records as explicit governed runtime concepts.
 - Define in-flight version behavior so published updates do not silently mutate active runs.
@@ -140,16 +140,16 @@ As a laboratory manager, I want task execution to reference consumed and produce
 
 ---
 
-### User Story 5 - Reuse the same runtime core for EDCS (Priority: P2)
+### User Story 5 - Keep the LIMS runtime separate from the shared form-engine standard (Priority: P2)
 
-As a platform architect, I want the runtime model to serve both LIMS and EDCS so module-specific policies do not force separate engines.
+As a platform architect, I want the LIMS runtime model to remain specific to LIMS even while it consumes the shared form-engine standard, so EDCS is not forced into a runtime model it does not need.
 
-**Independent Test**: Compare a LIMS accession run and a future EDCS visit/CRF run and confirm both can use the same `OperationRun`, `TaskRun`, `SubmissionRecord`, and `ApprovalRecord` structures while pointing at different subject and artifact references.
+**Independent Test**: Compare a LIMS accession run with a future EDCS capture flow and confirm EDCS can reuse the same published package standard without inheriting `OperationRun`, `TaskRun`, or LIMS-specific artifact linkage structures.
 
 **Acceptance Scenarios**:
 
-1. **Given** EDCS later reuses the foundation, **When** a visit workflow is executed, **Then** runtime entities remain compatible without requiring LIMS-only fields.
-2. **Given** LIMS and EDCS enforce different roles, **When** runtime permissions are evaluated, **Then** role mapping can vary by module while the runtime record structure stays shared.
+1. **Given** EDCS later adopts the shared form-engine standard, **When** forms are published and consumed there, **Then** EDCS is not required to reuse LIMS `OperationRun` or `TaskRun` entities.
+2. **Given** LIMS and EDCS enforce different runtime models, **When** architecture boundaries are reviewed, **Then** the LIMS runtime remains explicitly module-specific while package semantics stay reusable.
 
 ## Edge Cases
 
@@ -184,7 +184,7 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - **FR-015**: The runtime model MUST support conditional short-circuit completion, rejection, cancellation, pause/resume, and controlled termination semantics.
 - **FR-016**: The system MUST preserve in-flight runs on their original bound version set when newer operation versions are published or activated.
 - **FR-017**: The system MUST define controlled migration rules for draft or not-yet-started runs when an operation version is superseded.
-- **FR-018**: The system MUST support module-specific subject references without hard-coding the runtime model exclusively to LIMS specimens or EDCS visits.
+- **FR-018**: The system MUST support LIMS subject and artifact references without pretending the runtime model is the canonical execution model for EDCS.
 - **FR-019**: The runtime model MUST support role-gated assignment, execution, review, and approval actions consistent with tenant-aware permission checks.
 - **FR-020**: The system MUST remain compatible with a Viewflow-style runtime where orchestration state and task state are explicit and not hidden in free-form payloads.
 - **FR-021**: Runtime capture MUST remain backed by relational tenant-scoped models; graph-style knowledge artifacts may describe the system but MUST NOT replace runtime persistence or audit requirements.
@@ -192,6 +192,7 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - **FR-023**: For LIMS workflows, sample/biospecimen records and their derivatives MUST remain the primary operational artifacts referenced by runtime tasks.
 - **FR-024**: The runtime model MUST support explicit sample quantity/volume acquisition, derivation, reservation, and consumption records so workflow execution becomes the source of truth for sample usage history.
 - **FR-025**: The runtime model MUST support linkage from task execution to non-sample lab inventory transactions for materials and consumables such as reagents, tubes, kits, and labels.
+- **FR-026**: The runtime model MUST preserve traceability from each governed submission or approval to the relevant sample/subject context, operation version, SOP version context, form package version, task/run, and actor.
 
 ### Non-Functional Requirements
 
@@ -238,10 +239,11 @@ As a platform architect, I want the runtime model to serve both LIMS and EDCS so
 - **SC-003**: The spec explains how task submissions, approvals, and audit events relate without collapsing them into one payload field.
 - **SC-004**: The spec shows how runtime records reuse existing LIMS artifact domains for specimen/material traceability.
 - **SC-005**: The spec is implementation-ready enough to drive a dedicated runtime-domain issue or PR slice.
+- **SC-006**: The spec makes end-to-end runtime traceability explicit enough to support clinically credible review and audit flows.
 
 ## Delivery Mapping *(mandatory)*
 
-- **Issue title**: Design operation runtime domain
+- **Issue title**: Design LIMS operation runtime domain
 - **Issue reference**: `#108`
 - **Parent issue**: `#107`
 - **Issue generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/003-operation-runtime-domain`

@@ -1,0 +1,209 @@
+ontology:
+  name: workflow
+  entities:
+    -
+      name: Flow
+      contains:
+        - Node
+    -
+      name: Node
+      types:
+        - Start
+        - Task
+        - Decision
+        - End
+    -
+      name: Task
+      binds_to:
+        - View
+        - Form
+        - UserRole
+observed_patterns:
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/city/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /workflow/inbox/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/workflow/inbox/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /patterns/sequence/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/city/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/Europe/change/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/continent/Europe/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/121/delete/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/country/121/delete/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/api/swagger/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/registration/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/signup/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/hospital/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/vf_stats/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/stocks/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/django_stats/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/continent/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/country/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/ocean/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/sea/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/sea/
+      - .
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/bank/
+    title: "Workflow 101 Demo"
+    form_actions:
+      - /accounts/logout/
+      - https://demo.viewflow.io/atlas/forms/bank/

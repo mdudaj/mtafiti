@@ -2,7 +2,15 @@ skills:
   -
     id: compose_operations_dashboard_contract
     name: "Compose Operations Dashboard Contract"
-    description: "Aggregate operational summary cards and workbench payloads for dashboard-style UI surfaces."
+    description: "Use when composing operations dashboard summary cards, workbench payloads, and allowed-action responses for UI surfaces."
+    layer: ui
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - dashboard_panels
       - tenant_scope
@@ -20,7 +28,15 @@ skills:
   -
     id: define_django_json_api_endpoint
     name: "Define Django JSON API Endpoint"
-    description: "Create a versioned Django function-based endpoint backed by explicit URLconf routing and JsonResponse payloads."
+    description: "Use when creating or updating a versioned Django JSON API endpoint with explicit URLconf routing, JsonResponse payloads, and tenant-aware request handling."
+    layer: ui
+    depends_on:
+      []
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - url_path
       - request_methods
@@ -37,7 +53,15 @@ skills:
   -
     id: determine_repository_target_surface
     name: "Determine Repository Target Surface"
-    description: "Identify the correct subsystem, abstraction layer, and explicit non-goals before implementation begins."
+    description: "Use when deciding which repository subsystem, abstraction layer, and non-goals should own an implementation before editing code."
+    layer: meta
+    depends_on:
+      []
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - template_contract
     inputs:
       - user_request
       - candidate_surfaces
@@ -53,9 +77,95 @@ skills:
       - templates/agentic-workflow/COPILOT.md
       - templates/agentic-workflow/.agentic/right-thing.yaml
   -
+    id: extract_pattern_from_code
+    name: "Extract Pattern From Code"
+    description: "Use when locating the source-level implementation behind a reusable UI, workflow, navigation, or permission behavior."
+    layer: meta
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - behavior_signature
+      - candidate_modules
+      - framework_surface
+    tools:
+      []
+    steps:
+      - "Locate the template, module, class, or configuration surface implementing the observed behavior."
+      - "Extract the smallest source snippet that explains the behavior."
+      - "Record provenance so later skills stay tied to concrete implementation evidence."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
+    id: extract_pattern_from_ui
+    name: "Extract Pattern From UI"
+    description: "Use when mining page layouts, actions, interactions, and visible state changes from a demo surface before generalizing them into reusable ontology nodes or skills."
+    layer: ui
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Capture the page shell, visible components, actions, and route context."
+      - "Record interaction flows and any visible state or permission changes."
+      - "Promote the stable observations into page or interaction patterns instead of raw screenshots only."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/COPILOT.md
+  -
+    id: generalize_to_skill
+    name: "Generalize To Skill"
+    description: "Use when promoting a stable, repeated pattern into an atomic skill with dependencies, provenance, and a clear target layer."
+    layer: meta
+    depends_on:
+      - merge_patterns
+      - record_structured_agentic_lesson
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - pattern_candidate
+      - target_layer
+      - dependency_set
+    tools:
+      []
+    steps:
+      - "Split the pattern into the smallest useful capability that still stands on its own."
+      - "Record dependency skills and target layer instead of embedding everything in one recipe."
+      - "Publish the skill with provenance and confidence so later automation can compose it safely."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/tasks/lessons.md
+  -
     id: implement_schema_per_tenant_api
     name: "Implement Schema-per-Tenant API"
-    description: "Scope models, requests, and background execution to tenant schemas using django-tenants."
+    description: "Use when implementing a Django API or service that must resolve tenants, run inside tenant schemas, and prevent cross-tenant access with django-tenants."
+    layer: permission
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - tenant_domain
       - tenant_scoped_model
@@ -74,7 +184,15 @@ skills:
   -
     id: implement_tenant_aware_background_task
     name: "Implement Tenant-aware Background Task"
-    description: "Create a Celery shared_task that runs inside a tenant schema and emits audit or domain events."
+    description: "Use when creating a Celery shared_task that must execute inside a tenant schema and emit audit or domain events."
+    layer: workflow
+    depends_on:
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - tenant_schema
       - task_payload
@@ -93,7 +211,16 @@ skills:
   -
     id: implement_workflow_lifecycle
     name: "Implement Workflow Lifecycle"
-    description: "Model explicit workflow definition, run, task, and transition lifecycles using Django models and JSON APIs."
+    description: "Use when modeling explicit workflow definitions, runs, tasks, and transition APIs with Django persistence and JSON endpoints."
+    layer: workflow
+    depends_on:
+      - define_django_json_api_endpoint
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - workflow_definition
       - run_payload
@@ -111,7 +238,15 @@ skills:
   -
     id: manage_project_membership_lifecycle
     name: "Manage Project Membership Lifecycle"
-    description: "Handle invitations, membership transitions, and workspace configuration for tenant-local projects."
+    description: "Use when handling invitations, membership transitions, and tenant-local project workspace configuration."
+    layer: permission
+    depends_on:
+      - implement_schema_per_tenant_api
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - project
       - member_identity
@@ -126,9 +261,44 @@ skills:
       - src/core/models.py
       - src/core/views.py
   -
+    id: merge_patterns
+    name: "Merge Patterns"
+    description: "Use when combining behavioral evidence and source-code evidence into a single reusable ontology or skill candidate with explicit confidence."
+    layer: cross_layer
+    depends_on:
+      - extract_pattern_from_ui
+      - extract_pattern_from_code
+    confidence:
+      level: medium
+      sources:
+        - repository_docs
+        - template_contract
+    inputs:
+      - ui_pattern
+      - code_pattern
+      - confidence_rule
+    tools:
+      []
+    steps:
+      - "Compare the behavioral and implementation patterns for semantic alignment."
+      - "Promote matching patterns as high confidence and isolate unmatched ones as lower confidence."
+      - "Persist the merged pattern with cross-layer links instead of duplicating the same fact in multiple places."
+    evidence:
+      - docs/self-reflective-implementation.md
+      - templates/agentic-workflow/README.md
+      - templates/agentic-workflow/.agentic/right-thing.yaml
+  -
     id: model_lineage_graph_edges
     name: "Model Lineage Graph Edges"
-    description: "Represent asset-to-asset lineage as directed graph edges backed by Django models and APIs."
+    description: "Use when representing asset-to-asset lineage as directed graph edges backed by Django models and query or mutation APIs."
+    layer: state
+    depends_on:
+      - define_django_json_api_endpoint
+    confidence:
+      level: high
+      sources:
+        - repository_code
+        - repository_docs
     inputs:
       - from_asset
       - to_asset
@@ -143,9 +313,114 @@ skills:
       - src/core/models.py
       - docs/lineage.md
   -
+    id: observe_viewflow-demo-site_form_pattern
+    name: "Observe Viewflow Demo Site Form Pattern"
+    description: "Use when reviewing captured form behavior from viewflow-demo-site before merging it with source-code evidence into a stable pattern or skill."
+    layer: ui
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Review the captured form routes imported for viewflow-demo-site."
+      - "Compare layout structure, visible components, and interaction hints across the captured page models."
+      - "Merge the behavioral observations with source-code evidence before promoting them into stable implementation-facing skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    patterns:
+      - pattern:viewflow_demo_site_accounts_profile_form
+    source_slug: viewflow-demo-site
+  -
+    id: observe_viewflow-demo-site_navigation_pattern
+    name: "Observe Viewflow Demo Site Navigation Pattern"
+    description: "Use when reviewing captured navigation behavior from viewflow-demo-site before aligning it with source-code route and menu implementations."
+    layer: navigation
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - source_route
+      - target_route
+    tools:
+      []
+    steps:
+      - "Review the imported navigation edges and route transitions from the behavioral capture."
+      - "Compare them with source-defined menu, URL, and task-routing implementations."
+      - "Promote only stable route and navigation behaviors into committed ontology or reusable skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    source_slug: viewflow-demo-site
+  -
+    id: observe_viewflow-demo-site_workflow_form_pattern
+    name: "Observe Viewflow Demo Site Workflow Form Pattern"
+    description: "Use when reviewing captured workflow form behavior from viewflow-demo-site before merging it with source-code evidence into a stable pattern or skill."
+    layer: workflow
+    depends_on:
+      - extract_pattern_from_ui
+    confidence:
+      level: low
+      sources:
+        - behavioral_capture
+    inputs:
+      - page_route
+      - visible_components
+      - interaction_flow
+    tools:
+      []
+    steps:
+      - "Review the captured workflow form routes imported for viewflow-demo-site."
+      - "Compare layout structure, visible components, and interaction hints across the captured page models."
+      - "Merge the behavioral observations with source-code evidence before promoting them into stable implementation-facing skills."
+    evidence:
+      - analysis/behavioral_patterns/viewflow-demo-site/patterns.json
+      - analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    patterns:
+      - pattern:viewflow_demo_site_atlas_city_workflow_form
+      - pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+      - pattern:viewflow_demo_site_atlas_continent_workflow_form
+      - pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+      - pattern:viewflow_demo_site_atlas_country_workflow_form
+      - pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+      - pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+      - pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+      - pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+      - pattern:viewflow_demo_site_atlas_ocean_workflow_form
+      - pattern:viewflow_demo_site_atlas_sea_workflow_form
+      - pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+      - pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+      - pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+      - pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+      - pattern:viewflow_demo_site_intro_workflow_form
+      - pattern:viewflow_demo_site_patterns_sequence_workflow_form
+      - pattern:viewflow_demo_site_review_api_swagger_workflow_form
+      - pattern:viewflow_demo_site_review_review_workflow_form
+      - pattern:viewflow_demo_site_workflow_inbox_workflow_form
+    source_slug: viewflow-demo-site
+  -
     id: plan_viewflow_material_workflow_ui
     name: "Plan Viewflow + Material Workflow UI"
-    description: "Translate workflow UI design notes into a future Viewflow and django-material implementation plan."
+    description: "Use when translating workflow UI design notes into a Viewflow and django-material implementation plan with bounded runtime semantics."
+    layer: workflow
+    depends_on:
+      - compose_operations_dashboard_contract
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - external_framework_docs
     inputs:
       - workflow_nodes
       - material_components
@@ -164,7 +439,15 @@ skills:
   -
     id: record_structured_agentic_lesson
     name: "Record Structured Agentic Lesson"
-    description: "Capture wrong turns and successful corrections in a reusable lesson format that can steer future sessions."
+    description: "Use when capturing a wrong turn or successful correction in a reusable lesson format that should steer future sessions."
+    layer: meta
+    depends_on:
+      - determine_repository_target_surface
+    confidence:
+      level: high
+      sources:
+        - repository_docs
+        - template_contract
     inputs:
       - affected_surface
       - failure_signature

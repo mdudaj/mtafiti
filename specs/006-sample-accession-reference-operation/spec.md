@@ -8,8 +8,8 @@
 
 ## Repository Context *(mandatory)*
 
-- **Service area**: `lims` reference operation on the shared operation-driven foundation, with future `edcs` reuse patterns informed by the same contracts
-- **Affected code paths**: `src/lims/models.py`, `src/lims/services.py`, `src/lims/views.py`, `docs/lab-lims.md`, future shared operation/workflow/form-engine apps
+- **Service area**: `lims` reference operation on the LIMS-specific operation foundation, with shared form-engine standards remaining available to future `edcs` work
+- **Affected code paths**: `src/lims/models.py`, `src/lims/services.py`, `src/lims/views.py`, `docs/lab-lims.md`, future LIMS operation/workflow apps, shared form-engine app(s)
 - **Related design docs**: `specs/002-operation-driven-lims-edcs-foundation/spec.md`, `specs/003-operation-runtime-domain/spec.md`, `specs/004-odm-form-engine-foundation/spec.md`, `specs/005-workflow-builder-foundation/spec.md`, `docs/lab-lims.md`
 - **Prior checkpoints**: `022-architecture-spec-and-skills.md`, `019-reference-ux-and-routing.md`, `017-accession-wizard-and-metadata.md`, `016-preview-and-receiving-refactor.md`
 - **Knowledge graph / skills evidence**: `openclinica-odm-form-engine-patterns`, `viewflow-configurable-metadata-forms`, `viewflow-configurable-workflow-runtime-patterns`, `viewflow-assignment-permission-patterns`
@@ -38,19 +38,19 @@ The repository already has practical accessioning behavior:
 
 But that behavior still lives in a transitional receiving-oriented slice. It does not yet define Sample Accession as a fully governed operation version with explicit task bindings, runtime records, and compiler-owned form package references.
 
-Without this slice, the architecture remains plausible but not yet anchored to one canonical operational example that future LIMS and EDCS implementation work can follow.
+Without this slice, the architecture remains plausible but not yet anchored to one canonical operational example that future LIMS implementation work can follow.
 
 ## Goals
 
-- Define Sample Accession as the first fully described operation on the shared foundation.
+- Define Sample Accession as the first fully described operation on the LIMS-specific operation foundation.
 - Prove how one published operation version binds together:
   - operation identity and SOP context
   - compiler-owned form package outputs
   - workflow-template/node definitions
   - runtime run/task/submission/approval/material-usage records
-- Define the canonical accession path from intake through QC to either storage logging or rejection closure.
+- Define the canonical accession path from intake through QC to either storage logging or rejection and disposition closure.
 - Map current receiving APIs and screens into the future governed operation model without discarding already useful operator behavior.
-- Provide an implementation-ready reference slice that future operations in `lims` and `edcs` can imitate.
+- Provide an implementation-ready reference slice that future operations in `lims` can imitate while preserving alignment with the shared form-engine standard.
 
 ## Non-Goals
 
@@ -115,7 +115,7 @@ These modes differ in how the run is initiated and how intake data is prefilled,
 
 The reference workflow for a published `Sample Accession` version is:
 
-`Start -> Intake Capture -> QC Decision -> (Accepted -> Initial Storage Logging -> End) | (Rejected -> Discrepancy / Rejection Closure -> End)`
+`Start -> Intake Capture -> QC Decision -> (Accepted -> Initial Storage Logging -> End) | (Rejected -> Discrepancy / Disposition Closure -> End)`
 
 ### Node intent
 
@@ -129,14 +129,16 @@ The reference workflow for a published `Sample Accession` version is:
   - record first-pass accept/reject decision, condition notes, reviewer identity, and any gating observations
 - **Initial Storage Logging**
   - for accepted samples only, capture initial storage placement and receipt-complete state
-- **Discrepancy / Rejection Closure**
-  - for rejected samples only, capture discrepancy code, reason, disposition notes, and closure semantics
+- **Discrepancy / Disposition Closure**
+  - for rejected samples only, capture discrepancy code, rejection reason, disposition notes, and closure semantics
 - **End**
   - end the operation with an explicit accepted or rejected terminal outcome
 
 ## Compiler-owned Form Package Direction
 
 The reference operation should prove task-level capture by binding to compiler-owned published outputs, not by inventing fields in workflow or UI code.
+
+Sample Accession is also the mandatory first governed specimen activity in LIMS. Downstream specimen-handling operations should assume accession evidence already exists and should not bypass it with parallel intake paths.
 
 ### Preferred package shape
 
@@ -164,6 +166,10 @@ Suggested section families:
 - **Storage Placement**
   - facility / room / freezer / rack / box / position or equivalent interim storage references
   - storage-condition notes
+- **Outcome / Disposition Log**
+  - terminal outcome classification
+  - disposition action
+  - disposition notes
 - **Discrepancy & Rejection**
   - discrepancy code
   - rejection reason
@@ -173,10 +179,12 @@ Suggested section families:
 
 - **Intake Capture** binds receipt, identity/context, and condition/intake sections.
 - **QC Decision** binds only the QC decision section plus any decision-driving items needed for routing.
-- **Initial Storage Logging** binds only storage-placement items.
-- **Discrepancy / Rejection Closure** binds discrepancy and rejection items.
+- **Initial Storage Logging** binds storage-placement items and any storage-log fields needed to complete governed custody logging.
+- **Discrepancy / Disposition Closure** binds discrepancy, rejection, and disposition-log items.
 
 This proves the workflow-builder contract that tasks consume published package/section/group/item outputs rather than duplicating form definitions.
+
+All accession capture in this slice follows one rule: metadata, outcomes, storage-log entries, and disposition-log entries are recorded through task-bound package submissions first, then projected into biospecimen, receiving, discrepancy, storage, and related domain models as governed relational consequences.
 
 ## Runtime Semantics
 
@@ -199,7 +207,7 @@ The runtime should create task runs for:
 - `intake_capture`
 - `qc_decision`
 - `initial_storage_logging` when QC accepts
-- `rejection_closure` when QC rejects
+- `disposition_closure` when QC rejects
 
 Each `TaskRun` should preserve:
 
@@ -275,12 +283,12 @@ As an operator, I want different intake modes to create the same governed access
 
 As a lab operator, I want QC to control whether the sample proceeds to storage or closes as a rejection so the operation matches real receiving practice.
 
-**Independent Test**: Complete one accession with QC `accept` and confirm the storage task is created; complete another with QC `reject` and confirm the storage task is skipped and rejection closure becomes the terminal path.
+**Independent Test**: Complete one accession with QC `accept` and confirm the storage task is created; complete another with QC `reject` and confirm the storage task is skipped and disposition closure becomes the terminal path.
 
 **Acceptance Scenarios**:
 
-1. **Given** intake capture is complete, **When** QC records `accept`, **Then** the runtime creates `initial_storage_logging` and does not create rejection closure.
-2. **Given** intake capture is complete, **When** QC records `reject`, **Then** the runtime creates rejection/discrepancy closure and short-circuits storage logging.
+1. **Given** intake capture is complete, **When** QC records `accept`, **Then** the runtime creates `initial_storage_logging` and does not create disposition closure.
+2. **Given** intake capture is complete, **When** QC records `reject`, **Then** the runtime creates discrepancy and disposition closure and short-circuits storage logging.
 3. **Given** the run reaches a terminal state, **When** history is reviewed, **Then** it is clear whether the accession finished as accepted or rejected.
 
 ---
@@ -295,13 +303,13 @@ As a QA reviewer, I want Sample Accession to generate task-level submissions, au
 
 1. **Given** an intake task saves data, **When** the submission is recorded, **Then** it is stored as a structured task-linked submission against the exact published form version used.
 2. **Given** QC or closure changes run progression, **When** those actions complete, **Then** audit/event records capture actor, prior state, resulting state, and rationale.
-3. **Given** the accession binds or creates a specimen and reaches storage or discrepancy closure, **When** history is reviewed, **Then** specimen/material references remain explicit.
+3. **Given** the accession binds or creates a specimen and reaches storage or disposition closure, **When** history is reviewed, **Then** specimen/material references remain explicit.
 
 ---
 
 ### User Story 5 - Use Sample Accession as the implementation template for later operations (Priority: P2)
 
-As a platform architect, I want Sample Accession to be specific enough that later LIMS and EDCS operations can follow its pattern instead of inventing incompatible models.
+As a platform architect, I want Sample Accession to be specific enough that later LIMS operations can follow its pattern while EDCS reuses only the shared form-engine standard instead of inventing incompatible models.
 
 **Independent Test**: Derive a checklist for a later operation such as sample sorting or visit data capture and confirm the same operation/form/workflow/runtime layers can be reused.
 
@@ -324,22 +332,26 @@ As a platform architect, I want Sample Accession to be specific enough that late
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST model Sample Accession as a first-class `OperationDefinition` / `OperationVersion` reference operation under the shared foundation.
+- **FR-001**: The system MUST model Sample Accession as a first-class `OperationDefinition` / `OperationVersion` reference operation under the LIMS-specific operation foundation.
 - **FR-002**: Published Sample Accession versions MUST be immutable and require a new draft/published version for changes.
 - **FR-003**: The reference operation MUST support single, batch, and EDC-linked initiation modes without changing the core operation semantics.
 - **FR-004**: Each accession run MUST freeze the exact published operation, workflow-template, and form-package versions used at start time.
-- **FR-005**: The reference workflow MUST include intake capture, QC decision, and terminal branching to either initial storage logging or rejection closure.
+- **FR-005**: The reference workflow MUST include intake capture, QC decision, and terminal branching to either initial storage logging or rejection and disposition closure.
 - **FR-006**: Task capture for Sample Accession MUST bind to compiler-owned published package/version/section/group/item outputs.
 - **FR-007**: The intake task MUST support prefill or correlation data from manifest and EDC sources without changing the underlying compiled package semantics.
 - **FR-008**: The QC task MUST produce an explicit accepted/rejected outcome usable by workflow branching.
 - **FR-009**: Accepted accession runs MUST create or complete an initial storage-logging path before terminal completion.
-- **FR-010**: Rejected accession runs MUST create explicit discrepancy/rejection closure records and terminate without storage logging.
+- **FR-010**: Rejected accession runs MUST create explicit discrepancy and disposition-closure records and terminate without storage logging.
 - **FR-011**: The runtime MUST create task-linked `SubmissionRecord` entries for accession capture rather than relying only on free-form receipt metadata JSON.
-- **FR-012**: The runtime MUST emit auditable event history for run creation, task completion, branching decisions, storage completion, and rejection closure.
+- **FR-012**: The runtime MUST emit auditable event history for run creation, task completion, branching decisions, storage completion, and disposition closure.
 - **FR-013**: The runtime MUST link accession runs to existing LIMS aggregates including biospecimens, manifests, receiving events, and discrepancies where applicable.
 - **FR-014**: The reference operation MUST remain tenant-scoped and module-scoped.
 - **FR-015**: The specification MUST map current `/lims/receiving/*` task pages and APIs as transitional adapters or entrypoints into the future governed operation.
 - **FR-016**: The reference operation MUST be specific enough to drive future implementation slicing for operation config, compiler bindings, runtime, and UI migration.
+- **FR-017**: Sample Accession MUST act as the prerequisite governed operation for downstream specimen-handling activities unless an explicitly governed exceptional path is later defined.
+- **FR-018**: Each Sample Accession version MUST include mandatory SOP context so execution is reviewable against an approved receiving procedure.
+- **FR-019**: Metadata capture, outcome capture, storage-log capture, and disposition-log capture MUST be recorded through task-bound compiler-owned package submissions before projection into domain aggregates.
+- **FR-020**: Each accession submission and resulting runtime decision MUST remain traceable to specimen or intake context, operation version, SOP version context, form package version, task/run, and actor.
 
 ### Non-Functional Requirements
 
@@ -354,9 +366,9 @@ As a platform architect, I want Sample Accession to be specific enough that late
 - **AccessionWorkflowTemplateVersion**: Published bounded workflow topology for accession.
 - **AccessionFormPackageVersion**: Compiler-owned published package version consumed by accession tasks.
 - **AccessionRun**: `OperationRun` instance for a single, batch-item, or EDC-linked accession.
-- **AccessionTaskRun**: `TaskRun` instance for intake, QC, storage, or rejection closure.
+- **AccessionTaskRun**: `TaskRun` instance for intake, QC, storage, or disposition closure.
 - **AccessionSubmissionRecord**: Task-linked structured capture for an accession step.
-- **AccessionApprovalRecord**: Optional explicit sign-off artifact if QC or closure requires formal approval.
+- **AccessionApprovalRecord**: Optional explicit sign-off artifact if QC or disposition closure requires formal approval.
 - **AccessionMaterialUsageRecord**: Runtime linkage to biospecimen and resulting storage-placement artifacts.
 
 ## Proposed Implementation Slicing
@@ -379,6 +391,7 @@ As a platform architect, I want Sample Accession to be specific enough that late
 - **SC-003**: The spec clearly maps current receiving behavior into the future governed operation model instead of discarding it.
 - **SC-004**: The spec proves task-level bindings to compiler-owned package outputs with one concrete reference operation.
 - **SC-005**: The spec is implementation-ready enough to drive a dedicated issue/PR and later concrete backend/runtime work.
+- **SC-006**: The spec makes Sample Accession explicit enough to serve as the governed prerequisite pattern for later specimen-handling operations.
 
 ## Delivery Mapping *(mandatory)*
 

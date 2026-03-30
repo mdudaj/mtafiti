@@ -5,7 +5,7 @@
 
 ## Summary
 
-Define the shared operation runtime/configuration slice that turns the merged foundation architecture into a concrete runtime model: operation definitions and versions, activation lifecycle, operation runs, task runs, task submissions, approvals/signatures, audit linkage, material usage, and in-flight version behavior. This slice should explain how to evolve the current generic `core` workflow scaffold into a governed runtime that can serve both LIMS and EDCS.
+Define the LIMS operation runtime/configuration slice that turns the merged foundation architecture into a concrete runtime model: operation definitions and versions, activation lifecycle, operation runs, task runs, task submissions, approvals/signatures, audit linkage, material usage, traceability to SOP/form/sample context, and in-flight version behavior. This slice should explain how to evolve the current generic `core` workflow scaffold into a governed runtime for LIMS while leaving EDCS free to consume the shared form-engine standard through its own execution model.
 
 ## Technical Context
 
@@ -13,9 +13,9 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 **Primary Dependencies**: Django, django-tenants, Viewflow runtime conventions, existing core audit/event publishing, LIMS biospecimen/accessioning models  
 **Storage**: PostgreSQL tenant schemas  
 **Testing**: `spec_kit_workflow.py validate`, `python -m pytest -q src/tests/test_spec_kit_workflow.py src/tests/test_knowledge_graph_generator.py`  
-**Target Platform**: shared operation-driven runtime for `lims` and future `edcs`  
+**Target Platform**: LIMS operation-driven runtime with shared form-engine standards alignment for future `edcs`  
 **Project Type**: spec-first architecture slice  
-**Constraints**: preserve tenant isolation, preserve explicit Viewflow-style runtime state, avoid LIMS-only assumptions in shared runtime entities, reuse existing artifact models rather than duplicating them  
+**Constraints**: preserve tenant isolation, preserve explicit Viewflow-style runtime state, keep the runtime boundary explicitly LIMS-specific, and reuse existing artifact models rather than duplicating them  
 **Scale/Scope**: specification and issue-slicing only, not full runtime implementation
 
 ## Constitution Check
@@ -24,7 +24,7 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 - [x] The slice uses current repository evidence from `core` workflow primitives and `lims` artifact models.
 - [x] The plan keeps runtime execution distinct from authored operation/form/workflow configuration.
 - [x] The plan preserves tenant-aware and audit-aware behavior as first-class requirements.
-- [x] The plan keeps EDCS reuse explicit so the runtime does not collapse into a LIMS-only model.
+- [x] The plan keeps the runtime explicitly LIMS-specific while preserving a clean boundary to the shared form-engine standard.
 
 ## Research & Repository Evidence
 
@@ -41,7 +41,7 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 - run/task records do not freeze authored version context
 - task capture, approvals, and material usage are not explicit runtime entities
 - in-flight version behavior is not yet defined
-- subject/artifact references are not yet generalized enough for both LIMS and EDCS
+- subject/artifact references are not yet explicit enough for a durable LIMS runtime boundary
 
 ## Proposed Design Direction
 
@@ -49,7 +49,7 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 
 - Introduce `OperationDefinition` as the stable activity identity.
 - Introduce `OperationVersion` as the governed authored revision.
-- Record module scope (`lims`, future `edcs`), SOP linkage, status, and activation metadata.
+- Record LIMS module scope, SOP linkage, status, and activation metadata.
 
 ### 2. Runtime version freeze
 
@@ -72,11 +72,12 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 
 - Reuse the current event publication and audit publication pattern.
 - Make state changes, approvals, overrides, and significant capture steps auditable with stable runtime identifiers and correlation IDs.
+- Ensure runtime records can reconstruct who captured what, for which sample/subject, under which operation/SOP/form version context.
 
 ### 5. LIMS artifact linkage without duplication
 
 - Reference existing LIMS models for specimens, aliquots, pools, manifests, receiving events, and discrepancies.
-- Keep the shared runtime generic by storing typed references or bounded reference families rather than LIMS-only columns.
+- Keep the LIMS runtime relational and explicit by storing typed references or bounded reference families rather than collapsing artifact linkage into opaque payloads.
 
 ### 6. In-flight version behavior
 
@@ -84,10 +85,10 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 - Draft or queued-not-started runs may follow controlled migration rules, but only if explicitly allowed by the newer version.
 - Historical approvals and submissions remain bound to their original authored context.
 
-### 7. EDCS compatibility
+### 7. Boundary to EDCS
 
-- Keep subject context generic enough for participant/visit/form execution.
-- Separate module-specific permissions and navigation from the shared runtime record model.
+- Keep the runtime anchored to LIMS specimen and laboratory-execution contexts.
+- Leave EDCS execution-model concerns out of this slice while preserving compatibility at the shared form-engine boundary.
 
 ## Reviewable Slices
 
@@ -115,11 +116,11 @@ Define the shared operation runtime/configuration slice that turns the merged fo
 - Whether `SubmissionRecord` should support multiple draft saves before final submit in the first implementation slice
 - Whether approvals are always task-scoped first, or can be operation-scoped without a task run
 - How typed artifact references should be represented while staying relational and queryable
-- Which currently generic `core` workflow APIs can be adapted versus deprecated when the shared runtime lands
+- Which currently generic `core` workflow APIs can be adapted versus deprecated when the LIMS runtime lands
 
 ## Delivery Mapping
 
-- **Issue title**: Design operation runtime domain
+- **Issue title**: Design LIMS operation runtime domain
 - **Issue reference**: `#108`
 - **Parent issue**: `#107`
 - **Issue generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/003-operation-runtime-domain`

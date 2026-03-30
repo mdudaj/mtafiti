@@ -1,0 +1,362 @@
+ontology:
+  name: ui
+  entities:
+    -
+      name: ApplicationShell
+      contains:
+        - AppBar
+        - NavigationDrawer
+        - ContentArea
+        - NotificationSystem
+    -
+      name: ContentArea
+      renders:
+        - ListView
+        - DetailView
+        - FormView
+        - DashboardView
+        - WorkflowTaskView
+    -
+      name: PageModel
+      fields:
+        - route
+        - layout_type
+        - components
+        - actions
+        - data_binding
+        - workflow_binding
+        - permissions
+observed_patterns:
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /workflow/inbox/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /patterns/sequence/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /accounts/profile/
+    layout_type: form
+    components:
+      - form
+      - header
+      - main
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/city/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/Europe/change/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/121/delete/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/review/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /review/api/swagger/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/registration/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/signup/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/hospital/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /intro/vf_stats/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/oilngas/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/stocks/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /dashboard/django_stats/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/continent/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/country/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/ocean/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/sea/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - table
+      - ul
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    route: /atlas/forms/bank/
+    layout_type: workflow_form
+    components:
+      - aside
+      - form
+      - header
+      - main
+      - nav
+      - section
+      - ul

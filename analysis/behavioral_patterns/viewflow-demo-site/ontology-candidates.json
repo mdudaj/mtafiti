@@ -1,0 +1,4559 @@
+{
+  "ui": [
+    {
+      "route": "/intro/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/intro/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/workflow/inbox/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/patterns/sequence/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/accounts/profile/",
+      "layout_type": "form",
+      "components": [
+        "form",
+        "header",
+        "main",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/continent/Europe/change/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/country/121/delete/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/review/api/swagger/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/forms/registration/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/forms/signup/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/forms/hospital/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/intro/vf_stats/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/dashboard/stocks/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/dashboard/django_stats/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/continent/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/country/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/ocean/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/sea/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ]
+    },
+    {
+      "route": "/atlas/forms/bank/",
+      "layout_type": "workflow_form",
+      "components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "from": "/accounts/profile/",
+      "to": "/accounts/password_change/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2049/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2049/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2093/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2093/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2122/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2122/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2218/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2218/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2226/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2226/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2356/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2356/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2357/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2357/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2552/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2552/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2566/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2566/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2649/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2649/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2653/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2653/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2692/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2692/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2707/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2707/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2841/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2841/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2890/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2890/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2949/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/2949/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3591/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3591/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3639/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3639/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3718/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3718/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3773/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3773/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3796/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3796/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3938/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3938/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3953/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3953/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3991/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/3991/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/4058/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/city/4058/detail/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/city/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/Africa/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/Antarctica/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/Asia/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/Australia/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/Europe/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/North%20America/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/continent/South%20America/change/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/continent/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/continent/Europe/change/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/10/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/10/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/11/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/11/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/118/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/118/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/121/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/121/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/122/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/122/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/160/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/160/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/161/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/161/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/168/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/168/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/169/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/169/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/176/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/176/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/177/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/177/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/192/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/192/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/193/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/193/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/206/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/206/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/36/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/36/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/52/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/52/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/60/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/60/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/68/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/68/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/71/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/71/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/72/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/72/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/8/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/8/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/84/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/84/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/85/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/85/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/9/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/9/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/94/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/country/94/change/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/country/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2058/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2059/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2060/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2061/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2062/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2063/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2064/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2065/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2066/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/city/2067/detail/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/country/121/change/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/country/121/change/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/country/121/delete/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/bank/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/hospital/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/registration/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/bank/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/checkout/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/contact/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/login/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/profile/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/atlas/forms/wizard/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/forms/signup/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/Arctic/detail/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/Atlantic/detail/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/Indian/detail/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/Pacific/detail/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/ocean/Southern/detail/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/ocean/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/api/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/continent/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/country/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/forms/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/ocean/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/1/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/11/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/12/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/13/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/14/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/15/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/2/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/21/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/22/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/23/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/24/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/25/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/26/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/27/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/28/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/29/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/3/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/30/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/31/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/32/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/33/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/34/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/35/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/4/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/atlas/sea/7/change/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/review/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/atlas/sea/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/django_stats/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/oilngas/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/api/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/django_stats/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/oilngas/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/dashboard/stocks/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/review/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/dashboard/stocks/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/city/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/continent/Europe/change/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/continent/Europe/change/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/country/121/delete/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/country/121/delete/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/comment/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/comment/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/hospital/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/registration/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/atlas/forms/signup/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/intro/vf_stats/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/api/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/review/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/intro/vf_stats/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/api/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/api/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/cancelingpartialjoin/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/cancelingpartialjoin/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/defferedchoice/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/defferedchoice/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/exclusivechoice/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/exclusivechoice/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/loop/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/loop/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/multimerge/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/multimerge/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/multipleinstances/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/multipleinstances/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/parallelsplit/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/parallelsplit/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/partialjoin/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/partialjoin/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/resource_allocation/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/resource_allocation/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7079/input_user_details/238528/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7083/input_user_details/238552/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7092/input_user_details/238598/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7094/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7115/input_user_details/238731/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7126/input_user_details/238974/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7127/input_user_details/238976/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7135/input_user_details/239007/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7143/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7145/input_user_details/239057/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7157/input_user_details/239119/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7168/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7177/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7180/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7185/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7187/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7189/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7194/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7196/input_user_details/239363/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7199/input_user_details/239372/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7203/input_user_details/239390/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7215/input_user_details/239490/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7216/input_user_details/239492/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7217/input_user_details/239496/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7220/input_user_details/239547/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7225/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7226/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7228/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7229/input_user_details/239582/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7230/input_user_details/239584/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7231/input_user_details/239588/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7233/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7234/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7235/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7236/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7237/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7251/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7252/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7253/input_user_details/239742/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7254/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7255/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7258/input_user_details/239759/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7259/input_user_details/239761/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7260/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7264/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7267/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7271/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7282/input_user_details/239890/execute/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7284/input_user_details/239895/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/7285/input_user_details/239897/assign/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/flows/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/start/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/patterns/sequence/tasks/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/review/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/review/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/patterns/sequence/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/api/swagger/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/admin/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/api/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/api/swagger/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/751/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/751/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/770/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/770/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/778/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/778/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/801/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/801/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/822/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/822/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/826/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/826/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/828/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/828/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/842/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/842/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/845/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/845/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/849/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/849/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/851/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/review/review/851/detail/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/review/review/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/accounts/profile/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/api/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/api/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/atlas/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/dashboard/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/intro/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/patterns/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/review/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/review/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/archive/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/archive/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/flows/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/flows/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/flows/dynamicsplit/start/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/flows/helloworld/start/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/flows/shipment/start/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/inbox/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/inbox/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/inbox/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/queue/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/queue/"
+    },
+    {
+      "from": "/workflow/inbox/",
+      "to": "/workflow/queue/"
+    }
+  ],
+  "workflow": [
+    {
+      "route": "/intro/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/intro/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/city/",
+        "."
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/review/review/"
+      ]
+    },
+    {
+      "route": "/workflow/inbox/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/workflow/inbox/",
+        "."
+      ]
+    },
+    {
+      "route": "/patterns/sequence/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/city/",
+        "."
+      ]
+    },
+    {
+      "route": "/atlas/continent/Europe/change/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/continent/Europe/change/"
+      ]
+    },
+    {
+      "route": "/atlas/country/121/delete/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/country/121/delete/"
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/review/review/"
+      ]
+    },
+    {
+      "route": "/review/api/swagger/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/atlas/forms/registration/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/forms/registration/"
+      ]
+    },
+    {
+      "route": "/atlas/forms/signup/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/forms/signup/"
+      ]
+    },
+    {
+      "route": "/atlas/forms/hospital/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/forms/hospital/"
+      ]
+    },
+    {
+      "route": "/intro/vf_stats/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/dashboard/stocks/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/dashboard/django_stats/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/atlas/continent/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/continent/",
+        "."
+      ]
+    },
+    {
+      "route": "/atlas/country/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/country/",
+        "."
+      ]
+    },
+    {
+      "route": "/atlas/ocean/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/"
+      ]
+    },
+    {
+      "route": "/atlas/sea/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/sea/",
+        "."
+      ]
+    },
+    {
+      "route": "/atlas/forms/bank/",
+      "title": "Workflow 101 Demo",
+      "form_actions": [
+        "/accounts/logout/",
+        "https://demo.viewflow.io/atlas/forms/bank/"
+      ]
+    }
+  ],
+  "state": [
+    {
+      "route": "/intro/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/intro/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/workflow/inbox/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/patterns/sequence/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/accounts/profile/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/city/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/continent/Europe/change/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/country/121/delete/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/review/review/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/review/api/swagger/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/forms/registration/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/forms/signup/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/forms/hospital/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/intro/vf_stats/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/dashboard/stocks/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/dashboard/django_stats/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/continent/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/country/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/ocean/",
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/sea/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    },
+    {
+      "route": "/atlas/forms/bank/",
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ]
+    }
+  ],
+  "permission": [
+    {
+      "route": "/accounts/profile/",
+      "signal": "profile - django material admin /accounts/profile/"
+    }
+  ],
+  "cross_layer": [
+    {
+      "route": "/intro/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/intro/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/city/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/review/review/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/workflow/inbox/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/patterns/sequence/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/accounts/profile/",
+      "layout_type": "form",
+      "workflow_bound": false
+    },
+    {
+      "route": "/atlas/city/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/continent/Europe/change/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/country/121/delete/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/review/review/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/review/api/swagger/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/forms/registration/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/forms/signup/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/forms/hospital/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/intro/vf_stats/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/dashboard/oilngas/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/dashboard/stocks/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/dashboard/django_stats/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/continent/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/country/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/ocean/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/sea/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    },
+    {
+      "route": "/atlas/forms/bank/",
+      "layout_type": "workflow_form",
+      "workflow_bound": true
+    }
+  ]
+}

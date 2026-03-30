@@ -1,0 +1,20 @@
+{
+  "source_name": "viewflow-demo-site",
+  "source_slug": "viewflow-demo-site",
+  "source_url": "https://demo.viewflow.io/",
+  "source_type": "demo-site",
+  "frameworks": [
+    "viewflow",
+    "django-material"
+  ],
+  "capture_expectations": [
+    "atlas-crud-ui",
+    "workflow-examples",
+    "hybrid-forms-and-flows",
+    "navigation-patterns",
+    "permission-driven-variations"
+  ],
+  "latest_run": "20260330T044020Z",
+  "imported_at": "2026-03-30T04:41:28.269117+00:00",
+  "repo_relative_root": "analysis/behavioral_patterns/viewflow-demo-site"
+}

@@ -18,7 +18,7 @@ description: "Task list for metadata vocabularies and configurable form schemas"
 
 - [ ] T001 Confirm the vocabulary-domain model and tenant scope in `specs/001-metadata-vocabularies-and-form-schemas/spec.md`
 - [ ] T002 Confirm that fields belong directly to form versions and that published versions are immutable
-- [ ] T003 Confirm the runtime binding lifecycle for draft vs. published form versions
+- [ ] T003 Confirm the runtime binding lifecycle for draft vs. published form versions, while treating this schema model as migration prior art for the later compiler-owned package model
 - [ ] T004 Generate the initial GitHub issue body with `python .github/scripts/spec_kit_workflow.py issue-body specs/001-metadata-vocabularies-and-form-schemas`
 
 ---
@@ -31,6 +31,7 @@ description: "Task list for metadata vocabularies and configurable form schemas"
 - [ ] T013 [US3] Design the form definition, form version, and form-version-owned field data model
 - [ ] T014 [US3] Specify the two-step authoring flow: form metadata first, field builder second
 - [ ] T015 [US4] Specify published-version binding and activation rules for runtime targets
+- [ ] T016 [US1] Define how vocabulary governance from this slice carries forward into operation definitions, form packages, and runtime validation
 
 ---
 

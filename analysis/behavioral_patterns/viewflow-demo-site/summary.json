@@ -1,0 +1,654 @@
+{
+  "source_name": "viewflow-demo-site",
+  "base_url": "https://demo.viewflow.io/",
+  "run_label": "20260330T044020Z",
+  "fetch_mode": "http",
+  "browser_command": "",
+  "playwright_executable_path": "",
+  "captured_at": "2026-03-30T04:41:08.399946+00:00",
+  "page_count": 25,
+  "pages": [
+    {
+      "url": "https://demo.viewflow.io/intro/",
+      "route": "/intro/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Applications",
+      "heading_count": 8,
+      "link_count": 31,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/intro.json",
+      "html_path": "pages/intro.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/intro/",
+      "route": "/intro/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Applications",
+      "heading_count": 8,
+      "link_count": 31,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/intro.json",
+      "html_path": "pages/intro.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/dashboard/oilngas/",
+      "route": "/dashboard/oilngas/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Demo dashboards",
+      "heading_count": 3,
+      "link_count": 24,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/dashboard-oilngas.json",
+      "html_path": "pages/dashboard-oilngas.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/city/",
+      "route": "/atlas/city/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 4,
+      "link_count": 54,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-city.json",
+      "html_path": "pages/atlas-city.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/review/review/",
+      "route": "/review/review/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "FSM Flow Demo",
+      "heading_count": 4,
+      "link_count": 33,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/review-review.json",
+      "html_path": "pages/review-review.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/workflow/inbox/",
+      "route": "/workflow/inbox/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Workflow",
+      "heading_count": 8,
+      "link_count": 30,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/workflow-inbox.json",
+      "html_path": "pages/workflow-inbox.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/patterns/sequence/",
+      "route": "/patterns/sequence/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "WF Patterns",
+      "heading_count": 103,
+      "link_count": 89,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/patterns-sequence.json",
+      "html_path": "pages/patterns-sequence.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/accounts/profile/",
+      "route": "/accounts/profile/",
+      "title": "Profile - Django Material",
+      "primary_heading": "Admin",
+      "heading_count": 1,
+      "link_count": 1,
+      "form_count": 1,
+      "visible_components": [
+        "form",
+        "header",
+        "main",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/accounts-profile.json",
+      "html_path": "pages/accounts-profile.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/city/",
+      "route": "/atlas/city/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 4,
+      "link_count": 54,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-city.json",
+      "html_path": "pages/atlas-city.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/continent/Europe/change/",
+      "route": "/atlas/continent/Europe/change/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 7,
+      "link_count": 29,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-continent-europe-change.json",
+      "html_path": "pages/atlas-continent-europe-change.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/country/121/delete/",
+      "route": "/atlas/country/121/delete/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 9,
+      "link_count": 41,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-country-121-delete.json",
+      "html_path": "pages/atlas-country-121-delete.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/review/review/",
+      "route": "/review/review/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "FSM Flow Demo",
+      "heading_count": 4,
+      "link_count": 33,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/review-review.json",
+      "html_path": "pages/review-review.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/review/api/swagger/",
+      "route": "/review/api/swagger/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "FSM Flow Demo",
+      "heading_count": 2,
+      "link_count": 22,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/review-api-swagger.json",
+      "html_path": "pages/review-api-swagger.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/forms/registration/",
+      "route": "/atlas/forms/registration/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Forms",
+      "heading_count": 5,
+      "link_count": 43,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-forms-registration.json",
+      "html_path": "pages/atlas-forms-registration.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/forms/signup/",
+      "route": "/atlas/forms/signup/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Forms",
+      "heading_count": 9,
+      "link_count": 43,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-forms-signup.json",
+      "html_path": "pages/atlas-forms-signup.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/forms/hospital/",
+      "route": "/atlas/forms/hospital/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Forms",
+      "heading_count": 8,
+      "link_count": 43,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-forms-hospital.json",
+      "html_path": "pages/atlas-forms-hospital.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/intro/vf_stats/",
+      "route": "/intro/vf_stats/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Applications",
+      "heading_count": 1,
+      "link_count": 17,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/intro-vf-stats.json",
+      "html_path": "pages/intro-vf-stats.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/dashboard/oilngas/",
+      "route": "/dashboard/oilngas/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Demo dashboards",
+      "heading_count": 3,
+      "link_count": 24,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/dashboard-oilngas.json",
+      "html_path": "pages/dashboard-oilngas.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/dashboard/stocks/",
+      "route": "/dashboard/stocks/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Demo dashboards",
+      "heading_count": 3,
+      "link_count": 24,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/dashboard-stocks.json",
+      "html_path": "pages/dashboard-stocks.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/dashboard/django_stats/",
+      "route": "/dashboard/django_stats/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Demo dashboards",
+      "heading_count": 3,
+      "link_count": 24,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/dashboard-django-stats.json",
+      "html_path": "pages/dashboard-django-stats.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/continent/",
+      "route": "/atlas/continent/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 4,
+      "link_count": 35,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-continent.json",
+      "html_path": "pages/atlas-continent.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/country/",
+      "route": "/atlas/country/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 4,
+      "link_count": 79,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-country.json",
+      "html_path": "pages/atlas-country.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/ocean/",
+      "route": "/atlas/ocean/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 3,
+      "link_count": 33,
+      "form_count": 1,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-ocean.json",
+      "html_path": "pages/atlas-ocean.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/sea/",
+      "route": "/atlas/sea/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "CRUD sample",
+      "heading_count": 4,
+      "link_count": 54,
+      "form_count": 3,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "table",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-sea.json",
+      "html_path": "pages/atlas-sea.html"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/forms/bank/",
+      "route": "/atlas/forms/bank/",
+      "title": "Workflow 101 Demo",
+      "primary_heading": "Forms",
+      "heading_count": 15,
+      "link_count": 43,
+      "form_count": 2,
+      "visible_components": [
+        "aside",
+        "form",
+        "header",
+        "main",
+        "nav",
+        "section",
+        "ul"
+      ],
+      "interaction_types": [
+        "form-submit",
+        "form-submit",
+        "link-navigation"
+      ],
+      "page_model_path": "pages/atlas-forms-bank.json",
+      "html_path": "pages/atlas-forms-bank.html"
+    }
+  ],
+  "errors": [
+    {
+      "url": "https://demo.viewflow.io/api/",
+      "error": "Unsupported content type for https://demo.viewflow.io/api/: application/vnd.oai.openapi+json"
+    },
+    {
+      "url": "https://demo.viewflow.io/admin/review/review/",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "url": "https://demo.viewflow.io/atlas/forms/comment/",
+      "error": "HTTP Error 404: Not Found"
+    }
+  ]
+}

@@ -5,7 +5,7 @@
 
 ## Summary
 
-Revise the metadata configuration domain before further implementation so that controlled vocabularies become tenant-scoped, functionally organized, searchable through dedicated REST APIs, and easy to provision, while configurable forms evolve toward an ODK-style model where fields belong directly to versioned form definitions with explicit draft and published lifecycle states.
+Revise the metadata configuration domain before further implementation so that controlled vocabularies become tenant-scoped, functionally organized, searchable through dedicated REST APIs, and easy to provision, while configurable forms evolve toward an ODK-style model where fields belong directly to versioned form definitions with explicit draft and published lifecycle states. In the current repository direction, this slice now serves mainly as vocabulary governance and migration prior art beneath the later compiler-owned form-package architecture.
 
 ## Technical Context
 
@@ -34,6 +34,7 @@ Revise the metadata configuration domain before further implementation so that c
 - Current metadata models and APIs already exist in `src/lims/models.py`, `src/lims/services.py`, and `src/lims/views.py`.
 - Current tests in `src/tests/test_lims_metadata_api.py` prove the existing domain supports vocabularies, field definitions, schema versions, bindings, and validation, but not the revised vocabulary-domain model or ODK-style field ownership.
 - `docs/lab-lims.md` and the current session plan already position metadata as a shared configurable foundation for downstream workflows.
+- The newer operation/runtime/compiler/workflow bundles mean this slice should stay terminology-compatible while avoiding claims that metadata schemas are the final long-term capture model.
 
 ### Knowledge Graph / Skills
 
@@ -80,6 +81,7 @@ docs/spec-kit-workflow.md
   - vocabulary item search for widget consumption.
 - Design initial provisioning so a tenant can receive a default vocabulary pack without manual API bootstrapping.
 - Keep the first pass extensible for unforeseen vocabularies by allowing admins to create new domains and new vocabularies through configuration.
+- Keep vocabulary codes and item semantics reusable by later operation definitions, compiler-owned form packages, workflow bindings, and governed runtime validation.
 
 ### Configurable forms
 
@@ -88,6 +90,7 @@ docs/spec-kit-workflow.md
 - Model separate form versions with explicit draft and published states.
 - Treat published versions as immutable, with new changes performed in new draft versions.
 - Bind only published versions to runtime targets.
+- Treat this configurable-form model as transitional migration evidence for the later compiler-owned package/version model rather than the final architecture endpoint.
 
 ### Authoring workflow
 

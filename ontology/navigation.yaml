@@ -1,0 +1,4650 @@
+ontology:
+  name: navigation
+  entities:
+    -
+      name: NavigationSystem
+      structure:
+        - MenuGroup
+        - MenuItem
+    -
+      name: MenuItem
+      maps_to:
+        - View
+        - Workflow
+        - ExternalAction
+      visibility:
+        - permission_based
+        - state_based
+    -
+      name: Interaction
+      fields:
+        - trigger
+        - leads_to_view
+        - leads_to_workflow_task
+        - leads_to_state_change
+observed_patterns:
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /accounts/profile/
+    to: /accounts/password_change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2049/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2049/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2093/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2093/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2122/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2122/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2218/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2218/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2226/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2226/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2356/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2356/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2357/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2357/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2552/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2552/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2566/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2566/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2649/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2649/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2653/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2653/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2692/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2692/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2707/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2707/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2841/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2841/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2890/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2890/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2949/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/2949/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3591/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3591/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3639/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3639/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3718/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3718/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3773/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3773/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3796/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3796/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3938/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3938/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3953/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3953/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3991/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/3991/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/4058/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/city/4058/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/city/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/Africa/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/Antarctica/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/Asia/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/Australia/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/continent/Europe/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: "/atlas/continent/North%20America/change/"
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: "/atlas/continent/South%20America/change/"
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/continent/Europe/change/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/10/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/10/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/11/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/11/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/118/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/118/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/121/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/121/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/122/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/122/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/160/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/160/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/161/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/161/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/168/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/168/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/169/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/169/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/176/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/176/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/177/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/177/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/192/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/192/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/193/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/193/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/206/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/206/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/36/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/36/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/52/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/52/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/60/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/60/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/68/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/68/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/71/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/71/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/72/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/72/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/8/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/8/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/84/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/84/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/85/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/85/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/9/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/9/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/94/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/country/94/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2058/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2059/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2060/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2061/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2062/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2063/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2064/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2065/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2066/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/city/2067/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/country/121/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/country/121/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/country/121/delete/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/bank/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/hospital/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/registration/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/bank/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/checkout/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/contact/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/login/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /atlas/forms/wizard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/forms/signup/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/Arctic/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/Atlantic/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/Indian/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/Pacific/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/ocean/Southern/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/ocean/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/continent/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/country/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/forms/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/ocean/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/1/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/11/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/12/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/13/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/14/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/15/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/2/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/21/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/22/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/23/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/24/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/25/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/26/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/27/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/28/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/29/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/3/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/30/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/31/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/32/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/33/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/34/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/35/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/4/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /atlas/sea/7/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /atlas/sea/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/django_stats/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/oilngas/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/django_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/oilngas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /dashboard/stocks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /dashboard/stocks/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/city/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/continent/Europe/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/continent/Europe/change/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/country/121/delete/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/country/121/delete/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/comment/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/comment/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/hospital/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/registration/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /atlas/forms/signup/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /intro/vf_stats/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /intro/vf_stats/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/cancelingpartialjoin/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/cancelingpartialjoin/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/defferedchoice/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/defferedchoice/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/exclusivechoice/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/exclusivechoice/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/loop/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/loop/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/multimerge/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/multimerge/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/multipleinstances/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/multipleinstances/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/parallelsplit/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/parallelsplit/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/partialjoin/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/partialjoin/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/resource_allocation/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/resource_allocation/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7079/input_user_details/238528/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7083/input_user_details/238552/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7092/input_user_details/238598/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7094/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7115/input_user_details/238731/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7126/input_user_details/238974/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7127/input_user_details/238976/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7135/input_user_details/239007/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7143/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7145/input_user_details/239057/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7157/input_user_details/239119/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7168/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7177/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7180/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7185/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7187/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7189/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7194/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7196/input_user_details/239363/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7199/input_user_details/239372/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7203/input_user_details/239390/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7215/input_user_details/239490/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7216/input_user_details/239492/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7217/input_user_details/239496/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7220/input_user_details/239547/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7225/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7226/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7228/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7229/input_user_details/239582/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7230/input_user_details/239584/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7231/input_user_details/239588/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7233/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7234/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7235/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7236/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7237/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7251/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7252/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7253/input_user_details/239742/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7254/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7255/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7258/input_user_details/239759/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7259/input_user_details/239761/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7260/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7264/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7267/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7271/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7282/input_user_details/239890/execute/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7284/input_user_details/239895/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/7285/input_user_details/239897/assign/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/flows/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/start/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /patterns/sequence/tasks/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /patterns/sequence/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/api/swagger/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /admin/review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/api/swagger/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/751/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/751/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/770/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/770/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/778/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/778/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/801/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/801/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/822/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/822/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/826/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/826/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/828/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/828/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/842/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/842/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/845/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/845/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/849/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/849/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/851/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /review/review/851/detail/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /review/review/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /accounts/profile/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /api/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /atlas/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /dashboard/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /intro/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /patterns/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /review/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/archive/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/archive/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/flows/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/flows/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/flows/dynamicsplit/start/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/flows/helloworld/start/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/flows/shipment/start/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/inbox/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/inbox/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/inbox/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/queue/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/queue/
+  -
+    source: viewflow-demo-site
+    evidence: analysis/behavioral_patterns/viewflow-demo-site/ontology-candidates.json
+    from: /workflow/inbox/
+    to: /workflow/queue/

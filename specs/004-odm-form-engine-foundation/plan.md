@@ -5,7 +5,7 @@
 
 ## Summary
 
-Define a standalone ODM/OpenClinica-style form engine subsystem that parses, normalizes, validates, compiles, and exports governed form packages. This slice makes the compiler/validator the authority for form meaning, while Django, Viewflow, and django-material remain downstream orchestration/runtime and presentation layers that consume compiled outputs.
+Define a standalone ODM/OpenClinica-style form engine subsystem that parses, normalizes, validates, compiles, and exports governed form packages. This slice makes the compiler/validator the authority for form meaning, while Django, Viewflow, and django-material remain downstream orchestration/runtime and presentation layers that consume compiled outputs. It also makes the form-centric capture rule explicit: metadata, outcomes, storage-log entries, and disposition-log entries should originate in governed package submissions rather than fragmented ad hoc entry structures.
 
 ## Technical Context
 
@@ -70,6 +70,7 @@ Define a standalone ODM/OpenClinica-style form engine subsystem that parses, nor
 - runtime/workflow layers bind to published package/version references and compiled field/section identifiers
 - UI layers consume compiled render contracts and validation hints
 - neither layer parses source artifacts or owns semantic validation
+- one package family may still be rendered in task-specific subsets so workflows can capture only the relevant sections without creating parallel form definitions
 
 ### 5. Migration from current metadata slice
 

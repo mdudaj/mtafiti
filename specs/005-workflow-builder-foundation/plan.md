@@ -5,7 +5,7 @@
 
 ## Summary
 
-Define a bounded, Viewflow-compatible workflow-builder subsystem for operation-driven LIMS/EDCS. This slice focuses on workflow templates, node/edge/rule definitions, assignment and approval metadata, and task capture bindings to compiler-owned package outputs — while explicitly keeping form compilation and validation inside the separate ODM/OpenClinica engine.
+Define a bounded, Viewflow-compatible workflow-builder subsystem for LIMS operations. This slice focuses on workflow templates, node/edge/rule definitions, assignment and approval metadata, and task capture bindings to compiler-owned package outputs — while explicitly keeping form compilation and validation inside the separate ODM/OpenClinica engine. It stays terminology-compatible with the broader architecture by treating metadata, outcomes, storage-log entries, and disposition-log entries as compiler-owned capture subsets rather than workflow-local field families, and it does not require EDCS to adopt the same workflow-builder model.
 
 ## Technical Context
 
@@ -13,7 +13,7 @@ Define a bounded, Viewflow-compatible workflow-builder subsystem for operation-d
 **Primary Dependencies**: Django, django-tenants, Viewflow runtime conventions, future ODM engine outputs, existing core role/audit patterns  
 **Storage**: PostgreSQL tenant schemas  
 **Testing**: `spec_kit_workflow.py validate`, `python -m pytest -q src/tests/test_spec_kit_workflow.py src/tests/test_knowledge_graph_generator.py`  
-**Target Platform**: shared workflow configuration foundation for `lims` and `edcs`  
+**Target Platform**: LIMS workflow configuration foundation aligned to the shared form-engine standard  
 **Project Type**: spec-first architecture slice  
 **Constraints**: keep topology bounded to Viewflow-compatible patterns, keep compiler logic out of the builder, preserve tenant isolation, preserve deterministic published outputs  
 **Scale/Scope**: architecture/specification and issue slicing, not full workflow runtime implementation
@@ -24,7 +24,7 @@ Define a bounded, Viewflow-compatible workflow-builder subsystem for operation-d
 - [x] The slice respects the clarified boundary that the ODM engine is separate from orchestration/UI.
 - [x] The plan keeps workflow configuration separate from workflow runtime execution.
 - [x] The plan binds task capture to compiler-owned outputs instead of redefining form semantics.
-- [x] The plan keeps the builder reusable across LIMS and EDCS.
+- [x] The plan keeps the builder explicitly LIMS-specific while preserving compatibility with the shared form-engine standard.
 
 ## Research & Repository Evidence
 
@@ -66,6 +66,7 @@ Define a bounded, Viewflow-compatible workflow-builder subsystem for operation-d
 - bind nodes to published package/version/section/group/item outputs from the ODM engine
 - support full-package, section, group, or item-subset capture scopes
 - keep the builder from inventing or compiling field semantics
+- ensure node bindings can cleanly isolate standardized operational capture subsets such as metadata, outcomes, storage logs, and disposition logs while leaving those semantics in the compiler-owned package model
 
 ### 5. Runtime-facing outputs
 
@@ -99,7 +100,7 @@ Define a bounded, Viewflow-compatible workflow-builder subsystem for operation-d
 
 ## Delivery Mapping
 
-- **Issue title**: Design configurable workflow builder
+- **Issue title**: Design LIMS configurable workflow builder
 - **Issue reference**: `#110`
 - **Parent issue**: `#107`
 - **Issue generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/005-workflow-builder-foundation`

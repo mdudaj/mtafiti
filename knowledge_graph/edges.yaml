@@ -452,6 +452,98 @@ edges:
     from: api:api_v1_workflows_runs_run_id_transition
     to: module:core_views
   -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_accounts_profile_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_city_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_continent_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_country_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_ocean_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_atlas_sea_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_intro_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_patterns_sequence_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_review_api_swagger_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_review_review_workflow_form
+  -
+    relationship: produces
+    from: behavioralsource:viewflow-demo-site
+    to: pattern:viewflow_demo_site_workflow_inbox_workflow_form
+  -
+    relationship: uses
+    from: behavioralsource:viewflow-demo-site
+    to: framework:django_material
+  -
+    relationship: uses
+    from: behavioralsource:viewflow-demo-site
+    to: framework:viewflow
+  -
     relationship: depends_on
     from: framework:celery
     to: service:postgres
@@ -1268,6 +1360,174 @@ edges:
     from: module:tenants_views
     to: module:tenants_models
   -
+    relationship: uses
+    from: pattern:viewflow_demo_site_accounts_profile_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_accounts_profile_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_city_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_city_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_continent_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_continent_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_country_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_country_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_ocean_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_ocean_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_sea_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_atlas_sea_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_intro_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_intro_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_patterns_sequence_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_patterns_sequence_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_review_api_swagger_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_review_api_swagger_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_review_review_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_review_review_workflow_form
+    to: framework:viewflow
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_workflow_inbox_workflow_form
+    to: framework:django_material
+  -
+    relationship: uses
+    from: pattern:viewflow_demo_site_workflow_inbox_workflow_form
+    to: framework:viewflow
+  -
     relationship: depends_on
     from: service:backend
     to: service:postgres
@@ -1732,6 +1992,10 @@ edges:
     from: service:worker
     to: service:rabbitmq
   -
+    relationship: depends_on
+    from: skill:compose_operations_dashboard_contract
+    to: skill:define_django_json_api_endpoint
+  -
     relationship: uses
     from: skill:compose_operations_dashboard_contract
     to: framework:django
@@ -1744,6 +2008,26 @@ edges:
     from: skill:define_django_json_api_endpoint
     to: framework:django
   -
+    relationship: depends_on
+    from: skill:extract_pattern_from_code
+    to: skill:determine_repository_target_surface
+  -
+    relationship: depends_on
+    from: skill:extract_pattern_from_ui
+    to: skill:determine_repository_target_surface
+  -
+    relationship: depends_on
+    from: skill:generalize_to_skill
+    to: skill:merge_patterns
+  -
+    relationship: depends_on
+    from: skill:generalize_to_skill
+    to: skill:record_structured_agentic_lesson
+  -
+    relationship: depends_on
+    from: skill:implement_schema_per_tenant_api
+    to: skill:define_django_json_api_endpoint
+  -
     relationship: uses
     from: skill:implement_schema_per_tenant_api
     to: framework:django
@@ -1751,6 +2035,10 @@ edges:
     relationship: uses
     from: skill:implement_schema_per_tenant_api
     to: framework:django-tenants
+  -
+    relationship: depends_on
+    from: skill:implement_tenant_aware_background_task
+    to: skill:implement_schema_per_tenant_api
   -
     relationship: uses
     from: skill:implement_tenant_aware_background_task
@@ -1760,17 +2048,153 @@ edges:
     from: skill:implement_tenant_aware_background_task
     to: framework:django
   -
+    relationship: depends_on
+    from: skill:implement_workflow_lifecycle
+    to: skill:define_django_json_api_endpoint
+  -
+    relationship: depends_on
+    from: skill:implement_workflow_lifecycle
+    to: skill:implement_schema_per_tenant_api
+  -
     relationship: uses
     from: skill:implement_workflow_lifecycle
     to: framework:django
+  -
+    relationship: depends_on
+    from: skill:manage_project_membership_lifecycle
+    to: skill:implement_schema_per_tenant_api
   -
     relationship: uses
     from: skill:manage_project_membership_lifecycle
     to: framework:django
   -
+    relationship: depends_on
+    from: skill:merge_patterns
+    to: skill:extract_pattern_from_code
+  -
+    relationship: depends_on
+    from: skill:merge_patterns
+    to: skill:extract_pattern_from_ui
+  -
+    relationship: depends_on
+    from: skill:model_lineage_graph_edges
+    to: skill:define_django_json_api_endpoint
+  -
     relationship: uses
     from: skill:model_lineage_graph_edges
     to: framework:django
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_form_pattern
+    to: pattern:viewflow_demo_site_accounts_profile_form
+  -
+    relationship: depends_on
+    from: skill:observe_viewflow-demo-site_form_pattern
+    to: skill:extract_pattern_from_ui
+  -
+    relationship: uses
+    from: skill:observe_viewflow-demo-site_form_pattern
+    to: behavioralsource:viewflow-demo-site
+  -
+    relationship: depends_on
+    from: skill:observe_viewflow-demo-site_navigation_pattern
+    to: skill:extract_pattern_from_ui
+  -
+    relationship: uses
+    from: skill:observe_viewflow-demo-site_navigation_pattern
+    to: behavioralsource:viewflow-demo-site
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_city_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_continent_europe_change_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_continent_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_country_121_delete_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_country_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_forms_bank_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_forms_hospital_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_forms_registration_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_forms_signup_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_ocean_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_atlas_sea_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_dashboard_django_stats_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_dashboard_oilngas_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_dashboard_stocks_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_intro_vf_stats_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_intro_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_patterns_sequence_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_review_api_swagger_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_review_review_workflow_form
+  -
+    relationship: consumes
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: pattern:viewflow_demo_site_workflow_inbox_workflow_form
+  -
+    relationship: depends_on
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: skill:extract_pattern_from_ui
+  -
+    relationship: uses
+    from: skill:observe_viewflow-demo-site_workflow_form_pattern
+    to: behavioralsource:viewflow-demo-site
+  -
+    relationship: depends_on
+    from: skill:plan_viewflow_material_workflow_ui
+    to: skill:compose_operations_dashboard_contract
   -
     relationship: uses
     from: skill:plan_viewflow_material_workflow_ui
@@ -1779,6 +2203,10 @@ edges:
     relationship: uses
     from: skill:plan_viewflow_material_workflow_ui
     to: framework:viewflow
+  -
+    relationship: depends_on
+    from: skill:record_structured_agentic_lesson
+    to: skill:determine_repository_target_surface
   -
     relationship: configures
     from: tool:context_hub

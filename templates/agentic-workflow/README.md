@@ -31,6 +31,32 @@ Use `--dry-run` to preview files that would be written without changing the targ
 5. Verify before completion (targeted checks, then merge-gate checks).
 6. Record corrections in `tasks/lessons.md` so future sessions avoid repeats.
 
+## Behavioral ontology upgrade profile
+
+This template can also support framework-learning tasks where the objective is to mine reusable UI/workflow/navigation patterns from a live demo surface and the corresponding source code.
+
+Use this profile when you need to analyze systems such as Viewflow, django-material, or a framework demo application.
+
+### What to add on top of the base workflow
+
+* Crawl the behavioral surface first: pages, menus, actions, state transitions, and permission-driven variations.
+* Read source repositories as implementation truth: runtime classes, templates, components, and configuration patterns.
+* Build a connected ontology across UI, navigation, workflow, state, and permissions.
+* Extract atomic skills with dependencies and confidence, rather than one large framework summary.
+* Evolve the current harness outputs instead of creating a separate parallel harness.
+
+### Suggested output families
+
+* `ontology/`
+* `skills/`
+* `patterns/`
+* `components/`
+
+### Confidence rule
+
+* `high confidence`: UI/demo behavior and source implementation both support the pattern
+* `low confidence`: only one source supports it so far
+
 ## Right-thing contract
 
 Before implementation, the agent should prove:
