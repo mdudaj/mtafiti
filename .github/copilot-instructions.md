@@ -8,7 +8,8 @@
 * Track work items in `tasks/todo.md`; track lessons in `tasks/lessons.md`.
 * Start implementation work from a dedicated issue branch; do not make normal delivery changes on `main`.
 * Open or refresh the matching pull request for that branch and keep it in draft until scope, acceptance criteria, and validation notes are current.
-* Merge implementation work by squash merge after required checks pass; do not treat direct-to-`main` commits as a normal completion path.
+* Merge implementation work by auto-squash after required checks pass; do not treat direct-to-`main` commits as a normal completion path.
+* Do not wait for an additional review gate after all required workflow checks are green unless the operator explicitly asks for review.
 
 ## Verification contract
 
