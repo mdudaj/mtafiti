@@ -28,8 +28,10 @@ Use `--dry-run` to preview files that would be written without changing the targ
 2. Require planning for work with 3+ steps.
 3. Confirm the correct target surface before editing code.
 4. Execute in three phases: plan, execute, review.
-5. Verify before completion (targeted checks, then merge-gate checks).
-6. Record corrections in `tasks/lessons.md` so future sessions avoid repeats.
+5. Deliver implementation work on an issue branch with a matching draft PR instead of direct-to-`main` commits.
+6. Verify before completion (targeted checks, then merge-gate checks).
+7. Squash merge only after the PR is ready and validation is green.
+8. Persist validation artifacts in `test-results/` and record corrections in `tasks/lessons.md` so future sessions avoid repeats.
 
 ## Behavioral ontology upgrade profile
 
