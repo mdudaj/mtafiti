@@ -11,7 +11,13 @@
 
 1. **Plan**: define scope, acceptance checks, and dependencies in `tasks/todo.md`.
 2. **Execute**: implement minimal, safe changes and update task status as you go.
-3. **Review**: verify outcomes, summarize risks, and record lessons in `tasks/lessons.md`.
+3. **Review**: verify outcomes from `test-results/`, summarize risks, and record lessons in `tasks/lessons.md`.
+
+## Git delivery contract (required)
+
+* Create or switch to a dedicated issue branch before implementation work; normal feature delivery does not happen on `main`.
+* Open or refresh the matching PR as the review container for that branch and keep it draft until the slice is ready for one-pass review.
+* After relevant checks pass, complete delivery through squash merge rather than direct branch-to-`main` commits.
 
 ## Right-thing contract (required)
 
@@ -41,6 +47,7 @@ A task is not complete until:
 
 * behavior is demonstrated to work,
 * relevant tests/checks pass,
+* the work is staged through the expected branch + PR workflow,
 * and results are explicitly validated (not assumed).
 
 ## Engineering principles
@@ -60,3 +67,5 @@ After each correction, add an entry to `tasks/lessons.md` with:
 * missed evidence,
 * preventive rule,
 * verification added.
+
+Use the latest files in `test-results/` as the primary evidence source for that entry instead of relying on a paraphrased memory of the failure.
