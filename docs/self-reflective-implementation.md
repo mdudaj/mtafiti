@@ -58,6 +58,8 @@ Reflection edges:
 * `Integrator -> Planner` when scope or dependency assumptions fail.
 * `Failure triage -> Planner/Coder/QA` to prevent repeated blind retries.
 
+Use the validation artifacts under `./test-results/` as the default evidence source for those reflection edges. At minimum, review the current pytest XML report and the matching gate log before recording a lesson or choosing the next retry.
+
 ## Right-thing contract (new)
 
 Before any code change, the active lane must establish:
@@ -94,6 +96,8 @@ Each execution issue must include:
 
 Template: use `.github/ISSUE_TEMPLATE/delivery-work-item.md` for consistent issue setup.
 
+Before implementing an issue, compare the live issue text against the latest approved `spec-kit` bundle (`spec.md`, `plan.md`, and `tasks.md`). If the issue drifted from the bundle, update the issue or refresh the bundle before writing code. Treat this as a required gate, not an optional review step.
+
 ### Delivery order (required)
 
 Use this repository workflow for new implementation slices:
@@ -102,11 +106,13 @@ Use this repository workflow for new implementation slices:
 2. generate or refresh the GitHub issue set from the spec bundle,
 3. mirror executable work into SQL todos with dependencies,
 4. implement one issue per branch,
-5. commit and push the branch,
-6. open a PR generated from the same spec bundle for review,
-7. squash merge after review passes.
+5. commit and push coherent work on the branch using Conventional Commit messages,
+6. open or refresh a PR generated from the same spec bundle,
+7. keep the PR in draft until the issue slice is complete and validation notes are current,
+8. request review only when the PR is ready for one-pass review,
+9. squash merge after review passes.
 
-Direct-to-`main` implementation is reserved for exceptional repository maintenance, not normal feature delivery.
+Agents must treat branch -> PR -> squash merge as the default delivery path for implementation work. Direct-to-`main` changes are reserved for explicit, exceptional repository maintenance requested by the operator, not normal feature delivery.
 
 Use `docs/spec-kit-workflow.md` and `.github/scripts/spec_kit_workflow.py` to keep issue and PR text aligned with the approved spec bundle.
 
@@ -120,6 +126,33 @@ Use Conventional Commit-style work labels, but convert them to Git-safe branch r
 Use the same pattern for other branch types, for example `fix/...`, `docs/...`, `refactor/...`, `test/...`, and `chore/...`.
 
 Do not use issue-number-only branches when a scoped feature/fix label is available. Git refs cannot contain `:` or spaces, so the branch must use the slash + slug form even when the human-readable convention uses `type: Title`.
+
+### Commit conventions (required)
+
+Commit messages must use Conventional Commits:
+
+* Format: `type(scope optional): imperative summary`
+* Examples: `feat(shell): add ontology navigation resolver`, `fix(operations): reject cross-tenant action cards`
+* Preferred types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`, `ci`, `perf`, `revert`
+
+Use commits to record coherent implementation steps, not to curate a perfect public history inside the branch. Avoid commit titles such as `wip`, `misc fixes`, or `address feedback` with no scoped subject. When review feedback arrives, prefer additive follow-up commits on the branch; the repository keeps `main` clean by squash merging the reviewed PR.
+
+### Pull request discipline (required)
+
+Treat the PR, not the branch commit list, as the primary review unit.
+
+* One execution issue maps to one implementation PR.
+* Keep each PR small enough to review in one sitting and aligned to the linked issue deliverables.
+* Do not mix unrelated refactors, drive-by fixes, or opportunistic renames into an implementation PR.
+* Avoid combining broad file renames with logic changes unless the rename is required for the acceptance criteria.
+* Use a draft PR for incomplete work instead of a reviewable PR with a `WIP` title.
+* Agents should open or refresh the draft PR as part of delivery, not wait until after local implementation is effectively complete.
+* Mark the PR ready only when the description, validation notes, and risk handoff are current.
+* Resolve or answer review comments explicitly before merge.
+* Prefer squash merge so reviewed PRs yield a clean `main` history without requiring branch-local commit curation.
+* If the local branch accumulates unrelated stacked commits or the local git transport cannot publish, create a clean branch from `main` and publish only the scoped files through the repository PR tooling instead of waiting or rewriting shared history on `main`.
+
+Maintainers who need to enforce the same merge contract at the repository-settings level should use the branch-protection runbook in `docs/operations-runbooks.md` and the helper at `.github/scripts/configure_branch_protection.py` instead of editing GitHub settings ad hoc.
 
 ## Resources to expose (to reduce looping)
 
@@ -232,6 +265,8 @@ To make lessons reusable across sessions, capture the correction using a small t
 
 Each lesson should state the affected surface, missed evidence, preventive rule, and verification added.
 
+When available, cite the exact artifact paths reviewed from `./test-results/` so the next session can inspect the same failure evidence instead of relying on memory alone.
+
 ## Fast feedback profile (new)
 
 Use a two-speed execution pattern to reduce local cycle time while preserving full quality gates:
@@ -240,9 +275,11 @@ Use a two-speed execution pattern to reduce local cycle time while preserving fu
    * Run only tests directly related to changed surfaces.
    * Command: `.github/scripts/local_fast_feedback.sh <pytest selectors>`
    * Example: `.github/scripts/local_fast_feedback.sh tests/test_printing_api.py -k gateway`
+   * Artifacts: `test-results/local-fast-feedback.log` and `test-results/pytest-targeted.xml`
 2. **Pre-integration loop (required before handoff)**
    * Run docs/openapi/knowledge-graph checks and broad backend validation.
    * Command: `.github/scripts/local_fast_feedback.sh --full-gate`
+   * Artifacts: `test-results/full-gate.log` and `test-results/pytest-full-gate.xml`
    * Stage any new or deleted source/doc files first (`git add -A` or equivalent), otherwise repository-inventory checks can produce false greens locally and fail in CI.
 
 This keeps short iterations fast but still enforces the same merge-gate expectations before integration.
@@ -277,9 +314,10 @@ Every implementation task in this project should be executed end-to-end in one f
 2. run tests for the slice and then full backend suite,
 3. fix discovered issues,
 4. rerun tests until green,
-5. then commit/push,
-6. open/update the PR,
-7. merge via squash after review.
+5. then commit/push with Conventional Commit messages,
+6. open/update the PR and refresh the spec-derived description,
+7. keep the PR in draft until the slice is review-ready,
+8. merge via squash after review.
 
 Tasks should not be reported as done while still waiting on test execution or post-implementation validation.
 
