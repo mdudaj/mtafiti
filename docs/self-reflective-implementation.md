@@ -109,8 +109,8 @@ Use this repository workflow for new implementation slices:
 5. commit and push coherent work on the branch using Conventional Commit messages,
 6. open or refresh a PR generated from the same spec bundle,
 7. keep the PR in draft until the issue slice is complete and validation notes are current,
-8. request review only when the PR is ready for one-pass review,
-9. squash merge after review passes.
+8. enable auto-squash merge when the PR is ready,
+9. let the PR merge automatically after the required workflow checks pass.
 
 Agents must treat branch -> PR -> squash merge as the default delivery path for implementation work. Direct-to-`main` changes are reserved for explicit, exceptional repository maintenance requested by the operator, not normal feature delivery.
 
@@ -148,11 +148,13 @@ Treat the PR, not the branch commit list, as the primary review unit.
 * Use a draft PR for incomplete work instead of a reviewable PR with a `WIP` title.
 * Agents should open or refresh the draft PR as part of delivery, not wait until after local implementation is effectively complete.
 * Mark the PR ready only when the description, validation notes, and risk handoff are current.
-* Resolve or answer review comments explicitly before merge.
-* Prefer squash merge so reviewed PRs yield a clean `main` history without requiring branch-local commit curation.
+* Human review is optional and should be requested only when the operator asks for it or the change is unusually risky.
+* Prefer squash merge so green PRs yield a clean `main` history without requiring branch-local commit curation.
 * If the local branch accumulates unrelated stacked commits or the local git transport cannot publish, create a clean branch from `main` and publish only the scoped files through the repository PR tooling instead of waiting or rewriting shared history on `main`.
 
 Maintainers who need to enforce the same merge contract at the repository-settings level should use the branch-protection runbook in `docs/operations-runbooks.md` and the helper at `.github/scripts/configure_branch_protection.py` instead of editing GitHub settings ad hoc.
+
+The repository settings should allow only squash merges, enable auto-merge for green PRs, delete head branches on merge, and keep branch protection configured so workflow checks are sufficient without an additional approval gate.
 
 ## Resources to expose (to reduce looping)
 
