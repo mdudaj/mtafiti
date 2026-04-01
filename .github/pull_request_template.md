@@ -1,6 +1,15 @@
+# Pull Request
+
 ## Summary
 
-Describe what this PR changes and why.
+Describe what this PR changes, why it is needed now, and what is intentionally left out of scope.
+
+## Review unit
+
+- [ ] PR scope maps to exactly one execution issue / implementation slice.
+- [ ] PR is still small enough for one-pass review.
+- [ ] PR is draft if any acceptance criteria or validation notes are still incomplete.
+- [ ] Work was delivered on this branch/PR instead of by direct-to-`main` implementation.
 
 ## Spec Kit artifacts
 
@@ -14,10 +23,18 @@ Describe what this PR changes and why.
 - [ ] Linked execution issue includes Objective, Deliverables, Acceptance Criteria, Dependencies, and References.
 - [ ] Scope boundary for this PR is explicit and matches the issue deliverables.
 
+## Commit contract
+
+- [ ] Branch name uses the repository's Git-safe Conventional Commit slug format.
+- [ ] Branch commits use Conventional Commit subjects.
+- [ ] Final integration path for this work is squash merge after review and green checks.
+- [ ] No unrelated refactors, drive-by fixes, or broad rename-only churn are mixed into this PR.
+
 ## Handoff contract
 
 - [ ] Changed files and risk notes are captured in PR description.
 - [ ] Done/blocker state is explicit (no implicit “follow-up later” gaps).
+- [ ] Reviewers can see the primary files or behaviors to inspect first.
 
 ## Documentation chunk
 
@@ -30,3 +47,4 @@ Describe what this PR changes and why.
 ## Validation
 
 - [ ] Ran tests/checks relevant to this change.
+- [ ] Listed the concrete commands or manual checks used for validation in the PR body.
