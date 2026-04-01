@@ -1,4 +1,4 @@
-# Copilot repository instructions (template)
+# Copilot repository instructions
 
 ## Workflow contract
 
