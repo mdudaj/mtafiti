@@ -2,7 +2,7 @@ EnvironmentInventory:
   programming_languages:
     -
       name: Python
-      file_count: 166
+      file_count: 168
     -
       name: YAML
       file_count: 35

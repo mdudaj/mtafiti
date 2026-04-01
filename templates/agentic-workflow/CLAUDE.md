@@ -16,8 +16,8 @@
 ## Git delivery contract (required)
 
 * Create or switch to a dedicated issue branch before implementation work; normal feature delivery does not happen on `main`.
-* Open or refresh the matching PR as the review container for that branch and keep it draft until the slice is ready for one-pass review.
-* After relevant checks pass, complete delivery through squash merge rather than direct branch-to-`main` commits.
+* Open or refresh the matching PR as the integration container for that branch and keep it draft until the slice is ready for green validation.
+* After relevant checks pass, enable auto-squash merge rather than waiting for an additional review gate.
 
 ## Right-thing contract (required)
 

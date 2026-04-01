@@ -27,14 +27,14 @@ Describe what this PR changes, why it is needed now, and what is intentionally l
 
 - [ ] Branch name uses the repository's Git-safe Conventional Commit slug format.
 - [ ] Branch commits use Conventional Commit subjects.
-- [ ] Final integration path for this work is squash merge after review and green checks.
+- [ ] Final integration path for this work is auto-squash after green checks.
 - [ ] No unrelated refactors, drive-by fixes, or broad rename-only churn are mixed into this PR.
 
 ## Handoff contract
 
 - [ ] Changed files and risk notes are captured in PR description.
 - [ ] Done/blocker state is explicit (no implicit “follow-up later” gaps).
-- [ ] Reviewers can see the primary files or behaviors to inspect first.
+- [ ] Maintainers can see the primary files or behaviors to inspect first.
 
 ## Documentation chunk
 
