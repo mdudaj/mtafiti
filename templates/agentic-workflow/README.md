@@ -30,7 +30,7 @@ Use `--dry-run` to preview files that would be written without changing the targ
 4. Execute in three phases: plan, execute, review.
 5. Deliver implementation work on an issue branch with a matching draft PR instead of direct-to-`main` commits.
 6. Verify before completion (targeted checks, then merge-gate checks).
-7. Squash merge only after the PR is ready and validation is green.
+7. Enable auto-squash merge once the PR is ready and let green checks complete the merge.
 8. Persist validation artifacts in `test-results/` and record corrections in `tasks/lessons.md` so future sessions avoid repeats.
 
 ## Behavioral ontology upgrade profile
