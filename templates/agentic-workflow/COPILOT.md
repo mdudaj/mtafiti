@@ -11,7 +11,13 @@
 
 1. **Plan** in `tasks/todo.md` with scope boundaries and acceptance checks.
 2. **Execute** with minimal, convention-aligned code changes.
-3. **Review** with test evidence and lessons recorded in `tasks/lessons.md`.
+3. **Review** with test evidence from `test-results/` and lessons recorded in `tasks/lessons.md`.
+
+## Git delivery contract (required)
+
+* Create or switch to a dedicated issue branch before implementation work; normal feature delivery does not happen on `main`.
+* Open or refresh the matching PR as the review container for that branch and keep it draft until the slice is ready for one-pass review.
+* After targeted checks and merge-gate checks pass, hand off for squash merge rather than direct branch-to-`main` commits.
 
 ## Right-thing contract (required)
 
@@ -41,6 +47,7 @@ Do not mark done until:
 
 * targeted checks pass,
 * merge-gate checks pass (repo-defined),
+* the implementation is staged through a branch + PR workflow,
 * and behavior is verified end-to-end.
 
 ## Engineering principles
@@ -51,4 +58,4 @@ Do not mark done until:
 
 ## Self-improvement loop
 
-After each fix, rollback, or wrong-turn correction, append a reusable rule to `tasks/lessons.md`. Prefer lessons that explain why the earlier target or fix was wrong and what evidence would have prevented it.
+After each fix, rollback, or wrong-turn correction, review the current artifacts under `test-results/` first, then append a reusable rule to `tasks/lessons.md`. Prefer lessons that explain why the earlier target or fix was wrong, which report or log exposed it, and what evidence would have prevented it.
