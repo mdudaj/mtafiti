@@ -4,6 +4,7 @@ import uuid
 import pytest
 from django.test import Client
 from django.test.utils import override_settings
+from django.urls import reverse
 from django_tenants.utils import schema_context
 
 from tenants.models import Domain, Tenant
@@ -226,20 +227,31 @@ def test_ui_operations_html_pages_render():
     )
     assert gateway.status_code == 201
 
-    dashboard = client.get("/ui/operations/dashboard", HTTP_HOST=host)
+    operations_dashboard_url = reverse("ui_operations_dashboard_page")
+    operations_stewardship_url = reverse("ui_operations_stewardship_page")
+    operations_orchestration_url = reverse("ui_operations_orchestration_page")
+    operations_printing_url = reverse("ui_operations_printing_page")
+    operations_agent_url = reverse("ui_operations_agent_page")
+    workspace_url = reverse("user_portal_dashboard_page")
+
+    dashboard = client.get(operations_dashboard_url, HTTP_HOST=host)
     stewardship = client.get(
-        "/ui/operations/stewardship",
+        operations_stewardship_url,
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor",
     )
-    orchestration = client.get(f"/ui/operations/orchestration?project_id={project_id}", HTTP_HOST=host)
+    orchestration = client.get(
+        f"{operations_orchestration_url}?project_id={project_id}", HTTP_HOST=host
+    )
     printing = client.get(
-        "/ui/operations/printing",
+        operations_printing_url,
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor,tenant.admin",
     )
-    agent = client.get(f"/ui/operations/agent?project_id={project_id}", HTTP_HOST=host)
-    workspace = client.get("/app", HTTP_HOST=host)
+    agent = client.get(
+        f"{operations_agent_url}?project_id={project_id}", HTTP_HOST=host
+    )
+    workspace = client.get(workspace_url, HTTP_HOST=host)
 
     assert dashboard.status_code == 200
     assert stewardship.status_code == 200
@@ -249,6 +261,8 @@ def test_ui_operations_html_pages_render():
     assert workspace.status_code == 200
     assert b"Skip to content" in dashboard.content
     assert b"Operations Dashboard" in dashboard.content
+    assert b"Operations navigation" in dashboard.content
+    assert b"Stewardship</span>" in dashboard.content
     assert b"Stewardship Workbench" in stewardship.content
     assert b"Printing Operations" in printing.content
     assert b"data-ajax-model-select" in dashboard.content
@@ -256,10 +270,36 @@ def test_ui_operations_html_pages_render():
     assert b"/api/v1/ui/model-select-options?source=assets" in stewardship.content
     assert b"/api/v1/ui/model-select-options?source=print_templates" in printing.content
     assert b"/api/v1/ui/model-select-options?source=print_gateways" in printing.content
-    assert b"/api/v1/ui/model-select-options?source=print_templates" in workspace.content
+    assert (
+        b"/api/v1/ui/model-select-options?source=print_templates" in workspace.content
+    )
     assert b"/api/v1/ui/model-select-options?source=print_gateways" in workspace.content
     assert b"Ajax Filter Project" in orchestration.content
     assert b"Ajax Filter Project" in agent.content
+    assert operations_stewardship_url.encode() in dashboard.content
+    assert operations_orchestration_url.encode() in dashboard.content
+    assert operations_agent_url.encode() in dashboard.content
+    assert operations_printing_url.encode() in dashboard.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_user_workspace_navigation_filters_operations_link_for_reader(monkeypatch):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    host, _ = _create_tenants()
+    client = Client()
+    workspace_url = reverse("user_portal_dashboard_page")
+
+    reader = client.get(
+        workspace_url, HTTP_HOST=host, HTTP_X_USER_ROLES="catalog.reader"
+    )
+    editor = client.get(
+        workspace_url, HTTP_HOST=host, HTTP_X_USER_ROLES="catalog.editor"
+    )
+
+    assert reader.status_code == 200
+    assert editor.status_code == 200
+    assert b"Operations printing" not in reader.content
+    assert b"Operations printing" in editor.content
 
 
 @pytest.mark.django_db(transaction=True)
@@ -267,7 +307,7 @@ def test_ui_operations_html_pages_render():
 def test_ui_operations_html_pages_fallback_when_material_base_missing():
     host, _ = _create_tenants()
     client = Client()
-    dashboard = client.get("/ui/operations/dashboard", HTTP_HOST=host)
+    dashboard = client.get(reverse("ui_operations_dashboard_page"), HTTP_HOST=host)
     assert dashboard.status_code == 200
     assert b"Mtafiti Operations" in dashboard.content
 
@@ -280,7 +320,11 @@ def test_ui_operations_html_filters_apply():
     client.post(
         "/api/v1/stewardship/items",
         data=json.dumps(
-            {"item_type": "quality_exception", "subject_ref": "asset:critical", "severity": "critical"}
+            {
+                "item_type": "quality_exception",
+                "subject_ref": "asset:critical",
+                "severity": "critical",
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
@@ -288,14 +332,18 @@ def test_ui_operations_html_filters_apply():
     client.post(
         "/api/v1/stewardship/items",
         data=json.dumps(
-            {"item_type": "quality_exception", "subject_ref": "asset:low", "severity": "low"}
+            {
+                "item_type": "quality_exception",
+                "subject_ref": "asset:low",
+                "severity": "low",
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
     )
 
     filtered = client.get(
-        "/ui/operations/stewardship?severity=critical",
+        reverse("ui_operations_stewardship_page") + "?severity=critical",
         HTTP_HOST=host,
     )
     assert filtered.status_code == 200
@@ -312,7 +360,11 @@ def test_ui_action_controls_visibility_by_role(monkeypatch):
     client.post(
         "/api/v1/stewardship/items",
         data=json.dumps(
-            {"item_type": "quality_exception", "subject_ref": "asset:role-check", "severity": "high"}
+            {
+                "item_type": "quality_exception",
+                "subject_ref": "asset:role-check",
+                "severity": "high",
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
@@ -320,12 +372,12 @@ def test_ui_action_controls_visibility_by_role(monkeypatch):
     )
 
     admin_view = client.get(
-        "/ui/operations/stewardship",
+        reverse("ui_operations_stewardship_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="policy.admin",
     )
     reader_view = client.get(
-        "/ui/operations/stewardship",
+        reverse("ui_operations_stewardship_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.reader",
     )
@@ -341,7 +393,8 @@ def test_ui_feedback_banner_renders_from_query_params():
     host, _ = _create_tenants()
     client = Client()
     page = client.get(
-        "/ui/operations/dashboard?ui_message=Action%20completed&ui_error=0",
+        reverse("ui_operations_dashboard_page")
+        + "?ui_message=Action%20completed&ui_error=0",
         HTTP_HOST=host,
     )
     assert page.status_code == 200
@@ -357,14 +410,18 @@ def test_stewardship_action_form_fields_render_for_managers(monkeypatch):
     client.post(
         "/api/v1/stewardship/items",
         data=json.dumps(
-            {"item_type": "quality_exception", "subject_ref": "asset:form", "severity": "high"}
+            {
+                "item_type": "quality_exception",
+                "subject_ref": "asset:form",
+                "severity": "high",
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="policy.admin",
     )
     page = client.get(
-        "/ui/operations/stewardship",
+        reverse("ui_operations_stewardship_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="policy.admin",
     )
@@ -394,7 +451,7 @@ def test_stewardship_create_form_uses_asset_ajax_select():
     assert asset.status_code == 201
 
     page = client.get(
-        "/ui/operations/stewardship",
+        reverse("ui_operations_stewardship_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor",
     )
@@ -425,7 +482,7 @@ def test_access_request_create_form_uses_asset_ajax_select_and_prefills_requeste
     assert asset.status_code == 201
 
     page = client.get(
-        "/ui/operations/stewardship",
+        reverse("ui_operations_stewardship_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.reader",
         HTTP_X_USER_ID="reader@example.com",
@@ -451,7 +508,11 @@ def test_orchestration_action_form_renders_for_admin():
     ingestion = client.post(
         "/api/v1/ingestions",
         data=json.dumps(
-            {"project_id": project.json()["id"], "connector": "dbt", "source": {"processed_entities": 1}}
+            {
+                "project_id": project.json()["id"],
+                "connector": "dbt",
+                "source": {"processed_entities": 1},
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
@@ -459,7 +520,11 @@ def test_orchestration_action_form_renders_for_admin():
     workflow = client.post(
         "/api/v1/orchestration/workflows",
         data=json.dumps(
-            {"name": "ui-orch-actions", "project_id": project.json()["id"], "steps": [{"step_id": "s1", "ingestion_id": ingestion.json()["id"]}]}
+            {
+                "name": "ui-orch-actions",
+                "project_id": project.json()["id"],
+                "steps": [{"step_id": "s1", "ingestion_id": ingestion.json()["id"]}],
+            }
         ),
         content_type="application/json",
         HTTP_HOST=host,
@@ -473,7 +538,7 @@ def test_orchestration_action_form_renders_for_admin():
         HTTP_X_USER_ROLES="catalog.editor",
     )
     page = client.get(
-        "/ui/operations/orchestration",
+        reverse("ui_operations_orchestration_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="policy.admin",
     )
@@ -509,13 +574,15 @@ def test_orchestration_workflow_run_create_form_uses_ajax_selects():
     assert asset.status_code == 201
 
     page = client.get(
-        "/ui/operations/orchestration",
+        reverse("ui_operations_orchestration_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor",
     )
     assert page.status_code == 200
     assert b'data-ui-action-form="workflow-run-create"' in page.content
-    assert b"/api/v1/ui/model-select-options?source=workflow_definitions" in page.content
+    assert (
+        b"/api/v1/ui/model-select-options?source=workflow_definitions" in page.content
+    )
     assert b"/api/v1/ui/model-select-options?source=assets" in page.content
     assert b"Queue workflow run" in page.content
 
@@ -526,13 +593,19 @@ def test_agent_action_form_renders_with_input_fields():
     client = Client()
     client.post(
         "/api/v1/agent/runs",
-        data=json.dumps({"prompt": "project:p monitor", "allowed_tools": ["quality.read"], "start_now": True}),
+        data=json.dumps(
+            {
+                "prompt": "project:p monitor",
+                "allowed_tools": ["quality.read"],
+                "start_now": True,
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor",
     )
     page = client.get(
-        "/ui/operations/agent",
+        reverse("ui_operations_agent_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="catalog.editor",
     )
@@ -588,7 +661,7 @@ def test_printing_page_renders_jobs_and_gateways():
         HTTP_X_USER_ROLES="policy.admin",
     )
     page = client.get(
-        "/ui/operations/printing",
+        reverse("ui_operations_printing_page"),
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="policy.admin,catalog.editor",
     )

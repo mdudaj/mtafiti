@@ -17,8 +17,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
-from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
 from .events import maybe_publish_audit_event, maybe_publish_event
@@ -26,6 +26,7 @@ from .identity import require_any_role, require_role
 from .metrics import DB_READINESS_ERRORS, metrics_response
 from .models import (
     AccessRequest,
+    AgentRun,
     AssetVersion,
     Classification,
     CollaborationDocument,
@@ -34,9 +35,8 @@ from .models import (
     ConsentEvent,
     DataAsset,
     DataContract,
-    DataShare,
     DataProduct,
-    AgentRun,
+    DataShare,
     GlossaryTerm,
     GovernancePolicy,
     GovernancePolicyTransition,
@@ -49,85 +49,93 @@ from .models import (
     NotebookWorkspace,
     OrchestrationRun,
     OrchestrationWorkflow,
+    PrintGateway,
+    PrintJob,
+    PrintTemplate,
     PrivacyAction,
     PrivacyProfile,
-    PrintJob,
-    PrintGateway,
-    PrintTemplate,
     Project,
     ProjectInvitation,
     ProjectMembership,
     ProjectMembershipRoleHistory,
     ProjectWorkspace,
+    QualityCheckResult,
+    QualityRule,
     ReferenceDataset,
     ReferenceDatasetVersion,
     ResidencyProfile,
-    StewardshipItem,
-    QualityCheckResult,
-    QualityRule,
     RetentionHold,
     RetentionRule,
     RetentionRun,
+    StewardshipItem,
     UserNotification,
     UserProfile,
     WorkflowDefinition,
     WorkflowRun,
     WorkflowTask,
 )
+from .navigation import (
+    OPERATIONS_DASHBOARD_ACTION_DESCRIPTORS,
+    OPERATIONS_NAVIGATION_DESCRIPTORS,
+    USER_PORTAL_NAVIGATION_DESCRIPTORS,
+    resolve_action_descriptors,
+    resolve_navigation,
+    with_navigation,
+)
 from .notifications import dispatch_notification, process_notification_queue
 from .printing_renderers import render_label_preview
 from .tasks import evaluate_quality_rule, execute_connector_run, execute_retention_run
 
-
 DEFAULT_PRINT_TEMPLATE_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
-        'name': 'Zebra QR Label (9-pack ready)',
-        'template_ref': 'zebra/participant-batch',
-        'output_format': PrintJob.Format.ZPL,
-        'content': '^XA^PW200^LL200^LH0,0^FO44,76^BQN,2,4^FDQA,[[content]]^FS^FO10,194^A0N,15,15^FB180,1,0,C,0^FD[[line1]]^FS^FO10,210^A0N,15,15^FB180,1,0,C,0^FD[[line2]]^FS^XZ',
-        'sample_payload': {
-            'participant_prefix': 'MLTP2-MBY-KWJ-',
-            'range_start': 1,
-            'range_end': 1,
-            'serial_position': 'after_prefix',
-            'label_suffixes': [
-                'base',
-                'BLD-6mls',
-                'BLD-4mls',
-                'BLD-2mls',
-                'PLM1',
-                'PLM2',
-                'BLD-RNA',
-                'NA1',
-                'NA2',
+        "name": "Zebra QR Label (9-pack ready)",
+        "template_ref": "zebra/participant-batch",
+        "output_format": PrintJob.Format.ZPL,
+        "content": "^XA^PW200^LL200^LH0,0^FO44,76^BQN,2,4^FDQA,[[content]]^FS^FO10,194^A0N,15,15^FB180,1,0,C,0^FD[[line1]]^FS^FO10,210^A0N,15,15^FB180,1,0,C,0^FD[[line2]]^FS^XZ",
+        "sample_payload": {
+            "participant_prefix": "MLTP2-MBY-KWJ-",
+            "range_start": 1,
+            "range_end": 1,
+            "serial_position": "after_prefix",
+            "label_suffixes": [
+                "base",
+                "BLD-6mls",
+                "BLD-4mls",
+                "BLD-2mls",
+                "PLM1",
+                "PLM2",
+                "BLD-RNA",
+                "NA1",
+                "NA2",
             ],
         },
     },
     {
-        'name': 'A4 QR Sheet 65-up (38.1x21.2mm)',
-        'template_ref': 'a4/65-up',
-        'output_format': PrintJob.Format.PDF,
-        'content': 'QR [[content]]',
-        'sample_payload': {
-            'labels': ['MLTP2-MBY-KWJ-001'],
-            'pdf_sheet_preset': 'a4-38x21.2',
-            'batch_count': 5,
+        "name": "A4 QR Sheet 65-up (38.1x21.2mm)",
+        "template_ref": "a4/65-up",
+        "output_format": PrintJob.Format.PDF,
+        "content": "QR [[content]]",
+        "sample_payload": {
+            "labels": ["MLTP2-MBY-KWJ-001"],
+            "pdf_sheet_preset": "a4-38x21.2",
+            "batch_count": 5,
         },
     },
 )
 
 
 def _tenant_schema(request) -> str:
-    tenant = getattr(request, 'tenant', None)
+    tenant = getattr(request, "tenant", None)
     return tenant.schema_name if tenant else connection.schema_name
 
 
 def health(request):
-    return JsonResponse({'schema': connection.schema_name})
+    return JsonResponse({"schema": connection.schema_name})
 
 
 def probe_ok(request):
-    return JsonResponse({'status': 'ok'})
+    return JsonResponse({"status": "ok"})
+
 
 def livez(request):
     return probe_ok(request)
@@ -141,11 +149,11 @@ def readyz(request):
     try:
         connection.ensure_connection()
         with connection.cursor() as cursor:
-            cursor.execute('SELECT 1')
+            cursor.execute("SELECT 1")
     except DatabaseError:
         DB_READINESS_ERRORS.inc()
-        return JsonResponse({'status': 'not-ready'}, status=503)
-    return JsonResponse({'status': 'ok'})
+        return JsonResponse({"status": "not-ready"}, status=503)
+    return JsonResponse({"status": "ok"})
 
 
 def metrics(request):
@@ -155,86 +163,96 @@ def metrics(request):
 
 def _asset_to_dict(asset: DataAsset) -> dict[str, Any]:
     return {
-        'id': str(asset.id),
-        'qualified_name': asset.qualified_name,
-        'display_name': asset.display_name,
-        'asset_type': asset.asset_type,
-        'description': None if asset.description == '' else asset.description,
-        'owner': None if asset.owner == '' else asset.owner,
-        'tags': asset.tags,
-        'classifications': asset.classifications,
-        'properties': asset.properties,
-        'created_at': asset.created_at.isoformat(),
-        'updated_at': asset.updated_at.isoformat(),
+        "id": str(asset.id),
+        "qualified_name": asset.qualified_name,
+        "display_name": asset.display_name,
+        "asset_type": asset.asset_type,
+        "description": None if asset.description == "" else asset.description,
+        "owner": None if asset.owner == "" else asset.owner,
+        "tags": asset.tags,
+        "classifications": asset.classifications,
+        "properties": asset.properties,
+        "created_at": asset.created_at.isoformat(),
+        "updated_at": asset.updated_at.isoformat(),
     }
 
 
 def _asset_version_to_dict(version: AssetVersion) -> dict[str, Any]:
     return {
-        'id': str(version.id),
-        'asset_id': str(version.asset_id),
-        'version_number': version.version_number,
-        'change_summary': version.change_summary or None,
-        'change_set': version.change_set,
-        'status': version.status,
-        'created_by': version.created_by or None,
-        'created_at': version.created_at.isoformat(),
-        'updated_at': version.updated_at.isoformat(),
+        "id": str(version.id),
+        "asset_id": str(version.asset_id),
+        "version_number": version.version_number,
+        "change_summary": version.change_summary or None,
+        "change_set": version.change_set,
+        "status": version.status,
+        "created_by": version.created_by or None,
+        "created_at": version.created_at.isoformat(),
+        "updated_at": version.updated_at.isoformat(),
     }
 
 
 def _parse_json_body(request):
     try:
-        body = request.body.decode('utf-8') if request.body else ''
-        return json.loads(body or '{}')
+        body = request.body.decode("utf-8") if request.body else ""
+        return json.loads(body or "{}")
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
 
 
-def _parse_pagination(request, *, default_page_size: int = 50, max_page_size: int = 100):
-    page_param = request.GET.get('page')
-    page_size_param = request.GET.get('page_size')
-    limit_param = request.GET.get('limit')
-    offset_param = request.GET.get('offset')
+def _parse_pagination(
+    request, *, default_page_size: int = 50, max_page_size: int = 100
+):
+    page_param = request.GET.get("page")
+    page_size_param = request.GET.get("page_size")
+    limit_param = request.GET.get("limit")
+    offset_param = request.GET.get("offset")
 
     try:
         if limit_param is not None or offset_param is not None:
             limit = int(limit_param or default_page_size)
             offset = int(offset_param or 0)
             if limit < 1 or offset < 0:
-                return None, JsonResponse({'error': 'limit must be >= 1 and offset must be >= 0'}, status=400)
+                return None, JsonResponse(
+                    {"error": "limit must be >= 1 and offset must be >= 0"}, status=400
+                )
             page_size = min(limit, max_page_size)
             page = (offset // page_size) + 1
-            return {'page': page, 'page_size': page_size, 'offset': offset}, None
+            return {"page": page, "page_size": page_size, "offset": offset}, None
 
         page = int(page_param or 1)
         page_size = int(page_size_param or default_page_size)
     except ValueError:
-        return None, JsonResponse({'error': 'page/page_size/limit/offset must be integers'}, status=400)
+        return None, JsonResponse(
+            {"error": "page/page_size/limit/offset must be integers"}, status=400
+        )
 
     if page < 1 or page_size < 1:
-        return None, JsonResponse({'error': 'page and page_size must be >= 1'}, status=400)
+        return None, JsonResponse(
+            {"error": "page and page_size must be >= 1"}, status=400
+        )
     page_size = min(page_size, max_page_size)
     offset = (page - 1) * page_size
-    return {'page': page, 'page_size': page_size, 'offset': offset}, None
+    return {"page": page, "page_size": page_size, "offset": offset}, None
 
 
-def _paginated_response(request, qs, serializer, *, default_page_size: int = 50, max_page_size: int = 100):
+def _paginated_response(
+    request, qs, serializer, *, default_page_size: int = 50, max_page_size: int = 100
+):
     pagination, error = _parse_pagination(
         request, default_page_size=default_page_size, max_page_size=max_page_size
     )
     if error:
         return error
     total = qs.count()
-    offset = pagination['offset']
-    page_size = pagination['page_size']
+    offset = pagination["offset"]
+    page_size = pagination["page_size"]
     items = [serializer(item) for item in qs[offset : offset + page_size]]
     return JsonResponse(
         {
-            'items': items,
-            'page': pagination['page'],
-            'page_size': page_size,
-            'total': total,
+            "items": items,
+            "page": pagination["page"],
+            "page_size": page_size,
+            "total": total,
         }
     )
 
@@ -270,9 +288,9 @@ def _parse_orchestration_steps(value: Any) -> list[dict[str, Any]] | None:
     for raw_step in value:
         if not isinstance(raw_step, dict):
             return None
-        step_id = (raw_step.get('step_id') or '').strip()
-        ingestion_id = raw_step.get('ingestion_id')
-        depends_on = raw_step.get('depends_on') or []
+        step_id = (raw_step.get("step_id") or "").strip()
+        ingestion_id = raw_step.get("ingestion_id")
+        depends_on = raw_step.get("depends_on") or []
         if not step_id or not ingestion_id:
             return None
         if step_id in known_step_ids:
@@ -290,17 +308,17 @@ def _parse_orchestration_steps(value: Any) -> list[dict[str, Any]] | None:
         known_step_ids.add(step_id)
         normalized.append(
             {
-                'step_id': step_id,
-                'ingestion_id': normalized_ingestion_id,
-                'depends_on': depends_on,
+                "step_id": step_id,
+                "ingestion_id": normalized_ingestion_id,
+                "depends_on": depends_on,
             }
         )
     return normalized
 
 
 def _request_roles(request) -> set[str]:
-    raw = request.headers.get('X-User-Roles', '')
-    return {role.strip() for role in raw.split(',') if role.strip()}
+    raw = request.headers.get("X-User-Roles", "")
+    return {role.strip() for role in raw.split(",") if role.strip()}
 
 
 CLASSIFICATION_SENSITIVITY = {
@@ -311,59 +329,59 @@ CLASSIFICATION_SENSITIVITY = {
 }
 
 AGENT_TOOL_ALLOWLIST = {
-    'catalog.search',
-    'asset.read',
-    'contract.read',
-    'quality.read',
-    'lineage.read',
-    'governance.read',
+    "catalog.search",
+    "asset.read",
+    "contract.read",
+    "quality.read",
+    "lineage.read",
+    "governance.read",
 }
 
 
 DEFAULT_PARTICIPANT_LABEL_SUFFIXES = [
-    '',
-    'BLD-6mls',
-    'BLD-4mls',
-    'BLD-2mls',
-    'PLM1',
-    'PLM2',
-    'BLD-RNA',
-    'NA1',
-    'NA2',
+    "",
+    "BLD-6mls",
+    "BLD-4mls",
+    "BLD-2mls",
+    "PLM1",
+    "PLM2",
+    "BLD-RNA",
+    "NA1",
+    "NA2",
 ]
 
 
 def _join_label_part(label: str, part: str) -> str:
-    value = (label or '').strip()
-    token = (part or '').strip()
+    value = (label or "").strip()
+    token = (part or "").strip()
     if not token:
         return value
     if not value:
         return token
-    if value.endswith('-'):
-        return f'{value}{token}'
-    return f'{value}-{token}'
+    if value.endswith("-"):
+        return f"{value}{token}"
+    return f"{value}-{token}"
 
 
 def _expand_default_participant_labels(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return payload
-    if isinstance(payload.get('labels'), list) and payload.get('labels'):
+    if isinstance(payload.get("labels"), list) and payload.get("labels"):
         return payload
-    participant_prefix = (payload.get('participant_prefix') or '').strip()
-    range_start = payload.get('range_start')
-    range_end = payload.get('range_end')
-    serial_position = (payload.get('serial_position') or 'after_prefix').strip()
-    if serial_position not in {'after_prefix', 'at_end'}:
-        serial_position = 'after_prefix'
-    suffixes = payload.get('label_suffixes')
+    participant_prefix = (payload.get("participant_prefix") or "").strip()
+    range_start = payload.get("range_start")
+    range_end = payload.get("range_end")
+    serial_position = (payload.get("serial_position") or "after_prefix").strip()
+    if serial_position not in {"after_prefix", "at_end"}:
+        serial_position = "after_prefix"
+    suffixes = payload.get("label_suffixes")
     if isinstance(suffixes, list):
         normalized_suffixes = []
         for item in suffixes:
             raw = str(item).strip()
-            if raw.lower() in {'base', 'root'}:
-                raw = ''
-            normalized_suffixes.append(raw.lstrip('-'))
+            if raw.lower() in {"base", "root"}:
+                raw = ""
+            normalized_suffixes.append(raw.lstrip("-"))
         suffixes = normalized_suffixes
     else:
         suffixes = DEFAULT_PARTICIPANT_LABEL_SUFFIXES
@@ -376,19 +394,21 @@ def _expand_default_participant_labels(payload: dict[str, Any]) -> dict[str, Any
     width = max(3, len(str(range_start)), len(str(range_end)))
     labels: list[str] = []
     for participant in range(range_start, range_end + 1):
-        serial = f'{participant:0{width}d}'
+        serial = f"{participant:0{width}d}"
         for suffix in suffixes:
-            if serial_position == 'at_end':
+            if serial_position == "at_end":
                 label = _join_label_part(participant_prefix, suffix)
                 labels.append(_join_label_part(label, serial))
             else:
                 label = _join_label_part(participant_prefix, serial)
                 labels.append(_join_label_part(label, suffix))
-    return {**payload, 'labels': labels}
+    return {**payload, "labels": labels}
 
 
 def _classification_max_sensitivity(values: list[str]) -> int:
-    return max((CLASSIFICATION_SENSITIVITY.get(item, -1) for item in values), default=-1)
+    return max(
+        (CLASSIFICATION_SENSITIVITY.get(item, -1) for item in values), default=-1
+    )
 
 
 def _validate_classification_values(values: list[str]) -> list[str]:
@@ -406,247 +426,259 @@ def _enforce_sensitivity_upgrade_role(
         existing_values
     ):
         return None
-    return require_any_role(request, {'policy.admin', 'tenant.admin'})
+    return require_any_role(request, {"policy.admin", "tenant.admin"})
 
 
 def _ingestion_to_dict(ing: IngestionRequest) -> dict[str, Any]:
     return {
-        'id': str(ing.id),
-        'project_id': str(ing.project_id) if ing.project_id else None,
-        'connector': ing.connector,
-        'source': ing.source,
-        'mode': ing.mode if ing.mode else None,
-        'status': ing.status,
-        'created_at': ing.created_at.isoformat(),
-        'updated_at': ing.updated_at.isoformat(),
+        "id": str(ing.id),
+        "project_id": str(ing.project_id) if ing.project_id else None,
+        "connector": ing.connector,
+        "source": ing.source,
+        "mode": ing.mode if ing.mode else None,
+        "status": ing.status,
+        "created_at": ing.created_at.isoformat(),
+        "updated_at": ing.updated_at.isoformat(),
     }
 
 
 def _edge_to_dict(edge: LineageEdge) -> dict[str, Any]:
     return {
-        'id': str(edge.id),
-        'from_asset_id': str(edge.from_asset_id),
-        'to_asset_id': str(edge.to_asset_id),
-        'edge_type': edge.edge_type,
-        'properties': edge.properties,
-        'created_at': edge.created_at.isoformat(),
-        'updated_at': edge.updated_at.isoformat(),
+        "id": str(edge.id),
+        "from_asset_id": str(edge.from_asset_id),
+        "to_asset_id": str(edge.to_asset_id),
+        "edge_type": edge.edge_type,
+        "properties": edge.properties,
+        "created_at": edge.created_at.isoformat(),
+        "updated_at": edge.updated_at.isoformat(),
     }
 
 
 def _quality_rule_to_dict(rule: QualityRule) -> dict[str, Any]:
     return {
-        'id': str(rule.id),
-        'asset_id': str(rule.asset_id),
-        'rule_type': rule.rule_type,
-        'params': rule.params,
-        'severity': rule.severity,
-        'created_at': rule.created_at.isoformat(),
-        'updated_at': rule.updated_at.isoformat(),
+        "id": str(rule.id),
+        "asset_id": str(rule.asset_id),
+        "rule_type": rule.rule_type,
+        "params": rule.params,
+        "severity": rule.severity,
+        "created_at": rule.created_at.isoformat(),
+        "updated_at": rule.updated_at.isoformat(),
     }
 
 
 def _quality_result_to_dict(result: QualityCheckResult) -> dict[str, Any]:
     return {
-        'id': str(result.id),
-        'rule_id': str(result.rule_id),
-        'asset_id': str(result.rule.asset_id),
-        'status': result.status,
-        'details': result.details,
-        'created_at': result.created_at.isoformat(),
+        "id": str(result.id),
+        "rule_id": str(result.rule_id),
+        "asset_id": str(result.rule.asset_id),
+        "status": result.status,
+        "details": result.details,
+        "created_at": result.created_at.isoformat(),
     }
 
 
 def _contract_to_dict(contract: DataContract) -> dict[str, Any]:
     return {
-        'id': str(contract.id),
-        'asset_id': str(contract.asset_id),
-        'version': contract.version,
-        'status': contract.status,
-        'schema': contract.schema,
-        'expectations': contract.expectations,
-        'owners': contract.owners,
-        'created_at': contract.created_at.isoformat(),
-        'updated_at': contract.updated_at.isoformat(),
+        "id": str(contract.id),
+        "asset_id": str(contract.asset_id),
+        "version": contract.version,
+        "status": contract.status,
+        "schema": contract.schema,
+        "expectations": contract.expectations,
+        "owners": contract.owners,
+        "created_at": contract.created_at.isoformat(),
+        "updated_at": contract.updated_at.isoformat(),
     }
 
 
 def _retention_rule_to_dict(rule: RetentionRule) -> dict[str, Any]:
     return {
-        'id': str(rule.id),
-        'scope': rule.scope,
-        'action': rule.action,
-        'retention_period': rule.retention_period,
-        'grace_period': rule.grace_period or None,
-        'created_at': rule.created_at.isoformat(),
-        'updated_at': rule.updated_at.isoformat(),
+        "id": str(rule.id),
+        "scope": rule.scope,
+        "action": rule.action,
+        "retention_period": rule.retention_period,
+        "grace_period": rule.grace_period or None,
+        "created_at": rule.created_at.isoformat(),
+        "updated_at": rule.updated_at.isoformat(),
     }
 
 
 def _retention_hold_to_dict(hold: RetentionHold) -> dict[str, Any]:
     return {
-        'id': str(hold.id),
-        'asset_id': str(hold.asset_id),
-        'reason': hold.reason,
-        'active': hold.active,
-        'created_at': hold.created_at.isoformat(),
-        'released_at': hold.released_at.isoformat() if hold.released_at else None,
+        "id": str(hold.id),
+        "asset_id": str(hold.asset_id),
+        "reason": hold.reason,
+        "active": hold.active,
+        "created_at": hold.created_at.isoformat(),
+        "released_at": hold.released_at.isoformat() if hold.released_at else None,
     }
 
 
 def _retention_run_to_dict(run: RetentionRun) -> dict[str, Any]:
     return {
-        'id': str(run.id),
-        'rule_id': str(run.rule_id),
-        'mode': run.mode,
-        'status': run.status,
-        'summary': run.summary,
-        'created_at': run.created_at.isoformat(),
-        'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+        "id": str(run.id),
+        "rule_id": str(run.rule_id),
+        "mode": run.mode,
+        "status": run.status,
+        "summary": run.summary,
+        "created_at": run.created_at.isoformat(),
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
     }
 
 
 def _is_day_duration(value: str) -> bool:
-    return bool(re.fullmatch(r'P\d+D', value or ''))
+    return bool(re.fullmatch(r"P\d+D", value or ""))
 
 
 def _privacy_profile_to_dict(profile: PrivacyProfile) -> dict[str, Any]:
     return {
-        'id': str(profile.id),
-        'name': profile.name,
-        'lawful_basis': profile.lawful_basis,
-        'consent_required': profile.consent_required,
-        'consent_state': profile.consent_state,
-        'privacy_flags': profile.privacy_flags,
-        'created_at': profile.created_at.isoformat(),
-        'updated_at': profile.updated_at.isoformat(),
+        "id": str(profile.id),
+        "name": profile.name,
+        "lawful_basis": profile.lawful_basis,
+        "consent_required": profile.consent_required,
+        "consent_state": profile.consent_state,
+        "privacy_flags": profile.privacy_flags,
+        "created_at": profile.created_at.isoformat(),
+        "updated_at": profile.updated_at.isoformat(),
     }
 
 
 def _consent_event_to_dict(event: ConsentEvent) -> dict[str, Any]:
     return {
-        'id': str(event.id),
-        'profile_id': str(event.profile_id),
-        'consent_state': event.consent_state,
-        'reason': event.reason,
-        'created_at': event.created_at.isoformat(),
+        "id": str(event.id),
+        "profile_id": str(event.profile_id),
+        "consent_state": event.consent_state,
+        "reason": event.reason,
+        "created_at": event.created_at.isoformat(),
     }
 
 
 def _privacy_action_to_dict(action: PrivacyAction) -> dict[str, Any]:
     return {
-        'id': str(action.id),
-        'profile_id': str(action.profile_id),
-        'action_type': action.action_type,
-        'status': action.status,
-        'reason': action.reason or None,
-        'actor_id': action.actor_id or None,
-        'evidence': action.evidence,
-        'requested_at': action.requested_at.isoformat(),
-        'decided_at': action.decided_at.isoformat() if action.decided_at else None,
-        'executed_at': action.executed_at.isoformat() if action.executed_at else None,
+        "id": str(action.id),
+        "profile_id": str(action.profile_id),
+        "action_type": action.action_type,
+        "status": action.status,
+        "reason": action.reason or None,
+        "actor_id": action.actor_id or None,
+        "evidence": action.evidence,
+        "requested_at": action.requested_at.isoformat(),
+        "decided_at": action.decided_at.isoformat() if action.decided_at else None,
+        "executed_at": action.executed_at.isoformat() if action.executed_at else None,
     }
 
 
 def _agent_run_to_dict(agent_run: AgentRun) -> dict[str, Any]:
     return {
-        'id': str(agent_run.id),
-        'actor_id': agent_run.actor_id or None,
-        'prompt': agent_run.prompt,
-        'allowed_tools': agent_run.allowed_tools,
-        'timeout_seconds': agent_run.timeout_seconds,
-        'status': agent_run.status,
-        'output': agent_run.output,
-        'error_message': agent_run.error_message or None,
-        'started_at': agent_run.started_at.isoformat() if agent_run.started_at else None,
-        'finished_at': agent_run.finished_at.isoformat() if agent_run.finished_at else None,
-        'created_at': agent_run.created_at.isoformat(),
-        'updated_at': agent_run.updated_at.isoformat(),
+        "id": str(agent_run.id),
+        "actor_id": agent_run.actor_id or None,
+        "prompt": agent_run.prompt,
+        "allowed_tools": agent_run.allowed_tools,
+        "timeout_seconds": agent_run.timeout_seconds,
+        "status": agent_run.status,
+        "output": agent_run.output,
+        "error_message": agent_run.error_message or None,
+        "started_at": (
+            agent_run.started_at.isoformat() if agent_run.started_at else None
+        ),
+        "finished_at": (
+            agent_run.finished_at.isoformat() if agent_run.finished_at else None
+        ),
+        "created_at": agent_run.created_at.isoformat(),
+        "updated_at": agent_run.updated_at.isoformat(),
     }
 
 
 def _stewardship_item_to_dict(item: StewardshipItem) -> dict[str, Any]:
     return {
-        'id': str(item.id),
-        'item_type': item.item_type,
-        'subject_ref': item.subject_ref,
-        'severity': item.severity,
-        'status': item.status,
-        'assignee': item.assignee or None,
-        'due_at': item.due_at.isoformat() if item.due_at else None,
-        'resolution': item.resolution,
-        'actor_id': item.actor_id or None,
-        'created_at': item.created_at.isoformat(),
-        'updated_at': item.updated_at.isoformat(),
-        'resolved_at': item.resolved_at.isoformat() if item.resolved_at else None,
+        "id": str(item.id),
+        "item_type": item.item_type,
+        "subject_ref": item.subject_ref,
+        "severity": item.severity,
+        "status": item.status,
+        "assignee": item.assignee or None,
+        "due_at": item.due_at.isoformat() if item.due_at else None,
+        "resolution": item.resolution,
+        "actor_id": item.actor_id or None,
+        "created_at": item.created_at.isoformat(),
+        "updated_at": item.updated_at.isoformat(),
+        "resolved_at": item.resolved_at.isoformat() if item.resolved_at else None,
     }
 
 
 def _residency_profile_to_dict(profile: ResidencyProfile) -> dict[str, Any]:
     return {
-        'id': str(profile.id),
-        'name': profile.name,
-        'allowed_regions': profile.allowed_regions,
-        'blocked_regions': profile.blocked_regions,
-        'enforcement_mode': profile.enforcement_mode,
-        'status': profile.status,
-        'created_at': profile.created_at.isoformat(),
-        'updated_at': profile.updated_at.isoformat(),
+        "id": str(profile.id),
+        "name": profile.name,
+        "allowed_regions": profile.allowed_regions,
+        "blocked_regions": profile.blocked_regions,
+        "enforcement_mode": profile.enforcement_mode,
+        "status": profile.status,
+        "created_at": profile.created_at.isoformat(),
+        "updated_at": profile.updated_at.isoformat(),
     }
 
 
 def _access_request_to_dict(access_request: AccessRequest) -> dict[str, Any]:
     return {
-        'id': str(access_request.id),
-        'subject_ref': access_request.subject_ref,
-        'requester': access_request.requester,
-        'access_type': access_request.access_type,
-        'justification': access_request.justification,
-        'status': access_request.status,
-        'approver': access_request.approver or None,
-        'expires_at': access_request.expires_at.isoformat() if access_request.expires_at else None,
-        'created_at': access_request.created_at.isoformat(),
-        'updated_at': access_request.updated_at.isoformat(),
+        "id": str(access_request.id),
+        "subject_ref": access_request.subject_ref,
+        "requester": access_request.requester,
+        "access_type": access_request.access_type,
+        "justification": access_request.justification,
+        "status": access_request.status,
+        "approver": access_request.approver or None,
+        "expires_at": (
+            access_request.expires_at.isoformat() if access_request.expires_at else None
+        ),
+        "created_at": access_request.created_at.isoformat(),
+        "updated_at": access_request.updated_at.isoformat(),
     }
 
 
 def _reference_dataset_to_dict(dataset: ReferenceDataset) -> dict[str, Any]:
-    active_version = dataset.versions.filter(status=ReferenceDatasetVersion.Status.ACTIVE).order_by('-version').first()
+    active_version = (
+        dataset.versions.filter(status=ReferenceDatasetVersion.Status.ACTIVE)
+        .order_by("-version")
+        .first()
+    )
     return {
-        'id': str(dataset.id),
-        'name': dataset.name,
-        'owner': dataset.owner or None,
-        'domain': dataset.domain or None,
-        'active_version': active_version.version if active_version else None,
-        'created_at': dataset.created_at.isoformat(),
-        'updated_at': dataset.updated_at.isoformat(),
+        "id": str(dataset.id),
+        "name": dataset.name,
+        "owner": dataset.owner or None,
+        "domain": dataset.domain or None,
+        "active_version": active_version.version if active_version else None,
+        "created_at": dataset.created_at.isoformat(),
+        "updated_at": dataset.updated_at.isoformat(),
     }
 
 
-def _reference_dataset_version_to_dict(version: ReferenceDatasetVersion) -> dict[str, Any]:
+def _reference_dataset_version_to_dict(
+    version: ReferenceDatasetVersion,
+) -> dict[str, Any]:
     return {
-        'id': str(version.id),
-        'dataset_id': str(version.dataset_id),
-        'version': version.version,
-        'status': version.status,
-        'values': version.values,
-        'created_at': version.created_at.isoformat(),
-        'updated_at': version.updated_at.isoformat(),
+        "id": str(version.id),
+        "dataset_id": str(version.dataset_id),
+        "version": version.version,
+        "status": version.status,
+        "values": version.values,
+        "created_at": version.created_at.isoformat(),
+        "updated_at": version.updated_at.isoformat(),
     }
 
 
 def _master_record_to_dict(record: MasterRecord) -> dict[str, Any]:
     return {
-        'id': str(record.id),
-        'entity_type': record.entity_type,
-        'master_id': str(record.master_id),
-        'version': record.version,
-        'attributes': record.attributes,
-        'survivorship_policy': record.survivorship_policy,
-        'confidence': record.confidence,
-        'status': record.status,
-        'created_at': record.created_at.isoformat(),
-        'updated_at': record.updated_at.isoformat(),
+        "id": str(record.id),
+        "entity_type": record.entity_type,
+        "master_id": str(record.master_id),
+        "version": record.version,
+        "attributes": record.attributes,
+        "survivorship_policy": record.survivorship_policy,
+        "confidence": record.confidence,
+        "status": record.status,
+        "created_at": record.created_at.isoformat(),
+        "updated_at": record.updated_at.isoformat(),
     }
 
 
@@ -654,101 +686,105 @@ def _master_merge_candidate_to_dict(
     candidate: MasterMergeCandidate,
 ) -> dict[str, Any]:
     return {
-        'id': str(candidate.id),
-        'entity_type': candidate.entity_type,
-        'target_master_id': str(candidate.target_master_id),
-        'source_master_refs': candidate.source_master_refs,
-        'proposed_attributes': candidate.proposed_attributes,
-        'confidence': candidate.confidence,
-        'status': candidate.status,
-        'approved_by': candidate.approved_by or None,
-        'created_at': candidate.created_at.isoformat(),
-        'updated_at': candidate.updated_at.isoformat(),
+        "id": str(candidate.id),
+        "entity_type": candidate.entity_type,
+        "target_master_id": str(candidate.target_master_id),
+        "source_master_refs": candidate.source_master_refs,
+        "proposed_attributes": candidate.proposed_attributes,
+        "confidence": candidate.confidence,
+        "status": candidate.status,
+        "approved_by": candidate.approved_by or None,
+        "created_at": candidate.created_at.isoformat(),
+        "updated_at": candidate.updated_at.isoformat(),
     }
 
 
 def _classification_to_dict(classification: Classification) -> dict[str, Any]:
     return {
-        'id': str(classification.id),
-        'name': classification.name,
-        'level': classification.level,
-        'description': classification.description,
-        'tags': classification.tags,
-        'status': classification.status,
-        'created_at': classification.created_at.isoformat(),
-        'updated_at': classification.updated_at.isoformat(),
+        "id": str(classification.id),
+        "name": classification.name,
+        "level": classification.level,
+        "description": classification.description,
+        "tags": classification.tags,
+        "status": classification.status,
+        "created_at": classification.created_at.isoformat(),
+        "updated_at": classification.updated_at.isoformat(),
     }
 
 
 def _print_job_to_dict(print_job: PrintJob) -> dict[str, Any]:
     return {
-        'id': str(print_job.id),
-        'template_ref': print_job.template_ref,
-        'payload': print_job.payload,
-        'output_format': print_job.output_format,
-        'destination': print_job.destination,
-        'status': print_job.status,
-        'retry_count': print_job.retry_count,
-        'gateway_metadata': print_job.gateway_metadata,
-        'error_message': print_job.error_message or None,
-        'created_at': print_job.created_at.isoformat(),
-        'updated_at': print_job.updated_at.isoformat(),
+        "id": str(print_job.id),
+        "template_ref": print_job.template_ref,
+        "payload": print_job.payload,
+        "output_format": print_job.output_format,
+        "destination": print_job.destination,
+        "status": print_job.status,
+        "retry_count": print_job.retry_count,
+        "gateway_metadata": print_job.gateway_metadata,
+        "error_message": print_job.error_message or None,
+        "created_at": print_job.created_at.isoformat(),
+        "updated_at": print_job.updated_at.isoformat(),
     }
 
 
 def _print_gateway_to_dict(gateway: PrintGateway) -> dict[str, Any]:
     return {
-        'id': str(gateway.id),
-        'gateway_ref': gateway.gateway_ref,
-        'display_name': gateway.display_name,
-        'site_ref': gateway.site_ref or None,
-        'status': gateway.status,
-        'capabilities': gateway.capabilities,
-        'metadata': gateway.metadata,
-        'last_seen_version': gateway.last_seen_version or None,
-        'last_heartbeat_at': gateway.last_heartbeat_at.isoformat() if gateway.last_heartbeat_at else None,
-        'created_at': gateway.created_at.isoformat(),
-        'updated_at': gateway.updated_at.isoformat(),
+        "id": str(gateway.id),
+        "gateway_ref": gateway.gateway_ref,
+        "display_name": gateway.display_name,
+        "site_ref": gateway.site_ref or None,
+        "status": gateway.status,
+        "capabilities": gateway.capabilities,
+        "metadata": gateway.metadata,
+        "last_seen_version": gateway.last_seen_version or None,
+        "last_heartbeat_at": (
+            gateway.last_heartbeat_at.isoformat() if gateway.last_heartbeat_at else None
+        ),
+        "created_at": gateway.created_at.isoformat(),
+        "updated_at": gateway.updated_at.isoformat(),
     }
 
 
 def _print_template_to_dict(template: PrintTemplate) -> dict[str, Any]:
     return {
-        'id': str(template.id),
-        'name': template.name,
-        'template_ref': template.template_ref,
-        'output_format': template.output_format,
-        'content': template.content,
-        'sample_payload': template.sample_payload,
-        'created_at': template.created_at.isoformat(),
-        'updated_at': template.updated_at.isoformat(),
+        "id": str(template.id),
+        "name": template.name,
+        "template_ref": template.template_ref,
+        "output_format": template.output_format,
+        "content": template.content,
+        "sample_payload": template.sample_payload,
+        "created_at": template.created_at.isoformat(),
+        "updated_at": template.updated_at.isoformat(),
     }
 
 
 def _default_print_template_dicts() -> list[dict[str, Any]]:
     return [
         {
-            'id': item['template_ref'],
-            'name': item['name'],
-            'template_ref': item['template_ref'],
-            'output_format': item['output_format'],
-            'content': item['content'],
-            'sample_payload': dict(item['sample_payload']),
-            'created_at': None,
-            'updated_at': None,
+            "id": item["template_ref"],
+            "name": item["name"],
+            "template_ref": item["template_ref"],
+            "output_format": item["output_format"],
+            "content": item["content"],
+            "sample_payload": dict(item["sample_payload"]),
+            "created_at": None,
+            "updated_at": None,
         }
         for item in DEFAULT_PRINT_TEMPLATE_DEFINITIONS
     ]
 
 
-def _merge_templates_with_defaults(templates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _merge_templates_with_defaults(
+    templates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     defaults = _default_print_template_dicts()
-    by_ref = {item['template_ref']: item for item in templates}
+    by_ref = {item["template_ref"]: item for item in templates}
     for default_item in defaults:
-        by_ref.setdefault(default_item['template_ref'], default_item)
+        by_ref.setdefault(default_item["template_ref"], default_item)
     ordered_refs = []
     for item in [*templates, *defaults]:
-        ref = item['template_ref']
+        ref = item["template_ref"]
         if ref not in ordered_refs:
             ordered_refs.append(ref)
     return [by_ref[ref] for ref in ordered_refs]
@@ -757,17 +793,17 @@ def _merge_templates_with_defaults(templates: list[dict[str, Any]]) -> list[dict
 def _collaboration_document_to_dict(
     document: CollaborationDocument,
 ) -> dict[str, Any]:
-    latest_version = document.versions.order_by('-version').first()
+    latest_version = document.versions.order_by("-version").first()
     return {
-        'id': str(document.id),
-        'title': document.title,
-        'object_key': document.object_key,
-        'content_type': document.content_type or None,
-        'owner': document.owner or None,
-        'status': document.status,
-        'latest_version': latest_version.version if latest_version else None,
-        'created_at': document.created_at.isoformat(),
-        'updated_at': document.updated_at.isoformat(),
+        "id": str(document.id),
+        "title": document.title,
+        "object_key": document.object_key,
+        "content_type": document.content_type or None,
+        "owner": document.owner or None,
+        "status": document.status,
+        "latest_version": latest_version.version if latest_version else None,
+        "created_at": document.created_at.isoformat(),
+        "updated_at": document.updated_at.isoformat(),
     }
 
 
@@ -775,165 +811,171 @@ def _collaboration_version_to_dict(
     version: CollaborationDocumentVersion,
 ) -> dict[str, Any]:
     return {
-        'id': str(version.id),
-        'document_id': str(version.document_id),
-        'version': version.version,
-        'object_key': version.object_key,
-        'summary': version.summary,
-        'editor': version.editor or None,
-        'created_at': version.created_at.isoformat(),
+        "id": str(version.id),
+        "document_id": str(version.document_id),
+        "version": version.version,
+        "object_key": version.object_key,
+        "summary": version.summary,
+        "editor": version.editor or None,
+        "created_at": version.created_at.isoformat(),
     }
 
 
 def _notebook_workspace_to_dict(workspace: NotebookWorkspace) -> dict[str, Any]:
     return {
-        'id': str(workspace.id),
-        'name': workspace.name,
-        'owner': workspace.owner or None,
-        'image': workspace.image or None,
-        'cpu_limit': workspace.cpu_limit or None,
-        'memory_limit': workspace.memory_limit or None,
-        'storage_mounts': workspace.storage_mounts,
-        'status': workspace.status,
-        'created_at': workspace.created_at.isoformat(),
-        'updated_at': workspace.updated_at.isoformat(),
+        "id": str(workspace.id),
+        "name": workspace.name,
+        "owner": workspace.owner or None,
+        "image": workspace.image or None,
+        "cpu_limit": workspace.cpu_limit or None,
+        "memory_limit": workspace.memory_limit or None,
+        "storage_mounts": workspace.storage_mounts,
+        "status": workspace.status,
+        "created_at": workspace.created_at.isoformat(),
+        "updated_at": workspace.updated_at.isoformat(),
     }
 
 
 def _notebook_session_to_dict(session: NotebookSession) -> dict[str, Any]:
     return {
-        'id': str(session.id),
-        'workspace_id': str(session.workspace_id),
-        'user_id': session.user_id or None,
-        'pod_name': session.pod_name or None,
-        'status': session.status,
-        'metadata': session.metadata,
-        'started_at': session.started_at.isoformat(),
-        'ended_at': session.ended_at.isoformat() if session.ended_at else None,
+        "id": str(session.id),
+        "workspace_id": str(session.workspace_id),
+        "user_id": session.user_id or None,
+        "pod_name": session.pod_name or None,
+        "status": session.status,
+        "metadata": session.metadata,
+        "started_at": session.started_at.isoformat(),
+        "ended_at": session.ended_at.isoformat() if session.ended_at else None,
     }
 
 
 def _notebook_execution_to_dict(execution: NotebookExecution) -> dict[str, Any]:
     return {
-        'id': str(execution.id),
-        'session_id': str(execution.session_id),
-        'cell_ref': execution.cell_ref or None,
-        'status': execution.status,
-        'metadata': execution.metadata,
-        'requested_at': execution.requested_at.isoformat(),
-        'completed_at': execution.completed_at.isoformat() if execution.completed_at else None,
+        "id": str(execution.id),
+        "session_id": str(execution.session_id),
+        "cell_ref": execution.cell_ref or None,
+        "status": execution.status,
+        "metadata": execution.metadata,
+        "requested_at": execution.requested_at.isoformat(),
+        "completed_at": (
+            execution.completed_at.isoformat() if execution.completed_at else None
+        ),
     }
 
 
 def _connector_run_to_dict(run: ConnectorRun) -> dict[str, Any]:
     return {
-        'id': str(run.id),
-        'project_id': str(run.ingestion.project_id) if run.ingestion.project_id else None,
-        'ingestion_id': str(run.ingestion_id),
-        'execution_path': run.execution_path,
-        'status': run.status,
-        'retry_count': run.retry_count,
-        'progress': run.progress,
-        'error_message': run.error_message or None,
-        'started_at': run.started_at.isoformat() if run.started_at else None,
-        'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-        'created_at': run.created_at.isoformat(),
-        'updated_at': run.updated_at.isoformat(),
+        "id": str(run.id),
+        "project_id": (
+            str(run.ingestion.project_id) if run.ingestion.project_id else None
+        ),
+        "ingestion_id": str(run.ingestion_id),
+        "execution_path": run.execution_path,
+        "status": run.status,
+        "retry_count": run.retry_count,
+        "progress": run.progress,
+        "error_message": run.error_message or None,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "created_at": run.created_at.isoformat(),
+        "updated_at": run.updated_at.isoformat(),
     }
 
 
 def _workflow_definition_to_dict(definition: WorkflowDefinition) -> dict[str, Any]:
     return {
-        'id': str(definition.id),
-        'name': definition.name,
-        'description': definition.description,
-        'domain_ref': definition.domain_ref,
-        'created_at': definition.created_at.isoformat(),
-        'updated_at': definition.updated_at.isoformat(),
+        "id": str(definition.id),
+        "name": definition.name,
+        "description": definition.description,
+        "domain_ref": definition.domain_ref,
+        "created_at": definition.created_at.isoformat(),
+        "updated_at": definition.updated_at.isoformat(),
     }
 
 
 def _workflow_run_to_dict(run: WorkflowRun) -> dict[str, Any]:
     return {
-        'id': str(run.id),
-        'definition_id': str(run.definition_id),
-        'subject_ref': run.subject_ref,
-        'status': run.status,
-        'submitted_by': run.submitted_by or None,
-        'reviewed_by': run.reviewed_by or None,
-        'payload': run.payload,
-        'created_at': run.created_at.isoformat(),
-        'updated_at': run.updated_at.isoformat(),
+        "id": str(run.id),
+        "definition_id": str(run.definition_id),
+        "subject_ref": run.subject_ref,
+        "status": run.status,
+        "submitted_by": run.submitted_by or None,
+        "reviewed_by": run.reviewed_by or None,
+        "payload": run.payload,
+        "created_at": run.created_at.isoformat(),
+        "updated_at": run.updated_at.isoformat(),
     }
 
 
 def _workflow_task_to_dict(task: WorkflowTask) -> dict[str, Any]:
     return {
-        'id': str(task.id),
-        'run_id': str(task.run_id),
-        'task_type': task.task_type,
-        'assignee': task.assignee or None,
-        'status': task.status,
-        'created_at': task.created_at.isoformat(),
-        'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+        "id": str(task.id),
+        "run_id": str(task.run_id),
+        "task_type": task.task_type,
+        "assignee": task.assignee or None,
+        "status": task.status,
+        "created_at": task.created_at.isoformat(),
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
     }
 
 
 def _orchestration_workflow_to_dict(workflow: OrchestrationWorkflow) -> dict[str, Any]:
     return {
-        'id': str(workflow.id),
-        'project_id': str(workflow.project_id) if workflow.project_id else None,
-        'name': workflow.name,
-        'trigger_type': workflow.trigger_type,
-        'trigger_value': workflow.trigger_value or None,
-        'steps': workflow.steps,
-        'status': workflow.status,
-        'created_at': workflow.created_at.isoformat(),
-        'updated_at': workflow.updated_at.isoformat(),
+        "id": str(workflow.id),
+        "project_id": str(workflow.project_id) if workflow.project_id else None,
+        "name": workflow.name,
+        "trigger_type": workflow.trigger_type,
+        "trigger_value": workflow.trigger_value or None,
+        "steps": workflow.steps,
+        "status": workflow.status,
+        "created_at": workflow.created_at.isoformat(),
+        "updated_at": workflow.updated_at.isoformat(),
     }
 
 
 def _orchestration_run_to_dict(run: OrchestrationRun) -> dict[str, Any]:
     return {
-        'id': str(run.id),
-        'project_id': str(run.project_id) if run.project_id else None,
-        'workflow_id': str(run.workflow_id),
-        'trigger_context': run.trigger_context,
-        'status': run.status,
-        'step_results': run.step_results,
-        'error_message': run.error_message or None,
-        'started_at': run.started_at.isoformat() if run.started_at else None,
-        'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-        'created_at': run.created_at.isoformat(),
-        'updated_at': run.updated_at.isoformat(),
+        "id": str(run.id),
+        "project_id": str(run.project_id) if run.project_id else None,
+        "workflow_id": str(run.workflow_id),
+        "trigger_context": run.trigger_context,
+        "status": run.status,
+        "step_results": run.step_results,
+        "error_message": run.error_message or None,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "created_at": run.created_at.isoformat(),
+        "updated_at": run.updated_at.isoformat(),
     }
 
 
 def _governance_policy_to_dict(policy: GovernancePolicy) -> dict[str, Any]:
     return {
-        'id': str(policy.id),
-        'name': policy.name,
-        'version': policy.version,
-        'status': policy.status,
-        'rules': policy.rules,
-        'reason': policy.reason or None,
-        'actor_id': policy.actor_id or None,
-        'rollback_target_id': str(policy.rollback_target_id) if policy.rollback_target_id else None,
-        'created_at': policy.created_at.isoformat(),
-        'updated_at': policy.updated_at.isoformat(),
+        "id": str(policy.id),
+        "name": policy.name,
+        "version": policy.version,
+        "status": policy.status,
+        "rules": policy.rules,
+        "reason": policy.reason or None,
+        "actor_id": policy.actor_id or None,
+        "rollback_target_id": (
+            str(policy.rollback_target_id) if policy.rollback_target_id else None
+        ),
+        "created_at": policy.created_at.isoformat(),
+        "updated_at": policy.updated_at.isoformat(),
     }
 
 
 def _project_to_dict(project: Project) -> dict[str, Any]:
     return {
-        'id': str(project.id),
-        'name': project.name,
-        'code': project.code or None,
-        'institution_ref': project.institution_ref or None,
-        'status': project.status,
-        'sync_config': project.sync_config,
-        'created_at': project.created_at.isoformat(),
-        'updated_at': project.updated_at.isoformat(),
+        "id": str(project.id),
+        "name": project.name,
+        "code": project.code or None,
+        "institution_ref": project.institution_ref or None,
+        "status": project.status,
+        "sync_config": project.sync_config,
+        "created_at": project.created_at.isoformat(),
+        "updated_at": project.updated_at.isoformat(),
     }
 
 
@@ -944,124 +986,142 @@ def _project_option_to_dict(project: Project) -> dict[str, Any]:
     if project.institution_ref:
         description_parts.append(project.institution_ref)
     return {
-        'value': str(project.id),
-        'label': project.name,
-        'description': ' · '.join(description_parts) or None,
-        'meta': {'status': project.status},
+        "value": str(project.id),
+        "label": project.name,
+        "description": " · ".join(description_parts) or None,
+        "meta": {"status": project.status},
     }
 
 
 def _ui_project_filter_context(request) -> dict[str, str]:
-    project_id = (request.GET.get('project_id') or '').strip()
+    project_id = (request.GET.get("project_id") or "").strip()
     if not project_id:
-        return {'value': '', 'label': ''}
+        return {"value": "", "label": ""}
     try:
         project = Project.objects.get(id=project_id)
     except (ValidationError, Project.DoesNotExist):
-        return {'value': project_id, 'label': project_id}
-    return {'value': str(project.id), 'label': project.name}
+        return {"value": project_id, "label": project_id}
+    return {"value": str(project.id), "label": project.name}
 
 
 def _project_membership_to_dict(membership: ProjectMembership) -> dict[str, Any]:
     return {
-        'id': str(membership.id),
-        'project_id': str(membership.project_id),
-        'user_email': membership.user_email,
-        'role': membership.role,
-        'status': membership.status,
-        'invited_by': membership.invited_by or None,
-        'created_at': membership.created_at.isoformat(),
-        'updated_at': membership.updated_at.isoformat(),
+        "id": str(membership.id),
+        "project_id": str(membership.project_id),
+        "user_email": membership.user_email,
+        "role": membership.role,
+        "status": membership.status,
+        "invited_by": membership.invited_by or None,
+        "created_at": membership.created_at.isoformat(),
+        "updated_at": membership.updated_at.isoformat(),
     }
 
 
 def _project_workspace_to_dict(workspace: ProjectWorkspace) -> dict[str, Any]:
     return {
-        'id': str(workspace.id),
-        'project_id': str(workspace.project_id),
-        'collaboration_enabled': workspace.collaboration_enabled,
-        'data_management_enabled': workspace.data_management_enabled,
-        'document_management_enabled': workspace.document_management_enabled,
-        'collaboration_tools': workspace.collaboration_tools,
-        'data_resources': workspace.data_resources,
-        'documents': workspace.documents,
-        'created_at': workspace.created_at.isoformat(),
-        'updated_at': workspace.updated_at.isoformat(),
+        "id": str(workspace.id),
+        "project_id": str(workspace.project_id),
+        "collaboration_enabled": workspace.collaboration_enabled,
+        "data_management_enabled": workspace.data_management_enabled,
+        "document_management_enabled": workspace.document_management_enabled,
+        "collaboration_tools": workspace.collaboration_tools,
+        "data_resources": workspace.data_resources,
+        "documents": workspace.documents,
+        "created_at": workspace.created_at.isoformat(),
+        "updated_at": workspace.updated_at.isoformat(),
     }
 
 
 def _project_invitation_to_dict(invitation: ProjectInvitation) -> dict[str, Any]:
     return {
-        'id': str(invitation.id),
-        'project_id': str(invitation.project_id),
-        'email': invitation.email,
-        'role': invitation.role,
-        'status': invitation.status,
-        'token_attempts': invitation.token_attempts,
-        'max_token_attempts': invitation.max_token_attempts,
-        'expires_at': invitation.expires_at.isoformat(),
-        'accepted_at': invitation.accepted_at.isoformat() if invitation.accepted_at else None,
-        'revoked_at': invitation.revoked_at.isoformat() if invitation.revoked_at else None,
-        'resent_at': invitation.resent_at.isoformat() if invitation.resent_at else None,
-        'invited_by': invitation.invited_by or None,
-        'accepted_by': invitation.accepted_by or None,
-        'created_at': invitation.created_at.isoformat(),
-        'updated_at': invitation.updated_at.isoformat(),
+        "id": str(invitation.id),
+        "project_id": str(invitation.project_id),
+        "email": invitation.email,
+        "role": invitation.role,
+        "status": invitation.status,
+        "token_attempts": invitation.token_attempts,
+        "max_token_attempts": invitation.max_token_attempts,
+        "expires_at": invitation.expires_at.isoformat(),
+        "accepted_at": (
+            invitation.accepted_at.isoformat() if invitation.accepted_at else None
+        ),
+        "revoked_at": (
+            invitation.revoked_at.isoformat() if invitation.revoked_at else None
+        ),
+        "resent_at": invitation.resent_at.isoformat() if invitation.resent_at else None,
+        "invited_by": invitation.invited_by or None,
+        "accepted_by": invitation.accepted_by or None,
+        "created_at": invitation.created_at.isoformat(),
+        "updated_at": invitation.updated_at.isoformat(),
     }
 
 
 def _user_profile_to_dict(profile: UserProfile) -> dict[str, Any]:
     return {
-        'id': str(profile.id),
-        'email': profile.email,
-        'display_name': profile.display_name or None,
-        'status': profile.status,
-        'last_login_at': profile.last_login_at.isoformat() if profile.last_login_at else None,
-        'created_at': profile.created_at.isoformat(),
-        'updated_at': profile.updated_at.isoformat(),
+        "id": str(profile.id),
+        "email": profile.email,
+        "display_name": profile.display_name or None,
+        "status": profile.status,
+        "last_login_at": (
+            profile.last_login_at.isoformat() if profile.last_login_at else None
+        ),
+        "created_at": profile.created_at.isoformat(),
+        "updated_at": profile.updated_at.isoformat(),
     }
 
 
-def _project_membership_role_history_to_dict(history: ProjectMembershipRoleHistory) -> dict[str, Any]:
+def _project_membership_role_history_to_dict(
+    history: ProjectMembershipRoleHistory,
+) -> dict[str, Any]:
     return {
-        'id': str(history.id),
-        'membership_id': str(history.membership_id),
-        'action': history.action,
-        'previous_role': history.previous_role or None,
-        'new_role': history.new_role or None,
-        'previous_status': history.previous_status or None,
-        'new_status': history.new_status or None,
-        'actor_id': history.actor_id or None,
-        'created_at': history.created_at.isoformat(),
+        "id": str(history.id),
+        "membership_id": str(history.membership_id),
+        "action": history.action,
+        "previous_role": history.previous_role or None,
+        "new_role": history.new_role or None,
+        "previous_status": history.previous_status or None,
+        "new_status": history.new_status or None,
+        "actor_id": history.actor_id or None,
+        "created_at": history.created_at.isoformat(),
     }
 
 
 def _notification_to_dict(notification: UserNotification) -> dict[str, Any]:
     return {
-        'id': str(notification.id),
-        'user_email': notification.user_email,
-        'notification_type': notification.notification_type,
-        'channel': notification.channel,
-        'provider': notification.provider,
-        'delivery_status': notification.delivery_status,
-        'attempts': notification.attempts,
-        'max_attempts': notification.max_attempts,
-        'next_attempt_at': notification.next_attempt_at.isoformat() if notification.next_attempt_at else None,
-        'delivered_at': notification.delivered_at.isoformat() if notification.delivered_at else None,
-        'dead_lettered_at': notification.dead_lettered_at.isoformat() if notification.dead_lettered_at else None,
-        'last_error': notification.last_error or None,
-        'payload': notification.payload,
-        'read_at': notification.read_at.isoformat() if notification.read_at else None,
-        'created_at': notification.created_at.isoformat(),
+        "id": str(notification.id),
+        "user_email": notification.user_email,
+        "notification_type": notification.notification_type,
+        "channel": notification.channel,
+        "provider": notification.provider,
+        "delivery_status": notification.delivery_status,
+        "attempts": notification.attempts,
+        "max_attempts": notification.max_attempts,
+        "next_attempt_at": (
+            notification.next_attempt_at.isoformat()
+            if notification.next_attempt_at
+            else None
+        ),
+        "delivered_at": (
+            notification.delivered_at.isoformat() if notification.delivered_at else None
+        ),
+        "dead_lettered_at": (
+            notification.dead_lettered_at.isoformat()
+            if notification.dead_lettered_at
+            else None
+        ),
+        "last_error": notification.last_error or None,
+        "payload": notification.payload,
+        "read_at": notification.read_at.isoformat() if notification.read_at else None,
+        "created_at": notification.created_at.isoformat(),
     }
 
 
 def _hash_invitation_token(token: str) -> str:
-    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _invite_ttl_minutes() -> int:
-    raw = os.environ.get('EDMP_INVITE_TTL_MINUTES', '10080')
+    raw = os.environ.get("EDMP_INVITE_TTL_MINUTES", "10080")
     try:
         parsed = int(raw)
     except ValueError:
@@ -1070,7 +1130,7 @@ def _invite_ttl_minutes() -> int:
 
 
 def _invite_max_attempts() -> int:
-    raw = os.environ.get('EDMP_INVITE_MAX_ATTEMPTS', '5')
+    raw = os.environ.get("EDMP_INVITE_MAX_ATTEMPTS", "5")
     try:
         parsed = int(raw)
     except ValueError:
@@ -1080,46 +1140,46 @@ def _invite_max_attempts() -> int:
 
 def _glossary_term_to_dict(term: GlossaryTerm) -> dict[str, Any]:
     return {
-        'id': str(term.id),
-        'name': term.name,
-        'definition': term.definition or None,
-        'status': term.status,
-        'owners': term.owners,
-        'stewards': term.stewards,
-        'related_asset_ids': term.related_asset_ids,
-        'classifications': term.classifications,
-        'created_at': term.created_at.isoformat(),
-        'updated_at': term.updated_at.isoformat(),
+        "id": str(term.id),
+        "name": term.name,
+        "definition": term.definition or None,
+        "status": term.status,
+        "owners": term.owners,
+        "stewards": term.stewards,
+        "related_asset_ids": term.related_asset_ids,
+        "classifications": term.classifications,
+        "created_at": term.created_at.isoformat(),
+        "updated_at": term.updated_at.isoformat(),
     }
 
 
 def _data_product_to_dict(product: DataProduct) -> dict[str, Any]:
     return {
-        'id': str(product.id),
-        'name': product.name,
-        'domain': product.domain or None,
-        'owner': product.owner or None,
-        'asset_ids': product.asset_ids,
-        'sla': product.sla,
-        'status': product.status,
-        'created_at': product.created_at.isoformat(),
-        'updated_at': product.updated_at.isoformat(),
+        "id": str(product.id),
+        "name": product.name,
+        "domain": product.domain or None,
+        "owner": product.owner or None,
+        "asset_ids": product.asset_ids,
+        "sla": product.sla,
+        "status": product.status,
+        "created_at": product.created_at.isoformat(),
+        "updated_at": product.updated_at.isoformat(),
     }
 
 
 def _data_share_to_dict(share: DataShare) -> dict[str, Any]:
     return {
-        'id': str(share.id),
-        'asset_id': str(share.asset_id),
-        'consumer_ref': share.consumer_ref,
-        'purpose': share.purpose or None,
-        'constraints': share.constraints,
-        'linked_access_request_ids': share.linked_access_request_ids,
-        'status': share.status,
-        'expires_at': share.expires_at.isoformat() if share.expires_at else None,
-        'approved_by': share.approved_by or None,
-        'created_at': share.created_at.isoformat(),
-        'updated_at': share.updated_at.isoformat(),
+        "id": str(share.id),
+        "asset_id": str(share.asset_id),
+        "consumer_ref": share.consumer_ref,
+        "purpose": share.purpose or None,
+        "constraints": share.constraints,
+        "linked_access_request_ids": share.linked_access_request_ids,
+        "status": share.status,
+        "expires_at": share.expires_at.isoformat() if share.expires_at else None,
+        "approved_by": share.approved_by or None,
+        "created_at": share.created_at.isoformat(),
+        "updated_at": share.updated_at.isoformat(),
     }
 
 
@@ -1128,28 +1188,29 @@ def _normalize_share_constraints(value: Any) -> dict[str, Any] | None:
     if not isinstance(constraints, dict):
         return None
     normalized = dict(constraints)
-    masking_profile = normalized.get('masking_profile')
+    masking_profile = normalized.get("masking_profile")
     if masking_profile is not None and not isinstance(masking_profile, str):
         return None
-    row_filters = normalized.get('row_filters')
+    row_filters = normalized.get("row_filters")
     if row_filters is not None:
         parsed = _parse_string_list(row_filters)
         if parsed is None:
             return None
-        normalized['row_filters'] = parsed
-    allowed_regions = normalized.get('allowed_regions')
+        normalized["row_filters"] = parsed
+    allowed_regions = normalized.get("allowed_regions")
     if allowed_regions is not None:
         parsed = _parse_string_list(allowed_regions)
         if parsed is None:
             return None
-        normalized['allowed_regions'] = parsed
+        normalized["allowed_regions"] = parsed
     return normalized
 
 
 def _refresh_share_expiry(share: DataShare):
     if (
         share.expires_at
-        and share.status in {
+        and share.status
+        in {
             DataShare.Status.DRAFT,
             DataShare.Status.APPROVED,
             DataShare.Status.ACTIVE,
@@ -1157,11 +1218,13 @@ def _refresh_share_expiry(share: DataShare):
         and share.expires_at <= timezone.now()
     ):
         share.status = DataShare.Status.EXPIRED
-        share.save(update_fields=['status', 'updated_at'])
+        share.save(update_fields=["status", "updated_at"])
 
 
-def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_value: int) -> int | None:
-    if value is None or value == '':
+def _parse_int_clamped(
+    value: str | None, *, default: int, min_value: int, max_value: int
+) -> int | None:
+    if value is None or value == "":
         return default
     try:
         parsed = int(value)
@@ -1171,7 +1234,7 @@ def _parse_int_clamped(value: str | None, *, default: int, min_value: int, max_v
 
 
 def _search_project_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
-    qs = Project.objects.order_by('-updated_at', 'id')
+    qs = Project.objects.order_by("-updated_at", "id")
     if query:
         qs = qs.filter(
             Q(name__icontains=query)
@@ -1179,12 +1242,16 @@ def _search_project_options(*, query: str, limit: int, offset: int) -> dict[str,
             | Q(institution_ref__icontains=query)
         )
     count = qs.count()
-    results = [_project_option_to_dict(project) for project in qs[offset : offset + limit]]
-    return {'count': count, 'results': results}
+    results = [
+        _project_option_to_dict(project) for project in qs[offset : offset + limit]
+    ]
+    return {"count": count, "results": results}
 
 
-def _search_print_template_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
-    qs = PrintTemplate.objects.order_by('-updated_at', 'id')
+def _search_print_template_options(
+    *, query: str, limit: int, offset: int
+) -> dict[str, Any]:
+    qs = PrintTemplate.objects.order_by("-updated_at", "id")
     if query:
         qs = qs.filter(
             Q(name__icontains=query)
@@ -1194,21 +1261,23 @@ def _search_print_template_options(*, query: str, limit: int, offset: int) -> di
     count = qs.count()
     results = [
         {
-            'value': str(template.id),
-            'label': template.name,
-            'description': f'{template.template_ref} · {template.output_format}',
-            'meta': {
-                'template_ref': template.template_ref,
-                'output_format': template.output_format,
+            "value": str(template.id),
+            "label": template.name,
+            "description": f"{template.template_ref} · {template.output_format}",
+            "meta": {
+                "template_ref": template.template_ref,
+                "output_format": template.output_format,
             },
         }
         for template in qs[offset : offset + limit]
     ]
-    return {'count': count, 'results': results}
+    return {"count": count, "results": results}
 
 
-def _search_print_gateway_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
-    qs = PrintGateway.objects.order_by('-updated_at', 'id')
+def _search_print_gateway_options(
+    *, query: str, limit: int, offset: int
+) -> dict[str, Any]:
+    qs = PrintGateway.objects.order_by("-updated_at", "id")
     if query:
         qs = qs.filter(
             Q(display_name__icontains=query)
@@ -1219,23 +1288,29 @@ def _search_print_gateway_options(*, query: str, limit: int, offset: int) -> dic
     count = qs.count()
     results = [
         {
-            'value': gateway.gateway_ref,
-            'label': gateway.display_name,
-            'description': ' · '.join(
-                part for part in [gateway.gateway_ref, gateway.site_ref or None, gateway.status] if part
+            "value": gateway.gateway_ref,
+            "label": gateway.display_name,
+            "description": " · ".join(
+                part
+                for part in [
+                    gateway.gateway_ref,
+                    gateway.site_ref or None,
+                    gateway.status,
+                ]
+                if part
             ),
-            'meta': {
-                'gateway_id': str(gateway.id),
-                'status': gateway.status,
+            "meta": {
+                "gateway_id": str(gateway.id),
+                "status": gateway.status,
             },
         }
         for gateway in qs[offset : offset + limit]
     ]
-    return {'count': count, 'results': results}
+    return {"count": count, "results": results}
 
 
 def _search_asset_options(*, query: str, limit: int, offset: int) -> dict[str, Any]:
-    qs = DataAsset.objects.order_by('-updated_at', 'id')
+    qs = DataAsset.objects.order_by("-updated_at", "id")
     if query:
         query_lower = query.lower()
         qs = qs.filter(
@@ -1252,20 +1327,26 @@ def _search_asset_options(*, query: str, limit: int, offset: int) -> dict[str, A
     count = qs.count()
     results = [
         {
-            'value': str(asset.id),
-            'label': asset.display_name,
-            'description': ' · '.join(
-                part for part in [asset.qualified_name, asset.asset_type, asset.owner or None] if part
+            "value": str(asset.id),
+            "label": asset.display_name,
+            "description": " · ".join(
+                part
+                for part in [
+                    asset.qualified_name,
+                    asset.asset_type,
+                    asset.owner or None,
+                ]
+                if part
             ),
-            'meta': {
-                'qualified_name': asset.qualified_name,
-                'asset_type': asset.asset_type,
-                'owner': asset.owner or None,
+            "meta": {
+                "qualified_name": asset.qualified_name,
+                "asset_type": asset.asset_type,
+                "owner": asset.owner or None,
             },
         }
         for asset in qs[offset : offset + limit]
     ]
-    return {'count': count, 'results': results}
+    return {"count": count, "results": results}
 
 
 def _search_workflow_definition_options(
@@ -1274,7 +1355,7 @@ def _search_workflow_definition_options(
     limit: int,
     offset: int,
 ) -> dict[str, Any]:
-    qs = WorkflowDefinition.objects.order_by('-updated_at', 'id')
+    qs = WorkflowDefinition.objects.order_by("-updated_at", "id")
     if query:
         qs = qs.filter(
             Q(name__icontains=query)
@@ -1284,81 +1365,88 @@ def _search_workflow_definition_options(
     count = qs.count()
     results = [
         {
-            'value': str(definition.id),
-            'label': definition.name,
-            'description': ' · '.join(
-                part for part in [definition.domain_ref or None, definition.description or None] if part
+            "value": str(definition.id),
+            "label": definition.name,
+            "description": " · ".join(
+                part
+                for part in [
+                    definition.domain_ref or None,
+                    definition.description or None,
+                ]
+                if part
             ),
-            'meta': {
-                'domain_ref': definition.domain_ref or None,
+            "meta": {
+                "domain_ref": definition.domain_ref or None,
             },
         }
         for definition in qs[offset : offset + limit]
     ]
-    return {'count': count, 'results': results}
+    return {"count": count, "results": results}
 
 
 UI_MODEL_SELECT_SOURCES = {
-    'projects': _search_project_options,
-    'print_templates': _search_print_template_options,
-    'print_gateways': _search_print_gateway_options,
-    'assets': _search_asset_options,
-    'workflow_definitions': _search_workflow_definition_options,
+    "projects": _search_project_options,
+    "print_templates": _search_print_template_options,
+    "print_gateways": _search_print_gateway_options,
+    "assets": _search_asset_options,
+    "workflow_definitions": _search_workflow_definition_options,
 }
 
 
 @csrf_exempt
 def ui_model_select_options(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
 
-    source = (request.GET.get('source') or '').strip()
+    source = (request.GET.get("source") or "").strip()
     if source not in UI_MODEL_SELECT_SOURCES:
-        return JsonResponse({'error': 'unsupported_source'}, status=400)
+        return JsonResponse({"error": "unsupported_source"}, status=400)
 
     limit = _parse_int_clamped(
-        request.GET.get('limit'),
+        request.GET.get("limit"),
         default=20,
         min_value=1,
         max_value=100,
     )
     offset = _parse_int_clamped(
-        request.GET.get('offset'),
+        request.GET.get("offset"),
         default=0,
         min_value=0,
         max_value=10000,
     )
     if limit is None or offset is None:
-        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+        return JsonResponse({"error": "limit/offset must be integers"}, status=400)
 
-    query = (request.GET.get('q') or '').strip()
+    query = (request.GET.get("q") or "").strip()
     payload = UI_MODEL_SELECT_SOURCES[source](query=query, limit=limit, offset=offset)
-    return JsonResponse({'source': source, **payload})
+    return JsonResponse({"source": source, **payload})
 
 
 @csrf_exempt
 def search_assets(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
 
-    query = (request.GET.get('q') or '').strip()
+    query = (request.GET.get("q") or "").strip()
     if not query:
-        return JsonResponse({'error': 'q is required'}, status=400)
+        return JsonResponse({"error": "q is required"}, status=400)
 
     try:
-        limit = int(request.GET.get('limit', '100'))
-        offset = int(request.GET.get('offset', '0'))
+        limit = int(request.GET.get("limit", "100"))
+        offset = int(request.GET.get("offset", "0"))
     except ValueError:
-        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+        return JsonResponse({"error": "limit/offset must be integers"}, status=400)
     limit = min(max(limit, 1), 500)
     offset = max(offset, 0)
 
@@ -1373,41 +1461,50 @@ def search_assets(request):
         | Q(tags__contains=[query_lower])
         | Q(classifications__contains=[query])
         | Q(classifications__contains=[query_lower])
-    ).order_by('-updated_at', 'id')
+    ).order_by("-updated_at", "id")
 
     count = qs.count()
     results = [_asset_to_dict(a) for a in qs[offset : offset + limit]]
-    return JsonResponse({'count': count, 'results': results})
+    return JsonResponse({"count": count, "results": results})
 
 
 @csrf_exempt
 def retention_rules(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        rules = RetentionRule.objects.order_by('-updated_at')
-        return JsonResponse({'items': [_retention_rule_to_dict(r) for r in rules]})
+        rules = RetentionRule.objects.order_by("-updated_at")
+        return JsonResponse({"items": [_retention_rule_to_dict(r) for r in rules]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        action = payload.get('action')
-        retention_period = payload.get('retention_period')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        action = payload.get("action")
+        retention_period = payload.get("retention_period")
         if action not in {RetentionRule.Action.ARCHIVE, RetentionRule.Action.DELETE}:
-            return JsonResponse({'error': 'action must be archive or delete'}, status=400)
+            return JsonResponse(
+                {"error": "action must be archive or delete"}, status=400
+            )
         if not _is_day_duration(retention_period):
-            return JsonResponse({'error': 'retention_period must be ISO day duration (PnD)'}, status=400)
-        grace_period = payload.get('grace_period') or ''
+            return JsonResponse(
+                {"error": "retention_period must be ISO day duration (PnD)"}, status=400
+            )
+        grace_period = payload.get("grace_period") or ""
         if grace_period and not _is_day_duration(grace_period):
-            return JsonResponse({'error': 'grace_period must be ISO day duration (PnD)'}, status=400)
-        scope = payload.get('scope') or {}
+            return JsonResponse(
+                {"error": "grace_period must be ISO day duration (PnD)"}, status=400
+            )
+        scope = payload.get("scope") or {}
         if not isinstance(scope, dict):
-            return JsonResponse({'error': 'scope must be an object'}, status=400)
+            return JsonResponse({"error": "scope must be an object"}, status=400)
 
         rule = RetentionRule.objects.create(
             scope=scope,
@@ -1417,191 +1514,225 @@ def retention_rules(request):
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='retention.rule.created',
+            event_type="retention.rule.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.retention.rule.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.retention.rule.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_retention_rule_to_dict(rule),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='retention.rule.created',
-            resource_type='retention_rule',
+            action="retention.rule.created",
+            resource_type="retention_rule",
             resource_id=str(rule.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_retention_rule_to_dict(rule),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_retention_rule_to_dict(rule), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def retention_holds(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        only_active = request.GET.get('active', 'true').lower() in {'1', 'true', 'yes'}
-        qs = RetentionHold.objects.order_by('-created_at')
+        only_active = request.GET.get("active", "true").lower() in {"1", "true", "yes"}
+        qs = RetentionHold.objects.order_by("-created_at")
         if only_active:
             qs = qs.filter(active=True)
-        return JsonResponse({'items': [_retention_hold_to_dict(h) for h in qs]})
+        return JsonResponse({"items": [_retention_hold_to_dict(h) for h in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        asset_id = payload.get('asset_id')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        asset_id = payload.get("asset_id")
         if not asset_id:
-            return JsonResponse({'error': 'asset_id is required'}, status=400)
+            return JsonResponse({"error": "asset_id is required"}, status=400)
         try:
             asset = DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
-        hold = RetentionHold.objects.create(asset=asset, reason=(payload.get('reason') or ''))
+            return JsonResponse({"error": "asset_not_found"}, status=404)
+        hold = RetentionHold.objects.create(
+            asset=asset, reason=(payload.get("reason") or "")
+        )
         return JsonResponse(_retention_hold_to_dict(hold), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def retention_hold_release(request, hold_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         hold = RetentionHold.objects.get(id=hold_id)
     except (ValidationError, RetentionHold.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     hold.active = False
     hold.released_at = timezone.now()
-    hold.save(update_fields=['active', 'released_at'])
+    hold.save(update_fields=["active", "released_at"])
     return JsonResponse(_retention_hold_to_dict(hold))
 
 
 @csrf_exempt
 def retention_runs(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        rule_id = request.GET.get('rule_id')
-        runs = RetentionRun.objects.order_by('-created_at')
+        rule_id = request.GET.get("rule_id")
+        runs = RetentionRun.objects.order_by("-created_at")
         if rule_id:
             runs = runs.filter(rule_id=rule_id)
-        return JsonResponse({'items': [_retention_run_to_dict(r) for r in runs]})
+        return JsonResponse({"items": [_retention_run_to_dict(r) for r in runs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        rule_id = payload.get('rule_id')
-        mode = payload.get('mode') or RetentionRun.Mode.DRY_RUN
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        rule_id = payload.get("rule_id")
+        mode = payload.get("mode") or RetentionRun.Mode.DRY_RUN
         if mode not in {RetentionRun.Mode.DRY_RUN, RetentionRun.Mode.EXECUTE}:
-            return JsonResponse({'error': 'mode must be dry_run or execute'}, status=400)
+            return JsonResponse(
+                {"error": "mode must be dry_run or execute"}, status=400
+            )
         try:
             rule = RetentionRule.objects.get(id=rule_id)
         except (ValidationError, RetentionRule.DoesNotExist):
-            return JsonResponse({'error': 'rule_not_found'}, status=404)
-        run = RetentionRun.objects.create(rule=rule, mode=mode, status=RetentionRun.Status.STARTED)
+            return JsonResponse({"error": "rule_not_found"}, status=404)
+        run = RetentionRun.objects.create(
+            rule=rule, mode=mode, status=RetentionRun.Status.STARTED
+        )
         tenant_schema = _tenant_schema(request)
         result = execute_retention_run.apply(
             kwargs={
-                'tenant_schema': tenant_schema,
-                'run_id': str(run.id),
-                'correlation_id': getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-                'user_id': request.headers.get('X-User-Id'),
-                'request_id': request.headers.get('X-Request-Id') or request.headers.get('X-Request-ID'),
+                "tenant_schema": tenant_schema,
+                "run_id": str(run.id),
+                "correlation_id": getattr(request, "correlation_id", None)
+                or request.headers.get("X-Correlation-Id"),
+                "user_id": request.headers.get("X-User-Id"),
+                "request_id": request.headers.get("X-Request-Id")
+                or request.headers.get("X-Request-ID"),
             }
         ).get(propagate=True)
         refreshed = RetentionRun.objects.get(id=run.id)
-        return JsonResponse({'run': _retention_run_to_dict(refreshed), 'result': result}, status=201)
+        return JsonResponse(
+            {"run": _retention_run_to_dict(refreshed), "result": result}, status=201
+        )
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def privacy_profiles(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        items = [_privacy_profile_to_dict(p) for p in PrivacyProfile.objects.order_by('-updated_at')]
-        return JsonResponse({'items': items})
+        items = [
+            _privacy_profile_to_dict(p)
+            for p in PrivacyProfile.objects.order_by("-updated_at")
+        ]
+        return JsonResponse({"items": items})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = payload.get('name')
-        lawful_basis = payload.get('lawful_basis')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = payload.get("name")
+        lawful_basis = payload.get("lawful_basis")
         if not name or not lawful_basis:
-            return JsonResponse({'error': 'name and lawful_basis are required'}, status=400)
+            return JsonResponse(
+                {"error": "name and lawful_basis are required"}, status=400
+            )
         if lawful_basis not in {
             PrivacyProfile.LawfulBasis.CONTRACT,
             PrivacyProfile.LawfulBasis.LEGAL_OBLIGATION,
             PrivacyProfile.LawfulBasis.CONSENT,
             PrivacyProfile.LawfulBasis.LEGITIMATE_INTEREST,
         }:
-            return JsonResponse({'error': 'invalid_lawful_basis'}, status=400)
-        consent_state = payload.get('consent_state') or ConsentEvent.ConsentState.UNKNOWN
+            return JsonResponse({"error": "invalid_lawful_basis"}, status=400)
+        consent_state = (
+            payload.get("consent_state") or ConsentEvent.ConsentState.UNKNOWN
+        )
         if consent_state not in {
             ConsentEvent.ConsentState.UNKNOWN,
             ConsentEvent.ConsentState.GRANTED,
             ConsentEvent.ConsentState.WITHDRAWN,
             ConsentEvent.ConsentState.EXPIRED,
         }:
-            return JsonResponse({'error': 'invalid_consent_state'}, status=400)
-        privacy_flags = payload.get('privacy_flags') or []
-        if not isinstance(privacy_flags, list) or any(not isinstance(flag, str) for flag in privacy_flags):
-            return JsonResponse({'error': 'privacy_flags must be an array of strings'}, status=400)
+            return JsonResponse({"error": "invalid_consent_state"}, status=400)
+        privacy_flags = payload.get("privacy_flags") or []
+        if not isinstance(privacy_flags, list) or any(
+            not isinstance(flag, str) for flag in privacy_flags
+        ):
+            return JsonResponse(
+                {"error": "privacy_flags must be an array of strings"}, status=400
+            )
 
         profile = PrivacyProfile.objects.create(
             name=name,
             lawful_basis=lawful_basis,
-            consent_required=bool(payload.get('consent_required', False)),
+            consent_required=bool(payload.get("consent_required", False)),
             consent_state=consent_state,
             privacy_flags=privacy_flags,
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='privacy.profile.created',
+            event_type="privacy.profile.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.privacy.profile.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.privacy.profile.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_privacy_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='privacy.profile.created',
-            resource_type='privacy_profile',
+            action="privacy.profile.created",
+            resource_type="privacy_profile",
             resource_id=str(profile.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_privacy_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_privacy_profile_to_dict(profile), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -1609,640 +1740,704 @@ def privacy_profile_detail(request, profile_id: str):
     try:
         profile = PrivacyProfile.objects.get(id=profile_id)
     except (ValidationError, PrivacyProfile.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
 
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
         return JsonResponse(_privacy_profile_to_dict(profile))
 
-    if request.method == 'PATCH':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "PATCH":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        if 'name' in payload:
-            profile.name = payload['name']
-        if 'lawful_basis' in payload:
-            lawful_basis = payload['lawful_basis']
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if "name" in payload:
+            profile.name = payload["name"]
+        if "lawful_basis" in payload:
+            lawful_basis = payload["lawful_basis"]
             if lawful_basis not in {
                 PrivacyProfile.LawfulBasis.CONTRACT,
                 PrivacyProfile.LawfulBasis.LEGAL_OBLIGATION,
                 PrivacyProfile.LawfulBasis.CONSENT,
                 PrivacyProfile.LawfulBasis.LEGITIMATE_INTEREST,
             }:
-                return JsonResponse({'error': 'invalid_lawful_basis'}, status=400)
+                return JsonResponse({"error": "invalid_lawful_basis"}, status=400)
             profile.lawful_basis = lawful_basis
-        if 'consent_required' in payload:
-            profile.consent_required = bool(payload['consent_required'])
-        if 'consent_state' in payload:
-            consent_state = payload['consent_state']
+        if "consent_required" in payload:
+            profile.consent_required = bool(payload["consent_required"])
+        if "consent_state" in payload:
+            consent_state = payload["consent_state"]
             if consent_state not in {
                 ConsentEvent.ConsentState.UNKNOWN,
                 ConsentEvent.ConsentState.GRANTED,
                 ConsentEvent.ConsentState.WITHDRAWN,
                 ConsentEvent.ConsentState.EXPIRED,
             }:
-                return JsonResponse({'error': 'invalid_consent_state'}, status=400)
+                return JsonResponse({"error": "invalid_consent_state"}, status=400)
             profile.consent_state = consent_state
-        if 'privacy_flags' in payload:
-            flags = payload['privacy_flags']
-            if not isinstance(flags, list) or any(not isinstance(flag, str) for flag in flags):
-                return JsonResponse({'error': 'privacy_flags must be an array of strings'}, status=400)
+        if "privacy_flags" in payload:
+            flags = payload["privacy_flags"]
+            if not isinstance(flags, list) or any(
+                not isinstance(flag, str) for flag in flags
+            ):
+                return JsonResponse(
+                    {"error": "privacy_flags must be an array of strings"}, status=400
+                )
             profile.privacy_flags = flags
         profile.save()
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='privacy.profile.updated',
+            event_type="privacy.profile.updated",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.privacy.profile.updated',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.privacy.profile.updated",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_privacy_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='privacy.profile.updated',
-            resource_type='privacy_profile',
+            action="privacy.profile.updated",
+            resource_type="privacy_profile",
             resource_id=str(profile.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_privacy_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_privacy_profile_to_dict(profile))
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def privacy_consent_events(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        profile_id = request.GET.get('profile_id')
-        qs = ConsentEvent.objects.order_by('-created_at')
+        profile_id = request.GET.get("profile_id")
+        qs = ConsentEvent.objects.order_by("-created_at")
         if profile_id:
             qs = qs.filter(profile_id=profile_id)
-        return JsonResponse({'items': [_consent_event_to_dict(e) for e in qs]})
+        return JsonResponse({"items": [_consent_event_to_dict(e) for e in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        profile_id = payload.get('profile_id')
-        consent_state = payload.get('consent_state')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        profile_id = payload.get("profile_id")
+        consent_state = payload.get("consent_state")
         if not profile_id or not consent_state:
-            return JsonResponse({'error': 'profile_id and consent_state are required'}, status=400)
+            return JsonResponse(
+                {"error": "profile_id and consent_state are required"}, status=400
+            )
         if consent_state not in {
             ConsentEvent.ConsentState.UNKNOWN,
             ConsentEvent.ConsentState.GRANTED,
             ConsentEvent.ConsentState.WITHDRAWN,
             ConsentEvent.ConsentState.EXPIRED,
         }:
-            return JsonResponse({'error': 'invalid_consent_state'}, status=400)
+            return JsonResponse({"error": "invalid_consent_state"}, status=400)
         try:
             profile = PrivacyProfile.objects.get(id=profile_id)
         except (ValidationError, PrivacyProfile.DoesNotExist):
-            return JsonResponse({'error': 'profile_not_found'}, status=404)
+            return JsonResponse({"error": "profile_not_found"}, status=404)
 
         event = ConsentEvent.objects.create(
             profile=profile,
             consent_state=consent_state,
-            reason=payload.get('reason') or '',
+            reason=payload.get("reason") or "",
         )
         profile.consent_state = consent_state
-        profile.save(update_fields=['consent_state', 'updated_at'])
+        profile.save(update_fields=["consent_state", "updated_at"])
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='privacy.consent.changed',
+            event_type="privacy.consent.changed",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.privacy.consent.changed',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
-            data={'profile': _privacy_profile_to_dict(profile), 'consent_event': _consent_event_to_dict(event)},
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            routing_key=f"{tenant_schema}.privacy.consent.changed",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
+            data={
+                "profile": _privacy_profile_to_dict(profile),
+                "consent_event": _consent_event_to_dict(event),
+            },
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
-        if consent_state in {ConsentEvent.ConsentState.WITHDRAWN, ConsentEvent.ConsentState.EXPIRED}:
-            action_types = ['policy.re_evaluate', 'retention.review', 'stewardship.triage']
+        if consent_state in {
+            ConsentEvent.ConsentState.WITHDRAWN,
+            ConsentEvent.ConsentState.EXPIRED,
+        }:
+            action_types = [
+                "policy.re_evaluate",
+                "retention.review",
+                "stewardship.triage",
+            ]
             actions = [
                 PrivacyAction.objects.create(
                     profile=profile,
                     action_type=action_type,
                     status=PrivacyAction.Status.REQUESTED,
-                    reason=payload.get('reason') or '',
-                    actor_id=(request.headers.get('X-User-Id') or ''),
+                    reason=payload.get("reason") or "",
+                    actor_id=(request.headers.get("X-User-Id") or ""),
                 )
                 for action_type in action_types
             ]
             maybe_publish_event(
-                event_type='privacy.action.required',
+                event_type="privacy.action.required",
                 tenant_id=tenant_schema,
-                routing_key=f'{tenant_schema}.privacy.action.required',
-                correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-                user_id=request.headers.get('X-User-Id'),
+                routing_key=f"{tenant_schema}.privacy.action.required",
+                correlation_id=getattr(request, "correlation_id", None)
+                or request.headers.get("X-Correlation-Id"),
+                user_id=request.headers.get("X-User-Id"),
                 data={
-                    'profile_id': str(profile.id),
-                    'consent_state': consent_state,
-                    'actions': action_types,
-                    'action_ids': [str(action.id) for action in actions],
+                    "profile_id": str(profile.id),
+                    "consent_state": consent_state,
+                    "actions": action_types,
+                    "action_ids": [str(action.id) for action in actions],
                 },
-                rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+                rabbitmq_url=os.environ.get("RABBITMQ_URL"),
             )
         return JsonResponse(_consent_event_to_dict(event), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def privacy_actions(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
-            request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = PrivacyAction.objects.order_by('-requested_at')
-        profile_id = request.GET.get('profile_id')
+        qs = PrivacyAction.objects.order_by("-requested_at")
+        profile_id = request.GET.get("profile_id")
         if profile_id:
             qs = qs.filter(profile_id=profile_id)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        action_type = request.GET.get('action_type')
+        action_type = request.GET.get("action_type")
         if action_type:
             qs = qs.filter(action_type=action_type)
-        return JsonResponse({'items': [_privacy_action_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_privacy_action_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        profile_id = payload.get('profile_id')
-        action_type = (payload.get('action_type') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        profile_id = payload.get("profile_id")
+        action_type = (payload.get("action_type") or "").strip()
         if not profile_id or not action_type:
-            return JsonResponse({'error': 'profile_id and action_type are required'}, status=400)
+            return JsonResponse(
+                {"error": "profile_id and action_type are required"}, status=400
+            )
         try:
             profile = PrivacyProfile.objects.get(id=profile_id)
         except (ValidationError, PrivacyProfile.DoesNotExist):
-            return JsonResponse({'error': 'profile_not_found'}, status=404)
+            return JsonResponse({"error": "profile_not_found"}, status=404)
         action = PrivacyAction.objects.create(
             profile=profile,
             action_type=action_type,
             status=PrivacyAction.Status.REQUESTED,
-            reason=payload.get('reason') or '',
-            actor_id=(request.headers.get('X-User-Id') or ''),
+            reason=payload.get("reason") or "",
+            actor_id=(request.headers.get("X-User-Id") or ""),
         )
         return JsonResponse(_privacy_action_to_dict(action), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def privacy_action_decision(request, action_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         action = PrivacyAction.objects.get(id=action_id)
     except (ValidationError, PrivacyAction.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    decision = payload.get('decision')
-    if decision not in {'approve', 'reject'}:
-        return JsonResponse({'error': 'invalid_decision'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    decision = payload.get("decision")
+    if decision not in {"approve", "reject"}:
+        return JsonResponse({"error": "invalid_decision"}, status=400)
     if action.status != PrivacyAction.Status.REQUESTED:
-        return JsonResponse({'error': 'action_not_pending'}, status=400)
+        return JsonResponse({"error": "action_not_pending"}, status=400)
     action.status = (
-        PrivacyAction.Status.APPROVED if decision == 'approve' else PrivacyAction.Status.REJECTED
+        PrivacyAction.Status.APPROVED
+        if decision == "approve"
+        else PrivacyAction.Status.REJECTED
     )
-    action.reason = payload.get('reason') or action.reason
-    action.actor_id = request.headers.get('X-User-Id') or action.actor_id
+    action.reason = payload.get("reason") or action.reason
+    action.actor_id = request.headers.get("X-User-Id") or action.actor_id
     action.decided_at = timezone.now()
-    action.save(update_fields=['status', 'reason', 'actor_id', 'decided_at'])
+    action.save(update_fields=["status", "reason", "actor_id", "decided_at"])
     tenant_schema = _tenant_schema(request)
-    event_type = f'privacy.action.{action.status}'
+    event_type = f"privacy.action.{action.status}"
     payload_data = _privacy_action_to_dict(action)
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='privacy_action',
+        resource_type="privacy_action",
         resource_id=str(action.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload_data)
 
 
 @csrf_exempt
 def privacy_action_execute(request, action_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         action = PrivacyAction.objects.get(id=action_id)
     except (ValidationError, PrivacyAction.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if action.status != PrivacyAction.Status.APPROVED:
-        return JsonResponse({'error': 'action_not_approved'}, status=400)
+        return JsonResponse({"error": "action_not_approved"}, status=400)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    evidence = payload.get('evidence') or {}
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    evidence = payload.get("evidence") or {}
     if not isinstance(evidence, dict):
-        return JsonResponse({'error': 'evidence must be an object'}, status=400)
+        return JsonResponse({"error": "evidence must be an object"}, status=400)
     action.evidence = evidence
-    action.actor_id = request.headers.get('X-User-Id') or action.actor_id
+    action.actor_id = request.headers.get("X-User-Id") or action.actor_id
     action.status = PrivacyAction.Status.EXECUTED
     action.executed_at = timezone.now()
-    action.save(update_fields=['evidence', 'actor_id', 'status', 'executed_at'])
+    action.save(update_fields=["evidence", "actor_id", "status", "executed_at"])
     tenant_schema = _tenant_schema(request)
     payload_data = _privacy_action_to_dict(action)
     maybe_publish_event(
-        event_type='privacy.action.executed',
+        event_type="privacy.action.executed",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.privacy.action.executed',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.privacy.action.executed",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='privacy.action.executed',
-        resource_type='privacy_action',
+        action="privacy.action.executed",
+        resource_type="privacy_action",
         resource_id=str(action.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload_data)
 
 
 @csrf_exempt
 def agent_runs(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
-            request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = AgentRun.objects.order_by('-created_at')
-        status_filter = request.GET.get('status')
+        qs = AgentRun.objects.order_by("-created_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_agent_run_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_agent_run_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        prompt = (payload.get('prompt') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        prompt = (payload.get("prompt") or "").strip()
         if not prompt:
-            return JsonResponse({'error': 'prompt is required'}, status=400)
-        allowed_tools = payload.get('allowed_tools', [])
+            return JsonResponse({"error": "prompt is required"}, status=400)
+        allowed_tools = payload.get("allowed_tools", [])
         if not isinstance(allowed_tools, list) or not all(
             isinstance(item, str) and item for item in allowed_tools
         ):
-            return JsonResponse({'error': 'allowed_tools must be a list of strings'}, status=400)
+            return JsonResponse(
+                {"error": "allowed_tools must be a list of strings"}, status=400
+            )
         invalid_tools = sorted(set(allowed_tools) - AGENT_TOOL_ALLOWLIST)
         if invalid_tools:
-            return JsonResponse({'error': 'invalid_allowed_tools', 'details': invalid_tools}, status=400)
-        timeout_seconds = payload.get('timeout_seconds', 60)
+            return JsonResponse(
+                {"error": "invalid_allowed_tools", "details": invalid_tools}, status=400
+            )
+        timeout_seconds = payload.get("timeout_seconds", 60)
         try:
             timeout_seconds = int(timeout_seconds)
         except (TypeError, ValueError):
-            return JsonResponse({'error': 'timeout_seconds must be an integer'}, status=400)
+            return JsonResponse(
+                {"error": "timeout_seconds must be an integer"}, status=400
+            )
         if timeout_seconds < 5 or timeout_seconds > 3600:
-            return JsonResponse({'error': 'timeout_seconds out of range'}, status=400)
+            return JsonResponse({"error": "timeout_seconds out of range"}, status=400)
         now = timezone.now()
         status = AgentRun.Status.QUEUED
         started_at = None
         finished_at = None
-        if payload.get('start_now'):
+        if payload.get("start_now"):
             status = AgentRun.Status.RUNNING
             started_at = now
         agent_run = AgentRun.objects.create(
-            actor_id=(request.headers.get('X-User-Id') or ''),
+            actor_id=(request.headers.get("X-User-Id") or ""),
             prompt=prompt,
             allowed_tools=sorted(set(allowed_tools)),
             timeout_seconds=timeout_seconds,
             status=status,
             started_at=started_at,
             finished_at=finished_at,
-            output=payload.get('output') if isinstance(payload.get('output'), dict) else {},
+            output=(
+                payload.get("output") if isinstance(payload.get("output"), dict) else {}
+            ),
         )
         tenant_schema = _tenant_schema(request)
         payload_data = _agent_run_to_dict(agent_run)
         maybe_publish_event(
-            event_type='agent.run.created',
+            event_type="agent.run.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.agent.run.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.agent.run.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='agent.run.created',
-            resource_type='agent_run',
+            action="agent.run.created",
+            resource_type="agent_run",
             resource_id=str(agent_run.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(payload_data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def agent_run_transition(request, run_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     try:
         agent_run = AgentRun.objects.get(id=run_id)
     except (ValidationError, AgentRun.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
     now = timezone.now()
-    if action == 'start':
+    if action == "start":
         if agent_run.status != AgentRun.Status.QUEUED:
-            return JsonResponse({'error': 'invalid_status_transition'}, status=400)
+            return JsonResponse({"error": "invalid_status_transition"}, status=400)
         agent_run.status = AgentRun.Status.RUNNING
         agent_run.started_at = now
-        update_fields = ['status', 'started_at', 'updated_at']
-    elif action == 'complete':
+        update_fields = ["status", "started_at", "updated_at"]
+    elif action == "complete":
         if agent_run.status != AgentRun.Status.RUNNING:
-            return JsonResponse({'error': 'invalid_status_transition'}, status=400)
-        output = payload.get('output') or {}
+            return JsonResponse({"error": "invalid_status_transition"}, status=400)
+        output = payload.get("output") or {}
         if not isinstance(output, dict):
-            return JsonResponse({'error': 'output must be an object'}, status=400)
+            return JsonResponse({"error": "output must be an object"}, status=400)
         agent_run.status = AgentRun.Status.COMPLETED
         agent_run.output = output
-        agent_run.error_message = ''
+        agent_run.error_message = ""
         agent_run.finished_at = now
-        update_fields = ['status', 'output', 'error_message', 'finished_at', 'updated_at']
-    elif action == 'fail':
+        update_fields = [
+            "status",
+            "output",
+            "error_message",
+            "finished_at",
+            "updated_at",
+        ]
+    elif action == "fail":
         if agent_run.status != AgentRun.Status.RUNNING:
-            return JsonResponse({'error': 'invalid_status_transition'}, status=400)
-        error_message = (payload.get('error_message') or '').strip()
+            return JsonResponse({"error": "invalid_status_transition"}, status=400)
+        error_message = (payload.get("error_message") or "").strip()
         if not error_message:
-            return JsonResponse({'error': 'error_message is required'}, status=400)
+            return JsonResponse({"error": "error_message is required"}, status=400)
         agent_run.status = AgentRun.Status.FAILED
         agent_run.error_message = error_message
         agent_run.finished_at = now
-        update_fields = ['status', 'error_message', 'finished_at', 'updated_at']
-    elif action == 'cancel':
+        update_fields = ["status", "error_message", "finished_at", "updated_at"]
+    elif action == "cancel":
         if agent_run.status not in {AgentRun.Status.QUEUED, AgentRun.Status.RUNNING}:
-            return JsonResponse({'error': 'invalid_status_transition'}, status=400)
+            return JsonResponse({"error": "invalid_status_transition"}, status=400)
         agent_run.status = AgentRun.Status.CANCELLED
         if not agent_run.started_at:
             agent_run.started_at = now
         agent_run.finished_at = now
-        update_fields = ['status', 'started_at', 'finished_at', 'updated_at']
-    elif action == 'materialize_timeouts':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        update_fields = ["status", "started_at", "finished_at", "updated_at"]
+    elif action == "materialize_timeouts":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         if agent_run.status != AgentRun.Status.RUNNING or not agent_run.started_at:
-            return JsonResponse({'error': 'invalid_status_transition'}, status=400)
+            return JsonResponse({"error": "invalid_status_transition"}, status=400)
         deadline = agent_run.started_at + timedelta(seconds=agent_run.timeout_seconds)
         if now < deadline:
-            return JsonResponse({'error': 'run_not_timed_out'}, status=400)
+            return JsonResponse({"error": "run_not_timed_out"}, status=400)
         agent_run.status = AgentRun.Status.TIMED_OUT
-        agent_run.error_message = 'execution timed out'
+        agent_run.error_message = "execution timed out"
         agent_run.finished_at = now
-        update_fields = ['status', 'error_message', 'finished_at', 'updated_at']
+        update_fields = ["status", "error_message", "finished_at", "updated_at"]
     else:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_action"}, status=400)
     agent_run.save(update_fields=update_fields)
     tenant_schema = _tenant_schema(request)
-    event_type = f'agent.run.{agent_run.status}'
+    event_type = f"agent.run.{agent_run.status}"
     payload_data = _agent_run_to_dict(agent_run)
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='agent_run',
+        resource_type="agent_run",
         resource_id=str(agent_run.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload_data)
 
 
 @csrf_exempt
 def stewardship_items(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
-            request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = StewardshipItem.objects.order_by('-created_at')
-        status_filter = request.GET.get('status')
+        qs = StewardshipItem.objects.order_by("-created_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        severity_filter = request.GET.get('severity')
+        severity_filter = request.GET.get("severity")
         if severity_filter:
             qs = qs.filter(severity=severity_filter)
-        item_type_filter = request.GET.get('item_type')
+        item_type_filter = request.GET.get("item_type")
         if item_type_filter:
             qs = qs.filter(item_type=item_type_filter)
-        assignee_filter = request.GET.get('assignee')
+        assignee_filter = request.GET.get("assignee")
         if assignee_filter:
             qs = qs.filter(assignee=assignee_filter)
-        return JsonResponse({'items': [_stewardship_item_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_stewardship_item_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        item_type = payload.get('item_type')
-        subject_ref = (payload.get('subject_ref') or '').strip()
-        severity = payload.get('severity') or StewardshipItem.Severity.MEDIUM
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        item_type = payload.get("item_type")
+        subject_ref = (payload.get("subject_ref") or "").strip()
+        severity = payload.get("severity") or StewardshipItem.Severity.MEDIUM
         if item_type not in StewardshipItem.ItemType.values:
-            return JsonResponse({'error': 'invalid_item_type'}, status=400)
+            return JsonResponse({"error": "invalid_item_type"}, status=400)
         if severity not in StewardshipItem.Severity.values:
-            return JsonResponse({'error': 'invalid_severity'}, status=400)
+            return JsonResponse({"error": "invalid_severity"}, status=400)
         if not subject_ref:
-            return JsonResponse({'error': 'subject_ref is required'}, status=400)
+            return JsonResponse({"error": "subject_ref is required"}, status=400)
         due_at = None
-        due_at_value = payload.get('due_at')
+        due_at_value = payload.get("due_at")
         if due_at_value is not None:
             if not isinstance(due_at_value, str):
-                return JsonResponse({'error': 'due_at must be an ISO datetime string'}, status=400)
+                return JsonResponse(
+                    {"error": "due_at must be an ISO datetime string"}, status=400
+                )
             due_at = parse_datetime(due_at_value)
             if due_at is None:
-                return JsonResponse({'error': 'invalid_due_at'}, status=400)
+                return JsonResponse({"error": "invalid_due_at"}, status=400)
         item = StewardshipItem.objects.create(
             item_type=item_type,
             subject_ref=subject_ref,
             severity=severity,
-            assignee=(payload.get('assignee') or ''),
+            assignee=(payload.get("assignee") or ""),
             due_at=due_at,
             status=StewardshipItem.Status.OPEN,
-            actor_id=(request.headers.get('X-User-Id') or ''),
+            actor_id=(request.headers.get("X-User-Id") or ""),
         )
         tenant_schema = _tenant_schema(request)
         payload_data = _stewardship_item_to_dict(item)
         maybe_publish_event(
-            event_type='stewardship.item.created',
+            event_type="stewardship.item.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.stewardship.item.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.stewardship.item.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='stewardship.item.created',
-            resource_type='stewardship_item',
+            action="stewardship.item.created",
+            resource_type="stewardship_item",
             resource_id=str(item.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(payload_data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 def _stewardship_transition_allowed(item: StewardshipItem, action: str) -> bool:
     allowed = {
-        StewardshipItem.Status.OPEN: {'start_review', 'block', 'resolve', 'dismiss'},
-        StewardshipItem.Status.IN_REVIEW: {'block', 'resolve', 'dismiss'},
-        StewardshipItem.Status.BLOCKED: {'start_review', 'resolve', 'dismiss'},
-        StewardshipItem.Status.RESOLVED: {'reopen'},
-        StewardshipItem.Status.DISMISSED: {'reopen'},
+        StewardshipItem.Status.OPEN: {"start_review", "block", "resolve", "dismiss"},
+        StewardshipItem.Status.IN_REVIEW: {"block", "resolve", "dismiss"},
+        StewardshipItem.Status.BLOCKED: {"start_review", "resolve", "dismiss"},
+        StewardshipItem.Status.RESOLVED: {"reopen"},
+        StewardshipItem.Status.DISMISSED: {"reopen"},
     }
     return action in allowed.get(item.status, set())
 
 
 @csrf_exempt
 def stewardship_item_transition(request, item_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         item = StewardshipItem.objects.get(id=item_id)
     except (ValidationError, StewardshipItem.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
-    if action not in {'assign', 'start_review', 'block', 'resolve', 'dismiss', 'reopen'}:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
+    if action not in {
+        "assign",
+        "start_review",
+        "block",
+        "resolve",
+        "dismiss",
+        "reopen",
+    }:
+        return JsonResponse({"error": "invalid_action"}, status=400)
 
-    update_fields = ['updated_at']
-    if action == 'assign':
-        assignee = (payload.get('assignee') or '').strip()
+    update_fields = ["updated_at"]
+    if action == "assign":
+        assignee = (payload.get("assignee") or "").strip()
         if not assignee:
-            return JsonResponse({'error': 'assignee is required'}, status=400)
+            return JsonResponse({"error": "assignee is required"}, status=400)
         item.assignee = assignee
-        item.actor_id = request.headers.get('X-User-Id') or item.actor_id
-        update_fields.extend(['assignee', 'actor_id'])
-        event_type = 'stewardship.item.assigned'
+        item.actor_id = request.headers.get("X-User-Id") or item.actor_id
+        update_fields.extend(["assignee", "actor_id"])
+        event_type = "stewardship.item.assigned"
     else:
         if not _stewardship_transition_allowed(item, action):
-            return JsonResponse({'error': 'invalid_transition'}, status=400)
-        if action == 'start_review':
+            return JsonResponse({"error": "invalid_transition"}, status=400)
+        if action == "start_review":
             item.status = StewardshipItem.Status.IN_REVIEW
             item.resolved_at = None
-        elif action == 'block':
+        elif action == "block":
             item.status = StewardshipItem.Status.BLOCKED
             item.resolved_at = None
-        elif action == 'resolve':
-            resolution = payload.get('resolution') or {}
+        elif action == "resolve":
+            resolution = payload.get("resolution") or {}
             if not isinstance(resolution, dict):
-                return JsonResponse({'error': 'resolution must be an object'}, status=400)
+                return JsonResponse(
+                    {"error": "resolution must be an object"}, status=400
+                )
             item.status = StewardshipItem.Status.RESOLVED
             item.resolution = resolution
             item.resolved_at = timezone.now()
-            update_fields.append('resolution')
-        elif action == 'dismiss':
+            update_fields.append("resolution")
+        elif action == "dismiss":
             item.status = StewardshipItem.Status.DISMISSED
             item.resolved_at = timezone.now()
         else:
             item.status = StewardshipItem.Status.OPEN
             item.resolution = {}
             item.resolved_at = None
-            update_fields.append('resolution')
-        item.actor_id = request.headers.get('X-User-Id') or item.actor_id
-        update_fields.extend(['status', 'resolved_at', 'actor_id'])
+            update_fields.append("resolution")
+        item.actor_id = request.headers.get("X-User-Id") or item.actor_id
+        update_fields.extend(["status", "resolved_at", "actor_id"])
         event_type = (
-            'stewardship.item.resolved'
+            "stewardship.item.resolved"
             if item.status == StewardshipItem.Status.RESOLVED
-            else 'stewardship.item.transitioned'
+            else "stewardship.item.transitioned"
         )
     item.save(update_fields=update_fields)
 
@@ -2251,61 +2446,77 @@ def stewardship_item_transition(request, item_id: str):
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={**payload_data, 'transition_action': action},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={**payload_data, "transition_action": action},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='stewardship_item',
+        resource_type="stewardship_item",
         resource_id=str(item.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={**payload_data, 'transition_action': action},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={**payload_data, "transition_action": action},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload_data)
 
 
 @csrf_exempt
 def residency_profiles(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        qs = ResidencyProfile.objects.order_by('-updated_at')
-        return JsonResponse({'items': [_residency_profile_to_dict(p) for p in qs]})
+        qs = ResidencyProfile.objects.order_by("-updated_at")
+        return JsonResponse({"items": [_residency_profile_to_dict(p) for p in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
 
-        allowed_regions = payload.get('allowed_regions')
-        blocked_regions = payload.get('blocked_regions')
+        allowed_regions = payload.get("allowed_regions")
+        blocked_regions = payload.get("blocked_regions")
         if allowed_regions is None:
             allowed_regions = []
         if blocked_regions is None:
             blocked_regions = []
-        if not isinstance(allowed_regions, list) or any(not isinstance(v, str) for v in allowed_regions):
-            return JsonResponse({'error': 'allowed_regions must be a list of strings'}, status=400)
-        if not isinstance(blocked_regions, list) or any(not isinstance(v, str) for v in blocked_regions):
-            return JsonResponse({'error': 'blocked_regions must be a list of strings'}, status=400)
+        if not isinstance(allowed_regions, list) or any(
+            not isinstance(v, str) for v in allowed_regions
+        ):
+            return JsonResponse(
+                {"error": "allowed_regions must be a list of strings"}, status=400
+            )
+        if not isinstance(blocked_regions, list) or any(
+            not isinstance(v, str) for v in blocked_regions
+        ):
+            return JsonResponse(
+                {"error": "blocked_regions must be a list of strings"}, status=400
+            )
 
-        enforcement_mode = payload.get('enforcement_mode', ResidencyProfile.EnforcementMode.ADVISORY)
-        if enforcement_mode not in {ResidencyProfile.EnforcementMode.ADVISORY, ResidencyProfile.EnforcementMode.ENFORCED}:
-            return JsonResponse({'error': 'invalid_enforcement_mode'}, status=400)
+        enforcement_mode = payload.get(
+            "enforcement_mode", ResidencyProfile.EnforcementMode.ADVISORY
+        )
+        if enforcement_mode not in {
+            ResidencyProfile.EnforcementMode.ADVISORY,
+            ResidencyProfile.EnforcementMode.ENFORCED,
+        }:
+            return JsonResponse({"error": "invalid_enforcement_mode"}, status=400)
 
         profile = ResidencyProfile.objects.create(
             name=name,
@@ -2316,27 +2527,29 @@ def residency_profiles(request):
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='residency.profile.created',
+            event_type="residency.profile.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.residency.profile.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.residency.profile.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_residency_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='residency.profile.created',
-            resource_type='residency_profile',
+            action="residency.profile.created",
+            resource_type="residency_profile",
             resource_id=str(profile.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_residency_profile_to_dict(profile),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_residency_profile_to_dict(profile), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -2344,11 +2557,13 @@ def residency_profile_detail(request, profile_id: str):
     try:
         profile = ResidencyProfile.objects.get(id=profile_id)
     except (ValidationError, ResidencyProfile.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
 
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     return JsonResponse(_residency_profile_to_dict(profile))
@@ -2356,134 +2571,146 @@ def residency_profile_detail(request, profile_id: str):
 
 @csrf_exempt
 def residency_profile_activate(request, profile_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         profile = ResidencyProfile.objects.get(id=profile_id)
     except (ValidationError, ResidencyProfile.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     profile.status = ResidencyProfile.Status.ACTIVE
-    profile.save(update_fields=['status', 'updated_at'])
+    profile.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='residency.profile.activated',
+        event_type="residency.profile.activated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.residency.profile.activated',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.residency.profile.activated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_residency_profile_to_dict(profile),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='residency.profile.activated',
-        resource_type='residency_profile',
+        action="residency.profile.activated",
+        resource_type="residency_profile",
         resource_id=str(profile.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_residency_profile_to_dict(profile),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_residency_profile_to_dict(profile))
 
 
 @csrf_exempt
 def residency_profile_deprecate(request, profile_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         profile = ResidencyProfile.objects.get(id=profile_id)
     except (ValidationError, ResidencyProfile.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     profile.status = ResidencyProfile.Status.DEPRECATED
-    profile.save(update_fields=['status', 'updated_at'])
+    profile.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='residency.profile.deprecated',
+        event_type="residency.profile.deprecated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.residency.profile.deprecated',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.residency.profile.deprecated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_residency_profile_to_dict(profile),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='residency.profile.deprecated',
-        resource_type='residency_profile',
+        action="residency.profile.deprecated",
+        resource_type="residency_profile",
         resource_id=str(profile.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_residency_profile_to_dict(profile),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_residency_profile_to_dict(profile))
 
 
 @csrf_exempt
 def residency_check(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    profile_id = payload.get('profile_id')
-    target_region = payload.get('target_region')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    profile_id = payload.get("profile_id")
+    target_region = payload.get("target_region")
     if not profile_id or not isinstance(target_region, str):
-        return JsonResponse({'error': 'profile_id and target_region are required'}, status=400)
+        return JsonResponse(
+            {"error": "profile_id and target_region are required"}, status=400
+        )
     try:
         profile = ResidencyProfile.objects.get(id=profile_id)
     except (ValidationError, ResidencyProfile.DoesNotExist):
-        return JsonResponse({'error': 'profile_not_found'}, status=404)
+        return JsonResponse({"error": "profile_not_found"}, status=404)
 
     denied_by_block = target_region in set(profile.blocked_regions or [])
-    denied_by_allow = bool(profile.allowed_regions) and target_region not in set(profile.allowed_regions)
+    denied_by_allow = bool(profile.allowed_regions) and target_region not in set(
+        profile.allowed_regions
+    )
     allowed = not (denied_by_block or denied_by_allow)
-    denied_reason = ''
+    denied_reason = ""
     if denied_by_block:
-        denied_reason = 'blocked_region'
+        denied_reason = "blocked_region"
     elif denied_by_allow:
-        denied_reason = 'outside_allowed_regions'
+        denied_reason = "outside_allowed_regions"
     enforced = profile.enforcement_mode == ResidencyProfile.EnforcementMode.ENFORCED
     response = {
-        'profile_id': str(profile.id),
-        'target_region': target_region,
-        'allowed': allowed,
-        'decision': 'allow' if allowed else 'deny',
-        'enforced': enforced,
-        'status': profile.status,
+        "profile_id": str(profile.id),
+        "target_region": target_region,
+        "allowed": allowed,
+        "decision": "allow" if allowed else "deny",
+        "enforced": enforced,
+        "status": profile.status,
     }
     if denied_reason:
-        response['reason'] = denied_reason
+        response["reason"] = denied_reason
     if not allowed:
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='residency.violation.detected',
+            event_type="residency.violation.detected",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.residency.violation.detected',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.residency.violation.detected",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=response,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='residency.violation.detected',
-            resource_type='residency_profile',
+            action="residency.violation.detected",
+            resource_type="residency_profile",
             resource_id=str(profile.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=response,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
     if not allowed and enforced:
         return JsonResponse(response, status=403)
@@ -2492,193 +2719,233 @@ def residency_check(request):
 
 @csrf_exempt
 def access_requests(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        status_filter = request.GET.get('status')
-        qs = AccessRequest.objects.order_by('-updated_at')
+        status_filter = request.GET.get("status")
+        qs = AccessRequest.objects.order_by("-updated_at")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_access_request_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_access_request_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        subject_ref = (payload.get('subject_ref') or '').strip()
-        requester = (payload.get('requester') or request.headers.get('X-User-Id') or '').strip()
-        access_type = payload.get('access_type')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        subject_ref = (payload.get("subject_ref") or "").strip()
+        requester = (
+            payload.get("requester") or request.headers.get("X-User-Id") or ""
+        ).strip()
+        access_type = payload.get("access_type")
         if not subject_ref or not requester or not access_type:
-            return JsonResponse({'error': 'subject_ref, requester, and access_type are required'}, status=400)
+            return JsonResponse(
+                {"error": "subject_ref, requester, and access_type are required"},
+                status=400,
+            )
         if access_type not in {
             AccessRequest.AccessType.READ,
             AccessRequest.AccessType.WRITE,
             AccessRequest.AccessType.ADMIN,
             AccessRequest.AccessType.EXPORT,
         }:
-            return JsonResponse({'error': 'invalid_access_type'}, status=400)
+            return JsonResponse({"error": "invalid_access_type"}, status=400)
         access_request = AccessRequest.objects.create(
             subject_ref=subject_ref,
             requester=requester,
             access_type=access_type,
-            justification=(payload.get('justification') or ''),
+            justification=(payload.get("justification") or ""),
             status=AccessRequest.Status.SUBMITTED,
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='access.request.submitted',
+            event_type="access.request.submitted",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.access.request.submitted',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.access.request.submitted",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_access_request_to_dict(access_request),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='access.request.submitted',
-            resource_type='access_request',
+            action="access.request.submitted",
+            resource_type="access_request",
             resource_id=str(access_request.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_access_request_to_dict(access_request),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_access_request_to_dict(access_request), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def access_request_decision(request, request_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         access_request = AccessRequest.objects.get(id=request_id)
     except (ValidationError, AccessRequest.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    status_value = payload.get('status')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    status_value = payload.get("status")
     if status_value not in {
         AccessRequest.Status.IN_REVIEW,
         AccessRequest.Status.APPROVED,
         AccessRequest.Status.DENIED,
         AccessRequest.Status.REVOKED,
     }:
-        return JsonResponse({'error': 'invalid_status'}, status=400)
+        return JsonResponse({"error": "invalid_status"}, status=400)
 
     allowed_transitions = {
-        AccessRequest.Status.SUBMITTED: {AccessRequest.Status.IN_REVIEW, AccessRequest.Status.APPROVED, AccessRequest.Status.DENIED},
-        AccessRequest.Status.IN_REVIEW: {AccessRequest.Status.APPROVED, AccessRequest.Status.DENIED},
+        AccessRequest.Status.SUBMITTED: {
+            AccessRequest.Status.IN_REVIEW,
+            AccessRequest.Status.APPROVED,
+            AccessRequest.Status.DENIED,
+        },
+        AccessRequest.Status.IN_REVIEW: {
+            AccessRequest.Status.APPROVED,
+            AccessRequest.Status.DENIED,
+        },
         AccessRequest.Status.APPROVED: {AccessRequest.Status.REVOKED},
     }
     if status_value not in allowed_transitions.get(access_request.status, set()):
-        return JsonResponse({'error': 'invalid_transition'}, status=400)
+        return JsonResponse({"error": "invalid_transition"}, status=400)
 
     expires_at = access_request.expires_at
-    if status_value == AccessRequest.Status.APPROVED and 'expires_at' in payload and payload.get('expires_at'):
-        parsed = parse_datetime(str(payload.get('expires_at')))
+    if (
+        status_value == AccessRequest.Status.APPROVED
+        and "expires_at" in payload
+        and payload.get("expires_at")
+    ):
+        parsed = parse_datetime(str(payload.get("expires_at")))
         if not parsed:
-            return JsonResponse({'error': 'invalid_expires_at'}, status=400)
+            return JsonResponse({"error": "invalid_expires_at"}, status=400)
         if timezone.is_naive(parsed):
             parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
         expires_at = parsed
 
     access_request.status = status_value
-    access_request.approver = (payload.get('approver') or request.headers.get('X-User-Id') or '').strip()
-    access_request.expires_at = expires_at if status_value == AccessRequest.Status.APPROVED else access_request.expires_at
-    access_request.save(update_fields=['status', 'approver', 'expires_at', 'updated_at'])
+    access_request.approver = (
+        payload.get("approver") or request.headers.get("X-User-Id") or ""
+    ).strip()
+    access_request.expires_at = (
+        expires_at
+        if status_value == AccessRequest.Status.APPROVED
+        else access_request.expires_at
+    )
+    access_request.save(
+        update_fields=["status", "approver", "expires_at", "updated_at"]
+    )
     tenant_schema = _tenant_schema(request)
-    event_type = f'access.request.{status_value}'
+    event_type = f"access.request.{status_value}"
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_access_request_to_dict(access_request),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='access_request',
+        resource_type="access_request",
         resource_id=str(access_request.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_access_request_to_dict(access_request),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_access_request_to_dict(access_request))
 
 
 @csrf_exempt
 def data_shares(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = DataShare.objects.order_by('-updated_at')
-        status_filter = request.GET.get('status')
+        qs = DataShare.objects.order_by("-updated_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        asset_id = request.GET.get('asset_id')
+        asset_id = request.GET.get("asset_id")
         if asset_id:
             qs = qs.filter(asset_id=asset_id)
         items = []
         for share in qs:
             _refresh_share_expiry(share)
             items.append(_data_share_to_dict(share))
-        return JsonResponse({'items': items})
+        return JsonResponse({"items": items})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        asset_id = payload.get('asset_id')
-        consumer_ref = (payload.get('consumer_ref') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        asset_id = payload.get("asset_id")
+        consumer_ref = (payload.get("consumer_ref") or "").strip()
         if not asset_id or not consumer_ref:
-            return JsonResponse({'error': 'asset_id and consumer_ref are required'}, status=400)
+            return JsonResponse(
+                {"error": "asset_id and consumer_ref are required"}, status=400
+            )
         try:
             asset = DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
-        linked_access_request_ids = _parse_uuid_string_list(payload.get('linked_access_request_ids'))
+            return JsonResponse({"error": "asset_not_found"}, status=404)
+        linked_access_request_ids = _parse_uuid_string_list(
+            payload.get("linked_access_request_ids")
+        )
         if linked_access_request_ids is None:
             return JsonResponse(
-                {'error': 'linked_access_request_ids must be an array of UUID strings'},
+                {"error": "linked_access_request_ids must be an array of UUID strings"},
                 status=400,
             )
-        constraints = _normalize_share_constraints(payload.get('constraints'))
+        constraints = _normalize_share_constraints(payload.get("constraints"))
         if constraints is None:
-            return JsonResponse({'error': 'invalid_constraints'}, status=400)
+            return JsonResponse({"error": "invalid_constraints"}, status=400)
         expires_at = None
-        if payload.get('expires_at'):
-            parsed = parse_datetime(str(payload.get('expires_at')))
+        if payload.get("expires_at"):
+            parsed = parse_datetime(str(payload.get("expires_at")))
             if not parsed:
-                return JsonResponse({'error': 'invalid_expires_at'}, status=400)
+                return JsonResponse({"error": "invalid_expires_at"}, status=400)
             if timezone.is_naive(parsed):
                 parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
             expires_at = parsed
         share = DataShare.objects.create(
             asset=asset,
             consumer_ref=consumer_ref,
-            purpose=(payload.get('purpose') or ''),
+            purpose=(payload.get("purpose") or ""),
             constraints=constraints,
             linked_access_request_ids=linked_access_request_ids,
             status=DataShare.Status.DRAFT,
@@ -2687,190 +2954,207 @@ def data_shares(request):
         tenant_schema = _tenant_schema(request)
         data = _data_share_to_dict(share)
         maybe_publish_event(
-            event_type='data_share.created',
+            event_type="data_share.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.data_share.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.data_share.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='data_share.created',
-            resource_type='data_share',
+            action="data_share.created",
+            resource_type="data_share",
             resource_id=str(share.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def data_share_detail(request, share_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         share = DataShare.objects.get(id=share_id)
     except (ValidationError, DataShare.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     _refresh_share_expiry(share)
     return JsonResponse(_data_share_to_dict(share))
 
 
 @csrf_exempt
 def data_share_transition(request, share_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         share = DataShare.objects.get(id=share_id)
     except (ValidationError, DataShare.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     _refresh_share_expiry(share)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
-    if action not in {'approve', 'activate', 'revoke'}:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
+    if action not in {"approve", "activate", "revoke"}:
+        return JsonResponse({"error": "invalid_action"}, status=400)
     transitions = {
-        DataShare.Status.DRAFT: {'approve'},
-        DataShare.Status.APPROVED: {'activate', 'revoke'},
-        DataShare.Status.ACTIVE: {'revoke'},
+        DataShare.Status.DRAFT: {"approve"},
+        DataShare.Status.APPROVED: {"activate", "revoke"},
+        DataShare.Status.ACTIVE: {"revoke"},
     }
     if action not in transitions.get(share.status, set()):
-        return JsonResponse({'error': 'invalid_transition'}, status=400)
-    if action == 'approve':
+        return JsonResponse({"error": "invalid_transition"}, status=400)
+    if action == "approve":
         share.status = DataShare.Status.APPROVED
-        share.approved_by = (payload.get('approver') or request.headers.get('X-User-Id') or '').strip()
-        event_type = 'data_share.approved'
-    elif action == 'activate':
+        share.approved_by = (
+            payload.get("approver") or request.headers.get("X-User-Id") or ""
+        ).strip()
+        event_type = "data_share.approved"
+    elif action == "activate":
         share.status = DataShare.Status.ACTIVE
-        event_type = 'data_share.activated'
+        event_type = "data_share.activated"
     else:
         share.status = DataShare.Status.REVOKED
-        event_type = 'data_share.revoked'
-    share.save(update_fields=['status', 'approved_by', 'updated_at'])
+        event_type = "data_share.revoked"
+    share.save(update_fields=["status", "approved_by", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _data_share_to_dict(share)
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='data_share',
+        resource_type="data_share",
         resource_id=str(share.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def reference_datasets(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request,
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
+        )
         if forbidden:
             return forbidden
-        datasets = ReferenceDataset.objects.order_by('-updated_at')
-        return JsonResponse({'items': [_reference_dataset_to_dict(item) for item in datasets]})
+        datasets = ReferenceDataset.objects.order_by("-updated_at")
+        return JsonResponse(
+            {"items": [_reference_dataset_to_dict(item) for item in datasets]}
+        )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
         dataset = ReferenceDataset.objects.create(
             name=name,
-            owner=(payload.get('owner') or ''),
-            domain=(payload.get('domain') or ''),
+            owner=(payload.get("owner") or ""),
+            domain=(payload.get("domain") or ""),
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='reference.dataset.created',
+            event_type="reference.dataset.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.reference.dataset.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.reference.dataset.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_reference_dataset_to_dict(dataset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='reference.dataset.created',
-            resource_type='reference_dataset',
+            action="reference.dataset.created",
+            resource_type="reference_dataset",
             resource_id=str(dataset.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_reference_dataset_to_dict(dataset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_reference_dataset_to_dict(dataset), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def reference_dataset_versions(request, dataset_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         dataset = ReferenceDataset.objects.get(id=dataset_id)
     except (ValidationError, ReferenceDataset.DoesNotExist):
-        return JsonResponse({'error': 'dataset_not_found'}, status=404)
+        return JsonResponse({"error": "dataset_not_found"}, status=404)
 
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    values = payload.get('values')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    values = payload.get("values")
     if values is None:
         values = []
     if not isinstance(values, list):
-        return JsonResponse({'error': 'values must be a list'}, status=400)
+        return JsonResponse({"error": "values must be a list"}, status=400)
 
-    version = payload.get('version')
+    version = payload.get("version")
     if version is None:
-        version = (ReferenceDatasetVersion.objects.filter(dataset_id=dataset_id).aggregate(max_v=Max('version')).get('max_v') or 0) + 1
+        version = (
+            ReferenceDatasetVersion.objects.filter(dataset_id=dataset_id)
+            .aggregate(max_v=Max("version"))
+            .get("max_v")
+            or 0
+        ) + 1
     elif not isinstance(version, int) or version < 1:
-        return JsonResponse({'error': 'version must be a positive integer'}, status=400)
+        return JsonResponse({"error": "version must be a positive integer"}, status=400)
 
-    status_value = payload.get('status') or ReferenceDatasetVersion.Status.DRAFT
-    if status_value not in {ReferenceDatasetVersion.Status.DRAFT, ReferenceDatasetVersion.Status.APPROVED}:
-        return JsonResponse({'error': 'status must be draft or approved'}, status=400)
+    status_value = payload.get("status") or ReferenceDatasetVersion.Status.DRAFT
+    if status_value not in {
+        ReferenceDatasetVersion.Status.DRAFT,
+        ReferenceDatasetVersion.Status.APPROVED,
+    }:
+        return JsonResponse({"error": "status must be draft or approved"}, status=400)
 
     created = ReferenceDatasetVersion.objects.create(
         dataset=dataset,
@@ -2880,156 +3164,170 @@ def reference_dataset_versions(request, dataset_id: str):
     )
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='reference.version.created',
+        event_type="reference.version.created",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.reference.version.created',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.reference.version.created",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_reference_dataset_version_to_dict(created),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='reference.version.created',
-        resource_type='reference_dataset_version',
+        action="reference.version.created",
+        resource_type="reference_dataset_version",
         resource_id=str(created.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_reference_dataset_version_to_dict(created),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_reference_dataset_version_to_dict(created), status=201)
 
 
 @csrf_exempt
 def reference_dataset_activate(request, dataset_id: str, version: int):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
-        target = ReferenceDatasetVersion.objects.get(dataset_id=dataset_id, version=version)
+        target = ReferenceDatasetVersion.objects.get(
+            dataset_id=dataset_id, version=version
+        )
     except (ValidationError, ReferenceDatasetVersion.DoesNotExist):
-        return JsonResponse({'error': 'version_not_found'}, status=404)
+        return JsonResponse({"error": "version_not_found"}, status=404)
 
-    ReferenceDatasetVersion.objects.filter(dataset_id=dataset_id, status=ReferenceDatasetVersion.Status.ACTIVE).exclude(
-        id=target.id
-    ).update(status=ReferenceDatasetVersion.Status.DEPRECATED, updated_at=timezone.now())
+    ReferenceDatasetVersion.objects.filter(
+        dataset_id=dataset_id, status=ReferenceDatasetVersion.Status.ACTIVE
+    ).exclude(id=target.id).update(
+        status=ReferenceDatasetVersion.Status.DEPRECATED, updated_at=timezone.now()
+    )
     target.status = ReferenceDatasetVersion.Status.ACTIVE
-    target.save(update_fields=['status', 'updated_at'])
+    target.save(update_fields=["status", "updated_at"])
 
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='reference.version.activated',
+        event_type="reference.version.activated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.reference.version.activated',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.reference.version.activated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_reference_dataset_version_to_dict(target),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='reference.version.activated',
-        resource_type='reference_dataset_version',
+        action="reference.version.activated",
+        resource_type="reference_dataset_version",
         resource_id=str(target.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_reference_dataset_version_to_dict(target),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_reference_dataset_version_to_dict(target))
 
 
 @csrf_exempt
 def reference_dataset_version_values(request, dataset_id: str, version: int):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     try:
-        dataset_version = ReferenceDatasetVersion.objects.get(dataset_id=dataset_id, version=version)
+        dataset_version = ReferenceDatasetVersion.objects.get(
+            dataset_id=dataset_id, version=version
+        )
     except (ValidationError, ReferenceDatasetVersion.DoesNotExist):
-        return JsonResponse({'error': 'version_not_found'}, status=404)
+        return JsonResponse({"error": "version_not_found"}, status=404)
     return JsonResponse(
         {
-            'dataset_id': str(dataset_version.dataset_id),
-            'version': dataset_version.version,
-            'values': dataset_version.values,
+            "dataset_id": str(dataset_version.dataset_id),
+            "version": dataset_version.version,
+            "values": dataset_version.values,
         }
     )
 
 
 @csrf_exempt
 def master_records(request, entity_type: str):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         qs = MasterRecord.objects.filter(entity_type=entity_type).order_by(
-            '-updated_at'
+            "-updated_at"
         )
-        master_id = request.GET.get('master_id')
+        master_id = request.GET.get("master_id")
         if master_id:
             qs = qs.filter(master_id=master_id)
-        return JsonResponse({'items': [_master_record_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_master_record_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        attributes = payload.get('attributes') or {}
-        survivorship_policy = payload.get('survivorship_policy') or {}
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        attributes = payload.get("attributes") or {}
+        survivorship_policy = payload.get("survivorship_policy") or {}
         if not isinstance(attributes, dict):
-            return JsonResponse({'error': 'attributes must be an object'}, status=400)
+            return JsonResponse({"error": "attributes must be an object"}, status=400)
         if not isinstance(survivorship_policy, dict):
             return JsonResponse(
-                {'error': 'survivorship_policy must be an object'},
+                {"error": "survivorship_policy must be an object"},
                 status=400,
             )
-        confidence = payload.get('confidence')
+        confidence = payload.get("confidence")
         if confidence is not None and not isinstance(confidence, (int, float)):
-            return JsonResponse({'error': 'confidence must be numeric'}, status=400)
+            return JsonResponse({"error": "confidence must be numeric"}, status=400)
 
-        status_value = payload.get('status') or MasterRecord.Status.ACTIVE
+        status_value = payload.get("status") or MasterRecord.Status.ACTIVE
         if status_value not in {
             MasterRecord.Status.DRAFT,
             MasterRecord.Status.ACTIVE,
             MasterRecord.Status.ARCHIVED,
         }:
-            return JsonResponse({'error': 'invalid_status'}, status=400)
+            return JsonResponse({"error": "invalid_status"}, status=400)
 
-        raw_master_id = payload.get('master_id')
+        raw_master_id = payload.get("master_id")
         tenant_schema = _tenant_schema(request)
         if raw_master_id:
             try:
                 master_id = uuid.UUID(str(raw_master_id))
             except ValueError:
-                return JsonResponse({'error': 'invalid_master_id'}, status=400)
+                return JsonResponse({"error": "invalid_master_id"}, status=400)
             latest = (
                 MasterRecord.objects.filter(
                     entity_type=entity_type,
                     master_id=master_id,
                 )
-                .order_by('-version')
+                .order_by("-version")
                 .first()
             )
             if latest is None:
-                return JsonResponse({'error': 'master_not_found'}, status=404)
+                return JsonResponse({"error": "master_not_found"}, status=404)
             if status_value == MasterRecord.Status.ACTIVE:
                 MasterRecord.objects.filter(
                     entity_type=entity_type,
                     master_id=master_id,
                     status=MasterRecord.Status.ACTIVE,
-                ).update(status=MasterRecord.Status.SUPERSEDED, updated_at=timezone.now())
+                ).update(
+                    status=MasterRecord.Status.SUPERSEDED, updated_at=timezone.now()
+                )
             created = MasterRecord.objects.create(
                 entity_type=entity_type,
                 master_id=master_id,
@@ -3039,7 +3337,7 @@ def master_records(request, entity_type: str):
                 confidence=float(confidence) if confidence is not None else None,
                 status=status_value,
             )
-            event_type = 'master-data.record.updated'
+            event_type = "master-data.record.updated"
         else:
             created = MasterRecord.objects.create(
                 entity_type=entity_type,
@@ -3049,97 +3347,97 @@ def master_records(request, entity_type: str):
                 confidence=float(confidence) if confidence is not None else None,
                 status=status_value,
             )
-            event_type = 'master-data.record.created'
+            event_type = "master-data.record.created"
 
         maybe_publish_event(
             event_type=event_type,
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.{event_type}',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.{event_type}",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_master_record_to_dict(created),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
             action=event_type,
-            resource_type='master_record',
+            resource_type="master_record",
             resource_id=str(created.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_master_record_to_dict(created),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_master_record_to_dict(created), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def master_record_detail(request, entity_type: str, master_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
 
     qs = MasterRecord.objects.filter(entity_type=entity_type, master_id=master_id)
-    version = request.GET.get('version')
+    version = request.GET.get("version")
     if version:
         try:
             parsed_version = int(version)
         except ValueError:
-            return JsonResponse({'error': 'version must be an integer'}, status=400)
+            return JsonResponse({"error": "version must be an integer"}, status=400)
         record = qs.filter(version=parsed_version).first()
     else:
-        record = qs.order_by('-version').first()
+        record = qs.order_by("-version").first()
     if record is None:
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_master_record_to_dict(record))
 
 
 @csrf_exempt
 def master_merge_candidates(request, entity_type: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    target_master_id = payload.get('target_master_id')
-    proposed_attributes = payload.get('proposed_attributes') or {}
-    source_master_refs = payload.get('source_master_refs') or []
-    confidence = payload.get('confidence')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    target_master_id = payload.get("target_master_id")
+    proposed_attributes = payload.get("proposed_attributes") or {}
+    source_master_refs = payload.get("source_master_refs") or []
+    confidence = payload.get("confidence")
     if not target_master_id:
-        return JsonResponse({'error': 'target_master_id is required'}, status=400)
+        return JsonResponse({"error": "target_master_id is required"}, status=400)
     if not isinstance(proposed_attributes, dict):
         return JsonResponse(
-            {'error': 'proposed_attributes must be an object'},
+            {"error": "proposed_attributes must be an object"},
             status=400,
         )
     if not isinstance(source_master_refs, list):
         return JsonResponse(
-            {'error': 'source_master_refs must be a list'},
+            {"error": "source_master_refs must be a list"},
             status=400,
         )
     if confidence is not None and not isinstance(confidence, (int, float)):
-        return JsonResponse({'error': 'confidence must be numeric'}, status=400)
+        return JsonResponse({"error": "confidence must be numeric"}, status=400)
     try:
         parsed_target_master_id = uuid.UUID(str(target_master_id))
     except ValueError:
-        return JsonResponse({'error': 'invalid_target_master_id'}, status=400)
+        return JsonResponse({"error": "invalid_target_master_id"}, status=400)
     if not MasterRecord.objects.filter(
         entity_type=entity_type,
         master_id=parsed_target_master_id,
     ).exists():
-        return JsonResponse({'error': 'target_master_not_found'}, status=404)
+        return JsonResponse({"error": "target_master_not_found"}, status=404)
     candidate = MasterMergeCandidate.objects.create(
         entity_type=entity_type,
         target_master_id=parsed_target_master_id,
@@ -3152,9 +3450,9 @@ def master_merge_candidates(request, entity_type: str):
 
 @csrf_exempt
 def master_merge_candidate_approve(request, entity_type: str, candidate_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
@@ -3163,19 +3461,19 @@ def master_merge_candidate_approve(request, entity_type: str, candidate_id: str)
             entity_type=entity_type,
         )
     except (ValidationError, MasterMergeCandidate.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if candidate.status != MasterMergeCandidate.Status.PENDING:
-        return JsonResponse({'error': 'candidate_not_pending'}, status=400)
+        return JsonResponse({"error": "candidate_not_pending"}, status=400)
     latest = (
         MasterRecord.objects.filter(
             entity_type=entity_type,
             master_id=candidate.target_master_id,
         )
-        .order_by('-version')
+        .order_by("-version")
         .first()
     )
     if latest is None:
-        return JsonResponse({'error': 'target_master_not_found'}, status=404)
+        return JsonResponse({"error": "target_master_not_found"}, status=404)
     MasterRecord.objects.filter(
         entity_type=entity_type,
         master_id=candidate.target_master_id,
@@ -3192,236 +3490,236 @@ def master_merge_candidate_approve(request, entity_type: str, candidate_id: str)
     )
     candidate.status = MasterMergeCandidate.Status.APPROVED
     candidate.approved_by = (
-        request.headers.get('X-User-Id')
-        or request.headers.get('X-User-ID')
-        or ''
+        request.headers.get("X-User-Id") or request.headers.get("X-User-ID") or ""
     )
-    candidate.save(update_fields=['status', 'approved_by', 'updated_at'])
+    candidate.save(update_fields=["status", "approved_by", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='master-data.record.merged',
+        event_type="master-data.record.merged",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.master-data.record.merged',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.master-data.record.merged",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data={
-            'candidate': _master_merge_candidate_to_dict(candidate),
-            'record': _master_record_to_dict(merged),
+            "candidate": _master_merge_candidate_to_dict(candidate),
+            "record": _master_record_to_dict(merged),
         },
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='master-data.record.merged',
-        resource_type='master_record',
+        action="master-data.record.merged",
+        resource_type="master_record",
         resource_id=str(merged.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data={
-            'candidate': _master_merge_candidate_to_dict(candidate),
-            'record': _master_record_to_dict(merged),
+            "candidate": _master_merge_candidate_to_dict(candidate),
+            "record": _master_record_to_dict(merged),
         },
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'candidate': _master_merge_candidate_to_dict(candidate),
-            'record': _master_record_to_dict(merged),
+            "candidate": _master_merge_candidate_to_dict(candidate),
+            "record": _master_record_to_dict(merged),
         }
     )
 
 
 @csrf_exempt
 def classifications(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = Classification.objects.order_by('-updated_at')
-        status_filter = request.GET.get('status')
+        qs = Classification.objects.order_by("-updated_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_classification_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_classification_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
-        level = payload.get('level')
+            return JsonResponse({"error": "name is required"}, status=400)
+        level = payload.get("level")
         if level not in {
             Classification.Level.PUBLIC,
             Classification.Level.INTERNAL,
             Classification.Level.CONFIDENTIAL,
             Classification.Level.RESTRICTED,
         }:
-            return JsonResponse({'error': 'invalid_level'}, status=400)
-        tags = _parse_string_list(payload.get('tags'))
+            return JsonResponse({"error": "invalid_level"}, status=400)
+        tags = _parse_string_list(payload.get("tags"))
         if tags is None:
-            return JsonResponse({'error': 'tags must be an array of strings'}, status=400)
+            return JsonResponse(
+                {"error": "tags must be an array of strings"}, status=400
+            )
 
         classification = Classification.objects.create(
             name=name,
             level=level,
-            description=(payload.get('description') or ''),
+            description=(payload.get("description") or ""),
             tags=tags,
             status=Classification.Status.DRAFT,
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='classification.created',
+            event_type="classification.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.classification.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.classification.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_classification_to_dict(classification),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='classification.created',
-            resource_type='classification',
+            action="classification.created",
+            resource_type="classification",
             resource_id=str(classification.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_classification_to_dict(classification),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_classification_to_dict(classification), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def classification_detail(request, classification_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         classification = Classification.objects.get(id=classification_id)
     except (ValidationError, Classification.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_classification_to_dict(classification))
 
 
 @csrf_exempt
 def classification_activate(request, classification_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         classification = Classification.objects.get(id=classification_id)
     except (ValidationError, Classification.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     classification.status = Classification.Status.ACTIVE
-    classification.save(update_fields=['status', 'updated_at'])
+    classification.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='classification.activated',
+        event_type="classification.activated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.classification.activated',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.classification.activated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_classification_to_dict(classification),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='classification.activated',
-        resource_type='classification',
+        action="classification.activated",
+        resource_type="classification",
         resource_id=str(classification.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_classification_to_dict(classification),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_classification_to_dict(classification))
 
 
 @csrf_exempt
 def classification_deprecate(request, classification_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         classification = Classification.objects.get(id=classification_id)
     except (ValidationError, Classification.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     classification.status = Classification.Status.DEPRECATED
-    classification.save(update_fields=['status', 'updated_at'])
+    classification.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='classification.deprecated',
+        event_type="classification.deprecated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.classification.deprecated',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.classification.deprecated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_classification_to_dict(classification),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='classification.deprecated',
-        resource_type='classification',
+        action="classification.deprecated",
+        resource_type="classification",
         resource_id=str(classification.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_classification_to_dict(classification),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_classification_to_dict(classification))
 
 
 @csrf_exempt
 def asset_classifications(request, asset_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_role(request, 'catalog.editor')
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_role(request, "catalog.editor")
     if forbidden:
         return forbidden
     try:
         asset = DataAsset.objects.get(id=asset_id)
     except (ValidationError, DataAsset.DoesNotExist):
-        return JsonResponse({'error': 'asset_not_found'}, status=404)
+        return JsonResponse({"error": "asset_not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    classifications_value = _parse_string_list(payload.get('classifications'))
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    classifications_value = _parse_string_list(payload.get("classifications"))
     if classifications_value is None:
         return JsonResponse(
-            {'error': 'classifications must be an array of strings'},
+            {"error": "classifications must be an array of strings"},
             status=400,
         )
     selected = classifications_value or []
     invalid = _validate_classification_values(selected)
     if invalid:
         return JsonResponse(
-            {'error': 'unknown_classifications', 'items': invalid},
+            {"error": "unknown_classifications", "items": invalid},
             status=400,
         )
     if selected:
@@ -3429,14 +3727,14 @@ def asset_classifications(request, asset_id: str):
             Classification.objects.filter(
                 status=Classification.Status.ACTIVE,
                 name__in=selected,
-            ).values_list('name', flat=True)
+            ).values_list("name", flat=True)
         )
         missing = sorted(set(selected) - active_names)
         if missing:
             return JsonResponse(
                 {
-                    'error': 'inactive_or_unknown_classifications',
-                    'items': missing,
+                    "error": "inactive_or_unknown_classifications",
+                    "items": missing,
                 },
                 status=400,
             )
@@ -3448,75 +3746,77 @@ def asset_classifications(request, asset_id: str):
     if forbidden:
         return forbidden
     asset.classifications = selected
-    asset.save(update_fields=['classifications', 'updated_at'])
+    asset.save(update_fields=["classifications", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='asset.classification.changed',
+        event_type="asset.classification.changed",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.asset.classification.changed',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.asset.classification.changed",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_asset_to_dict(asset),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='asset.classification.changed',
-        resource_type='asset',
+        action="asset.classification.changed",
+        resource_type="asset",
         resource_id=str(asset.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_asset_to_dict(asset),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_asset_to_dict(asset))
 
 
 @csrf_exempt
 def print_jobs(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        status_filter = request.GET.get('status')
-        qs = PrintJob.objects.order_by('-created_at')
+        status_filter = request.GET.get("status")
+        qs = PrintJob.objects.order_by("-created_at")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_print_job_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_print_job_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        template_ref = (payload.get('template_ref') or '').strip()
-        destination = (payload.get('destination') or '').strip()
-        output_format = payload.get('output_format')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        template_ref = (payload.get("template_ref") or "").strip()
+        destination = (payload.get("destination") or "").strip()
+        output_format = payload.get("output_format")
         if not template_ref or not destination or not output_format:
             return JsonResponse(
-                {'error': 'template_ref, destination, and output_format are required'},
+                {"error": "template_ref, destination, and output_format are required"},
                 status=400,
             )
         if output_format not in {PrintJob.Format.ZPL, PrintJob.Format.PDF}:
-            return JsonResponse({'error': 'invalid_output_format'}, status=400)
-        print_payload = payload.get('payload') or {}
+            return JsonResponse({"error": "invalid_output_format"}, status=400)
+        print_payload = payload.get("payload") or {}
         if not isinstance(print_payload, dict):
-            return JsonResponse({'error': 'payload must be an object'}, status=400)
+            return JsonResponse({"error": "payload must be an object"}, status=400)
         if output_format == PrintJob.Format.ZPL:
             print_payload = _expand_default_participant_labels(print_payload)
         template = PrintTemplate.objects.filter(template_ref=template_ref).first()
         if template and template.output_format != output_format:
-            return JsonResponse({'error': 'template_output_format_mismatch'}, status=400)
-        template_content = template.content if template else ''
+            return JsonResponse(
+                {"error": "template_output_format_mismatch"}, status=400
+            )
+        template_content = template.content if template else ""
         gateway_metadata = {
-            'render_preview': render_label_preview(
+            "render_preview": render_label_preview(
                 output_format=output_format,
                 template_content=template_content,
                 payload=print_payload,
@@ -3533,72 +3833,72 @@ def print_jobs(request):
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='print.requested',
+            event_type="print.requested",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.print.requested',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.print.requested",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_print_job_to_dict(print_job),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='print.requested',
-            resource_type='print_job',
+            action="print.requested",
+            resource_type="print_job",
             resource_id=str(print_job.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_print_job_to_dict(print_job),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_print_job_to_dict(print_job), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def print_job_detail(request, job_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         print_job = PrintJob.objects.get(id=job_id)
     except (ValidationError, PrintJob.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_print_job_to_dict(print_job))
 
 
 @csrf_exempt
 def print_job_preview_pdf(request, job_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         print_job = PrintJob.objects.get(id=job_id)
     except (ValidationError, PrintJob.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
-    preview = (print_job.gateway_metadata or {}).get('render_preview') or {}
-    pdf_base64 = preview.get('pdf_base64')
+        return JsonResponse({"error": "not_found"}, status=404)
+    preview = (print_job.gateway_metadata or {}).get("render_preview") or {}
+    pdf_base64 = preview.get("pdf_base64")
     if not isinstance(pdf_base64, str) or not pdf_base64.strip():
-        return JsonResponse({'error': 'preview_pdf_not_available'}, status=404)
+        return JsonResponse({"error": "preview_pdf_not_available"}, status=404)
     try:
         pdf_bytes = base64.b64decode(pdf_base64)
     except (ValueError, binascii.Error):
-        return JsonResponse({'error': 'invalid_preview_pdf'}, status=500)
-    response = HttpResponse(pdf_bytes, content_type='application/pdf')
-    response['Content-Disposition'] = (
+        return JsonResponse({"error": "invalid_preview_pdf"}, status=500)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = (
         f'attachment; filename="print-job-{print_job.id}-preview.pdf"'
     )
     return response
@@ -3606,37 +3906,37 @@ def print_job_preview_pdf(request, job_id: str):
 
 @csrf_exempt
 def print_job_status(request, job_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         print_job = PrintJob.objects.get(id=job_id)
     except (ValidationError, PrintJob.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    status_value = payload.get('status')
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    status_value = payload.get("status")
     if status_value not in {
         PrintJob.Status.RETRYING,
         PrintJob.Status.COMPLETED,
         PrintJob.Status.FAILED,
     }:
-        return JsonResponse({'error': 'invalid_status'}, status=400)
-    retry_count = payload.get('retry_count')
+        return JsonResponse({"error": "invalid_status"}, status=400)
+    retry_count = payload.get("retry_count")
     if retry_count is not None and not isinstance(retry_count, int):
-        return JsonResponse({'error': 'retry_count must be an integer'}, status=400)
-    gateway_metadata = payload.get('gateway_metadata')
+        return JsonResponse({"error": "retry_count must be an integer"}, status=400)
+    gateway_metadata = payload.get("gateway_metadata")
     if gateway_metadata is not None and not isinstance(gateway_metadata, dict):
         return JsonResponse(
-            {'error': 'gateway_metadata must be an object'},
+            {"error": "gateway_metadata must be an object"},
             status=400,
         )
-    error_message = payload.get('error_message')
+    error_message = payload.get("error_message")
     if error_message is not None and not isinstance(error_message, str):
-        return JsonResponse({'error': 'error_message must be a string'}, status=400)
+        return JsonResponse({"error": "error_message must be a string"}, status=400)
 
     print_job.status = status_value
     if retry_count is not None:
@@ -3647,399 +3947,407 @@ def print_job_status(request, job_id: str):
         print_job.error_message = error_message
     print_job.save(
         update_fields=[
-            'status',
-            'retry_count',
-            'gateway_metadata',
-            'error_message',
-            'updated_at',
+            "status",
+            "retry_count",
+            "gateway_metadata",
+            "error_message",
+            "updated_at",
         ]
     )
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type=f'print.{status_value}',
+        event_type=f"print.{status_value}",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.print.{status_value}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.print.{status_value}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_print_job_to_dict(print_job),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action=f'print.{status_value}',
-        resource_type='print_job',
+        action=f"print.{status_value}",
+        resource_type="print_job",
         resource_id=str(print_job.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_print_job_to_dict(print_job),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_print_job_to_dict(print_job))
 
 
 @csrf_exempt
 def print_gateways(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        status_filter = (request.GET.get('status') or '').strip()
-        qs = PrintGateway.objects.order_by('-updated_at')
+        status_filter = (request.GET.get("status") or "").strip()
+        qs = PrintGateway.objects.order_by("-updated_at")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_print_gateway_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_print_gateway_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        gateway_ref = (payload.get('gateway_ref') or '').strip()
-        display_name = (payload.get('display_name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        gateway_ref = (payload.get("gateway_ref") or "").strip()
+        display_name = (payload.get("display_name") or "").strip()
         if not gateway_ref or not display_name:
-            return JsonResponse({'error': 'gateway_ref and display_name are required'}, status=400)
+            return JsonResponse(
+                {"error": "gateway_ref and display_name are required"}, status=400
+            )
         if PrintGateway.objects.filter(gateway_ref=gateway_ref).exists():
-            return JsonResponse({'error': 'gateway_already_exists'}, status=409)
-        capabilities = payload.get('capabilities')
+            return JsonResponse({"error": "gateway_already_exists"}, status=409)
+        capabilities = payload.get("capabilities")
         if capabilities is None:
             capabilities = []
         if not isinstance(capabilities, list):
-            return JsonResponse({'error': 'capabilities must be an array'}, status=400)
-        metadata = payload.get('metadata')
+            return JsonResponse({"error": "capabilities must be an array"}, status=400)
+        metadata = payload.get("metadata")
         if metadata is None:
             metadata = {}
         if not isinstance(metadata, dict):
-            return JsonResponse({'error': 'metadata must be an object'}, status=400)
-        status_value = (payload.get('status') or PrintGateway.Status.OFFLINE).strip()
+            return JsonResponse({"error": "metadata must be an object"}, status=400)
+        status_value = (payload.get("status") or PrintGateway.Status.OFFLINE).strip()
         if status_value not in PrintGateway.Status.values:
-            return JsonResponse({'error': 'invalid_status'}, status=400)
+            return JsonResponse({"error": "invalid_status"}, status=400)
         gateway = PrintGateway.objects.create(
             gateway_ref=gateway_ref,
             display_name=display_name,
-            site_ref=(payload.get('site_ref') or '').strip(),
+            site_ref=(payload.get("site_ref") or "").strip(),
             status=status_value,
             capabilities=capabilities,
             metadata=metadata,
-            last_seen_version=(payload.get('last_seen_version') or '').strip(),
+            last_seen_version=(payload.get("last_seen_version") or "").strip(),
         )
         return JsonResponse(_print_gateway_to_dict(gateway), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def print_templates(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = PrintTemplate.objects.order_by('-updated_at')
-        return JsonResponse({'items': [_print_template_to_dict(item) for item in qs]})
+        qs = PrintTemplate.objects.order_by("-updated_at")
+        return JsonResponse({"items": [_print_template_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
-        template_ref = (payload.get('template_ref') or '').strip()
-        output_format = (payload.get('output_format') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
+        template_ref = (payload.get("template_ref") or "").strip()
+        output_format = (payload.get("output_format") or "").strip()
         if not name or not template_ref or not output_format:
             return JsonResponse(
-                {'error': 'name, template_ref, and output_format are required'},
+                {"error": "name, template_ref, and output_format are required"},
                 status=400,
             )
         if output_format not in {PrintJob.Format.ZPL, PrintJob.Format.PDF}:
-            return JsonResponse({'error': 'invalid_output_format'}, status=400)
+            return JsonResponse({"error": "invalid_output_format"}, status=400)
         if PrintTemplate.objects.filter(template_ref=template_ref).exists():
-            return JsonResponse({'error': 'template_ref_already_exists'}, status=409)
-        sample_payload = payload.get('sample_payload')
+            return JsonResponse({"error": "template_ref_already_exists"}, status=409)
+        sample_payload = payload.get("sample_payload")
         if sample_payload is None:
             sample_payload = {}
         if not isinstance(sample_payload, dict):
-            return JsonResponse({'error': 'sample_payload must be an object'}, status=400)
+            return JsonResponse(
+                {"error": "sample_payload must be an object"}, status=400
+            )
         template = PrintTemplate.objects.create(
             name=name,
             template_ref=template_ref,
             output_format=output_format,
-            content=(payload.get('content') or '').strip(),
+            content=(payload.get("content") or "").strip(),
             sample_payload=sample_payload,
         )
         return JsonResponse(_print_template_to_dict(template), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def print_gateway_heartbeat(request, gateway_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    configured_token = (os.environ.get('EDMP_PRINT_GATEWAY_HEARTBEAT_TOKEN') or '').strip()
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    configured_token = (
+        os.environ.get("EDMP_PRINT_GATEWAY_HEARTBEAT_TOKEN") or ""
+    ).strip()
     if configured_token:
-        supplied_token = (request.headers.get('X-Print-Gateway-Token') or '').strip()
+        supplied_token = (request.headers.get("X-Print-Gateway-Token") or "").strip()
         if supplied_token != configured_token:
-            return JsonResponse({'error': 'invalid_gateway_token'}, status=403)
+            return JsonResponse({"error": "invalid_gateway_token"}, status=403)
     else:
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
     try:
         gateway = PrintGateway.objects.get(id=gateway_id)
     except (ValidationError, PrintGateway.DoesNotExist):
-        return JsonResponse({'error': 'gateway_not_found'}, status=404)
+        return JsonResponse({"error": "gateway_not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    status_value = (payload.get('status') or PrintGateway.Status.ONLINE).strip()
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    status_value = (payload.get("status") or PrintGateway.Status.ONLINE).strip()
     if status_value not in PrintGateway.Status.values:
-        return JsonResponse({'error': 'invalid_status'}, status=400)
-    capabilities = payload.get('capabilities')
+        return JsonResponse({"error": "invalid_status"}, status=400)
+    capabilities = payload.get("capabilities")
     if capabilities is not None and not isinstance(capabilities, list):
-        return JsonResponse({'error': 'capabilities must be an array'}, status=400)
-    metadata = payload.get('metadata')
+        return JsonResponse({"error": "capabilities must be an array"}, status=400)
+    metadata = payload.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
-        return JsonResponse({'error': 'metadata must be an object'}, status=400)
-    version = payload.get('version')
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
+    version = payload.get("version")
     if version is not None and not isinstance(version, str):
-        return JsonResponse({'error': 'version must be a string'}, status=400)
+        return JsonResponse({"error": "version must be a string"}, status=400)
     gateway.status = status_value
     gateway.last_heartbeat_at = timezone.now()
-    update_fields = ['status', 'last_heartbeat_at', 'updated_at']
+    update_fields = ["status", "last_heartbeat_at", "updated_at"]
     if capabilities is not None:
         gateway.capabilities = capabilities
-        update_fields.append('capabilities')
+        update_fields.append("capabilities")
     if metadata is not None:
         gateway.metadata = metadata
-        update_fields.append('metadata')
+        update_fields.append("metadata")
     if version is not None:
         gateway.last_seen_version = version.strip()
-        update_fields.append('last_seen_version')
+        update_fields.append("last_seen_version")
     gateway.save(update_fields=update_fields)
     return JsonResponse(_print_gateway_to_dict(gateway))
 
 
 @csrf_exempt
 def collaboration_documents(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        documents = CollaborationDocument.objects.order_by('-updated_at')
+        documents = CollaborationDocument.objects.order_by("-updated_at")
         return JsonResponse(
-            {'items': [_collaboration_document_to_dict(item) for item in documents]}
+            {"items": [_collaboration_document_to_dict(item) for item in documents]}
         )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        title = (payload.get('title') or '').strip()
-        object_key = (payload.get('object_key') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        title = (payload.get("title") or "").strip()
+        object_key = (payload.get("object_key") or "").strip()
         if not title or not object_key:
             return JsonResponse(
-                {'error': 'title and object_key are required'},
+                {"error": "title and object_key are required"},
                 status=400,
             )
-        content_type = payload.get('content_type') or ''
-        owner = payload.get('owner') or request.headers.get('X-User-Id') or ''
+        content_type = payload.get("content_type") or ""
+        owner = payload.get("owner") or request.headers.get("X-User-Id") or ""
         if content_type and not isinstance(content_type, str):
-            return JsonResponse({'error': 'content_type must be a string'}, status=400)
+            return JsonResponse({"error": "content_type must be a string"}, status=400)
         if owner and not isinstance(owner, str):
-            return JsonResponse({'error': 'owner must be a string'}, status=400)
+            return JsonResponse({"error": "owner must be a string"}, status=400)
 
         document = CollaborationDocument.objects.create(
             title=title,
             object_key=object_key,
             content_type=content_type,
             owner=owner,
-            status='active',
+            status="active",
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='collaboration.document.created',
+            event_type="collaboration.document.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.collaboration.document.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.collaboration.document.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_collaboration_document_to_dict(document),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='collaboration.document.created',
-            resource_type='collaboration_document',
+            action="collaboration.document.created",
+            resource_type="collaboration_document",
             resource_id=str(document.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_collaboration_document_to_dict(document),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_collaboration_document_to_dict(document), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def collaboration_document_detail(request, document_id: str):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         try:
             document = CollaborationDocument.objects.get(id=document_id)
         except (ValidationError, CollaborationDocument.DoesNotExist):
-            return JsonResponse({'error': 'not_found'}, status=404)
+            return JsonResponse({"error": "not_found"}, status=404)
         return JsonResponse(_collaboration_document_to_dict(document))
 
-    if request.method == 'PATCH':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "PATCH":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         try:
             document = CollaborationDocument.objects.get(id=document_id)
         except (ValidationError, CollaborationDocument.DoesNotExist):
-            return JsonResponse({'error': 'not_found'}, status=404)
+            return JsonResponse({"error": "not_found"}, status=404)
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        if 'title' in payload:
-            title = payload.get('title')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        if "title" in payload:
+            title = payload.get("title")
             if not isinstance(title, str) or not title.strip():
-                return JsonResponse({'error': 'title must be a non-empty string'}, status=400)
+                return JsonResponse(
+                    {"error": "title must be a non-empty string"}, status=400
+                )
             document.title = title.strip()
-        if 'owner' in payload:
-            owner = payload.get('owner')
+        if "owner" in payload:
+            owner = payload.get("owner")
             if owner is not None and not isinstance(owner, str):
-                return JsonResponse({'error': 'owner must be a string'}, status=400)
-            document.owner = owner or ''
-        document.save(update_fields=['title', 'owner', 'updated_at'])
+                return JsonResponse({"error": "owner must be a string"}, status=400)
+            document.owner = owner or ""
+        document.save(update_fields=["title", "owner", "updated_at"])
         return JsonResponse(_collaboration_document_to_dict(document))
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def collaboration_document_session(request, document_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         document = CollaborationDocument.objects.get(id=document_id)
     except (ValidationError, CollaborationDocument.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    mode = payload.get('mode') or 'edit'
-    if mode not in {'view', 'edit'}:
-        return JsonResponse({'error': 'mode must be view or edit'}, status=400)
-    if mode == 'edit':
-        forbidden_edit = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    mode = payload.get("mode") or "edit"
+    if mode not in {"view", "edit"}:
+        return JsonResponse({"error": "mode must be view or edit"}, status=400)
+    if mode == "edit":
+        forbidden_edit = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden_edit:
             return forbidden_edit
 
     tenant_schema = _tenant_schema(request)
     session_token = str(uuid.uuid4())
     event_type = (
-        'collaboration.session.started'
-        if mode == 'edit'
-        else 'collaboration.session.viewed'
+        "collaboration.session.started"
+        if mode == "edit"
+        else "collaboration.session.viewed"
     )
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data={
-            'document': _collaboration_document_to_dict(document),
-            'mode': mode,
-            'session_token': session_token,
+            "document": _collaboration_document_to_dict(document),
+            "mode": mode,
+            "session_token": session_token,
         },
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='collaboration_document',
+        resource_type="collaboration_document",
         resource_id=str(document.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={'mode': mode, 'session_token': session_token},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={"mode": mode, "session_token": session_token},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'document_id': str(document.id),
-            'mode': mode,
-            'session_token': session_token,
+            "document_id": str(document.id),
+            "mode": mode,
+            "session_token": session_token,
         }
     )
 
 
 @csrf_exempt
 def collaboration_document_versions(request, document_id: str):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         versions = CollaborationDocumentVersion.objects.filter(
             document_id=document_id
-        ).order_by('-version')
+        ).order_by("-version")
         return JsonResponse(
-            {'items': [_collaboration_version_to_dict(item) for item in versions]}
+            {"items": [_collaboration_version_to_dict(item) for item in versions]}
         )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         try:
             document = CollaborationDocument.objects.get(id=document_id)
         except (ValidationError, CollaborationDocument.DoesNotExist):
-            return JsonResponse({'error': 'not_found'}, status=404)
+            return JsonResponse({"error": "not_found"}, status=404)
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        object_key = (payload.get('object_key') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        object_key = (payload.get("object_key") or "").strip()
         if not object_key:
-            return JsonResponse({'error': 'object_key is required'}, status=400)
+            return JsonResponse({"error": "object_key is required"}, status=400)
         latest_version = (
             CollaborationDocumentVersion.objects.filter(document_id=document_id)
-            .order_by('-version')
+            .order_by("-version")
             .first()
         )
         next_version = 1 if latest_version is None else latest_version.version + 1
@@ -4047,384 +4355,397 @@ def collaboration_document_versions(request, document_id: str):
             document=document,
             version=next_version,
             object_key=object_key,
-            summary=(payload.get('summary') or ''),
-            editor=(payload.get('editor') or request.headers.get('X-User-Id') or ''),
+            summary=(payload.get("summary") or ""),
+            editor=(payload.get("editor") or request.headers.get("X-User-Id") or ""),
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='collaboration.version.persisted',
+            event_type="collaboration.version.persisted",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.collaboration.version.persisted',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.collaboration.version.persisted",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data={
-                'document': _collaboration_document_to_dict(document),
-                'version': _collaboration_version_to_dict(version),
+                "document": _collaboration_document_to_dict(document),
+                "version": _collaboration_version_to_dict(version),
             },
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='collaboration.version.persisted',
-            resource_type='collaboration_document',
+            action="collaboration.version.persisted",
+            resource_type="collaboration_document",
             resource_id=str(document.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_collaboration_version_to_dict(version),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_collaboration_version_to_dict(version), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def notebook_workspaces(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        workspaces = NotebookWorkspace.objects.order_by('-updated_at')
+        workspaces = NotebookWorkspace.objects.order_by("-updated_at")
         return JsonResponse(
-            {'items': [_notebook_workspace_to_dict(item) for item in workspaces]}
+            {"items": [_notebook_workspace_to_dict(item) for item in workspaces]}
         )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
-        storage_mounts = payload.get('storage_mounts')
+            return JsonResponse({"error": "name is required"}, status=400)
+        storage_mounts = payload.get("storage_mounts")
         if storage_mounts is None:
             storage_mounts = []
         if not isinstance(storage_mounts, list) or any(
             not isinstance(item, str) for item in storage_mounts
         ):
             return JsonResponse(
-                {'error': 'storage_mounts must be an array of strings'},
+                {"error": "storage_mounts must be an array of strings"},
                 status=400,
             )
         workspace = NotebookWorkspace.objects.create(
             name=name,
-            owner=(payload.get('owner') or request.headers.get('X-User-Id') or ''),
-            image=(payload.get('image') or ''),
-            cpu_limit=(payload.get('cpu_limit') or ''),
-            memory_limit=(payload.get('memory_limit') or ''),
+            owner=(payload.get("owner") or request.headers.get("X-User-Id") or ""),
+            image=(payload.get("image") or ""),
+            cpu_limit=(payload.get("cpu_limit") or ""),
+            memory_limit=(payload.get("memory_limit") or ""),
             storage_mounts=storage_mounts,
-            status='active',
+            status="active",
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='notebook.workspace.created',
+            event_type="notebook.workspace.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.notebook.workspace.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.notebook.workspace.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_notebook_workspace_to_dict(workspace),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='notebook.workspace.created',
-            resource_type='notebook_workspace',
+            action="notebook.workspace.created",
+            resource_type="notebook_workspace",
             resource_id=str(workspace.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_notebook_workspace_to_dict(workspace),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_notebook_workspace_to_dict(workspace), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def notebook_workspace_sessions(request, workspace_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         workspace = NotebookWorkspace.objects.get(id=workspace_id)
     except (ValidationError, NotebookWorkspace.DoesNotExist):
-        return JsonResponse({'error': 'workspace_not_found'}, status=404)
+        return JsonResponse({"error": "workspace_not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    metadata = payload.get('metadata') or {}
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
-        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
     session = NotebookSession.objects.create(
         workspace=workspace,
-        user_id=(payload.get('user_id') or request.headers.get('X-User-Id') or ''),
-        pod_name=(payload.get('pod_name') or ''),
+        user_id=(payload.get("user_id") or request.headers.get("X-User-Id") or ""),
+        pod_name=(payload.get("pod_name") or ""),
         metadata=metadata,
         status=NotebookSession.Status.STARTED,
     )
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='notebook.session.started',
+        event_type="notebook.session.started",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.notebook.session.started',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.notebook.session.started",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_session_to_dict(session),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='notebook.session.started',
-        resource_type='notebook_session',
+        action="notebook.session.started",
+        resource_type="notebook_session",
         resource_id=str(session.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_session_to_dict(session),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_notebook_session_to_dict(session), status=201)
 
 
 @csrf_exempt
 def notebook_sessions(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
-    qs = NotebookSession.objects.order_by('-started_at')
-    workspace_id = request.GET.get('workspace_id')
+    qs = NotebookSession.objects.order_by("-started_at")
+    workspace_id = request.GET.get("workspace_id")
     if workspace_id:
         qs = qs.filter(workspace_id=workspace_id)
-    status_filter = request.GET.get('status')
+    status_filter = request.GET.get("status")
     if status_filter:
         qs = qs.filter(status=status_filter)
-    return JsonResponse({'items': [_notebook_session_to_dict(item) for item in qs]})
+    return JsonResponse({"items": [_notebook_session_to_dict(item) for item in qs]})
 
 
 @csrf_exempt
 def notebook_session_terminate(request, session_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         session = NotebookSession.objects.get(id=session_id)
     except (ValidationError, NotebookSession.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    reason = payload.get('reason') or 'terminated'
-    if reason not in {'terminated', 'resource_limit'}:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    reason = payload.get("reason") or "terminated"
+    if reason not in {"terminated", "resource_limit"}:
         return JsonResponse(
-            {'error': 'reason must be terminated or resource_limit'},
+            {"error": "reason must be terminated or resource_limit"},
             status=400,
         )
     session.status = (
         NotebookSession.Status.TERMINATED
-        if reason == 'terminated'
+        if reason == "terminated"
         else NotebookSession.Status.RESOURCE_LIMITED
     )
     session.ended_at = timezone.now()
     metadata = session.metadata or {}
-    metadata['termination_reason'] = reason
+    metadata["termination_reason"] = reason
     session.metadata = metadata
-    session.save(update_fields=['status', 'ended_at', 'metadata'])
+    session.save(update_fields=["status", "ended_at", "metadata"])
     tenant_schema = _tenant_schema(request)
     event_type = (
-        'notebook.session.terminated'
-        if reason == 'terminated'
-        else 'notebook.resource_limit.terminated'
+        "notebook.session.terminated"
+        if reason == "terminated"
+        else "notebook.resource_limit.terminated"
     )
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_session_to_dict(session),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='notebook_session',
+        resource_type="notebook_session",
         resource_id=str(session.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_session_to_dict(session),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_notebook_session_to_dict(session))
 
 
 @csrf_exempt
 def notebook_session_executions(request, session_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         session = NotebookSession.objects.get(id=session_id)
     except (ValidationError, NotebookSession.DoesNotExist):
-        return JsonResponse({'error': 'session_not_found'}, status=404)
+        return JsonResponse({"error": "session_not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    metadata = payload.get('metadata') or {}
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    metadata = payload.get("metadata") or {}
     if not isinstance(metadata, dict):
-        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
     execution = NotebookExecution.objects.create(
         session=session,
-        cell_ref=(payload.get('cell_ref') or ''),
+        cell_ref=(payload.get("cell_ref") or ""),
         metadata=metadata,
         status=NotebookExecution.Status.REQUESTED,
     )
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='notebook.execution.requested',
+        event_type="notebook.execution.requested",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.notebook.execution.requested',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.notebook.execution.requested",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_execution_to_dict(execution),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='notebook.execution.requested',
-        resource_type='notebook_execution',
+        action="notebook.execution.requested",
+        resource_type="notebook_execution",
         resource_id=str(execution.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_execution_to_dict(execution),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_notebook_execution_to_dict(execution), status=201)
 
 
 @csrf_exempt
 def notebook_execution_complete(request, execution_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         execution = NotebookExecution.objects.get(id=execution_id)
     except (ValidationError, NotebookExecution.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    status_value = payload.get('status') or NotebookExecution.Status.COMPLETED
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    status_value = payload.get("status") or NotebookExecution.Status.COMPLETED
     if status_value not in {
         NotebookExecution.Status.COMPLETED,
         NotebookExecution.Status.FAILED,
     }:
         return JsonResponse(
-            {'error': 'status must be completed or failed'},
+            {"error": "status must be completed or failed"},
             status=400,
         )
-    metadata = payload.get('metadata')
+    metadata = payload.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
-        return JsonResponse({'error': 'metadata must be an object'}, status=400)
+        return JsonResponse({"error": "metadata must be an object"}, status=400)
     execution.status = status_value
     execution.completed_at = timezone.now()
     if metadata is not None:
         execution.metadata = metadata
-    execution.save(update_fields=['status', 'completed_at', 'metadata'])
+    execution.save(update_fields=["status", "completed_at", "metadata"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='notebook.execution.completed',
+        event_type="notebook.execution.completed",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.notebook.execution.completed',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.notebook.execution.completed",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_execution_to_dict(execution),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='notebook.execution.completed',
-        resource_type='notebook_execution',
+        action="notebook.execution.completed",
+        resource_type="notebook_execution",
         resource_id=str(execution.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_notebook_execution_to_dict(execution),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_notebook_execution_to_dict(execution))
 
 
 @csrf_exempt
 def contracts(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
-        asset_id = request.GET.get('asset_id')
-        qs = DataContract.objects.order_by('-updated_at')
+        asset_id = request.GET.get("asset_id")
+        qs = DataContract.objects.order_by("-updated_at")
         if asset_id:
             qs = qs.filter(asset_id=asset_id)
-        return JsonResponse({'items': [_contract_to_dict(c) for c in qs]})
+        return JsonResponse({"items": [_contract_to_dict(c) for c in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        asset_id = payload.get('asset_id')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        asset_id = payload.get("asset_id")
         if not asset_id:
-            return JsonResponse({'error': 'asset_id is required'}, status=400)
+            return JsonResponse({"error": "asset_id is required"}, status=400)
         try:
             asset = DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
+            return JsonResponse({"error": "asset_not_found"}, status=404)
 
-        schema = payload.get('schema') or {}
-        expectations = payload.get('expectations') or []
-        owners = payload.get('owners') or []
+        schema = payload.get("schema") or {}
+        expectations = payload.get("expectations") or []
+        owners = payload.get("owners") or []
         if not isinstance(schema, dict):
-            return JsonResponse({'error': 'schema must be an object'}, status=400)
+            return JsonResponse({"error": "schema must be an object"}, status=400)
         if not isinstance(expectations, list):
-            return JsonResponse({'error': 'expectations must be a list'}, status=400)
-        if not isinstance(owners, list) or any(not isinstance(owner, str) for owner in owners):
-            return JsonResponse({'error': 'owners must be a list of strings'}, status=400)
+            return JsonResponse({"error": "expectations must be a list"}, status=400)
+        if not isinstance(owners, list) or any(
+            not isinstance(owner, str) for owner in owners
+        ):
+            return JsonResponse(
+                {"error": "owners must be a list of strings"}, status=400
+            )
 
-        version = payload.get('version')
+        version = payload.get("version")
         if version is None:
-            version = (DataContract.objects.filter(asset_id=asset_id).aggregate(max_v=Max('version')).get('max_v') or 0) + 1
+            version = (
+                DataContract.objects.filter(asset_id=asset_id)
+                .aggregate(max_v=Max("version"))
+                .get("max_v")
+                or 0
+            ) + 1
         elif not isinstance(version, int) or version < 1:
-            return JsonResponse({'error': 'version must be a positive integer'}, status=400)
+            return JsonResponse(
+                {"error": "version must be a positive integer"}, status=400
+            )
 
         contract = DataContract.objects.create(
             asset=asset,
@@ -4436,27 +4757,29 @@ def contracts(request):
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='contract.created',
+            event_type="contract.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.contract.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.contract.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_contract_to_dict(contract),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='contract.created',
-            resource_type='data_contract',
+            action="contract.created",
+            resource_type="data_contract",
             resource_id=str(contract.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_contract_to_dict(contract),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_contract_to_dict(contract), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -4464,10 +4787,12 @@ def contract_detail(request, contract_id: str):
     try:
         contract = DataContract.objects.get(id=contract_id)
     except (ValidationError, DataContract.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+        return JsonResponse({"error": "not_found"}, status=404)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     return JsonResponse(_contract_to_dict(contract))
@@ -4475,298 +4800,345 @@ def contract_detail(request, contract_id: str):
 
 @csrf_exempt
 def asset_contracts(request, asset_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
-    contracts_qs = DataContract.objects.filter(asset_id=asset_id).order_by('-version')
-    return JsonResponse({'items': [_contract_to_dict(c) for c in contracts_qs]})
+    contracts_qs = DataContract.objects.filter(asset_id=asset_id).order_by("-version")
+    return JsonResponse({"items": [_contract_to_dict(c) for c in contracts_qs]})
 
 
 @csrf_exempt
 def asset_versions(request, asset_id: str):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
-            request, {'catalog.reader', 'catalog.editor', 'tenant.admin'}
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
         )
         if forbidden:
             return forbidden
-        versions = AssetVersion.objects.filter(asset_id=asset_id).order_by('-version_number')
-        return JsonResponse({'items': [_asset_version_to_dict(item) for item in versions]})
+        versions = AssetVersion.objects.filter(asset_id=asset_id).order_by(
+            "-version_number"
+        )
+        return JsonResponse(
+            {"items": [_asset_version_to_dict(item) for item in versions]}
+        )
 
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         try:
             asset = DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
+            return JsonResponse({"error": "asset_not_found"}, status=404)
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        change_set = payload.get('change_set') or {}
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        change_set = payload.get("change_set") or {}
         if not isinstance(change_set, dict):
-            return JsonResponse({'error': 'change_set must be an object'}, status=400)
+            return JsonResponse({"error": "change_set must be an object"}, status=400)
         latest_version = (
-            AssetVersion.objects.filter(asset_id=asset_id).aggregate(max_v=Max('version_number')).get('max_v') or 0
+            AssetVersion.objects.filter(asset_id=asset_id)
+            .aggregate(max_v=Max("version_number"))
+            .get("max_v")
+            or 0
         )
         version = AssetVersion.objects.create(
             asset=asset,
             version_number=latest_version + 1,
-            change_summary=(payload.get('change_summary') or ''),
+            change_summary=(payload.get("change_summary") or ""),
             change_set=change_set,
             status=AssetVersion.Status.DRAFT,
-            created_by=(request.headers.get('X-User-Id') or ''),
+            created_by=(request.headers.get("X-User-Id") or ""),
         )
         tenant_schema = _tenant_schema(request)
         data = _asset_version_to_dict(version)
         maybe_publish_event(
-            event_type='asset_version.created',
+            event_type="asset_version.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.asset_version.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.asset_version.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='asset_version.created',
-            resource_type='asset_version',
+            action="asset_version.created",
+            resource_type="asset_version",
             resource_id=str(version.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def asset_version_publish(request, asset_id: str, version_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         version = AssetVersion.objects.get(id=version_id, asset_id=asset_id)
     except (ValidationError, AssetVersion.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if version.status != AssetVersion.Status.DRAFT:
-        return JsonResponse({'error': 'only_draft_versions_can_be_published'}, status=400)
+        return JsonResponse(
+            {"error": "only_draft_versions_can_be_published"}, status=400
+        )
 
     change_set = version.change_set or {}
-    ownership = change_set.get('ownership') or {}
-    classifications = change_set.get('classifications')
-    effective_owner = ownership.get('owner') if isinstance(ownership, dict) else None
+    ownership = change_set.get("ownership") or {}
+    classifications = change_set.get("classifications")
+    effective_owner = ownership.get("owner") if isinstance(ownership, dict) else None
     if not effective_owner:
-        effective_owner = DataAsset.objects.filter(id=asset_id).values_list('owner', flat=True).first() or ''
+        effective_owner = (
+            DataAsset.objects.filter(id=asset_id)
+            .values_list("owner", flat=True)
+            .first()
+            or ""
+        )
     effective_classifications = (
         classifications
         if isinstance(classifications, list)
-        else DataAsset.objects.filter(id=asset_id).values_list('classifications', flat=True).first() or []
+        else DataAsset.objects.filter(id=asset_id)
+        .values_list("classifications", flat=True)
+        .first()
+        or []
     )
     if not effective_owner:
-        return JsonResponse({'error': 'owner_required'}, status=400)
+        return JsonResponse({"error": "owner_required"}, status=400)
     parsed_classifications = _parse_string_list(effective_classifications)
     if parsed_classifications is None or not parsed_classifications:
-        return JsonResponse({'error': 'classifications_required'}, status=400)
+        return JsonResponse({"error": "classifications_required"}, status=400)
     invalid = _validate_classification_values(parsed_classifications)
     if invalid:
-        return JsonResponse({'error': 'unknown_classifications', 'items': invalid}, status=400)
+        return JsonResponse(
+            {"error": "unknown_classifications", "items": invalid}, status=400
+        )
 
-    schema_change = change_set.get('schema')
+    schema_change = change_set.get("schema")
     active_contract = (
-        DataContract.objects.filter(asset_id=asset_id, status=DataContract.Status.ACTIVE).order_by('-version').first()
+        DataContract.objects.filter(
+            asset_id=asset_id, status=DataContract.Status.ACTIVE
+        )
+        .order_by("-version")
+        .first()
     )
-    if schema_change is not None and active_contract is not None and schema_change != active_contract.schema:
-        return JsonResponse({'error': 'contract_incompatible_schema_change'}, status=400)
+    if (
+        schema_change is not None
+        and active_contract is not None
+        and schema_change != active_contract.schema
+    ):
+        return JsonResponse(
+            {"error": "contract_incompatible_schema_change"}, status=400
+        )
 
     AssetVersion.objects.filter(
         asset_id=asset_id,
         status=AssetVersion.Status.PUBLISHED,
-    ).exclude(id=version.id).update(status=AssetVersion.Status.SUPERSEDED, updated_at=timezone.now())
+    ).exclude(id=version.id).update(
+        status=AssetVersion.Status.SUPERSEDED, updated_at=timezone.now()
+    )
     version.status = AssetVersion.Status.PUBLISHED
-    version.save(update_fields=['status', 'updated_at'])
+    version.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _asset_version_to_dict(version)
     maybe_publish_event(
-        event_type='asset_version.published',
+        event_type="asset_version.published",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.asset_version.published',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.asset_version.published",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='asset_version.published',
-        resource_type='asset_version',
+        action="asset_version.published",
+        resource_type="asset_version",
         resource_id=str(version.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_event(
-        event_type='asset_version.superseded',
+        event_type="asset_version.superseded",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.asset_version.superseded',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={'asset_id': asset_id, 'published_version_id': str(version.id)},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        routing_key=f"{tenant_schema}.asset_version.superseded",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={"asset_id": asset_id, "published_version_id": str(version.id)},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def contract_activate(request, contract_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         contract = DataContract.objects.get(id=contract_id)
     except (ValidationError, DataContract.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
-    DataContract.objects.filter(asset_id=contract.asset_id, status=DataContract.Status.ACTIVE).exclude(id=contract.id).update(
-        status=DataContract.Status.DEPRECATED
-    )
+        return JsonResponse({"error": "not_found"}, status=404)
+    DataContract.objects.filter(
+        asset_id=contract.asset_id, status=DataContract.Status.ACTIVE
+    ).exclude(id=contract.id).update(status=DataContract.Status.DEPRECATED)
     contract.status = DataContract.Status.ACTIVE
-    contract.save(update_fields=['status', 'updated_at'])
+    contract.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='contract.activated',
+        event_type="contract.activated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.contract.activated',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.contract.activated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_contract_to_dict(contract),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='contract.activated',
-        resource_type='data_contract',
+        action="contract.activated",
+        resource_type="data_contract",
         resource_id=str(contract.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_contract_to_dict(contract),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_contract_to_dict(contract))
 
 
 @csrf_exempt
 def contract_deprecate(request, contract_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         contract = DataContract.objects.get(id=contract_id)
     except (ValidationError, DataContract.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     contract.status = DataContract.Status.DEPRECATED
-    contract.save(update_fields=['status', 'updated_at'])
+    contract.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='contract.deprecated',
+        event_type="contract.deprecated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.contract.deprecated',
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.contract.deprecated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_contract_to_dict(contract),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='contract.deprecated',
-        resource_type='data_contract',
+        action="contract.deprecated",
+        resource_type="data_contract",
         resource_id=str(contract.id),
-        correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_contract_to_dict(contract),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_contract_to_dict(contract))
 
 
 @csrf_exempt
 def quality_rules(request):
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
-        asset_id = request.GET.get('asset_id')
-        qs = QualityRule.objects.order_by('-updated_at')
+        asset_id = request.GET.get("asset_id")
+        qs = QualityRule.objects.order_by("-updated_at")
         if asset_id:
             qs = qs.filter(asset_id=asset_id)
         items = [_quality_rule_to_dict(r) for r in qs]
-        return JsonResponse({'items': items})
+        return JsonResponse({"items": items})
 
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        asset_id = payload.get('asset_id')
-        rule_type = payload.get('rule_type')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        asset_id = payload.get("asset_id")
+        rule_type = payload.get("rule_type")
         if not asset_id or not rule_type:
-            return JsonResponse({'error': 'asset_id and rule_type are required'}, status=400)
+            return JsonResponse(
+                {"error": "asset_id and rule_type are required"}, status=400
+            )
         try:
             asset = DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
-        params = payload.get('params') or {}
+            return JsonResponse({"error": "asset_not_found"}, status=404)
+        params = payload.get("params") or {}
         if not isinstance(params, dict):
-            return JsonResponse({'error': 'params must be an object'}, status=400)
-        severity = payload.get('severity') or QualityRule.Severity.WARNING
+            return JsonResponse({"error": "params must be an object"}, status=400)
+        severity = payload.get("severity") or QualityRule.Severity.WARNING
         if severity not in {QualityRule.Severity.WARNING, QualityRule.Severity.ERROR}:
-            return JsonResponse({'error': 'severity must be warning or error'}, status=400)
+            return JsonResponse(
+                {"error": "severity must be warning or error"}, status=400
+            )
 
-        rule = QualityRule.objects.create(asset=asset, rule_type=rule_type, params=params, severity=severity)
+        rule = QualityRule.objects.create(
+            asset=asset, rule_type=rule_type, params=params, severity=severity
+        )
         return JsonResponse(_quality_rule_to_dict(rule), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def quality_rule_evaluate(request, rule_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_role(request, 'catalog.editor')
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_role(request, "catalog.editor")
     if forbidden:
         return forbidden
     try:
         QualityRule.objects.get(id=rule_id)
     except (ValidationError, QualityRule.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
 
     tenant_schema = _tenant_schema(request)
     result = evaluate_quality_rule.apply(
         kwargs={
-            'tenant_schema': tenant_schema,
-            'rule_id': rule_id,
-            'correlation_id': getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            'user_id': request.headers.get('X-User-Id'),
-            'request_id': request.headers.get('X-Request-Id') or request.headers.get('X-Request-ID'),
+            "tenant_schema": tenant_schema,
+            "rule_id": rule_id,
+            "correlation_id": getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            "user_id": request.headers.get("X-User-Id"),
+            "request_id": request.headers.get("X-Request-Id")
+            or request.headers.get("X-Request-ID"),
         }
     ).get(propagate=True)
     return JsonResponse(result)
@@ -4774,78 +5146,87 @@ def quality_rule_evaluate(request, rule_id: str):
 
 @csrf_exempt
 def quality_results(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
-    rule_id = request.GET.get('rule_id')
-    asset_id = request.GET.get('asset_id')
+    rule_id = request.GET.get("rule_id")
+    asset_id = request.GET.get("asset_id")
     try:
-        limit = int(request.GET.get('limit', '100'))
-        offset = int(request.GET.get('offset', '0'))
+        limit = int(request.GET.get("limit", "100"))
+        offset = int(request.GET.get("offset", "0"))
     except ValueError:
-        return JsonResponse({'error': 'limit/offset must be integers'}, status=400)
+        return JsonResponse({"error": "limit/offset must be integers"}, status=400)
     limit = min(max(limit, 1), 500)
     offset = max(offset, 0)
 
-    qs = QualityCheckResult.objects.select_related('rule').order_by('-created_at')
+    qs = QualityCheckResult.objects.select_related("rule").order_by("-created_at")
     if rule_id:
         qs = qs.filter(rule_id=rule_id)
     if asset_id:
         qs = qs.filter(rule__asset_id=asset_id)
     items = [_quality_result_to_dict(r) for r in qs[offset : offset + limit]]
-    return JsonResponse({'items': items})
+    return JsonResponse({"items": items})
 
 
 @csrf_exempt
 def data_products(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = DataProduct.objects.order_by('-updated_at')
-        status_filter = request.GET.get('status')
+        qs = DataProduct.objects.order_by("-updated_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_data_product_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_data_product_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
+    if request.method == "POST":
         forbidden = require_any_role(
             request,
-            {'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
         if DataProduct.objects.filter(name=name).exists():
-            return JsonResponse({'error': 'name_already_exists'}, status=409)
+            return JsonResponse({"error": "name_already_exists"}, status=409)
 
-        asset_ids = _parse_uuid_string_list(payload.get('asset_ids'))
+        asset_ids = _parse_uuid_string_list(payload.get("asset_ids"))
         if asset_ids is None:
-            return JsonResponse({'error': 'asset_ids must be an array of UUID strings'}, status=400)
+            return JsonResponse(
+                {"error": "asset_ids must be an array of UUID strings"}, status=400
+            )
         existing_asset_ids = {
-            str(asset_id) for asset_id in DataAsset.objects.filter(id__in=asset_ids).values_list('id', flat=True)
+            str(asset_id)
+            for asset_id in DataAsset.objects.filter(id__in=asset_ids).values_list(
+                "id", flat=True
+            )
         }
         missing_asset_ids = sorted(set(asset_ids) - existing_asset_ids)
         if missing_asset_ids:
-            return JsonResponse({'error': 'asset_not_found', 'asset_ids': missing_asset_ids}, status=400)
+            return JsonResponse(
+                {"error": "asset_not_found", "asset_ids": missing_asset_ids}, status=400
+            )
 
-        sla = payload.get('sla') or {}
+        sla = payload.get("sla") or {}
         if not isinstance(sla, dict):
-            return JsonResponse({'error': 'sla must be an object'}, status=400)
+            return JsonResponse({"error": "sla must be an object"}, status=400)
         product = DataProduct.objects.create(
             name=name,
-            domain=(payload.get('domain') or ''),
-            owner=(payload.get('owner') or ''),
+            domain=(payload.get("domain") or ""),
+            owner=(payload.get("owner") or ""),
             asset_ids=asset_ids,
             sla=sla,
             status=DataProduct.Status.DRAFT,
@@ -4853,63 +5234,63 @@ def data_products(request):
         tenant_schema = _tenant_schema(request)
         data = _data_product_to_dict(product)
         maybe_publish_event(
-            event_type='data_product.created',
+            event_type="data_product.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.data_product.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.data_product.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='data_product.created',
-            resource_type='data_product',
+            action="data_product.created",
+            resource_type="data_product",
             resource_id=str(product.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def data_product_detail(request, product_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         product = DataProduct.objects.get(id=product_id)
     except (ValidationError, DataProduct.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_data_product_to_dict(product))
 
 
 @csrf_exempt
 def data_product_activate(request, product_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         product = DataProduct.objects.get(id=product_id)
     except (ValidationError, DataProduct.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if not product.owner:
-        return JsonResponse({'error': 'owner_required'}, status=400)
+        return JsonResponse({"error": "owner_required"}, status=400)
     if not product.asset_ids:
-        return JsonResponse({'error': 'asset_ids_required'}, status=400)
+        return JsonResponse({"error": "asset_ids_required"}, status=400)
 
     missing_contracts = []
     for asset_id in product.asset_ids:
@@ -4921,127 +5302,131 @@ def data_product_activate(request, product_id: str):
             missing_contracts.append(asset_id)
     if missing_contracts:
         return JsonResponse(
-            {'error': 'missing_active_contracts', 'asset_ids': missing_contracts},
+            {"error": "missing_active_contracts", "asset_ids": missing_contracts},
             status=400,
         )
     product.status = DataProduct.Status.ACTIVE
-    product.save(update_fields=['status', 'updated_at'])
+    product.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _data_product_to_dict(product)
     maybe_publish_event(
-        event_type='data_product.activated',
+        event_type="data_product.activated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.data_product.activated',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.data_product.activated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='data_product.activated',
-        resource_type='data_product',
+        action="data_product.activated",
+        resource_type="data_product",
         resource_id=str(product.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def data_product_retire(request, product_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         product = DataProduct.objects.get(id=product_id)
     except (ValidationError, DataProduct.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     product.status = DataProduct.Status.RETIRED
-    product.save(update_fields=['status', 'updated_at'])
+    product.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _data_product_to_dict(product)
     maybe_publish_event(
-        event_type='data_product.retired',
+        event_type="data_product.retired",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.data_product.retired',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.data_product.retired",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='data_product.retired',
-        resource_type='data_product',
+        action="data_product.retired",
+        resource_type="data_product",
         resource_id=str(product.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def glossary_terms(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = GlossaryTerm.objects.order_by('-updated_at')
-        status_filter = request.GET.get('status')
+        qs = GlossaryTerm.objects.order_by("-updated_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_glossary_term_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_glossary_term_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
+    if request.method == "POST":
         forbidden = require_any_role(
             request,
-            {'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
         if GlossaryTerm.objects.filter(name=name).exists():
-            return JsonResponse({'error': 'name_already_exists'}, status=409)
-        owners = _parse_string_list(payload.get('owners'))
+            return JsonResponse({"error": "name_already_exists"}, status=409)
+        owners = _parse_string_list(payload.get("owners"))
         if owners is None:
-            return JsonResponse({'error': 'owners must be an array of strings'}, status=400)
-        stewards = _parse_string_list(payload.get('stewards'))
+            return JsonResponse(
+                {"error": "owners must be an array of strings"}, status=400
+            )
+        stewards = _parse_string_list(payload.get("stewards"))
         if stewards is None:
-            return JsonResponse({'error': 'stewards must be an array of strings'}, status=400)
-        classifications = _parse_string_list(payload.get('classifications'))
+            return JsonResponse(
+                {"error": "stewards must be an array of strings"}, status=400
+            )
+        classifications = _parse_string_list(payload.get("classifications"))
         if classifications is None:
             return JsonResponse(
-                {'error': 'classifications must be an array of strings'},
+                {"error": "classifications must be an array of strings"},
                 status=400,
             )
         invalid = _validate_classification_values(classifications)
         if invalid:
             return JsonResponse(
-                {'error': 'unknown_classifications', 'items': invalid},
+                {"error": "unknown_classifications", "items": invalid},
                 status=400,
             )
         term = GlossaryTerm.objects.create(
             name=name,
-            definition=(payload.get('definition') or ''),
+            definition=(payload.get("definition") or ""),
             status=GlossaryTerm.Status.DRAFT,
             owners=owners,
             stewards=stewards,
@@ -5051,248 +5436,253 @@ def glossary_terms(request):
         tenant_schema = _tenant_schema(request)
         data = _glossary_term_to_dict(term)
         maybe_publish_event(
-            event_type='glossary.term.created',
+            event_type="glossary.term.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.glossary.term.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.glossary.term.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='glossary.term.created',
-            resource_type='glossary_term',
+            action="glossary.term.created",
+            resource_type="glossary_term",
             resource_id=str(term.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def glossary_term_detail(request, term_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         term = GlossaryTerm.objects.get(id=term_id)
     except (ValidationError, GlossaryTerm.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_glossary_term_to_dict(term))
 
 
 @csrf_exempt
 def glossary_term_approve(request, term_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         term = GlossaryTerm.objects.get(id=term_id)
     except (ValidationError, GlossaryTerm.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if term.status == GlossaryTerm.Status.DEPRECATED:
-        return JsonResponse({'error': 'term_deprecated'}, status=400)
+        return JsonResponse({"error": "term_deprecated"}, status=400)
     term.status = GlossaryTerm.Status.APPROVED
-    term.save(update_fields=['status', 'updated_at'])
+    term.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _glossary_term_to_dict(term)
     maybe_publish_event(
-        event_type='glossary.term.approved',
+        event_type="glossary.term.approved",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.glossary.term.approved',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.glossary.term.approved",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='glossary.term.approved',
-        resource_type='glossary_term',
+        action="glossary.term.approved",
+        resource_type="glossary_term",
         resource_id=str(term.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def glossary_term_deprecate(request, term_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
         term = GlossaryTerm.objects.get(id=term_id)
     except (ValidationError, GlossaryTerm.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     term.status = GlossaryTerm.Status.DEPRECATED
-    term.save(update_fields=['status', 'updated_at'])
+    term.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _glossary_term_to_dict(term)
     maybe_publish_event(
-        event_type='glossary.term.deprecated',
+        event_type="glossary.term.deprecated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.glossary.term.deprecated',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.glossary.term.deprecated",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='glossary.term.deprecated',
-        resource_type='glossary_term',
+        action="glossary.term.deprecated",
+        resource_type="glossary_term",
         resource_id=str(term.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def asset_glossary_term_link(request, asset_id: str, term_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_role(request, 'catalog.editor')
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_role(request, "catalog.editor")
     if forbidden:
         return forbidden
     try:
         asset = DataAsset.objects.get(id=asset_id)
     except (ValidationError, DataAsset.DoesNotExist):
-        return JsonResponse({'error': 'asset_not_found'}, status=404)
+        return JsonResponse({"error": "asset_not_found"}, status=404)
     try:
         term = GlossaryTerm.objects.get(id=term_id)
     except (ValidationError, GlossaryTerm.DoesNotExist):
-        return JsonResponse({'error': 'term_not_found'}, status=404)
+        return JsonResponse({"error": "term_not_found"}, status=404)
     if term.status != GlossaryTerm.Status.APPROVED:
-        return JsonResponse({'error': 'term_not_approved'}, status=400)
+        return JsonResponse({"error": "term_not_approved"}, status=400)
     related_asset_ids = list(term.related_asset_ids or [])
     asset_ref = str(asset.id)
     if asset_ref not in related_asset_ids:
         related_asset_ids.append(asset_ref)
         term.related_asset_ids = related_asset_ids
-        term.save(update_fields=['related_asset_ids', 'updated_at'])
+        term.save(update_fields=["related_asset_ids", "updated_at"])
     tenant_schema = _tenant_schema(request)
     data = _glossary_term_to_dict(term)
     maybe_publish_event(
-        event_type='glossary.term.linked_to_asset',
+        event_type="glossary.term.linked_to_asset",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.glossary.term.linked_to_asset',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={'term': data, 'asset': _asset_to_dict(asset)},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        routing_key=f"{tenant_schema}.glossary.term.linked_to_asset",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={"term": data, "asset": _asset_to_dict(asset)},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='glossary.term.linked_to_asset',
-        resource_type='glossary_term',
+        action="glossary.term.linked_to_asset",
+        resource_type="glossary_term",
         resource_id=str(term.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
-        data={'term': data, 'asset': _asset_to_dict(asset)},
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
+        data={"term": data, "asset": _asset_to_dict(asset)},
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(data)
 
 
 @csrf_exempt
 def governance_policies(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = GovernancePolicy.objects.order_by('-updated_at')
-        name = (request.GET.get('name') or '').strip()
+        qs = GovernancePolicy.objects.order_by("-updated_at")
+        name = (request.GET.get("name") or "").strip()
         if name:
             qs = qs.filter(name=name)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_governance_policy_to_dict(item) for item in qs]})
+        return JsonResponse(
+            {"items": [_governance_policy_to_dict(item) for item in qs]}
+        )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
-        rules = payload.get('rules') or {}
+            return JsonResponse({"error": "name is required"}, status=400)
+        rules = payload.get("rules") or {}
         if not isinstance(rules, dict):
-            return JsonResponse({'error': 'rules must be an object'}, status=400)
+            return JsonResponse({"error": "rules must be an object"}, status=400)
 
         latest_version = (
-            GovernancePolicy.objects.filter(name=name).aggregate(max_version=Max('version')).get('max_version') or 0
+            GovernancePolicy.objects.filter(name=name)
+            .aggregate(max_version=Max("version"))
+            .get("max_version")
+            or 0
         )
         policy = GovernancePolicy.objects.create(
             name=name,
             version=latest_version + 1,
             status=GovernancePolicy.Status.DRAFT,
             rules=rules,
-            reason=(payload.get('reason') or '').strip(),
-            actor_id=request.headers.get('X-User-Id') or '',
+            reason=(payload.get("reason") or "").strip(),
+            actor_id=request.headers.get("X-User-Id") or "",
         )
         return JsonResponse(_governance_policy_to_dict(policy), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def governance_policy_detail(request, policy_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         policy = GovernancePolicy.objects.get(id=policy_id)
     except (ValidationError, GovernancePolicy.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_governance_policy_to_dict(policy))
 
 
 def _governance_transition_allowed(policy: GovernancePolicy, action: str) -> bool:
     allowed = {
-        GovernancePolicy.Status.DRAFT: {'submit_for_review'},
-        GovernancePolicy.Status.IN_REVIEW: {'approve'},
-        GovernancePolicy.Status.APPROVED: {'activate'},
-        GovernancePolicy.Status.ACTIVE: {'rollback'},
+        GovernancePolicy.Status.DRAFT: {"submit_for_review"},
+        GovernancePolicy.Status.IN_REVIEW: {"approve"},
+        GovernancePolicy.Status.APPROVED: {"activate"},
+        GovernancePolicy.Status.ACTIVE: {"rollback"},
     }
     return action in allowed.get(policy.status, set())
 
@@ -5317,35 +5707,35 @@ def _create_policy_transition(
 
 @csrf_exempt
 def governance_policy_transition(request, policy_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
-    if action not in {'submit_for_review', 'approve', 'activate', 'rollback'}:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
+    if action not in {"submit_for_review", "approve", "activate", "rollback"}:
+        return JsonResponse({"error": "invalid_action"}, status=400)
     try:
         policy = GovernancePolicy.objects.get(id=policy_id)
     except (ValidationError, GovernancePolicy.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if not _governance_transition_allowed(policy, action):
-        return JsonResponse({'error': 'invalid_transition'}, status=400)
+        return JsonResponse({"error": "invalid_transition"}, status=400)
 
-    reason = (payload.get('reason') or '').strip()
-    actor_id = request.headers.get('X-User-Id') or ''
+    reason = (payload.get("reason") or "").strip()
+    actor_id = request.headers.get("X-User-Id") or ""
     from_status = policy.status
     rollback_target = None
-    if action == 'submit_for_review':
+    if action == "submit_for_review":
         policy.status = GovernancePolicy.Status.IN_REVIEW
-        event_type = 'policy.submitted_for_review'
-    elif action == 'approve':
+        event_type = "policy.submitted_for_review"
+    elif action == "approve":
         policy.status = GovernancePolicy.Status.APPROVED
-        event_type = 'policy.approved'
-    elif action == 'activate':
+        event_type = "policy.approved"
+    elif action == "activate":
         policy.status = GovernancePolicy.Status.ACTIVE
         GovernancePolicy.objects.filter(
             name=policy.name,
@@ -5354,7 +5744,7 @@ def governance_policy_transition(request, policy_id: str):
             status=GovernancePolicy.Status.SUPERSEDED,
             updated_at=timezone.now(),
         )
-        event_type = 'policy.activated'
+        event_type = "policy.activated"
     else:
         rollback_target = (
             GovernancePolicy.objects.filter(
@@ -5362,29 +5752,33 @@ def governance_policy_transition(request, policy_id: str):
                 status=GovernancePolicy.Status.SUPERSEDED,
             )
             .exclude(id=policy.id)
-            .order_by('-version')
+            .order_by("-version")
             .first()
         )
         if rollback_target is None:
-            return JsonResponse({'error': 'rollback_target_not_found'}, status=400)
+            return JsonResponse({"error": "rollback_target_not_found"}, status=400)
         policy.status = GovernancePolicy.Status.ROLLED_BACK
         rollback_target.status = GovernancePolicy.Status.ACTIVE
         rollback_target.reason = reason
         rollback_target.actor_id = actor_id
-        rollback_target.save(update_fields=['status', 'reason', 'actor_id', 'updated_at'])
+        rollback_target.save(
+            update_fields=["status", "reason", "actor_id", "updated_at"]
+        )
         _create_policy_transition(
             policy=rollback_target,
             from_status=GovernancePolicy.Status.SUPERSEDED,
-            action='restore_from_rollback',
+            action="restore_from_rollback",
             reason=reason,
             actor_id=actor_id,
         )
-        event_type = 'policy.rolled_back'
+        event_type = "policy.rolled_back"
 
     policy.reason = reason
     policy.actor_id = actor_id
     policy.rollback_target = rollback_target
-    policy.save(update_fields=['status', 'reason', 'actor_id', 'rollback_target', 'updated_at'])
+    policy.save(
+        update_fields=["status", "reason", "actor_id", "rollback_target", "updated_at"]
+    )
     _create_policy_transition(
         policy=policy,
         from_status=from_status,
@@ -5397,356 +5791,369 @@ def governance_policy_transition(request, policy_id: str):
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='governance_policy',
+        resource_type="governance_policy",
         resource_id=str(policy.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload)
 
 
 @csrf_exempt
 def workflow_definitions(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        definitions = WorkflowDefinition.objects.order_by('-updated_at')
+        definitions = WorkflowDefinition.objects.order_by("-updated_at")
         return JsonResponse(
-            {'items': [_workflow_definition_to_dict(item) for item in definitions]}
+            {"items": [_workflow_definition_to_dict(item) for item in definitions]}
         )
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
         definition = WorkflowDefinition.objects.create(
             name=name,
-            description=(payload.get('description') or ''),
-            domain_ref=(payload.get('domain_ref') or ''),
+            description=(payload.get("description") or ""),
+            domain_ref=(payload.get("domain_ref") or ""),
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='workflow.definition.created',
+            event_type="workflow.definition.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.workflow.definition.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.workflow.definition.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_workflow_definition_to_dict(definition),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='workflow.definition.created',
-            resource_type='workflow_definition',
+            action="workflow.definition.created",
+            resource_type="workflow_definition",
             resource_id=str(definition.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_workflow_definition_to_dict(definition),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_workflow_definition_to_dict(definition), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def workflow_definition_detail(request, definition_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         definition = WorkflowDefinition.objects.get(id=definition_id)
     except (ValidationError, WorkflowDefinition.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(_workflow_definition_to_dict(definition))
 
 
 @csrf_exempt
 def workflow_runs(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = WorkflowRun.objects.order_by('-created_at')
-        definition_id = request.GET.get('definition_id')
+        qs = WorkflowRun.objects.order_by("-created_at")
+        definition_id = request.GET.get("definition_id")
         if definition_id:
             qs = qs.filter(definition_id=definition_id)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return JsonResponse({'items': [_workflow_run_to_dict(item) for item in qs]})
+        return JsonResponse({"items": [_workflow_run_to_dict(item) for item in qs]})
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        definition_id = payload.get('definition_id')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        definition_id = payload.get("definition_id")
         if not definition_id:
-            return JsonResponse({'error': 'definition_id is required'}, status=400)
+            return JsonResponse({"error": "definition_id is required"}, status=400)
         try:
             definition = WorkflowDefinition.objects.get(id=definition_id)
         except (ValidationError, WorkflowDefinition.DoesNotExist):
-            return JsonResponse({'error': 'definition_not_found'}, status=404)
+            return JsonResponse({"error": "definition_not_found"}, status=404)
         run = WorkflowRun.objects.create(
             definition=definition,
-            subject_ref=(payload.get('subject_ref') or ''),
-            payload=payload.get('payload') or {},
+            subject_ref=(payload.get("subject_ref") or ""),
+            payload=payload.get("payload") or {},
             status=WorkflowRun.Status.DRAFT,
-            submitted_by=request.headers.get('X-User-Id') or '',
+            submitted_by=request.headers.get("X-User-Id") or "",
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='workflow.run.created',
+            event_type="workflow.run.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.workflow.run.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.workflow.run.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_workflow_run_to_dict(run),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='workflow.run.created',
-            resource_type='workflow_run',
+            action="workflow.run.created",
+            resource_type="workflow_run",
             resource_id=str(run.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_workflow_run_to_dict(run),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_workflow_run_to_dict(run), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 def _workflow_transition_allowed(run: WorkflowRun, action: str) -> bool:
     allowed = {
-        WorkflowRun.Status.DRAFT: {'submit'},
-        WorkflowRun.Status.IN_REVIEW: {'approve', 'reject'},
-        WorkflowRun.Status.APPROVED: {'activate', 'rollback'},
-        WorkflowRun.Status.ACTIVE: {'supersede', 'rollback'},
+        WorkflowRun.Status.DRAFT: {"submit"},
+        WorkflowRun.Status.IN_REVIEW: {"approve", "reject"},
+        WorkflowRun.Status.APPROVED: {"activate", "rollback"},
+        WorkflowRun.Status.ACTIVE: {"supersede", "rollback"},
     }
     return action in allowed.get(run.status, set())
 
 
 @csrf_exempt
 def workflow_run_transition(request, run_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
-    if action not in {'submit', 'approve', 'reject', 'activate', 'supersede', 'rollback'}:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
+    if action not in {
+        "submit",
+        "approve",
+        "reject",
+        "activate",
+        "supersede",
+        "rollback",
+    }:
+        return JsonResponse({"error": "invalid_action"}, status=400)
     try:
         run = WorkflowRun.objects.get(id=run_id)
     except (ValidationError, WorkflowRun.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if not _workflow_transition_allowed(run, action):
-        return JsonResponse({'error': 'invalid_transition'}, status=400)
+        return JsonResponse({"error": "invalid_transition"}, status=400)
 
-    if action == 'submit':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if action == "submit":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         run.status = WorkflowRun.Status.IN_REVIEW
         WorkflowTask.objects.create(
             run=run,
-            task_type='review',
-            assignee=(payload.get('assignee') or ''),
+            task_type="review",
+            assignee=(payload.get("assignee") or ""),
             status=WorkflowTask.Status.OPEN,
         )
-    elif action in {'approve', 'reject'}:
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    elif action in {"approve", "reject"}:
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         run.status = (
             WorkflowRun.Status.APPROVED
-            if action == 'approve'
+            if action == "approve"
             else WorkflowRun.Status.REJECTED
         )
-        run.reviewed_by = request.headers.get('X-User-Id') or ''
+        run.reviewed_by = request.headers.get("X-User-Id") or ""
         WorkflowTask.objects.filter(run=run, status=WorkflowTask.Status.OPEN).update(
             status=WorkflowTask.Status.COMPLETED,
             completed_at=timezone.now(),
         )
-    elif action == 'activate':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    elif action == "activate":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         run.status = WorkflowRun.Status.ACTIVE
-    elif action == 'supersede':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    elif action == "supersede":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         run.status = WorkflowRun.Status.SUPERSEDED
     else:
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         run.status = WorkflowRun.Status.ROLLED_BACK
 
-    run.save(update_fields=['status', 'reviewed_by', 'updated_at'])
+    run.save(update_fields=["status", "reviewed_by", "updated_at"])
     tenant_schema = _tenant_schema(request)
-    event_type = f'workflow.run.{action}'
+    event_type = f"workflow.run.{action}"
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_workflow_run_to_dict(run),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='workflow_run',
+        resource_type="workflow_run",
         resource_id=str(run.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_workflow_run_to_dict(run),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_workflow_run_to_dict(run))
 
 
 @csrf_exempt
 def workflow_run_tasks(request, run_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
-    tasks = WorkflowTask.objects.filter(run_id=run_id).order_by('-created_at')
-    return JsonResponse({'items': [_workflow_task_to_dict(item) for item in tasks]})
+    tasks = WorkflowTask.objects.filter(run_id=run_id).order_by("-created_at")
+    return JsonResponse({"items": [_workflow_task_to_dict(item) for item in tasks]})
 
 
 @csrf_exempt
 def projects(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = Project.objects.order_by('-created_at')
-        status_filter = request.GET.get('status')
+        qs = Project.objects.order_by("-created_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
         return _paginated_response(request, qs, _project_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
+            return JsonResponse({"error": "name is required"}, status=400)
         project = Project.objects.create(
             name=name,
-            code=(payload.get('code') or '').strip(),
-            institution_ref=(payload.get('institution_ref') or '').strip(),
-            status=(payload.get('status') or 'active').strip() or 'active',
-            sync_config=payload.get('sync_config')
-            if isinstance(payload.get('sync_config'), dict)
-            else {},
+            code=(payload.get("code") or "").strip(),
+            institution_ref=(payload.get("institution_ref") or "").strip(),
+            status=(payload.get("status") or "active").strip() or "active",
+            sync_config=(
+                payload.get("sync_config")
+                if isinstance(payload.get("sync_config"), dict)
+                else {}
+            ),
         )
         ProjectWorkspace.objects.create(project=project)
         return JsonResponse(_project_to_dict(project), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def users(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = UserProfile.objects.order_by('-created_at')
-        status_filter = request.GET.get('status')
+        qs = UserProfile.objects.order_by("-created_at")
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        email_filter = (request.GET.get('email') or '').strip().lower()
+        email_filter = (request.GET.get("email") or "").strip().lower()
         if email_filter:
             qs = qs.filter(email=email_filter)
         return _paginated_response(request, qs, _user_profile_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        email = (payload.get('email') or '').strip().lower()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        email = (payload.get("email") or "").strip().lower()
         if not email:
-            return JsonResponse({'error': 'email is required'}, status=400)
+            return JsonResponse({"error": "email is required"}, status=400)
         if UserProfile.objects.filter(email=email).exists():
-            return JsonResponse({'error': 'user_already_exists'}, status=409)
-        status = (payload.get('status') or UserProfile.Status.ACTIVE).strip()
+            return JsonResponse({"error": "user_already_exists"}, status=409)
+        status = (payload.get("status") or UserProfile.Status.ACTIVE).strip()
         if status not in UserProfile.Status.values:
-            return JsonResponse({'error': 'invalid_status'}, status=400)
+            return JsonResponse({"error": "invalid_status"}, status=400)
         profile = UserProfile.objects.create(
             email=email,
-            display_name=(payload.get('display_name') or '').strip(),
+            display_name=(payload.get("display_name") or "").strip(),
             status=status,
         )
         return JsonResponse(_user_profile_to_dict(profile), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -5754,103 +6161,113 @@ def user_detail(request, user_id: str):
     try:
         profile = UserProfile.objects.get(id=user_id)
     except (ValidationError, UserProfile.DoesNotExist):
-        return JsonResponse({'error': 'user_not_found'}, status=404)
+        return JsonResponse({"error": "user_not_found"}, status=404)
 
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         return JsonResponse(_user_profile_to_dict(profile))
 
-    if request.method not in {'PUT', 'PATCH'}:
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method not in {"PUT", "PATCH"}:
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
     update_fields = []
-    if 'display_name' in payload:
-        profile.display_name = (payload.get('display_name') or '').strip()
-        update_fields.append('display_name')
-    if 'status' in payload:
-        status = (payload.get('status') or '').strip()
+    if "display_name" in payload:
+        profile.display_name = (payload.get("display_name") or "").strip()
+        update_fields.append("display_name")
+    if "status" in payload:
+        status = (payload.get("status") or "").strip()
         if status not in UserProfile.Status.values:
-            return JsonResponse({'error': 'invalid_status'}, status=400)
+            return JsonResponse({"error": "invalid_status"}, status=400)
         profile.status = status
-        update_fields.append('status')
+        update_fields.append("status")
     if not update_fields:
-        return JsonResponse({'error': 'no_changes_requested'}, status=400)
-    update_fields.append('updated_at')
+        return JsonResponse({"error": "no_changes_requested"}, status=400)
+    update_fields.append("updated_at")
     profile.save(update_fields=update_fields)
     return JsonResponse(_user_profile_to_dict(profile))
 
 
 @csrf_exempt
 def notifications(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = UserNotification.objects.order_by('-created_at')
-        status_filter = (request.GET.get('status') or '').strip()
+        qs = UserNotification.objects.order_by("-created_at")
+        status_filter = (request.GET.get("status") or "").strip()
         if status_filter:
             qs = qs.filter(delivery_status=status_filter)
-        channel_filter = (request.GET.get('channel') or '').strip()
+        channel_filter = (request.GET.get("channel") or "").strip()
         if channel_filter:
             qs = qs.filter(channel=channel_filter)
         return _paginated_response(request, qs, _notification_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        user_email = (payload.get('user_email') or '').strip().lower()
-        notification_type = (payload.get('notification_type') or '').strip()
-        channel = (payload.get('channel') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        user_email = (payload.get("user_email") or "").strip().lower()
+        notification_type = (payload.get("notification_type") or "").strip()
+        channel = (payload.get("channel") or "").strip()
         if not user_email:
-            return JsonResponse({'error': 'user_email is required'}, status=400)
+            return JsonResponse({"error": "user_email is required"}, status=400)
         if not notification_type:
-            return JsonResponse({'error': 'notification_type is required'}, status=400)
+            return JsonResponse({"error": "notification_type is required"}, status=400)
         if channel not in UserNotification.Channel.values:
-            return JsonResponse({'error': 'invalid_channel'}, status=400)
-        max_attempts = payload.get('max_attempts') or 3
+            return JsonResponse({"error": "invalid_channel"}, status=400)
+        max_attempts = payload.get("max_attempts") or 3
         if not isinstance(max_attempts, int) or max_attempts < 1:
-            return JsonResponse({'error': 'invalid_max_attempts'}, status=400)
+            return JsonResponse({"error": "invalid_max_attempts"}, status=400)
         notification = UserNotification.objects.create(
             user_email=user_email,
             notification_type=notification_type,
             channel=channel,
-            provider=(payload.get('provider') or 'default').strip() or 'default',
+            provider=(payload.get("provider") or "default").strip() or "default",
             max_attempts=max_attempts,
-            payload=payload.get('payload') if isinstance(payload.get('payload'), dict) else {},
+            payload=(
+                payload.get("payload")
+                if isinstance(payload.get("payload"), dict)
+                else {}
+            ),
         )
         return JsonResponse(_notification_to_dict(notification), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def notification_dispatch(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    limit = payload.get('limit') if isinstance(payload.get('limit'), int) else 100
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    limit = payload.get("limit") if isinstance(payload.get("limit"), int) else 100
     limit = min(max(limit, 1), 500)
     summary = process_notification_queue(limit=limit)
     return JsonResponse(summary)
@@ -5858,24 +6275,31 @@ def notification_dispatch(request):
 
 @csrf_exempt
 def notification_retry(request, notification_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     try:
         notification = UserNotification.objects.get(id=notification_id)
     except (ValidationError, UserNotification.DoesNotExist):
-        return JsonResponse({'error': 'notification_not_found'}, status=404)
+        return JsonResponse({"error": "notification_not_found"}, status=404)
     if notification.delivery_status == UserNotification.DeliveryStatus.SENT:
-        return JsonResponse({'error': 'notification_already_sent'}, status=400)
+        return JsonResponse({"error": "notification_already_sent"}, status=400)
     if notification.delivery_status == UserNotification.DeliveryStatus.DEAD_LETTER:
         notification.attempts = 0
         notification.dead_lettered_at = None
     notification.delivery_status = UserNotification.DeliveryStatus.PENDING
     notification.next_attempt_at = None
     notification.save(
-        update_fields=['attempts', 'delivery_status', 'next_attempt_at', 'dead_lettered_at']
+        update_fields=[
+            "attempts",
+            "delivery_status",
+            "next_attempt_at",
+            "dead_lettered_at",
+        ]
     )
     updated = dispatch_notification(notification)
     return JsonResponse(_notification_to_dict(updated))
@@ -5883,20 +6307,20 @@ def notification_retry(request, notification_id: str):
 
 @csrf_exempt
 def project_members(request, project_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     try:
         project = Project.objects.get(id=project_id)
     except (ValidationError, Project.DoesNotExist):
-        return JsonResponse({'error': 'project_not_found'}, status=404)
-    qs = ProjectMembership.objects.filter(project=project).order_by('-created_at')
-    status_filter = request.GET.get('status')
+        return JsonResponse({"error": "project_not_found"}, status=404)
+    qs = ProjectMembership.objects.filter(project=project).order_by("-created_at")
+    status_filter = request.GET.get("status")
     if status_filter:
         qs = qs.filter(status=status_filter)
     return _paginated_response(request, qs, _project_membership_to_dict)
@@ -5907,93 +6331,101 @@ def project_workspace(request, project_id: str):
     try:
         project = Project.objects.get(id=project_id)
     except (ValidationError, Project.DoesNotExist):
-        return JsonResponse({'error': 'project_not_found'}, status=404)
+        return JsonResponse({"error": "project_not_found"}, status=404)
 
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
         workspace, _ = ProjectWorkspace.objects.get_or_create(project=project)
         return JsonResponse(_project_workspace_to_dict(workspace))
 
-    if request.method not in {'PUT', 'PATCH'}:
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method not in {"PUT", "PATCH"}:
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
 
     workspace, _ = ProjectWorkspace.objects.get_or_create(project=project)
     update_fields = []
-    for field in ('collaboration_enabled', 'data_management_enabled', 'document_management_enabled'):
+    for field in (
+        "collaboration_enabled",
+        "data_management_enabled",
+        "document_management_enabled",
+    ):
         if field in payload:
             value = payload.get(field)
             if not isinstance(value, bool):
-                return JsonResponse({'error': f'invalid_{field}'}, status=400)
+                return JsonResponse({"error": f"invalid_{field}"}, status=400)
             setattr(workspace, field, value)
             update_fields.append(field)
-    for field in ('collaboration_tools', 'data_resources', 'documents'):
+    for field in ("collaboration_tools", "data_resources", "documents"):
         if field in payload:
             value = payload.get(field)
             if not isinstance(value, list):
-                return JsonResponse({'error': f'invalid_{field}'}, status=400)
+                return JsonResponse({"error": f"invalid_{field}"}, status=400)
             setattr(workspace, field, value)
             update_fields.append(field)
     if not update_fields:
-        return JsonResponse({'error': 'no_changes_requested'}, status=400)
-    update_fields.append('updated_at')
+        return JsonResponse({"error": "no_changes_requested"}, status=400)
+    update_fields.append("updated_at")
     workspace.save(update_fields=update_fields)
     return JsonResponse(_project_workspace_to_dict(workspace))
 
 
 @csrf_exempt
 def project_member_lifecycle(request, project_id: str, membership_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = (payload.get('action') or '').strip()
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = (payload.get("action") or "").strip()
     if not action:
-        return JsonResponse({'error': 'action is required'}, status=400)
+        return JsonResponse({"error": "action is required"}, status=400)
 
     try:
         project = Project.objects.get(id=project_id)
         membership = ProjectMembership.objects.get(id=membership_id, project=project)
     except (ValidationError, Project.DoesNotExist, ProjectMembership.DoesNotExist):
-        return JsonResponse({'error': 'membership_not_found'}, status=404)
+        return JsonResponse({"error": "membership_not_found"}, status=404)
 
     previous_role = membership.role
     previous_status = membership.status
-    actor_id = request.headers.get('X-User-Id') or ''
+    actor_id = request.headers.get("X-User-Id") or ""
 
-    if action == 'revoke':
+    if action == "revoke":
         if membership.status == ProjectMembership.Status.INACTIVE:
-            return JsonResponse({'error': 'membership_already_inactive'}, status=400)
+            return JsonResponse({"error": "membership_already_inactive"}, status=400)
         membership.status = ProjectMembership.Status.INACTIVE
-    elif action == 'reactivate':
+    elif action == "reactivate":
         if membership.status == ProjectMembership.Status.ACTIVE:
-            return JsonResponse({'error': 'membership_already_active'}, status=400)
+            return JsonResponse({"error": "membership_already_active"}, status=400)
         membership.status = ProjectMembership.Status.ACTIVE
-    elif action == 'change_role':
-        role = (payload.get('role') or '').strip()
+    elif action == "change_role":
+        role = (payload.get("role") or "").strip()
         if role not in ProjectMembership.Role.values:
-            return JsonResponse({'error': 'invalid_role'}, status=400)
+            return JsonResponse({"error": "invalid_role"}, status=400)
         if role == membership.role:
-            return JsonResponse({'error': 'role_unchanged'}, status=400)
+            return JsonResponse({"error": "role_unchanged"}, status=400)
         membership.role = role
     else:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
+        return JsonResponse({"error": "invalid_action"}, status=400)
 
-    membership.save(update_fields=['role', 'status', 'updated_at'])
+    membership.save(update_fields=["role", "status", "updated_at"])
     history = ProjectMembershipRoleHistory.objects.create(
         membership=membership,
         action=action,
@@ -6004,69 +6436,77 @@ def project_member_lifecycle(request, project_id: str, membership_id: str):
         actor_id=actor_id,
     )
     tenant_schema = _tenant_schema(request)
-    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
+    correlation_id = getattr(request, "correlation_id", None) or request.headers.get(
+        "X-Correlation-Id"
+    )
     event_data = {
-        'project_id': str(project.id),
-        'membership': _project_membership_to_dict(membership),
-        'history': _project_membership_role_history_to_dict(history),
+        "project_id": str(project.id),
+        "membership": _project_membership_to_dict(membership),
+        "history": _project_membership_role_history_to_dict(history),
     }
     maybe_publish_event(
-        event_type='project.member.lifecycle.updated',
+        event_type="project.member.lifecycle.updated",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.project.member.lifecycle.updated',
+        routing_key=f"{tenant_schema}.project.member.lifecycle.updated",
         correlation_id=correlation_id,
         user_id=actor_id or None,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='project.member.lifecycle.updated',
-        resource_type='project',
+        action="project.member.lifecycle.updated",
+        resource_type="project",
         resource_id=str(project.id),
         correlation_id=correlation_id,
         user_id=actor_id or None,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'membership': _project_membership_to_dict(membership),
-            'history': _project_membership_role_history_to_dict(history),
+            "membership": _project_membership_to_dict(membership),
+            "history": _project_membership_role_history_to_dict(history),
         }
     )
 
 
 @csrf_exempt
 def project_member_invites(request, project_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
+        return JsonResponse({"error": "invalid_json"}, status=400)
 
     try:
         project = Project.objects.get(id=project_id)
     except (ValidationError, Project.DoesNotExist):
-        return JsonResponse({'error': 'project_not_found'}, status=404)
+        return JsonResponse({"error": "project_not_found"}, status=404)
 
-    email = (payload.get('email') or '').strip().lower()
+    email = (payload.get("email") or "").strip().lower()
     if not email:
-        return JsonResponse({'error': 'email is required'}, status=400)
-    role = (payload.get('role') or '').strip()
+        return JsonResponse({"error": "email is required"}, status=400)
+    role = (payload.get("role") or "").strip()
     if role not in ProjectMembership.Role.values:
-        return JsonResponse({'error': 'invalid_role'}, status=400)
+        return JsonResponse({"error": "invalid_role"}, status=400)
 
     tenant_schema = _tenant_schema(request)
-    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
-    user_id = request.headers.get('X-User-Id') or ''
+    correlation_id = getattr(request, "correlation_id", None) or request.headers.get(
+        "X-Correlation-Id"
+    )
+    user_id = request.headers.get("X-User-Id") or ""
     existing_user = UserProfile.objects.filter(email=email).exists()
 
     if existing_user:
-        UserProfile.objects.filter(email=email).exclude(status=UserProfile.Status.ACTIVE).update(
+        UserProfile.objects.filter(email=email).exclude(
+            status=UserProfile.Status.ACTIVE
+        ).update(
             status=UserProfile.Status.ACTIVE,
             updated_at=timezone.now(),
         )
@@ -6074,55 +6514,55 @@ def project_member_invites(request, project_id: str):
             project=project,
             user_email=email,
             defaults={
-                'role': role,
-                'status': ProjectMembership.Status.ACTIVE,
-                'invited_by': user_id,
+                "role": role,
+                "status": ProjectMembership.Status.ACTIVE,
+                "invited_by": user_id,
             },
         )
         notification = UserNotification.objects.create(
             user_email=email,
-            notification_type='project_membership_invite',
+            notification_type="project_membership_invite",
             channel=UserNotification.Channel.IN_APP,
-            provider='default',
+            provider="default",
             payload={
-                'project_id': str(project.id),
-                'project_name': project.name,
-                'role': role,
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "role": role,
             },
         )
         event_data = {
-            'project_id': str(project.id),
-            'project_name': project.name,
-            'email': email,
-            'role': role,
-            'delivery': 'in_app',
-            'notification_id': str(notification.id),
-            'membership': _project_membership_to_dict(membership),
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "email": email,
+            "role": role,
+            "delivery": "in_app",
+            "notification_id": str(notification.id),
+            "membership": _project_membership_to_dict(membership),
         }
         maybe_publish_event(
-            event_type='project.member.invited',
+            event_type="project.member.invited",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.project.member.invited',
+            routing_key=f"{tenant_schema}.project.member.invited",
             correlation_id=correlation_id,
             user_id=user_id or None,
             data=event_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='project.member.invited',
-            resource_type='project',
+            action="project.member.invited",
+            resource_type="project",
             resource_id=str(project.id),
             correlation_id=correlation_id,
             user_id=user_id or None,
             data=event_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(
             {
-                'delivery': 'existing_user_notification',
-                'notification_id': str(notification.id),
-                'membership': _project_membership_to_dict(membership),
+                "delivery": "existing_user_notification",
+                "notification_id": str(notification.id),
+                "membership": _project_membership_to_dict(membership),
             },
             status=201,
         )
@@ -6132,8 +6572,8 @@ def project_member_invites(request, project_id: str):
     UserProfile.objects.get_or_create(
         email=email,
         defaults={
-            'status': UserProfile.Status.INVITED,
-            'display_name': '',
+            "status": UserProfile.Status.INVITED,
+            "display_name": "",
         },
     )
     invitation = ProjectInvitation.objects.create(
@@ -6145,56 +6585,58 @@ def project_member_invites(request, project_id: str):
         invited_by=user_id,
         expires_at=timezone.now() + timedelta(minutes=expires_minutes),
     )
-    app_base_url = os.environ.get('EDMP_APP_BASE_URL', 'http://localhost:8000').rstrip('/')
-    invite_link = f'{app_base_url}/invite-login?token={raw_token}'
+    app_base_url = os.environ.get("EDMP_APP_BASE_URL", "http://localhost:8000").rstrip(
+        "/"
+    )
+    invite_link = f"{app_base_url}/invite-login?token={raw_token}"
     notification = UserNotification.objects.create(
         user_email=email,
-        notification_type='project_membership_invite_link',
+        notification_type="project_membership_invite_link",
         channel=UserNotification.Channel.EMAIL,
-        provider='default',
+        provider="default",
         payload={
-            'project_id': str(project.id),
-            'project_name': project.name,
-            'role': role,
-            'invite_link': invite_link,
-            'expires_at': invitation.expires_at.isoformat(),
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "role": role,
+            "invite_link": invite_link,
+            "expires_at": invitation.expires_at.isoformat(),
         },
     )
     event_data = {
-        'project_id': str(project.id),
-        'project_name': project.name,
-        'email': email,
-        'role': role,
-        'delivery': 'one_time_login_link',
-        'invite_link': invite_link,
-        'invitation': _project_invitation_to_dict(invitation),
-        'notification_id': str(notification.id),
+        "project_id": str(project.id),
+        "project_name": project.name,
+        "email": email,
+        "role": role,
+        "delivery": "one_time_login_link",
+        "invite_link": invite_link,
+        "invitation": _project_invitation_to_dict(invitation),
+        "notification_id": str(notification.id),
     }
     maybe_publish_event(
-        event_type='project.invitation.created',
+        event_type="project.invitation.created",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.project.invitation.created',
+        routing_key=f"{tenant_schema}.project.invitation.created",
         correlation_id=correlation_id,
         user_id=user_id or None,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='project.invitation.created',
-        resource_type='project',
+        action="project.invitation.created",
+        resource_type="project",
         resource_id=str(project.id),
         correlation_id=correlation_id,
         user_id=user_id or None,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'delivery': 'one_time_login_link',
-            'notification_id': str(notification.id),
-            'invite_link': invite_link,
-            'invitation': _project_invitation_to_dict(invitation),
+            "delivery": "one_time_login_link",
+            "notification_id": str(notification.id),
+            "invite_link": invite_link,
+            "invitation": _project_invitation_to_dict(invitation),
         },
         status=201,
     )
@@ -6202,152 +6644,176 @@ def project_member_invites(request, project_id: str):
 
 @csrf_exempt
 def project_invitation_accept(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    token = (payload.get('token') or '').strip()
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    token = (payload.get("token") or "").strip()
     if not token:
-        return JsonResponse({'error': 'token is required'}, status=400)
+        return JsonResponse({"error": "token is required"}, status=400)
     token_hash = _hash_invitation_token(token)
     try:
-        invitation = ProjectInvitation.objects.select_related('project').get(
+        invitation = ProjectInvitation.objects.select_related("project").get(
             Q(token=token_hash) | Q(token=token)
         )
     except ProjectInvitation.DoesNotExist:
-        return JsonResponse({'error': 'invitation_not_found'}, status=404)
+        return JsonResponse({"error": "invitation_not_found"}, status=404)
     if invitation.status == ProjectInvitation.Status.REVOKED:
-        return JsonResponse({'error': 'invitation_revoked'}, status=400)
+        return JsonResponse({"error": "invitation_revoked"}, status=400)
     if invitation.status != ProjectInvitation.Status.PENDING:
-        return JsonResponse({'error': 'invitation_not_pending'}, status=400)
+        return JsonResponse({"error": "invitation_not_pending"}, status=400)
     if invitation.expires_at <= timezone.now():
         invitation.status = ProjectInvitation.Status.EXPIRED
-        invitation.save(update_fields=['status', 'updated_at'])
-        return JsonResponse({'error': 'invitation_expired'}, status=400)
+        invitation.save(update_fields=["status", "updated_at"])
+        return JsonResponse({"error": "invitation_expired"}, status=400)
     invitation.token_attempts += 1
     if invitation.token_attempts > invitation.max_token_attempts:
         invitation.status = ProjectInvitation.Status.REVOKED
         invitation.revoked_at = timezone.now()
-        invitation.save(update_fields=['token_attempts', 'status', 'revoked_at', 'updated_at'])
-        return JsonResponse({'error': 'invitation_attempt_limit_exceeded'}, status=400)
+        invitation.save(
+            update_fields=["token_attempts", "status", "revoked_at", "updated_at"]
+        )
+        return JsonResponse({"error": "invitation_attempt_limit_exceeded"}, status=400)
 
-    accepted_by = (payload.get('user_id') or request.headers.get('X-User-Id') or invitation.email).strip()
+    accepted_by = (
+        payload.get("user_id") or request.headers.get("X-User-Id") or invitation.email
+    ).strip()
     profile, _ = UserProfile.objects.get_or_create(
         email=invitation.email,
         defaults={
-            'status': UserProfile.Status.ACTIVE,
-            'display_name': '',
+            "status": UserProfile.Status.ACTIVE,
+            "display_name": "",
         },
     )
     if profile.status != UserProfile.Status.ACTIVE:
         profile.status = UserProfile.Status.ACTIVE
     profile.last_login_at = timezone.now()
-    profile.save(update_fields=['status', 'last_login_at', 'updated_at'])
+    profile.save(update_fields=["status", "last_login_at", "updated_at"])
     membership, _ = ProjectMembership.objects.update_or_create(
         project=invitation.project,
         user_email=invitation.email,
         defaults={
-            'role': invitation.role,
-            'status': ProjectMembership.Status.ACTIVE,
-            'invited_by': invitation.invited_by,
+            "role": invitation.role,
+            "status": ProjectMembership.Status.ACTIVE,
+            "invited_by": invitation.invited_by,
         },
     )
     invitation.status = ProjectInvitation.Status.ACCEPTED
     invitation.accepted_by = accepted_by
     invitation.accepted_at = timezone.now()
-    invitation.save(update_fields=['status', 'accepted_by', 'accepted_at', 'token_attempts', 'updated_at'])
+    invitation.save(
+        update_fields=[
+            "status",
+            "accepted_by",
+            "accepted_at",
+            "token_attempts",
+            "updated_at",
+        ]
+    )
 
     tenant_schema = _tenant_schema(request)
-    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
+    correlation_id = getattr(request, "correlation_id", None) or request.headers.get(
+        "X-Correlation-Id"
+    )
     event_data = {
-        'project_id': str(invitation.project_id),
-        'email': invitation.email,
-        'role': invitation.role,
-        'membership': _project_membership_to_dict(membership),
+        "project_id": str(invitation.project_id),
+        "email": invitation.email,
+        "role": invitation.role,
+        "membership": _project_membership_to_dict(membership),
     }
     maybe_publish_event(
-        event_type='project.invitation.accepted',
+        event_type="project.invitation.accepted",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.project.invitation.accepted',
+        routing_key=f"{tenant_schema}.project.invitation.accepted",
         correlation_id=correlation_id,
         user_id=accepted_by,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='project.invitation.accepted',
-        resource_type='project',
+        action="project.invitation.accepted",
+        resource_type="project",
         resource_id=str(invitation.project_id),
         correlation_id=correlation_id,
         user_id=accepted_by,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'membership': _project_membership_to_dict(membership),
-            'invitation': _project_invitation_to_dict(invitation),
+            "membership": _project_membership_to_dict(membership),
+            "invitation": _project_invitation_to_dict(invitation),
         }
     )
 
 
 @csrf_exempt
 def project_invitation_revoke(request, invitation_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     try:
-        invitation = ProjectInvitation.objects.select_related('project').get(id=invitation_id)
+        invitation = ProjectInvitation.objects.select_related("project").get(
+            id=invitation_id
+        )
     except (ValidationError, ProjectInvitation.DoesNotExist):
-        return JsonResponse({'error': 'invitation_not_found'}, status=404)
+        return JsonResponse({"error": "invitation_not_found"}, status=404)
     if invitation.status == ProjectInvitation.Status.ACCEPTED:
-        return JsonResponse({'error': 'invitation_already_accepted'}, status=400)
+        return JsonResponse({"error": "invitation_already_accepted"}, status=400)
     invitation.status = ProjectInvitation.Status.REVOKED
     invitation.revoked_at = timezone.now()
-    invitation.save(update_fields=['status', 'revoked_at', 'updated_at'])
+    invitation.save(update_fields=["status", "revoked_at", "updated_at"])
     tenant_schema = _tenant_schema(request)
-    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
-    actor_id = request.headers.get('X-User-Id')
-    event_data = {'invitation': _project_invitation_to_dict(invitation)}
+    correlation_id = getattr(request, "correlation_id", None) or request.headers.get(
+        "X-Correlation-Id"
+    )
+    actor_id = request.headers.get("X-User-Id")
+    event_data = {"invitation": _project_invitation_to_dict(invitation)}
     maybe_publish_event(
-        event_type='project.invitation.revoked',
+        event_type="project.invitation.revoked",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.project.invitation.revoked',
+        routing_key=f"{tenant_schema}.project.invitation.revoked",
         correlation_id=correlation_id,
         user_id=actor_id,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='project.invitation.revoked',
-        resource_type='project',
+        action="project.invitation.revoked",
+        resource_type="project",
         resource_id=str(invitation.project_id),
         correlation_id=correlation_id,
         user_id=actor_id,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
-    return JsonResponse({'invitation': _project_invitation_to_dict(invitation)})
+    return JsonResponse({"invitation": _project_invitation_to_dict(invitation)})
 
 
 @csrf_exempt
 def project_invitation_resend(request, invitation_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(
+        request, {"catalog.editor", "policy.admin", "tenant.admin"}
+    )
     if forbidden:
         return forbidden
     try:
-        invitation = ProjectInvitation.objects.select_related('project').get(id=invitation_id)
+        invitation = ProjectInvitation.objects.select_related("project").get(
+            id=invitation_id
+        )
     except (ValidationError, ProjectInvitation.DoesNotExist):
-        return JsonResponse({'error': 'invitation_not_found'}, status=404)
+        return JsonResponse({"error": "invitation_not_found"}, status=404)
     if invitation.status == ProjectInvitation.Status.ACCEPTED:
-        return JsonResponse({'error': 'invitation_already_accepted'}, status=400)
+        return JsonResponse({"error": "invitation_already_accepted"}, status=400)
     raw_token = uuid.uuid4().hex
     invitation.token = _hash_invitation_token(raw_token)
     invitation.token_attempts = 0
@@ -6355,276 +6821,286 @@ def project_invitation_resend(request, invitation_id: str):
     invitation.status = ProjectInvitation.Status.PENDING
     invitation.revoked_at = None
     invitation.accepted_at = None
-    invitation.accepted_by = ''
+    invitation.accepted_by = ""
     invitation.resent_at = timezone.now()
     invitation.expires_at = timezone.now() + timedelta(minutes=_invite_ttl_minutes())
     invitation.save(
         update_fields=[
-            'token',
-            'token_attempts',
-            'max_token_attempts',
-            'status',
-            'revoked_at',
-            'accepted_at',
-            'accepted_by',
-            'resent_at',
-            'expires_at',
-            'updated_at',
+            "token",
+            "token_attempts",
+            "max_token_attempts",
+            "status",
+            "revoked_at",
+            "accepted_at",
+            "accepted_by",
+            "resent_at",
+            "expires_at",
+            "updated_at",
         ]
     )
-    app_base_url = os.environ.get('EDMP_APP_BASE_URL', 'http://localhost:8000').rstrip('/')
-    invite_link = f'{app_base_url}/invite-login?token={raw_token}'
+    app_base_url = os.environ.get("EDMP_APP_BASE_URL", "http://localhost:8000").rstrip(
+        "/"
+    )
+    invite_link = f"{app_base_url}/invite-login?token={raw_token}"
     UserNotification.objects.create(
         user_email=invitation.email,
-        notification_type='project_membership_invite_link_resend',
+        notification_type="project_membership_invite_link_resend",
         channel=UserNotification.Channel.EMAIL,
-        provider='default',
+        provider="default",
         payload={
-            'project_id': str(invitation.project_id),
-            'project_name': invitation.project.name,
-            'role': invitation.role,
-            'invite_link': invite_link,
-            'expires_at': invitation.expires_at.isoformat(),
+            "project_id": str(invitation.project_id),
+            "project_name": invitation.project.name,
+            "role": invitation.role,
+            "invite_link": invite_link,
+            "expires_at": invitation.expires_at.isoformat(),
         },
     )
     tenant_schema = _tenant_schema(request)
-    correlation_id = getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id')
-    actor_id = request.headers.get('X-User-Id')
+    correlation_id = getattr(request, "correlation_id", None) or request.headers.get(
+        "X-Correlation-Id"
+    )
+    actor_id = request.headers.get("X-User-Id")
     event_data = {
-        'invite_link': invite_link,
-        'invitation': _project_invitation_to_dict(invitation),
+        "invite_link": invite_link,
+        "invitation": _project_invitation_to_dict(invitation),
     }
     maybe_publish_event(
-        event_type='project.invitation.resent',
+        event_type="project.invitation.resent",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.project.invitation.resent',
+        routing_key=f"{tenant_schema}.project.invitation.resent",
         correlation_id=correlation_id,
         user_id=actor_id,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='project.invitation.resent',
-        resource_type='project',
+        action="project.invitation.resent",
+        resource_type="project",
         resource_id=str(invitation.project_id),
         correlation_id=correlation_id,
         user_id=actor_id,
         data=event_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(
         {
-            'invite_link': invite_link,
-            'invitation': _project_invitation_to_dict(invitation),
+            "invite_link": invite_link,
+            "invitation": _project_invitation_to_dict(invitation),
         }
     )
 
 
 @csrf_exempt
 def orchestration_workflows(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = OrchestrationWorkflow.objects.order_by('-created_at')
-        project_id = request.GET.get('project_id')
+        qs = OrchestrationWorkflow.objects.order_by("-created_at")
+        project_id = request.GET.get("project_id")
         if project_id:
             qs = qs.filter(project_id=project_id)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        trigger_type = request.GET.get('trigger_type')
+        trigger_type = request.GET.get("trigger_type")
         if trigger_type:
             qs = qs.filter(trigger_type=trigger_type)
         return _paginated_response(request, qs, _orchestration_workflow_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        name = (payload.get('name') or '').strip()
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        name = (payload.get("name") or "").strip()
         if not name:
-            return JsonResponse({'error': 'name is required'}, status=400)
-        trigger_type = payload.get('trigger_type') or OrchestrationWorkflow.TriggerType.EVENT
+            return JsonResponse({"error": "name is required"}, status=400)
+        trigger_type = (
+            payload.get("trigger_type") or OrchestrationWorkflow.TriggerType.EVENT
+        )
         if trigger_type not in OrchestrationWorkflow.TriggerType.values:
-            return JsonResponse({'error': 'invalid_trigger_type'}, status=400)
-        project_id = payload.get('project_id')
+            return JsonResponse({"error": "invalid_trigger_type"}, status=400)
+        project_id = payload.get("project_id")
         project = None
         if project_id:
             try:
                 project = Project.objects.get(id=project_id)
             except (ValidationError, Project.DoesNotExist):
-                return JsonResponse({'error': 'project_not_found'}, status=404)
-        workflow_status = payload.get('status') or OrchestrationWorkflow.Status.ACTIVE
+                return JsonResponse({"error": "project_not_found"}, status=404)
+        workflow_status = payload.get("status") or OrchestrationWorkflow.Status.ACTIVE
         if workflow_status not in OrchestrationWorkflow.Status.values:
-            return JsonResponse({'error': 'invalid_status'}, status=400)
-        steps = _parse_orchestration_steps(payload.get('steps'))
+            return JsonResponse({"error": "invalid_status"}, status=400)
+        steps = _parse_orchestration_steps(payload.get("steps"))
         if steps is None:
-            return JsonResponse({'error': 'invalid_steps'}, status=400)
+            return JsonResponse({"error": "invalid_steps"}, status=400)
         for step in steps:
             try:
-                ingestion = IngestionRequest.objects.get(id=step['ingestion_id'])
+                ingestion = IngestionRequest.objects.get(id=step["ingestion_id"])
             except (ValidationError, IngestionRequest.DoesNotExist):
-                return JsonResponse({'error': 'step_ingestion_not_found'}, status=404)
+                return JsonResponse({"error": "step_ingestion_not_found"}, status=404)
             if project and ingestion.project_id != project.id:
-                return JsonResponse({'error': 'step_project_mismatch'}, status=400)
+                return JsonResponse({"error": "step_project_mismatch"}, status=400)
         workflow = OrchestrationWorkflow.objects.create(
             project=project,
             name=name,
             trigger_type=trigger_type,
-            trigger_value=(payload.get('trigger_value') or '').strip(),
+            trigger_value=(payload.get("trigger_value") or "").strip(),
             steps=steps,
             status=workflow_status,
         )
         tenant_schema = _tenant_schema(request)
         payload_data = _orchestration_workflow_to_dict(workflow)
         maybe_publish_event(
-            event_type='orchestration.workflow.created',
+            event_type="orchestration.workflow.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.orchestration.workflow.created',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.orchestration.workflow.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='orchestration.workflow.created',
-            resource_type='orchestration_workflow',
+            action="orchestration.workflow.created",
+            resource_type="orchestration_workflow",
             resource_id=str(workflow.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(payload_data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def orchestration_runs(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = OrchestrationRun.objects.order_by('-created_at')
-        project_id = request.GET.get('project_id')
+        qs = OrchestrationRun.objects.order_by("-created_at")
+        project_id = request.GET.get("project_id")
         if project_id:
             qs = qs.filter(project_id=project_id)
-        workflow_id = request.GET.get('workflow_id')
+        workflow_id = request.GET.get("workflow_id")
         if workflow_id:
             qs = qs.filter(workflow_id=workflow_id)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
         return _paginated_response(request, qs, _orchestration_run_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(
+            request, {"catalog.editor", "policy.admin", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        workflow_id = payload.get('workflow_id')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        workflow_id = payload.get("workflow_id")
         if not workflow_id:
-            return JsonResponse({'error': 'workflow_id is required'}, status=400)
+            return JsonResponse({"error": "workflow_id is required"}, status=400)
         try:
             workflow = OrchestrationWorkflow.objects.get(id=workflow_id)
         except (ValidationError, OrchestrationWorkflow.DoesNotExist):
-            return JsonResponse({'error': 'workflow_not_found'}, status=404)
+            return JsonResponse({"error": "workflow_not_found"}, status=404)
         if workflow.status != OrchestrationWorkflow.Status.ACTIVE:
-            return JsonResponse({'error': 'workflow_not_active'}, status=400)
+            return JsonResponse({"error": "workflow_not_active"}, status=400)
         run = OrchestrationRun.objects.create(
             project=workflow.project,
             workflow=workflow,
-            trigger_context=payload.get('trigger_context')
-            if isinstance(payload.get('trigger_context'), dict)
-            else {},
+            trigger_context=(
+                payload.get("trigger_context")
+                if isinstance(payload.get("trigger_context"), dict)
+                else {}
+            ),
             status=OrchestrationRun.Status.QUEUED,
             step_results=[],
         )
         tenant_schema = _tenant_schema(request)
         payload_data = _orchestration_run_to_dict(run)
         maybe_publish_event(
-            event_type='orchestration.run.queued',
+            event_type="orchestration.run.queued",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.orchestration.run.queued',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.orchestration.run.queued",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='orchestration.run.queued',
-            resource_type='orchestration_run',
+            action="orchestration.run.queued",
+            resource_type="orchestration_run",
             resource_id=str(run.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=payload_data,
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(payload_data, status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def orchestration_run_transition(request, run_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
-        run = OrchestrationRun.objects.select_related('workflow').get(id=run_id)
+        run = OrchestrationRun.objects.select_related("workflow").get(id=run_id)
     except (ValidationError, OrchestrationRun.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
     if payload is None:
-        return JsonResponse({'error': 'invalid_json'}, status=400)
-    action = payload.get('action')
-    if action not in {'start', 'cancel'}:
-        return JsonResponse({'error': 'invalid_action'}, status=400)
-    if action == 'cancel':
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    action = payload.get("action")
+    if action not in {"start", "cancel"}:
+        return JsonResponse({"error": "invalid_action"}, status=400)
+    if action == "cancel":
         if run.status in {
             OrchestrationRun.Status.SUCCEEDED,
             OrchestrationRun.Status.FAILED,
             OrchestrationRun.Status.CANCELLED,
         }:
-            return JsonResponse({'error': 'run_not_cancellable'}, status=400)
+            return JsonResponse({"error": "run_not_cancellable"}, status=400)
         run.status = OrchestrationRun.Status.CANCELLED
         run.finished_at = timezone.now()
-        run.error_message = 'cancelled by user'
-        run.save(update_fields=['status', 'finished_at', 'error_message', 'updated_at'])
-        event_type = 'orchestration.run.cancelled'
+        run.error_message = "cancelled by user"
+        run.save(update_fields=["status", "finished_at", "error_message", "updated_at"])
+        event_type = "orchestration.run.cancelled"
     else:
         if run.status != OrchestrationRun.Status.QUEUED:
-            return JsonResponse({'error': 'invalid_transition'}, status=400)
+            return JsonResponse({"error": "invalid_transition"}, status=400)
         run.status = OrchestrationRun.Status.RUNNING
         run.started_at = timezone.now()
-        run.save(update_fields=['status', 'started_at', 'updated_at'])
-        event_type = 'orchestration.run.started'
+        run.save(update_fields=["status", "started_at", "updated_at"])
+        event_type = "orchestration.run.started"
         step_results: list[dict[str, Any]] = []
         tenant_schema = _tenant_schema(request)
         for step in run.workflow.steps:
-            ingestion_id = step.get('ingestion_id')
+            ingestion_id = step.get("ingestion_id")
             try:
                 ingestion = IngestionRequest.objects.get(id=ingestion_id)
             except (ValidationError, IngestionRequest.DoesNotExist):
@@ -6634,14 +7110,14 @@ def orchestration_run_transition(request, run_id: str):
                 run.step_results = step_results
                 run.save(
                     update_fields=[
-                        'status',
-                        'error_message',
-                        'finished_at',
-                        'step_results',
-                        'updated_at',
+                        "status",
+                        "error_message",
+                        "finished_at",
+                        "step_results",
+                        "updated_at",
                     ]
                 )
-                event_type = 'orchestration.run.failed'
+                event_type = "orchestration.run.failed"
                 break
             connector_run = ConnectorRun.objects.create(
                 ingestion=ingestion,
@@ -6652,90 +7128,90 @@ def orchestration_run_transition(request, run_id: str):
             )
             execute_connector_run.apply(
                 kwargs={
-                    'tenant_schema': tenant_schema,
-                    'run_id': str(connector_run.id),
-                    'correlation_id': getattr(request, 'correlation_id', None)
-                    or request.headers.get('X-Correlation-Id'),
-                    'user_id': request.headers.get('X-User-Id'),
-                    'request_id': request.headers.get('X-Request-Id')
-                    or request.headers.get('X-Request-ID'),
+                    "tenant_schema": tenant_schema,
+                    "run_id": str(connector_run.id),
+                    "correlation_id": getattr(request, "correlation_id", None)
+                    or request.headers.get("X-Correlation-Id"),
+                    "user_id": request.headers.get("X-User-Id"),
+                    "request_id": request.headers.get("X-Request-Id")
+                    or request.headers.get("X-Request-ID"),
                 }
             ).get(propagate=True)
             refreshed_connector_run = ConnectorRun.objects.get(id=connector_run.id)
             step_result = {
-                'step_id': step.get('step_id'),
-                'ingestion_id': str(ingestion.id),
-                'connector_run_id': str(refreshed_connector_run.id),
-                'status': refreshed_connector_run.status,
+                "step_id": step.get("step_id"),
+                "ingestion_id": str(ingestion.id),
+                "connector_run_id": str(refreshed_connector_run.id),
+                "status": refreshed_connector_run.status,
             }
             step_results.append(step_result)
             if refreshed_connector_run.status != ConnectorRun.Status.SUCCEEDED:
                 run.status = OrchestrationRun.Status.FAILED
                 run.error_message = (
-                    refreshed_connector_run.error_message or 'connector_run_failed'
+                    refreshed_connector_run.error_message or "connector_run_failed"
                 )
                 run.finished_at = timezone.now()
                 run.step_results = step_results
                 run.save(
                     update_fields=[
-                        'status',
-                        'error_message',
-                        'finished_at',
-                        'step_results',
-                        'updated_at',
+                        "status",
+                        "error_message",
+                        "finished_at",
+                        "step_results",
+                        "updated_at",
                     ]
                 )
-                event_type = 'orchestration.run.failed'
+                event_type = "orchestration.run.failed"
                 break
         else:
             run.status = OrchestrationRun.Status.SUCCEEDED
-            run.error_message = ''
+            run.error_message = ""
             run.finished_at = timezone.now()
             run.step_results = step_results
             run.save(
                 update_fields=[
-                    'status',
-                    'error_message',
-                    'finished_at',
-                    'step_results',
-                    'updated_at',
+                    "status",
+                    "error_message",
+                    "finished_at",
+                    "step_results",
+                    "updated_at",
                 ]
             )
-            event_type = 'orchestration.run.succeeded'
+            event_type = "orchestration.run.succeeded"
 
     tenant_schema = _tenant_schema(request)
     payload_data = _orchestration_run_to_dict(run)
     maybe_publish_event(
         event_type=event_type,
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.{event_type}',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.{event_type}",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
         action=event_type,
-        resource_type='orchestration_run',
+        resource_type="orchestration_run",
         resource_id=str(run.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=payload_data,
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(payload_data)
 
 
 @csrf_exempt
 def ui_operations_dashboard(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
@@ -6744,11 +7220,11 @@ def ui_operations_dashboard(request):
 
 @csrf_exempt
 def ui_operations_stewardship_workbench(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
@@ -6757,11 +7233,11 @@ def ui_operations_stewardship_workbench(request):
 
 @csrf_exempt
 def ui_operations_orchestration_monitor(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
@@ -6770,11 +7246,11 @@ def ui_operations_orchestration_monitor(request):
 
 @csrf_exempt
 def ui_operations_agent_monitor(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
@@ -6782,7 +7258,7 @@ def ui_operations_agent_monitor(request):
 
 
 def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
-    project_id = request.GET.get('project_id')
+    project_id = request.GET.get("project_id")
     roles = _request_roles(request)
     stewardship_qs = StewardshipItem.objects.all()
     workflow_qs = WorkflowRun.objects.all()
@@ -6793,7 +7269,7 @@ def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
     print_template_qs = PrintTemplate.objects.all()
     if project_id:
         orchestration_qs = orchestration_qs.filter(project_id=project_id)
-        agent_qs = agent_qs.filter(prompt__icontains=f'project:{project_id}')
+        agent_qs = agent_qs.filter(prompt__icontains=f"project:{project_id}")
     stewardship_counts = {
         status: stewardship_qs.filter(status=status).count()
         for status in StewardshipItem.Status.values
@@ -6811,40 +7287,45 @@ def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
         for status in AgentRun.Status.values
     }
     printing_counts = {
-        'jobs': {
+        "jobs": {
             status: print_job_qs.filter(status=status).count()
             for status in PrintJob.Status.values
         },
-        'gateways': {
+        "gateways": {
             status: print_gateway_qs.filter(status=status).count()
             for status in PrintGateway.Status.values
         },
-        'templates': print_template_qs.count(),
+        "templates": print_template_qs.count(),
     }
+    dashboard_links = resolve_action_descriptors(
+        request,
+        descriptors=OPERATIONS_DASHBOARD_ACTION_DESCRIPTORS,
+    )
     return {
-        'project_id': project_id,
-        'cards': {
-            'stewardship': stewardship_counts,
-            'workflow': workflow_counts,
-            'orchestration': orchestration_counts,
-            'agent': agent_counts,
-            'printing': printing_counts,
+        "project_id": project_id,
+        "cards": {
+            "stewardship": stewardship_counts,
+            "workflow": workflow_counts,
+            "orchestration": orchestration_counts,
+            "agent": agent_counts,
+            "printing": printing_counts,
         },
-        'capabilities': {
-            'can_view': bool(
+        "card_links": {item["key"]: item for item in dashboard_links},
+        "capabilities": {
+            "can_view": bool(
                 roles
-                & {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+                & {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"}
             ),
-            'can_manage_stewardship': bool(roles & {'policy.admin', 'tenant.admin'}),
-            'can_queue_orchestration_runs': bool(
-                roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
+            "can_manage_stewardship": bool(roles & {"policy.admin", "tenant.admin"}),
+            "can_queue_orchestration_runs": bool(
+                roles & {"catalog.editor", "policy.admin", "tenant.admin"}
             ),
-            'can_manage_orchestration': bool(roles & {'policy.admin', 'tenant.admin'}),
-            'can_manage_agents': bool(
-                roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
+            "can_manage_orchestration": bool(roles & {"policy.admin", "tenant.admin"}),
+            "can_manage_agents": bool(
+                roles & {"catalog.editor", "policy.admin", "tenant.admin"}
             ),
-            'can_manage_printing': bool(
-                roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
+            "can_manage_printing": bool(
+                roles & {"catalog.editor", "policy.admin", "tenant.admin"}
             ),
         },
     }
@@ -6852,16 +7333,16 @@ def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
 
 def _ui_operations_stewardship_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
-    can_manage = bool(roles & {'policy.admin', 'tenant.admin'})
-    can_create = bool(roles & {'catalog.editor', 'policy.admin', 'tenant.admin'})
+    can_manage = bool(roles & {"policy.admin", "tenant.admin"})
+    can_create = bool(roles & {"catalog.editor", "policy.admin", "tenant.admin"})
     can_create_access_requests = bool(
-        roles & {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'}
+        roles & {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"}
     )
-    qs = StewardshipItem.objects.order_by('-created_at')
-    status_filter = request.GET.get('status')
+    qs = StewardshipItem.objects.order_by("-created_at")
+    status_filter = request.GET.get("status")
     if status_filter:
         qs = qs.filter(status=status_filter)
-    severity_filter = request.GET.get('severity')
+    severity_filter = request.GET.get("severity")
     if severity_filter:
         qs = qs.filter(severity=severity_filter)
     items = []
@@ -6869,145 +7350,142 @@ def _ui_operations_stewardship_payload(request) -> dict[str, Any]:
         item_data = _stewardship_item_to_dict(item)
         allowed_actions = []
         if can_manage:
-            allowed_actions.append('assign')
+            allowed_actions.append("assign")
             if item.status in {
                 StewardshipItem.Status.OPEN,
                 StewardshipItem.Status.BLOCKED,
             }:
-                allowed_actions.append('start_review')
+                allowed_actions.append("start_review")
             if item.status in {
                 StewardshipItem.Status.OPEN,
                 StewardshipItem.Status.IN_REVIEW,
             }:
-                allowed_actions.append('block')
+                allowed_actions.append("block")
             if item.status in {
                 StewardshipItem.Status.OPEN,
                 StewardshipItem.Status.IN_REVIEW,
                 StewardshipItem.Status.BLOCKED,
             }:
-                allowed_actions.extend(['resolve', 'dismiss'])
+                allowed_actions.extend(["resolve", "dismiss"])
             if item.status in {
                 StewardshipItem.Status.RESOLVED,
                 StewardshipItem.Status.DISMISSED,
             }:
-                allowed_actions.append('reopen')
-        item_data['allowed_actions'] = sorted(set(allowed_actions))
+                allowed_actions.append("reopen")
+        item_data["allowed_actions"] = sorted(set(allowed_actions))
         items.append(item_data)
     return {
-        'items': items,
-        'capabilities': {
-            'can_manage_stewardship': can_manage,
-            'can_create_stewardship': can_create,
-            'can_create_access_requests': can_create_access_requests,
+        "items": items,
+        "capabilities": {
+            "can_manage_stewardship": can_manage,
+            "can_create_stewardship": can_create,
+            "can_create_access_requests": can_create_access_requests,
         },
     }
 
 
 def _ui_operations_orchestration_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
-    project_id = request.GET.get('project_id')
-    workflows_qs = OrchestrationWorkflow.objects.order_by('-created_at')
-    runs_qs = OrchestrationRun.objects.order_by('-created_at')
+    project_id = request.GET.get("project_id")
+    workflows_qs = OrchestrationWorkflow.objects.order_by("-created_at")
+    runs_qs = OrchestrationRun.objects.order_by("-created_at")
     if project_id:
         workflows_qs = workflows_qs.filter(project_id=project_id)
         runs_qs = runs_qs.filter(project_id=project_id)
-    can_queue_runs = bool(
-        roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
-    )
-    can_cancel_runs = bool(roles & {'policy.admin', 'tenant.admin'})
-    can_create_workflow_runs = bool(roles & {'catalog.editor', 'tenant.admin'})
+    can_queue_runs = bool(roles & {"catalog.editor", "policy.admin", "tenant.admin"})
+    can_cancel_runs = bool(roles & {"policy.admin", "tenant.admin"})
+    can_create_workflow_runs = bool(roles & {"catalog.editor", "tenant.admin"})
     runs = []
     for item in runs_qs[:100]:
         item_data = _orchestration_run_to_dict(item)
         allowed_actions = []
         if can_queue_runs and item.status == OrchestrationRun.Status.QUEUED:
-            allowed_actions.append('start')
+            allowed_actions.append("start")
         if can_cancel_runs and item.status in {
             OrchestrationRun.Status.QUEUED,
             OrchestrationRun.Status.RUNNING,
         }:
-            allowed_actions.append('cancel')
-        item_data['allowed_actions'] = allowed_actions
+            allowed_actions.append("cancel")
+        item_data["allowed_actions"] = allowed_actions
         runs.append(item_data)
     return {
-        'project_id': project_id,
-        'workflows': [_orchestration_workflow_to_dict(item) for item in workflows_qs[:100]],
-        'runs': runs,
-        'capabilities': {
-            'can_queue_runs': can_queue_runs,
-            'can_cancel_runs': can_cancel_runs,
-            'can_create_workflow_runs': can_create_workflow_runs,
+        "project_id": project_id,
+        "workflows": [
+            _orchestration_workflow_to_dict(item) for item in workflows_qs[:100]
+        ],
+        "runs": runs,
+        "capabilities": {
+            "can_queue_runs": can_queue_runs,
+            "can_cancel_runs": can_cancel_runs,
+            "can_create_workflow_runs": can_create_workflow_runs,
         },
     }
 
 
 def _ui_operations_agent_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
-    project_id = request.GET.get('project_id')
-    qs = AgentRun.objects.order_by('-created_at')
+    project_id = request.GET.get("project_id")
+    qs = AgentRun.objects.order_by("-created_at")
     if project_id:
-        qs = qs.filter(prompt__icontains=f'project:{project_id}')
-    can_create_runs = bool(
-        roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
-    )
-    can_cancel_runs = bool(
-        roles & {'catalog.editor', 'policy.admin', 'tenant.admin'}
-    )
-    can_materialize_timeouts = bool(
-        roles & {'policy.admin', 'tenant.admin'}
-    )
+        qs = qs.filter(prompt__icontains=f"project:{project_id}")
+    can_create_runs = bool(roles & {"catalog.editor", "policy.admin", "tenant.admin"})
+    can_cancel_runs = bool(roles & {"catalog.editor", "policy.admin", "tenant.admin"})
+    can_materialize_timeouts = bool(roles & {"policy.admin", "tenant.admin"})
     runs = []
     for item in qs[:100]:
         item_data = _agent_run_to_dict(item)
         allowed_actions = []
         if can_create_runs and item.status == AgentRun.Status.QUEUED:
-            allowed_actions.append('start')
+            allowed_actions.append("start")
         if can_create_runs and item.status == AgentRun.Status.RUNNING:
-            allowed_actions.append('complete')
-            allowed_actions.append('fail')
+            allowed_actions.append("complete")
+            allowed_actions.append("fail")
         if can_cancel_runs and item.status in {
             AgentRun.Status.QUEUED,
             AgentRun.Status.RUNNING,
         }:
-            allowed_actions.append('cancel')
+            allowed_actions.append("cancel")
         if can_materialize_timeouts and item.status == AgentRun.Status.RUNNING:
-            allowed_actions.append('materialize_timeouts')
-        item_data['allowed_actions'] = allowed_actions
+            allowed_actions.append("materialize_timeouts")
+        item_data["allowed_actions"] = allowed_actions
         runs.append(item_data)
     return {
-        'project_id': project_id,
-        'runs': runs,
-        'capabilities': {
-            'can_create_runs': can_create_runs,
-            'can_cancel_runs': can_cancel_runs,
-            'can_materialize_timeouts': can_materialize_timeouts,
+        "project_id": project_id,
+        "runs": runs,
+        "capabilities": {
+            "can_create_runs": can_create_runs,
+            "can_cancel_runs": can_cancel_runs,
+            "can_materialize_timeouts": can_materialize_timeouts,
         },
     }
 
 
 def _ui_operations_printing_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
-    can_create_jobs = bool(roles & {'catalog.editor', 'tenant.admin'})
-    can_manage_jobs = bool(roles & {'policy.admin', 'tenant.admin'})
-    can_manage_gateways = bool(roles & {'policy.admin', 'tenant.admin'})
-    can_manage_templates = bool(roles & {'catalog.editor', 'tenant.admin'})
+    can_create_jobs = bool(roles & {"catalog.editor", "tenant.admin"})
+    can_manage_jobs = bool(roles & {"policy.admin", "tenant.admin"})
+    can_manage_gateways = bool(roles & {"policy.admin", "tenant.admin"})
+    can_manage_templates = bool(roles & {"catalog.editor", "tenant.admin"})
 
-    jobs_qs = PrintJob.objects.order_by('-created_at')
-    job_status_filter = (request.GET.get('job_status') or '').strip()
+    jobs_qs = PrintJob.objects.order_by("-created_at")
+    job_status_filter = (request.GET.get("job_status") or "").strip()
     if job_status_filter:
         jobs_qs = jobs_qs.filter(status=job_status_filter)
 
-    gateways_qs = PrintGateway.objects.order_by('-updated_at')
-    gateway_status_filter = (request.GET.get('gateway_status') or '').strip()
+    gateways_qs = PrintGateway.objects.order_by("-updated_at")
+    gateway_status_filter = (request.GET.get("gateway_status") or "").strip()
     if gateway_status_filter:
         gateways_qs = gateways_qs.filter(status=gateway_status_filter)
-    templates_qs = PrintTemplate.objects.order_by('-updated_at')
+    templates_qs = PrintTemplate.objects.order_by("-updated_at")
 
     jobs = []
     for item in jobs_qs[:200]:
         item_data = _print_job_to_dict(item)
         allowed_actions = []
-        if can_manage_jobs and item.status in {PrintJob.Status.PENDING, PrintJob.Status.RETRYING}:
+        if can_manage_jobs and item.status in {
+            PrintJob.Status.PENDING,
+            PrintJob.Status.RETRYING,
+        }:
             allowed_actions.extend(
                 [
                     PrintJob.Status.RETRYING,
@@ -7015,78 +7493,86 @@ def _ui_operations_printing_payload(request) -> dict[str, Any]:
                     PrintJob.Status.FAILED,
                 ]
             )
-        item_data['allowed_actions'] = sorted(set(allowed_actions))
+        item_data["allowed_actions"] = sorted(set(allowed_actions))
         jobs.append(item_data)
 
     return {
-        'jobs': jobs,
-        'gateways': [_print_gateway_to_dict(item) for item in gateways_qs[:200]],
-        'templates': [_print_template_to_dict(item) for item in templates_qs[:200]],
-        'cards': {
-            'jobs': {
+        "jobs": jobs,
+        "gateways": [_print_gateway_to_dict(item) for item in gateways_qs[:200]],
+        "templates": [_print_template_to_dict(item) for item in templates_qs[:200]],
+        "cards": {
+            "jobs": {
                 status: PrintJob.objects.filter(status=status).count()
                 for status in PrintJob.Status.values
             },
-            'gateways': {
+            "gateways": {
                 status: PrintGateway.objects.filter(status=status).count()
                 for status in PrintGateway.Status.values
             },
-            'templates': PrintTemplate.objects.count(),
+            "templates": PrintTemplate.objects.count(),
         },
-        'capabilities': {
-            'can_create_jobs': can_create_jobs,
-            'can_manage_jobs': can_manage_jobs,
-            'can_manage_gateways': can_manage_gateways,
-            'can_manage_templates': can_manage_templates,
+        "capabilities": {
+            "can_create_jobs": can_create_jobs,
+            "can_manage_jobs": can_manage_jobs,
+            "can_manage_gateways": can_manage_gateways,
+            "can_manage_templates": can_manage_templates,
         },
     }
 
 
 def _user_portal_dashboard_payload(request) -> dict[str, Any]:
     roles = _request_roles(request)
-    roles_enforced = os.environ.get('EDMP_ENFORCE_ROLES', '').lower() in {
-        '1',
-        'true',
-        'yes',
+    roles_enforced = os.environ.get("EDMP_ENFORCE_ROLES", "").lower() in {
+        "1",
+        "true",
+        "yes",
     }
     can_submit_print_jobs = (
-        bool(roles & {'catalog.editor', 'tenant.admin'}) if roles_enforced else True
+        bool(roles & {"catalog.editor", "tenant.admin"}) if roles_enforced else True
     )
     can_manage_templates = (
-        bool(roles & {'catalog.editor', 'tenant.admin'}) if roles_enforced else True
+        bool(roles & {"catalog.editor", "tenant.admin"}) if roles_enforced else True
     )
     can_manage_printers = (
-        bool(roles & {'policy.admin', 'tenant.admin'}) if roles_enforced else True
-    )
-    can_view_operations = (
-        bool(roles & {'catalog.editor', 'policy.admin', 'tenant.admin'})
-        if roles_enforced
-        else True
+        bool(roles & {"policy.admin", "tenant.admin"}) if roles_enforced else True
     )
     templates = _merge_templates_with_defaults(
-        [_print_template_to_dict(item) for item in PrintTemplate.objects.order_by('-updated_at')[:100]]
+        [
+            _print_template_to_dict(item)
+            for item in PrintTemplate.objects.order_by("-updated_at")[:100]
+        ]
     )[:100]
-    gateways = [_print_gateway_to_dict(item) for item in PrintGateway.objects.order_by('-updated_at')[:100]]
-    jobs = [_print_job_to_dict(item) for item in PrintJob.objects.order_by('-created_at')[:20]]
+    gateways = [
+        _print_gateway_to_dict(item)
+        for item in PrintGateway.objects.order_by("-updated_at")[:100]
+    ]
+    jobs = [
+        _print_job_to_dict(item)
+        for item in PrintJob.objects.order_by("-created_at")[:20]
+    ]
     return {
-        'templates': templates,
-        'gateways': gateways,
-        'recent_jobs': jobs,
-        'cards': {
-            'templates': len(templates),
-            'printers': len(gateways),
-            'recent_jobs': len(jobs),
+        "templates": templates,
+        "gateways": gateways,
+        "recent_jobs": jobs,
+        "cards": {
+            "templates": len(templates),
+            "printers": len(gateways),
+            "recent_jobs": len(jobs),
         },
-        'user_context': {
-            'user_id': (request.headers.get('X-User-Id') or 'anonymous').strip(),
-            'roles': sorted(roles),
-            'tenant_schema': _tenant_schema(request),
+        "user_context": {
+            "user_id": (request.headers.get("X-User-Id") or "anonymous").strip(),
+            "roles": sorted(roles),
+            "tenant_schema": _tenant_schema(request),
         },
-        'navigation': {'can_view_operations': can_view_operations},
-        'capabilities': {
-            'can_submit_print_jobs': can_submit_print_jobs,
-            'can_manage_templates': can_manage_templates,
-            'can_manage_printers': can_manage_printers,
+        "navigation": resolve_navigation(
+            request,
+            active_key="home",
+            descriptors=USER_PORTAL_NAVIGATION_DESCRIPTORS,
+        ),
+        "capabilities": {
+            "can_submit_print_jobs": can_submit_print_jobs,
+            "can_manage_templates": can_manage_templates,
+            "can_manage_printers": can_manage_printers,
         },
     }
 
@@ -7094,50 +7580,57 @@ def _user_portal_dashboard_payload(request) -> dict[str, Any]:
 def _ui_base_template() -> str:
     if settings.EDMP_UI_MATERIAL_ENABLED:
         try:
-            get_template('material/base.html')
-            return 'material/base.html'
+            get_template("material/base.html")
+            return "material/base.html"
         except TemplateDoesNotExist:
             pass
-    return 'core/ui/base_fallback.html'
+    return "core/ui/base_fallback.html"
 
 
 def _ui_feedback_context(request) -> dict[str, Any]:
     return {
-        'ui_message': (request.GET.get('ui_message') or '').strip(),
-        'ui_error': (request.GET.get('ui_error') or '').strip().lower()
-        in {'1', 'true', 'yes'},
+        "ui_message": (request.GET.get("ui_message") or "").strip(),
+        "ui_error": (request.GET.get("ui_error") or "").strip().lower()
+        in {"1", "true", "yes"},
     }
 
 
 def _ui_user_context(request) -> dict[str, Any]:
     return {
-        'user_id': (request.headers.get('X-User-Id') or 'anonymous').strip(),
-        'roles': sorted(_request_roles(request)),
-        'tenant_schema': _tenant_schema(request),
+        "user_id": (request.headers.get("X-User-Id") or "anonymous").strip(),
+        "roles": sorted(_request_roles(request)),
+        "tenant_schema": _tenant_schema(request),
     }
 
 
 @csrf_exempt
 def ui_operations_dashboard_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     project_filter = _ui_project_filter_context(request)
     return render(
         request,
-        'core/ui/operations_dashboard.html',
+        "core/ui/operations_dashboard.html",
         {
-            'base_template': _ui_base_template(),
-            'active_nav': 'dashboard',
-            'payload': _ui_operations_dashboard_payload(request),
-            'user_context': _ui_user_context(request),
-            'project_id': project_filter['value'],
-            'project_filter': project_filter,
+            "base_template": _ui_base_template(),
+            "active_nav": "dashboard",
+            "payload": with_navigation(
+                _ui_operations_dashboard_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="dashboard",
+                    descriptors=OPERATIONS_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
+            "user_context": _ui_user_context(request),
+            "project_id": project_filter["value"],
+            "project_filter": project_filter,
             **_ui_feedback_context(request),
         },
     )
@@ -7145,28 +7638,35 @@ def ui_operations_dashboard_page(request):
 
 @csrf_exempt
 def ui_operations_stewardship_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     return render(
         request,
-        'core/ui/operations_stewardship.html',
+        "core/ui/operations_stewardship.html",
         {
-            'base_template': _ui_base_template(),
-            'active_nav': 'stewardship',
-            'payload': _ui_operations_stewardship_payload(request),
-            'user_context': _ui_user_context(request),
-            'status_filter': request.GET.get('status', ''),
-            'severity_filter': request.GET.get('severity', ''),
-            'status_options': StewardshipItem.Status.values,
-            'severity_options': StewardshipItem.Severity.values,
-            'item_type_options': StewardshipItem.ItemType.values,
-            'access_type_options': AccessRequest.AccessType.values,
+            "base_template": _ui_base_template(),
+            "active_nav": "stewardship",
+            "payload": with_navigation(
+                _ui_operations_stewardship_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="stewardship",
+                    descriptors=OPERATIONS_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
+            "user_context": _ui_user_context(request),
+            "status_filter": request.GET.get("status", ""),
+            "severity_filter": request.GET.get("severity", ""),
+            "status_options": StewardshipItem.Status.values,
+            "severity_options": StewardshipItem.Severity.values,
+            "item_type_options": StewardshipItem.ItemType.values,
+            "access_type_options": AccessRequest.AccessType.values,
             **_ui_feedback_context(request),
         },
     )
@@ -7174,25 +7674,32 @@ def ui_operations_stewardship_page(request):
 
 @csrf_exempt
 def ui_operations_orchestration_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     project_filter = _ui_project_filter_context(request)
     return render(
         request,
-        'core/ui/operations_orchestration.html',
+        "core/ui/operations_orchestration.html",
         {
-            'base_template': _ui_base_template(),
-            'active_nav': 'orchestration',
-            'payload': _ui_operations_orchestration_payload(request),
-            'user_context': _ui_user_context(request),
-            'project_id': project_filter['value'],
-            'project_filter': project_filter,
+            "base_template": _ui_base_template(),
+            "active_nav": "orchestration",
+            "payload": with_navigation(
+                _ui_operations_orchestration_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="orchestration",
+                    descriptors=OPERATIONS_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
+            "user_context": _ui_user_context(request),
+            "project_id": project_filter["value"],
+            "project_filter": project_filter,
             **_ui_feedback_context(request),
         },
     )
@@ -7200,25 +7707,32 @@ def ui_operations_orchestration_page(request):
 
 @csrf_exempt
 def ui_operations_agent_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     project_filter = _ui_project_filter_context(request)
     return render(
         request,
-        'core/ui/operations_agent.html',
+        "core/ui/operations_agent.html",
         {
-            'base_template': _ui_base_template(),
-            'active_nav': 'agent',
-            'payload': _ui_operations_agent_payload(request),
-            'user_context': _ui_user_context(request),
-            'project_id': project_filter['value'],
-            'project_filter': project_filter,
+            "base_template": _ui_base_template(),
+            "active_nav": "agent",
+            "payload": with_navigation(
+                _ui_operations_agent_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="agent",
+                    descriptors=OPERATIONS_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
+            "user_context": _ui_user_context(request),
+            "project_id": project_filter["value"],
+            "project_filter": project_filter,
             **_ui_feedback_context(request),
         },
     )
@@ -7226,27 +7740,34 @@ def ui_operations_agent_page(request):
 
 @csrf_exempt
 def ui_operations_printing_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     return render(
         request,
-        'core/ui/operations_printing.html',
+        "core/ui/operations_printing.html",
         {
-            'base_template': _ui_base_template(),
-            'active_nav': 'printing',
-            'payload': _ui_operations_printing_payload(request),
-            'user_context': _ui_user_context(request),
-            'job_status_filter': request.GET.get('job_status', ''),
-            'gateway_status_filter': request.GET.get('gateway_status', ''),
-            'job_status_options': PrintJob.Status.values,
-            'gateway_status_options': PrintGateway.Status.values,
-            'job_format_options': PrintJob.Format.values,
+            "base_template": _ui_base_template(),
+            "active_nav": "printing",
+            "payload": with_navigation(
+                _ui_operations_printing_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="printing",
+                    descriptors=OPERATIONS_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
+            "user_context": _ui_user_context(request),
+            "job_status_filter": request.GET.get("job_status", ""),
+            "gateway_status_filter": request.GET.get("gateway_status", ""),
+            "job_status_options": PrintJob.Status.values,
+            "gateway_status_options": PrintGateway.Status.values,
+            "job_format_options": PrintJob.Format.values,
             **_ui_feedback_context(request),
         },
     )
@@ -7254,20 +7775,27 @@ def ui_operations_printing_page(request):
 
 @csrf_exempt
 def user_portal_dashboard_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
     forbidden = require_any_role(
         request,
-        {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+        {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
     )
     if forbidden:
         return forbidden
     return render(
         request,
-        'core/ui/user_dashboard.html',
+        "core/ui/user_dashboard.html",
         {
-            'active_nav': 'home',
-            'payload': _user_portal_dashboard_payload(request),
+            "active_nav": "home",
+            "payload": with_navigation(
+                _user_portal_dashboard_payload(request),
+                resolve_navigation(
+                    request,
+                    active_key="home",
+                    descriptors=USER_PORTAL_NAVIGATION_DESCRIPTORS,
+                ),
+            ),
             **_ui_feedback_context(request),
         },
     )
@@ -7275,142 +7803,142 @@ def user_portal_dashboard_page(request):
 
 @csrf_exempt
 def connector_runs(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         forbidden = require_any_role(
             request,
-            {'catalog.reader', 'catalog.editor', 'policy.admin', 'tenant.admin'},
+            {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin"},
         )
         if forbidden:
             return forbidden
-        qs = ConnectorRun.objects.select_related('ingestion').order_by('-created_at')
-        ingestion_id = request.GET.get('ingestion_id')
+        qs = ConnectorRun.objects.select_related("ingestion").order_by("-created_at")
+        ingestion_id = request.GET.get("ingestion_id")
         if ingestion_id:
             qs = qs.filter(ingestion_id=ingestion_id)
-        project_id = request.GET.get('project_id')
+        project_id = request.GET.get("project_id")
         if project_id:
             qs = qs.filter(ingestion__project_id=project_id)
-        status_filter = request.GET.get('status')
+        status_filter = request.GET.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
         return _paginated_response(request, qs, _connector_run_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_any_role(request, {'catalog.editor', 'tenant.admin'})
+    if request.method == "POST":
+        forbidden = require_any_role(request, {"catalog.editor", "tenant.admin"})
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        ingestion_id = payload.get('ingestion_id')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        ingestion_id = payload.get("ingestion_id")
         if not ingestion_id:
-            return JsonResponse({'error': 'ingestion_id is required'}, status=400)
+            return JsonResponse({"error": "ingestion_id is required"}, status=400)
         try:
             ingestion = IngestionRequest.objects.get(id=ingestion_id)
         except (ValidationError, IngestionRequest.DoesNotExist):
-            return JsonResponse({'error': 'ingestion_not_found'}, status=404)
+            return JsonResponse({"error": "ingestion_not_found"}, status=404)
 
         execution_path = (
-            payload.get('execution_path') or ConnectorRun.ExecutionPath.WORKER
+            payload.get("execution_path") or ConnectorRun.ExecutionPath.WORKER
         )
         if execution_path not in {
             ConnectorRun.ExecutionPath.WORKER,
             ConnectorRun.ExecutionPath.JOB,
         }:
-            return JsonResponse({'error': 'invalid_execution_path'}, status=400)
+            return JsonResponse({"error": "invalid_execution_path"}, status=400)
 
         run = ConnectorRun.objects.create(
             ingestion=ingestion,
             execution_path=execution_path,
             status=ConnectorRun.Status.QUEUED,
-            retry_count=int(payload.get('retry_count') or 0),
+            retry_count=int(payload.get("retry_count") or 0),
             progress={},
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='connector.run.queued',
+            event_type="connector.run.queued",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.connector.run.queued',
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.connector.run.queued",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_connector_run_to_dict(run),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='connector.run.queued',
-            resource_type='connector_run',
+            action="connector.run.queued",
+            resource_type="connector_run",
             resource_id=str(run.id),
-            correlation_id=getattr(request, 'correlation_id', None)
-            or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_connector_run_to_dict(run),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         result = execute_connector_run.apply(
             kwargs={
-                'tenant_schema': tenant_schema,
-                'run_id': str(run.id),
-                'correlation_id': getattr(request, 'correlation_id', None)
-                or request.headers.get('X-Correlation-Id'),
-                'user_id': request.headers.get('X-User-Id'),
-                'request_id': request.headers.get('X-Request-Id')
-                or request.headers.get('X-Request-ID'),
+                "tenant_schema": tenant_schema,
+                "run_id": str(run.id),
+                "correlation_id": getattr(request, "correlation_id", None)
+                or request.headers.get("X-Correlation-Id"),
+                "user_id": request.headers.get("X-User-Id"),
+                "request_id": request.headers.get("X-Request-Id")
+                or request.headers.get("X-Request-ID"),
             }
         ).get(propagate=True)
         refreshed = ConnectorRun.objects.get(id=run.id)
         return JsonResponse(
-            {'run': _connector_run_to_dict(refreshed), 'result': result},
+            {"run": _connector_run_to_dict(refreshed), "result": result},
             status=201,
         )
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def connector_run_cancel(request, run_id: str):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_any_role(request, {'policy.admin', 'tenant.admin'})
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_any_role(request, {"policy.admin", "tenant.admin"})
     if forbidden:
         return forbidden
     try:
-        run = ConnectorRun.objects.select_related('ingestion').get(id=run_id)
+        run = ConnectorRun.objects.select_related("ingestion").get(id=run_id)
     except (ValidationError, ConnectorRun.DoesNotExist):
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
     if run.status in {
         ConnectorRun.Status.SUCCEEDED,
         ConnectorRun.Status.FAILED,
         ConnectorRun.Status.CANCELLED,
     }:
-        return JsonResponse({'error': 'run_not_cancellable'}, status=400)
+        return JsonResponse({"error": "run_not_cancellable"}, status=400)
     run.status = ConnectorRun.Status.CANCELLED
     run.finished_at = timezone.now()
-    run.error_message = 'cancelled by user'
-    run.save(update_fields=['status', 'finished_at', 'error_message', 'updated_at'])
+    run.error_message = "cancelled by user"
+    run.save(update_fields=["status", "finished_at", "error_message", "updated_at"])
     run.ingestion.status = IngestionRequest.Status.FAILED
-    run.ingestion.save(update_fields=['status', 'updated_at'])
+    run.ingestion.save(update_fields=["status", "updated_at"])
     tenant_schema = _tenant_schema(request)
     maybe_publish_event(
-        event_type='connector.run.cancelled',
+        event_type="connector.run.cancelled",
         tenant_id=tenant_schema,
-        routing_key=f'{tenant_schema}.connector.run.cancelled',
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        routing_key=f"{tenant_schema}.connector.run.cancelled",
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_connector_run_to_dict(run),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     maybe_publish_audit_event(
         tenant_id=tenant_schema,
-        action='connector.run.cancelled',
-        resource_type='connector_run',
+        action="connector.run.cancelled",
+        resource_type="connector_run",
         resource_id=str(run.id),
-        correlation_id=getattr(request, 'correlation_id', None)
-        or request.headers.get('X-Correlation-Id'),
-        user_id=request.headers.get('X-User-Id'),
+        correlation_id=getattr(request, "correlation_id", None)
+        or request.headers.get("X-Correlation-Id"),
+        user_id=request.headers.get("X-User-Id"),
         data=_connector_run_to_dict(run),
-        rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+        rabbitmq_url=os.environ.get("RABBITMQ_URL"),
     )
     return JsonResponse(_connector_run_to_dict(run))
 
@@ -7418,67 +7946,71 @@ def connector_run_cancel(request, run_id: str):
 @csrf_exempt
 def ingestions(request):
     """Create tenant-scoped ingestion requests."""
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
-        qs = IngestionRequest.objects.order_by('-created_at')
-        project_id = request.GET.get('project_id')
+        qs = IngestionRequest.objects.order_by("-created_at")
+        project_id = request.GET.get("project_id")
         if project_id:
             qs = qs.filter(project_id=project_id)
         return _paginated_response(request, qs, _ingestion_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
+            return JsonResponse({"error": "invalid_json"}, status=400)
 
-        connector = payload.get('connector')
-        source = payload.get('source')
-        project_id = payload.get('project_id')
+        connector = payload.get("connector")
+        source = payload.get("source")
+        project_id = payload.get("project_id")
         if not connector:
-            return JsonResponse({'error': 'connector is required'}, status=400)
+            return JsonResponse({"error": "connector is required"}, status=400)
         if source is None or not isinstance(source, dict):
-            return JsonResponse({'error': 'source must be an object'}, status=400)
+            return JsonResponse({"error": "source must be an object"}, status=400)
         project = None
         if project_id:
             try:
                 project = Project.objects.get(id=project_id)
             except (ValidationError, Project.DoesNotExist):
-                return JsonResponse({'error': 'project_not_found'}, status=404)
+                return JsonResponse({"error": "project_not_found"}, status=404)
 
         ing = IngestionRequest.objects.create(
             project=project,
             connector=connector,
             source=source,
-            mode=payload.get('mode') or '',
+            mode=payload.get("mode") or "",
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='ingestion.created',
+            event_type="ingestion.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.ingestion.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.ingestion.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_ingestion_to_dict(ing),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='ingestion.created',
-            resource_type='ingestion',
+            action="ingestion.created",
+            resource_type="ingestion",
             resource_id=str(ing.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_ingestion_to_dict(ing),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_ingestion_to_dict(ing), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -7486,25 +8018,33 @@ def ingestion_detail(request, ingestion_id: str):
     try:
         ing = IngestionRequest.objects.get(id=ingestion_id)
     except IngestionRequest.DoesNotExist:
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
 
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         data = _ingestion_to_dict(ing)
-        latest_run = ing.connector_runs.order_by('-created_at').first()
+        latest_run = ing.connector_runs.order_by("-created_at").first()
         if latest_run:
-            data['execution'] = {
-                'state': latest_run.status,
-                'started_at': latest_run.started_at.isoformat() if latest_run.started_at else None,
-                'finished_at': latest_run.finished_at.isoformat() if latest_run.finished_at else None,
-                'retry_count': latest_run.retry_count,
-                'progress': latest_run.progress,
+            data["execution"] = {
+                "state": latest_run.status,
+                "started_at": (
+                    latest_run.started_at.isoformat() if latest_run.started_at else None
+                ),
+                "finished_at": (
+                    latest_run.finished_at.isoformat()
+                    if latest_run.finished_at
+                    else None
+                ),
+                "retry_count": latest_run.retry_count,
+                "progress": latest_run.progress,
             }
         return JsonResponse(data)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -7514,77 +8054,87 @@ def assets(request):
     GET supports page/page_size pagination (default page_size 50, max 100).
     Legacy limit/offset params are also accepted.
     """
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
-        qs = DataAsset.objects.order_by('created_at')
+        qs = DataAsset.objects.order_by("created_at")
         return _paginated_response(request, qs, _asset_to_dict)
 
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
+            return JsonResponse({"error": "invalid_json"}, status=400)
 
-        qualified_name = payload.get('qualified_name')
-        asset_type = payload.get('asset_type')
-        description = payload.get('description')
-        owner = payload.get('owner')
+        qualified_name = payload.get("qualified_name")
+        asset_type = payload.get("asset_type")
+        description = payload.get("description")
+        owner = payload.get("owner")
         if not qualified_name or not asset_type:
-            return JsonResponse({'error': 'qualified_name and asset_type are required'}, status=400)
+            return JsonResponse(
+                {"error": "qualified_name and asset_type are required"}, status=400
+            )
         if description is not None and not isinstance(description, str):
-            return JsonResponse({'error': 'description must be a string'}, status=400)
+            return JsonResponse({"error": "description must be a string"}, status=400)
         if owner is not None and not isinstance(owner, str):
-            return JsonResponse({'error': 'owner must be a string'}, status=400)
-        tags = _parse_string_list(payload.get('tags'))
+            return JsonResponse({"error": "owner must be a string"}, status=400)
+        tags = _parse_string_list(payload.get("tags"))
         if tags is None:
-            return JsonResponse({'error': 'tags must be an array of strings'}, status=400)
-        classifications = _parse_string_list(payload.get('classifications'))
+            return JsonResponse(
+                {"error": "tags must be an array of strings"}, status=400
+            )
+        classifications = _parse_string_list(payload.get("classifications"))
         if classifications is None:
-            return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
+            return JsonResponse(
+                {"error": "classifications must be an array of strings"}, status=400
+            )
         invalid = _validate_classification_values(classifications)
         if invalid:
             return JsonResponse(
-                {'error': 'unknown_classifications', 'items': invalid},
+                {"error": "unknown_classifications", "items": invalid},
                 status=400,
             )
 
         asset = DataAsset.objects.create(
             qualified_name=qualified_name,
-            display_name=payload.get('display_name') or qualified_name,
+            display_name=payload.get("display_name") or qualified_name,
             asset_type=asset_type,
-            description='' if description is None else description,
-            owner='' if owner is None else owner,
+            description="" if description is None else description,
+            owner="" if owner is None else owner,
             tags=tags,
             classifications=classifications,
-            properties=payload.get('properties') or {},
+            properties=payload.get("properties") or {},
         )
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='asset.created',
+            event_type="asset.created",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.catalog.asset.created',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.catalog.asset.created",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_asset_to_dict(asset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='asset.created',
-            resource_type='asset',
+            action="asset.created",
+            resource_type="asset",
             resource_id=str(asset.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_asset_to_dict(asset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_asset_to_dict(asset), status=201)
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
@@ -7592,50 +8142,64 @@ def asset_detail(request, asset_id: str):
     try:
         asset = DataAsset.objects.get(id=asset_id)
     except DataAsset.DoesNotExist:
-        return JsonResponse({'error': 'not_found'}, status=404)
+        return JsonResponse({"error": "not_found"}, status=404)
 
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
         return JsonResponse(_asset_to_dict(asset))
 
-    if request.method == 'PUT':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "PUT":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
+            return JsonResponse({"error": "invalid_json"}, status=400)
 
-        if 'asset_type' in payload and payload['asset_type'] != asset.asset_type:
-            return JsonResponse({'error': 'asset_type is immutable'}, status=400)
+        if "asset_type" in payload and payload["asset_type"] != asset.asset_type:
+            return JsonResponse({"error": "asset_type is immutable"}, status=400)
 
-        if 'display_name' in payload:
-            if payload['display_name'] is None:
-                return JsonResponse({'error': 'display_name cannot be null'}, status=400)
-            asset.display_name = payload['display_name']
-        if 'description' in payload:
-            if payload['description'] is not None and not isinstance(payload['description'], str):
-                return JsonResponse({'error': 'description must be a string'}, status=400)
-            asset.description = '' if payload['description'] is None else payload['description']
-        if 'owner' in payload:
-            if payload['owner'] is not None and not isinstance(payload['owner'], str):
-                return JsonResponse({'error': 'owner must be a string'}, status=400)
-            asset.owner = '' if payload['owner'] is None else payload['owner']
-        if 'tags' in payload:
-            tags = _parse_string_list(payload['tags'])
+        if "display_name" in payload:
+            if payload["display_name"] is None:
+                return JsonResponse(
+                    {"error": "display_name cannot be null"}, status=400
+                )
+            asset.display_name = payload["display_name"]
+        if "description" in payload:
+            if payload["description"] is not None and not isinstance(
+                payload["description"], str
+            ):
+                return JsonResponse(
+                    {"error": "description must be a string"}, status=400
+                )
+            asset.description = (
+                "" if payload["description"] is None else payload["description"]
+            )
+        if "owner" in payload:
+            if payload["owner"] is not None and not isinstance(payload["owner"], str):
+                return JsonResponse({"error": "owner must be a string"}, status=400)
+            asset.owner = "" if payload["owner"] is None else payload["owner"]
+        if "tags" in payload:
+            tags = _parse_string_list(payload["tags"])
             if tags is None:
-                return JsonResponse({'error': 'tags must be an array of strings'}, status=400)
+                return JsonResponse(
+                    {"error": "tags must be an array of strings"}, status=400
+                )
             asset.tags = tags
-        if 'classifications' in payload:
-            classifications = _parse_string_list(payload['classifications'])
+        if "classifications" in payload:
+            classifications = _parse_string_list(payload["classifications"])
             if classifications is None:
-                return JsonResponse({'error': 'classifications must be an array of strings'}, status=400)
+                return JsonResponse(
+                    {"error": "classifications must be an array of strings"}, status=400
+                )
             invalid = _validate_classification_values(classifications)
             if invalid:
                 return JsonResponse(
-                    {'error': 'unknown_classifications', 'items': invalid},
+                    {"error": "unknown_classifications", "items": invalid},
                     status=400,
                 )
             forbidden = _enforce_sensitivity_upgrade_role(
@@ -7646,13 +8210,15 @@ def asset_detail(request, asset_id: str):
             if forbidden:
                 return forbidden
             asset.classifications = classifications
-        if 'properties' in payload:
-            props = payload['properties']
+        if "properties" in payload:
+            props = payload["properties"]
             if props is None:
                 asset.properties = {}
             else:
                 if not isinstance(props, dict):
-                    return JsonResponse({'error': 'properties must be an object'}, status=400)
+                    return JsonResponse(
+                        {"error": "properties must be an object"}, status=400
+                    )
                 merged = dict(asset.properties)
                 for k, v in props.items():
                     if v is None:
@@ -7663,118 +8229,135 @@ def asset_detail(request, asset_id: str):
         asset.save()
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='asset.updated',
+            event_type="asset.updated",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.catalog.asset.updated',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            routing_key=f"{tenant_schema}.catalog.asset.updated",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_asset_to_dict(asset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='asset.updated',
-            resource_type='asset',
+            action="asset.updated",
+            resource_type="asset",
             resource_id=str(asset.id),
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
             data=_asset_to_dict(asset),
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         return JsonResponse(_asset_to_dict(asset))
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def lineage_edges(request):
     """Tenant-scoped lineage edge upsert/query."""
-    if request.method == 'POST':
-        forbidden = require_role(request, 'catalog.editor')
+    if request.method == "POST":
+        forbidden = require_role(request, "catalog.editor")
         if forbidden:
             return forbidden
         payload = _parse_json_body(request)
         if payload is None:
-            return JsonResponse({'error': 'invalid_json'}, status=400)
-        items = payload.get('items')
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        items = payload.get("items")
         if not isinstance(items, list):
-            return JsonResponse({'error': 'items must be a list'}, status=400)
+            return JsonResponse({"error": "items must be a list"}, status=400)
 
         required_ids: set[str] = set()
         for item in items:
             if not isinstance(item, dict):
-                return JsonResponse({'error': 'items must be objects'}, status=400)
-            from_id = item.get('from_asset_id')
-            to_id = item.get('to_asset_id')
-            edge_type = item.get('edge_type')
+                return JsonResponse({"error": "items must be objects"}, status=400)
+            from_id = item.get("from_asset_id")
+            to_id = item.get("to_asset_id")
+            edge_type = item.get("edge_type")
             if not from_id or not to_id or not edge_type:
-                return JsonResponse({'error': 'from_asset_id, to_asset_id, and edge_type are required'}, status=400)
+                return JsonResponse(
+                    {"error": "from_asset_id, to_asset_id, and edge_type are required"},
+                    status=400,
+                )
             try:
                 uuid.UUID(from_id)
                 uuid.UUID(to_id)
             except ValueError:
-                return JsonResponse({'error': 'from_asset_id and to_asset_id must be UUIDs'}, status=400)
+                return JsonResponse(
+                    {"error": "from_asset_id and to_asset_id must be UUIDs"}, status=400
+                )
             required_ids.add(from_id)
             required_ids.add(to_id)
 
-        existing = {str(a.id) for a in DataAsset.objects.filter(id__in=list(required_ids))}
+        existing = {
+            str(a.id) for a in DataAsset.objects.filter(id__in=list(required_ids))
+        }
         if required_ids - existing:
-            return JsonResponse({'error': 'asset_not_found'}, status=404)
+            return JsonResponse({"error": "asset_not_found"}, status=404)
 
         out: list[dict[str, Any]] = []
         for item in items:
             edge, _ = LineageEdge.objects.update_or_create(
-                from_asset_id=item['from_asset_id'],
-                to_asset_id=item['to_asset_id'],
-                edge_type=item['edge_type'],
-                defaults={'properties': item.get('properties') or {}},
+                from_asset_id=item["from_asset_id"],
+                to_asset_id=item["to_asset_id"],
+                edge_type=item["edge_type"],
+                defaults={"properties": item.get("properties") or {}},
             )
             out.append(_edge_to_dict(edge))
 
         tenant_schema = _tenant_schema(request)
         maybe_publish_event(
-            event_type='lineage.edge.upserted',
+            event_type="lineage.edge.upserted",
             tenant_id=tenant_schema,
-            routing_key=f'{tenant_schema}.lineage.edge.upserted',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
-            data={'items': out},
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            routing_key=f"{tenant_schema}.lineage.edge.upserted",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
+            data={"items": out},
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
         maybe_publish_audit_event(
             tenant_id=tenant_schema,
-            action='lineage.edge.upserted',
-            resource_type='lineage_edge',
-            correlation_id=getattr(request, 'correlation_id', None) or request.headers.get('X-Correlation-Id'),
-            user_id=request.headers.get('X-User-Id'),
-            data={'items': out},
-            rabbitmq_url=os.environ.get('RABBITMQ_URL'),
+            action="lineage.edge.upserted",
+            resource_type="lineage_edge",
+            correlation_id=getattr(request, "correlation_id", None)
+            or request.headers.get("X-Correlation-Id"),
+            user_id=request.headers.get("X-User-Id"),
+            data={"items": out},
+            rabbitmq_url=os.environ.get("RABBITMQ_URL"),
         )
-        return JsonResponse({'items': out})
+        return JsonResponse({"items": out})
 
-    if request.method == 'GET':
-        forbidden = require_any_role(request, {'catalog.reader', 'catalog.editor', 'tenant.admin'})
+    if request.method == "GET":
+        forbidden = require_any_role(
+            request, {"catalog.reader", "catalog.editor", "tenant.admin"}
+        )
         if forbidden:
             return forbidden
-        asset_id = request.GET.get('asset_id')
+        asset_id = request.GET.get("asset_id")
         if not asset_id:
-            return JsonResponse({'error': 'asset_id is required'}, status=400)
+            return JsonResponse({"error": "asset_id is required"}, status=400)
         try:
             uuid.UUID(asset_id)
         except ValueError:
-            return JsonResponse({'error': 'asset_id must be a UUID'}, status=400)
+            return JsonResponse({"error": "asset_id must be a UUID"}, status=400)
         try:
             DataAsset.objects.get(id=asset_id)
         except (ValidationError, DataAsset.DoesNotExist):
-            return JsonResponse({'error': 'not_found'}, status=404)
+            return JsonResponse({"error": "not_found"}, status=404)
 
-        direction = request.GET.get('direction', 'downstream')
-        if direction not in {'upstream', 'downstream'}:
-            return JsonResponse({'error': 'direction must be upstream or downstream'}, status=400)
+        direction = request.GET.get("direction", "downstream")
+        if direction not in {"upstream", "downstream"}:
+            return JsonResponse(
+                {"error": "direction must be upstream or downstream"}, status=400
+            )
 
-        depth = _parse_int_clamped(request.GET.get('depth'), default=1, min_value=1, max_value=5)
+        depth = _parse_int_clamped(
+            request.GET.get("depth"), default=1, min_value=1, max_value=5
+        )
         if depth is None:
-            return JsonResponse({'error': 'depth must be an integer'}, status=400)
+            return JsonResponse({"error": "depth must be an integer"}, status=400)
 
         current = {asset_id}
         visited_assets = {asset_id}
@@ -7782,7 +8365,7 @@ def lineage_edges(request):
         for _ in range(depth):
             if not current:
                 break
-            if direction == 'upstream':
+            if direction == "upstream":
                 qs = LineageEdge.objects.filter(to_asset_id__in=list(current))
                 next_assets = {str(e.from_asset_id) for e in qs}
             else:
@@ -7794,7 +8377,10 @@ def lineage_edges(request):
             visited_assets |= current
 
         edge_items = [_edge_to_dict(e) for e in edges.values()]
-        assets = [_asset_to_dict(a) for a in DataAsset.objects.filter(id__in=list(visited_assets))]
-        return JsonResponse({'edges': edge_items, 'assets': assets})
+        assets = [
+            _asset_to_dict(a)
+            for a in DataAsset.objects.filter(id__in=list(visited_assets))
+        ]
+        return JsonResponse({"edges": edge_items, "assets": assets})
 
-    return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    return JsonResponse({"error": "method_not_allowed"}, status=405)

@@ -1,7 +1,8 @@
 <div class="toolbar">
   <div class="muted">{{ toolbar_description }}</div>
   <form method="get" class="right" aria-label="{{ form_aria_label }}">
-    {% include "core/ui/includes/ajax_model_select.html" with field_name="project_id" field_label="Project" field_value=project_filter.value field_display_value=project_filter.label endpoint_url="/api/v1/ui/model-select-options?source=projects" placeholder="Search projects by name, code, or institution" %}
+    {% url 'ui_model_select_options' as ui_model_select_options_url %}
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="project_id" field_label="Project" field_value=project_filter.value field_display_value=project_filter.label endpoint_url=ui_model_select_options_url|add:'?source=projects' placeholder="Search projects by name, code, or institution" %}
     <button class="button" type="submit"><span class="material-symbols-outlined button-icon" aria-hidden="true">filter_alt</span><span>{{ submit_label|default:"Filter" }}</span></button>
     <a class="button secondary" href="{{ clear_url }}">Clear</a>
   </form>

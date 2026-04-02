@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url="/lims/" current_label="Reference" %}
+{% url 'lims_dashboard_page' as lims_dashboard_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="LIMS" parent_url=lims_dashboard_url current_label="Reference" %}
 {{ payload.sync_runs|json_script:"lims-reference-sync-runs" }}
 
 <div class="stat-grid">

@@ -3,9 +3,20 @@ import uuid
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from django_tenants.utils import schema_context
 
-from lims.models import Country, District, Lab, Region, Site, Street, Study, TanzaniaAddressSyncRun, Ward
+from lims.models import (
+    Country,
+    District,
+    Lab,
+    Region,
+    Site,
+    Street,
+    Study,
+    TanzaniaAddressSyncRun,
+    Ward,
+)
 
 
 def _create_lims_host(client: Client, route_slug: str) -> str:
@@ -53,7 +64,9 @@ def _provision_sample_accession_bundle(client: Client, host: str) -> tuple[str, 
     return payload["operation_definition"]["id"], payload["operation_version"]["id"]
 
 
-def _start_sample_accession_run(client: Client, host: str, *, operation_id: str, operation_version_id: str) -> dict[str, object]:
+def _start_sample_accession_run(
+    client: Client, host: str, *, operation_id: str, operation_version_id: str
+) -> dict[str, object]:
     created = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs",
         data=json.dumps(
@@ -80,32 +93,132 @@ def test_lims_html_pages_render_with_role_aware_actions():
     host = _create_lims_host(client, "tenant-ui")
 
     pages = [
-        ("/lims/", b"Laboratory operations workspace", None),
-        ("/lims/tasks/", b"Workflow task inbox", b'data-lims-action="task-inbox"'),
-        ("/lims/reference/", b"Reference and geography", b"Choose a reference workflow"),
-        ("/lims/reference/operations/sample-accession/", b"Sample accession reference bundle", b'data-lims-action="reference-sample-accession-provision"'),
-        ("/lims/reference/labs/create/", b"Create lab", b'data-lims-action="reference-lab-create"'),
-        ("/lims/reference/studies/create/", b"Create study", b'data-lims-action="reference-study-create"'),
-        ("/lims/reference/sites/create/", b"Create site", b'data-lims-action="reference-site-create"'),
-        ("/lims/reference/address-sync/", b"Run geography sync", b'data-lims-action="reference-address-sync"'),
-        ("/lims/metadata/", b"Metadata configuration", b"Choose a metadata workflow"),
-        ("/lims/metadata/vocabularies/create/", b"Create vocabulary", b'data-lims-action="metadata-vocabulary-create"'),
-        ("/lims/metadata/fields/create/", b"Create field definition", b'data-lims-action="metadata-field-create"'),
-        ("/lims/metadata/schemas/create/", b"Create form and draft version", b'data-lims-action="metadata-schema-create"'),
-        ("/lims/metadata/bindings/create/", b"Create schema binding", b'data-lims-action="metadata-binding-create"'),
-        ("/lims/metadata/versions/publish/", b"Publish schema version", b'data-lims-action="metadata-version-publish"'),
-        ("/lims/biospecimens/", b"Biospecimen registry", b'data-lims-action="biospecimen-create"'),
-        ("/lims/receiving/", b"Receiving and accessioning", b"Choose a receiving workflow"),
-        ("/lims/receiving/single/", b"Receive single specimen", b'data-lims-action="receiving-single-create"'),
-        ("/lims/receiving/batch/", b"Receive batch manifest", b'data-lims-action="receiving-manifest-create"'),
-        ("/lims/receiving/edc-import/", b"Retrieve metadata from EDC", b'data-lims-action="receiving-edc-import"'),
-        ("/lims/processing/", b"Batch and plate processing", b'data-lims-action="processing-batch-create"'),
-        ("/lims/storage/", b"Storage and inventory administration", b"Choose a storage or inventory workflow"),
-        ("/lims/storage/locations/create/", b"Create storage location", b'data-lims-action="storage-location-create"'),
-        ("/lims/storage/placements/create/", b"Record specimen placement", b'data-lims-action="storage-placement-create"'),
-        ("/lims/storage/materials/create/", b"Create inventory material", b'data-lims-action="inventory-material-create"'),
-        ("/lims/storage/lots/create/", b"Receive inventory lot", b'data-lims-action="inventory-lot-create"'),
-        ("/lims/storage/transactions/create/", b"Record stock transaction", b'data-lims-action="inventory-transaction-create"'),
+        (reverse("lims_dashboard_page"), b"Laboratory operations workspace", None),
+        (
+            reverse("lims_task_inbox_page"),
+            b"Workflow task inbox",
+            b'data-lims-action="task-inbox"',
+        ),
+        (
+            reverse("lims_reference_page"),
+            b"Reference and geography",
+            b"Choose a reference workflow",
+        ),
+        (
+            reverse("lims_reference_sample_accession_page"),
+            b"Sample accession reference bundle",
+            b'data-lims-action="reference-sample-accession-provision"',
+        ),
+        (
+            reverse("lims_reference_create_lab_page"),
+            b"Create lab",
+            b'data-lims-action="reference-lab-create"',
+        ),
+        (
+            reverse("lims_reference_create_study_page"),
+            b"Create study",
+            b'data-lims-action="reference-study-create"',
+        ),
+        (
+            reverse("lims_reference_create_site_page"),
+            b"Create site",
+            b'data-lims-action="reference-site-create"',
+        ),
+        (
+            reverse("lims_reference_address_sync_page"),
+            b"Run geography sync",
+            b'data-lims-action="reference-address-sync"',
+        ),
+        (
+            reverse("lims_metadata_page"),
+            b"Metadata configuration",
+            b"Choose a metadata workflow",
+        ),
+        (
+            reverse("lims_metadata_create_vocabulary_page"),
+            b"Create vocabulary",
+            b'data-lims-action="metadata-vocabulary-create"',
+        ),
+        (
+            reverse("lims_metadata_create_field_page"),
+            b"Create field definition",
+            b'data-lims-action="metadata-field-create"',
+        ),
+        (
+            reverse("lims_metadata_create_schema_page"),
+            b"Create form and draft version",
+            b'data-lims-action="metadata-schema-create"',
+        ),
+        (
+            reverse("lims_metadata_create_binding_page"),
+            b"Create schema binding",
+            b'data-lims-action="metadata-binding-create"',
+        ),
+        (
+            reverse("lims_metadata_publish_version_page"),
+            b"Publish schema version",
+            b'data-lims-action="metadata-version-publish"',
+        ),
+        (
+            reverse("lims_biospecimens_page"),
+            b"Biospecimen registry",
+            b'data-lims-action="biospecimen-create"',
+        ),
+        (
+            reverse("lims_receiving_page"),
+            b"Receiving and accessioning",
+            b"Choose a receiving workflow",
+        ),
+        (
+            reverse("lims_receiving_single_page"),
+            b"Receive single specimen",
+            b'data-lims-action="receiving-single-create"',
+        ),
+        (
+            reverse("lims_receiving_batch_page"),
+            b"Receive batch manifest",
+            b'data-lims-action="receiving-manifest-create"',
+        ),
+        (
+            reverse("lims_receiving_edc_import_page"),
+            b"Retrieve metadata from EDC",
+            b'data-lims-action="receiving-edc-import"',
+        ),
+        (
+            reverse("lims_processing_page"),
+            b"Batch and plate processing",
+            b'data-lims-action="processing-batch-create"',
+        ),
+        (
+            reverse("lims_storage_inventory_page"),
+            b"Storage and inventory administration",
+            b"Choose a storage or inventory workflow",
+        ),
+        (
+            reverse("lims_storage_create_location_page"),
+            b"Create storage location",
+            b'data-lims-action="storage-location-create"',
+        ),
+        (
+            reverse("lims_storage_create_placement_page"),
+            b"Record specimen placement",
+            b'data-lims-action="storage-placement-create"',
+        ),
+        (
+            reverse("lims_storage_create_material_page"),
+            b"Create inventory material",
+            b'data-lims-action="inventory-material-create"',
+        ),
+        (
+            reverse("lims_storage_create_lot_page"),
+            b"Receive inventory lot",
+            b'data-lims-action="inventory-lot-create"',
+        ),
+        (
+            reverse("lims_storage_create_transaction_page"),
+            b"Record stock transaction",
+            b'data-lims-action="inventory-transaction-create"',
+        ),
     ]
 
     for path, title, action_marker in pages:
@@ -123,7 +236,11 @@ def test_lims_operator_can_view_metadata_page_without_manage_actions(monkeypatch
     client = Client()
     host = _create_lims_host(client, "tenant-ui-operator")
 
-    response = client.get("/lims/metadata/", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.operator")
+    response = client.get(
+        reverse("lims_metadata_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+    )
 
     assert response.status_code == 200
     assert b"Metadata configuration" in response.content
@@ -136,7 +253,11 @@ def test_metadata_page_shows_visual_schema_builder_for_admins():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-metadata-builder")
 
-    response = client.get("/lims/metadata/schemas/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    response = client.get(
+        reverse("lims_metadata_create_schema_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
 
     assert response.status_code == 200
     assert b"Form metadata" in response.content
@@ -151,31 +272,136 @@ def test_reference_forms_expose_slug_and_address_selectors():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-reference-forms")
 
-    lab_page = client.get("/lims/reference/labs/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    lab_page = client.get(
+        reverse("lims_reference_create_lab_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert lab_page.status_code == 200
     assert b"Auto-generated from lab name, but editable" in lab_page.content
     assert b"/api/v1/lims/reference/select-options?source=streets" in lab_page.content
-    assert b"document.querySelector('[data-lims-field=\"' + name + '\"]') || document.querySelector('[data-field=\"' + name + '\"]')" in lab_page.content
+    assert (
+        b"document.querySelector('[data-lims-field=\"' + name + '\"]') || document.querySelector('[data-field=\"' + name + '\"]')"
+        in lab_page.content
+    )
 
-    study_page = client.get("/lims/reference/studies/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    study_page = client.get(
+        reverse("lims_reference_create_study_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert study_page.status_code == 200
     assert b"Auto-generated from study name, but editable" in study_page.content
 
-    site_page = client.get("/lims/reference/sites/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    site_page = client.get(
+        reverse("lims_reference_create_site_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert site_page.status_code == 200
     assert b"Auto-generated from site name, but editable" in site_page.content
     assert b"multiple size=" in site_page.content
     assert b"/api/v1/lims/reference/select-options?source=regions" in site_page.content
-    assert b"/api/v1/lims/reference/select-options?source=districts" in site_page.content
-    assert b"/api/v1/lims/reference/select-options?source=wards" not in site_page.content
-    assert b"/api/v1/lims/reference/select-options?source=streets" not in site_page.content
+    assert (
+        b"/api/v1/lims/reference/select-options?source=districts" in site_page.content
+    )
+    assert (
+        b"/api/v1/lims/reference/select-options?source=wards" not in site_page.content
+    )
+    assert (
+        b"/api/v1/lims/reference/select-options?source=streets" not in site_page.content
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_reference_launchpad_renders_sample_accession_workflow_entry():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-reference-workflow-entry")
+    reference_url = reverse("lims_reference_page")
+    sample_accession_url = reverse("lims_reference_sample_accession_page")
+
+    response = client.get(
+        reference_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+
+    assert response.status_code == 200
+    assert b"Provision sample accession" in response.content
+    assert sample_accession_url.encode() in response.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_lims_launchpads_render_canonical_action_links():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-launchpad-action-links")
+    task_inbox_url = reverse("lims_task_inbox_page")
+    metadata_url = reverse("lims_metadata_page")
+    receiving_url = reverse("lims_receiving_page")
+    storage_url = reverse("lims_storage_inventory_page")
+    sample_accession_url = reverse("lims_reference_sample_accession_page")
+    metadata_vocabulary_url = reverse("lims_metadata_create_vocabulary_page")
+    metadata_publish_url = reverse("lims_metadata_publish_version_page")
+    receiving_single_url = reverse("lims_receiving_single_page")
+    receiving_edc_import_url = reverse("lims_receiving_edc_import_page")
+    storage_location_url = reverse("lims_storage_create_location_page")
+    storage_transaction_url = reverse("lims_storage_create_transaction_page")
+
+    task_inbox = client.get(
+        task_inbox_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+    metadata = client.get(
+        metadata_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+    receiving = client.get(
+        receiving_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+    storage = client.get(storage_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+
+    assert task_inbox.status_code == 200
+    assert receiving_url.encode() in task_inbox.content
+    assert sample_accession_url.encode() in task_inbox.content
+
+    assert metadata.status_code == 200
+    assert metadata_vocabulary_url.encode() in metadata.content
+    assert metadata_publish_url.encode() in metadata.content
+
+    assert receiving.status_code == 200
+    assert receiving_single_url.encode() in receiving.content
+    assert receiving_edc_import_url.encode() in receiving.content
+
+    assert storage.status_code == 200
+    assert storage_location_url.encode() in storage.content
+    assert storage_transaction_url.encode() in storage.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_lims_dashboard_renders_canonical_quick_links():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-dashboard-links")
+    dashboard_url = reverse("lims_dashboard_page")
+    reference_url = reverse("lims_reference_page")
+    metadata_url = reverse("lims_metadata_page")
+    processing_url = reverse("lims_processing_page")
+    storage_url = reverse("lims_storage_inventory_page")
+
+    response = client.get(
+        dashboard_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+
+    assert response.status_code == 200
+    assert reference_url.encode() in response.content
+    assert metadata_url.encode() in response.content
+    assert processing_url.encode() in response.content
+    assert storage_url.encode() in response.content
+    assert b"ready" in response.content
 
 
 @pytest.mark.django_db(transaction=True)
 def test_reference_launchpad_shows_site_study_badges_and_address_breadcrumbs():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-reference-launchpad")
-    summary = client.get("/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    summary = client.get(
+        "/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
     schema_name = summary.json()["tenant_schema"]
 
     with schema_context(schema_name):
@@ -219,8 +445,12 @@ def test_reference_launchpad_shows_site_study_badges_and_address_breadcrumbs():
             street=street,
             postcode="25112",
         )
-        study_one = Study.objects.create(name="DBS Pilot", code="dbs-pilot", lead_lab=lab)
-        study_two = Study.objects.create(name="DBS Extension", code="dbs-extension", lead_lab=lab)
+        study_one = Study.objects.create(
+            name="DBS Pilot", code="dbs-pilot", lead_lab=lab
+        )
+        study_two = Study.objects.create(
+            name="DBS Extension", code="dbs-extension", lead_lab=lab
+        )
         site = Site.objects.create(
             name="Moshi Site",
             code="moshi-site",
@@ -236,14 +466,24 @@ def test_reference_launchpad_shows_site_study_badges_and_address_breadcrumbs():
         )
         site.studies.set([study_one, study_two])
 
-    response = client.get("/lims/reference/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    response = client.get(
+        reverse("lims_reference_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
 
     assert response.status_code == 200
     assert b"DBS Pilot" in response.content
     assert b"DBS Extension" in response.content
     assert b"lims-badge lims-badge--info" in response.content
-    assert b"Majengo market / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112" in response.content
-    assert b"Clocktower / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112" in response.content
+    assert (
+        b"Majengo market / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112"
+        in response.content
+    )
+    assert (
+        b"Clocktower / Sokoine Road / Majengo / Moshi / Kilimanjaro / Tanzania / 25112"
+        in response.content
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -251,21 +491,27 @@ def test_address_sync_page_shows_live_progress_monitor():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-sync-progress")
 
-    response = client.get("/lims/reference/address-sync/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    response = client.get(
+        reverse("lims_reference_address_sync_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
 
     assert response.status_code == 200
     assert b"Current progress" in response.content
     assert b"Discovered workload" in response.content
     assert b"Progress is based on pages discovered so far" in response.content
-    assert b'data-sync-runs-table' in response.content
-    assert b'data-sync-progress-bar' in response.content
+    assert b"data-sync-runs-table" in response.content
+    assert b"data-sync-progress-bar" in response.content
 
 
 @pytest.mark.django_db(transaction=True)
 def test_reference_page_shows_live_sync_progress_and_active_run_marker():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-reference-sync")
-    summary = client.get("/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    summary = client.get(
+        "/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
     schema_name = summary.json()["tenant_schema"]
 
     with schema_context(schema_name):
@@ -276,12 +522,16 @@ def test_reference_page_shows_live_sync_progress_and_active_run_marker():
             stats={"failure_count": 2},
         )
 
-    response = client.get("/lims/reference/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    response = client.get(
+        reverse("lims_reference_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
 
     assert response.status_code == 200
     assert b"Recent address sync runs" in response.content
     assert b"Progress updates automatically while a run is active" in response.content
-    assert b'data-reference-sync-runs-table' in response.content
+    assert b"data-reference-sync-runs-table" in response.content
     assert b"Progress" in response.content
     assert b"Active run" in response.content
     assert b"lims-badge lims-badge--active" in response.content
@@ -292,7 +542,11 @@ def test_reference_sample_accession_page_shows_bundle_status_after_provision():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-reference-sample-accession")
 
-    initial = client.get("/lims/reference/operations/sample-accession/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    initial = client.get(
+        reverse("lims_reference_sample_accession_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert initial.status_code == 200
     assert b"Not provisioned" in initial.content
     assert b"Governed runs" in initial.content
@@ -304,7 +558,11 @@ def test_reference_sample_accession_page_shows_bundle_status_after_provision():
     )
     assert provisioned.status_code == 200
 
-    page = client.get("/lims/reference/operations/sample-accession/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    page = client.get(
+        reverse("lims_reference_sample_accession_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert page.status_code == 200
     assert b"Published v1" in page.content
     assert b"sample-accession-package" in page.content
@@ -312,24 +570,48 @@ def test_reference_sample_accession_page_shows_bundle_status_after_provision():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_task_inbox_lists_actionable_operator_work_and_links_to_runtime_detail(monkeypatch):
+def test_task_inbox_lists_actionable_operator_work_and_links_to_runtime_detail(
+    monkeypatch,
+):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-ui-task-inbox")
-    operation_id, operation_version_id = _provision_sample_accession_bundle(client, host)
-    run = _start_sample_accession_run(client, host, operation_id=operation_id, operation_version_id=operation_version_id)
-    intake_task = next(item for item in run["tasks"] if item["node_key"] == "intake_capture")
+    operation_id, operation_version_id = _provision_sample_accession_bundle(
+        client, host
+    )
+    run = _start_sample_accession_run(
+        client,
+        host,
+        operation_id=operation_id,
+        operation_version_id=operation_version_id,
+    )
+    intake_task = next(
+        item for item in run["tasks"] if item["node_key"] == "intake_capture"
+    )
+    task_detail_url = reverse(
+        "lims_task_detail_page",
+        kwargs={
+            "operation_id": operation_id,
+            "run_id": run["id"],
+            "task_id": intake_task["id"],
+        },
+    )
 
-    inbox = client.get("/lims/tasks/", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.operator", HTTP_X_USER_ID="operator-1")
+    inbox = client.get(
+        reverse("lims_task_inbox_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.operator",
+        HTTP_X_USER_ID="operator-1",
+    )
 
     assert inbox.status_code == 200
     assert b"Workflow task inbox" in inbox.content
     assert b"Intake capture" in inbox.content
     assert b"SUBJ-UI-001" in inbox.content
-    assert f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/".encode() in inbox.content
+    assert task_detail_url.encode() in inbox.content
 
     detail = client.get(
-        f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/",
+        task_detail_url,
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
         HTTP_X_USER_ID="operator-1",
@@ -346,24 +628,54 @@ def test_task_inbox_shows_approval_queue_for_review_roles(monkeypatch):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-ui-task-approvals")
-    operation_id, operation_version_id = _provision_sample_accession_bundle(client, host)
-    run = _start_sample_accession_run(client, host, operation_id=operation_id, operation_version_id=operation_version_id)
-    intake_task = next(item for item in run["tasks"] if item["node_key"] == "intake_capture")
+    operation_id, operation_version_id = _provision_sample_accession_bundle(
+        client, host
+    )
+    run = _start_sample_accession_run(
+        client,
+        host,
+        operation_id=operation_id,
+        operation_version_id=operation_version_id,
+    )
+    intake_task = next(
+        item for item in run["tasks"] if item["node_key"] == "intake_capture"
+    )
 
     intake_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{run['id']}/tasks/{intake_task['id']}/submit",
-        data=json.dumps({"payload": {"subject_identifier": "SUBJ-UI-001", "received_at": "2026-03-21"}}),
+        data=json.dumps(
+            {
+                "payload": {
+                    "subject_identifier": "SUBJ-UI-001",
+                    "received_at": "2026-03-21",
+                }
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
         HTTP_X_USER_ID="operator-1",
     )
     assert intake_submitted.status_code == 200
-    qc_task = next(item for item in intake_submitted.json()["tasks"] if item["node_key"] == "qc_decision")
+    qc_task = next(
+        item
+        for item in intake_submitted.json()["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
+    qc_task_detail_url = reverse(
+        "lims_task_detail_page",
+        kwargs={
+            "operation_id": operation_id,
+            "run_id": run["id"],
+            "task_id": qc_task["id"],
+        },
+    )
 
     qc_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/submit",
-        data=json.dumps({"payload": {"qc_decision": "accept", "qc_notes": "Looks good"}}),
+        data=json.dumps(
+            {"payload": {"qc_decision": "accept", "qc_notes": "Looks good"}}
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
@@ -371,15 +683,20 @@ def test_task_inbox_shows_approval_queue_for_review_roles(monkeypatch):
     )
     assert qc_submitted.status_code == 200
 
-    inbox = client.get("/lims/tasks/", HTTP_HOST=host, HTTP_X_USER_ROLES="lims.qa", HTTP_X_USER_ID="qa-1")
+    inbox = client.get(
+        reverse("lims_task_inbox_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.qa",
+        HTTP_X_USER_ID="qa-1",
+    )
 
     assert inbox.status_code == 200
     assert b"Approval queue" in inbox.content
     assert b"QC decision" in inbox.content
-    assert f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/".encode() in inbox.content
+    assert qc_task_detail_url.encode() in inbox.content
 
     detail = client.get(
-        f"/lims/operations/{operation_id}/runs/{run['id']}/tasks/{qc_task['id']}/",
+        qc_task_detail_url,
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.qa",
         HTTP_X_USER_ID="qa-1",
@@ -397,7 +714,8 @@ def test_lims_feedback_banner_uses_message_and_status_flag():
     host = _create_lims_host(client, "tenant-ui-feedback")
 
     success = client.get(
-        "/lims/reference/address-sync/?ui_message=Sync%20started&ui_error=0",
+        reverse("lims_reference_address_sync_page")
+        + "?ui_message=Sync%20started&ui_error=0",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="tenant.admin",
     )
@@ -408,7 +726,8 @@ def test_lims_feedback_banner_uses_message_and_status_flag():
     assert b'<span class="banner-message">Sync started</span>' in success.content
 
     failure = client.get(
-        "/lims/reference/address-sync/?ui_message=Sync%20failed&ui_error=1",
+        reverse("lims_reference_address_sync_page")
+        + "?ui_message=Sync%20failed&ui_error=1",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="tenant.admin",
     )
@@ -424,7 +743,11 @@ def test_receiving_pages_show_qc_storage_and_import_workflows():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-receiving")
 
-    single_page = client.get("/lims/receiving/single/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    single_page = client.get(
+        reverse("lims_receiving_single_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert single_page.status_code == 200
     assert b"Step 1 of 3" in single_page.content
     assert b"Receiving date" in single_page.content
@@ -432,7 +755,11 @@ def test_receiving_pages_show_qc_storage_and_import_workflows():
     assert b"Configured metadata" in single_page.content
     assert b"Configured storage" in single_page.content
 
-    batch_page = client.get("/lims/receiving/batch/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    batch_page = client.get(
+        reverse("lims_receiving_batch_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert batch_page.status_code == 200
     assert b"Download CSV template" in batch_page.content
     assert b"Import CSV / Excel-saved CSV" in batch_page.content
@@ -440,7 +767,11 @@ def test_receiving_pages_show_qc_storage_and_import_workflows():
     assert b"receiving_date" in batch_page.content
     assert b"brought_by" in batch_page.content
 
-    edc_page = client.get("/lims/receiving/edc-import/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    edc_page = client.get(
+        reverse("lims_receiving_edc_import_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert edc_page.status_code == 200
     assert b"Lab form" in edc_page.content
     assert b"Expected sample" in edc_page.content
@@ -454,33 +785,57 @@ def test_storage_inventory_pages_show_admin_forms():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-storage")
 
-    launchpad = client.get("/lims/storage/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    launchpad = client.get(
+        reverse("lims_storage_inventory_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert launchpad.status_code == 200
     assert b"Storage and inventory administration" in launchpad.content
     assert b"Create storage location" in launchpad.content
     assert b"Record stock transaction" in launchpad.content
 
-    location_page = client.get("/lims/storage/locations/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    location_page = client.get(
+        reverse("lims_storage_create_location_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert location_page.status_code == 200
     assert b"Temperature zone" in location_page.content
     assert b"Metadata JSON" in location_page.content
 
-    placement_page = client.get("/lims/storage/placements/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    placement_page = client.get(
+        reverse("lims_storage_create_placement_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert placement_page.status_code == 200
     assert b"Immutable storage history" in placement_page.content
     assert b"Quantity snapshot" in placement_page.content
 
-    material_page = client.get("/lims/storage/materials/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    material_page = client.get(
+        reverse("lims_storage_create_material_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert material_page.status_code == 200
     assert b"Default unit" in material_page.content
     assert b"Create inventory material" in material_page.content
 
-    lot_page = client.get("/lims/storage/lots/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    lot_page = client.get(
+        reverse("lims_storage_create_lot_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert lot_page.status_code == 200
     assert b"Lot number" in lot_page.content
     assert b"Initial quantity" in lot_page.content
 
-    transaction_page = client.get("/lims/storage/transactions/create/", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin")
+    transaction_page = client.get(
+        reverse("lims_storage_create_transaction_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
     assert transaction_page.status_code == 200
     assert b"Transaction type" in transaction_page.content
     assert b"Linked biospecimen" in transaction_page.content

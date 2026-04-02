@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Create study" %}
+{% url 'lims_reference_page' as lims_reference_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url=lims_reference_url current_label="Create study" %}
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-study-create">
@@ -20,7 +21,7 @@
     </label>
     <div class="button-row">
       <button class="button" type="button" onclick="createStudy()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create study</span></button>
-      <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+      <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
     </div>
   </div>
 </section>

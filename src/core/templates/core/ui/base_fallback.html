@@ -465,12 +465,15 @@
           </div>
         </div>
         <nav class="nav" aria-label="Operations navigation">
-          <div class="nav-section-label">Applications</div>
-          <a href="/ui/operations/dashboard" class="{% if active_nav == 'dashboard' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">dashboard</span><span class="nav-label">Dashboard</span></a>
-          <a href="/ui/operations/stewardship" class="{% if active_nav == 'stewardship' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">fact_check</span><span class="nav-label">Stewardship</span></a>
-          <a href="/ui/operations/orchestration" class="{% if active_nav == 'orchestration' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">account_tree</span><span class="nav-label">Orchestration</span></a>
-          <a href="/ui/operations/printing" class="{% if active_nav == 'printing' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">print</span><span class="nav-label">Printing</span></a>
-          <a href="/ui/operations/agent" class="{% if active_nav == 'agent' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">smart_toy</span><span class="nav-label">Agent runs</span></a>
+          {% for section in payload.navigation.sections %}
+          <div class="nav-section-label">{{ section.label }}</div>
+          {% for item in section.items %}
+          <a href="{{ item.href }}" class="{% if item.is_active %}active{% endif %}">
+            <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+            <span class="nav-label">{{ item.label }}</span>
+          </a>
+          {% endfor %}
+          {% endfor %}
         </nav>
       </aside>
       <main class="content" id="main-content">

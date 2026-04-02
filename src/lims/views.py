@@ -2,19 +2,30 @@ import json
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
-from django.http import JsonResponse
-from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
-from django.core.exceptions import ValidationError
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.csrf import csrf_exempt
 
 from core.identity import request_roles, roles_enforced
 from core.models import CollaborationDocument, CollaborationDocumentVersion
+from core.navigation import (
+    LIMS_DASHBOARD_ACTION_DESCRIPTORS,
+    METADATA_ACTION_DESCRIPTORS,
+    RECEIVING_ACTION_DESCRIPTORS,
+    REFERENCE_ACTION_DESCRIPTORS,
+    STORAGE_ACTION_DESCRIPTORS,
+    TASK_INBOX_ACTION_DESCRIPTORS,
+    WORKSPACE_NAVIGATION_DESCRIPTORS,
+    resolve_action_descriptors,
+    resolve_navigation,
+)
 
-from .permissions import has_lims_permission, permission_summary_for_roles, require_lims_permission
 from .models import (
     AccessioningManifest,
     AccessioningManifestItem,
@@ -39,6 +50,7 @@ from .models import (
     InventoryMaterial,
     InventoryTransaction,
     Lab,
+    MaterialUsageRecord,
     MetadataFieldDefinition,
     MetadataSchema,
     MetadataSchemaBinding,
@@ -47,7 +59,6 @@ from .models import (
     MetadataVocabulary,
     MetadataVocabularyDomain,
     MetadataVocabularyItem,
-    MaterialUsageRecord,
     OperationDefinition,
     OperationRun,
     OperationVersion,
@@ -62,70 +73,72 @@ from .models import (
     StorageLocation,
     Street,
     Study,
+    SubmissionRecord,
     TanzaniaAddressSyncRun,
+    TaskRun,
     Ward,
     WorkflowEdgeTemplate,
     WorkflowNodeTemplate,
-    SubmissionRecord,
-    TaskRun,
     WorkflowStepBinding,
     WorkflowTemplate,
     WorkflowTemplateVersion,
 )
+from .permissions import (
+    has_lims_permission,
+    permission_summary_for_roles,
+    require_lims_permission,
+)
 from .services import (
+    AccessioningError,
+    BatchPlateError,
+    BiospecimenTransitionError,
+    ReferenceOperationProvisionError,
+    StorageInventoryError,
     accessioning_report,
     adapt_manifest_item_receive_to_sample_accession,
     adapt_single_receive_to_sample_accession,
-    AccessioningError,
-    approve_task_run,
     allocate_biospecimen_identifiers,
-    BatchPlateError,
+    approve_task_run,
     bootstrap_form_package_version_from_schema_version,
-    BiospecimenTransitionError,
     clone_form_package_version,
-    create_receiving_discrepancy,
     create_aliquots,
     create_inventory_lot,
+    create_pool,
     create_processing_batch,
     create_processing_batch_worksheet_job,
-    create_pool,
+    create_receiving_discrepancy,
     generate_manifest_identifier,
     get_default_metadata_vocabulary_domain,
+    place_artifact_in_storage,
     processing_batch_worksheet,
-    provision_sample_accession_reference_bundle,
     provision_default_metadata_vocabularies,
-    receive_manifest_item,
-    receive_single_biospecimen,
-    ReferenceOperationProvisionError,
-    record_inventory_transaction,
+    provision_sample_accession_reference_bundle,
     publish_form_package_version,
+    record_inventory_transaction,
     resolve_schema_version_for_binding,
     start_operation_run,
     submit_manifest,
     submit_task_run,
-    StorageInventoryError,
     sync_run_to_dict,
-    place_artifact_in_storage,
-    transition_processing_batch,
     transition_biospecimen,
     transition_pool,
+    transition_processing_batch,
     validate_metadata_payload,
     validate_operation_version,
-    validate_form_package_version,
     validate_workflow_template_version,
 )
 from .tasks import sync_tanzania_address_run
 
 
 def _user_context(request) -> dict[str, object]:
-    user_id = (request.headers.get('X-User-Id') or 'anonymous').strip()
-    raw_roles = (request.headers.get('X-User-Roles') or '').strip()
-    roles = sorted({role.strip() for role in raw_roles.split(',') if role.strip()})
-    tenant = getattr(request, 'tenant', None)
+    user_id = (request.headers.get("X-User-Id") or "anonymous").strip()
+    raw_roles = (request.headers.get("X-User-Roles") or "").strip()
+    roles = sorted({role.strip() for role in raw_roles.split(",") if role.strip()})
+    tenant = getattr(request, "tenant", None)
     return {
-        'user_id': user_id,
-        'roles': roles,
-        'tenant_schema': getattr(tenant, 'schema_name', 'public'),
+        "user_id": user_id,
+        "roles": roles,
+        "tenant_schema": getattr(tenant, "schema_name", "public"),
     }
 
 
@@ -143,7 +156,16 @@ def _can_view_operations(request) -> bool:
         return True
     return bool(
         set(request_roles(request))
-        & {"catalog.reader", "catalog.editor", "policy.admin", "tenant.admin", "lims.operator", "lims.manager", "lims.qa", "lims.admin"}
+        & {
+            "catalog.reader",
+            "catalog.editor",
+            "policy.admin",
+            "tenant.admin",
+            "lims.operator",
+            "lims.manager",
+            "lims.qa",
+            "lims.admin",
+        }
     )
 
 
@@ -154,35 +176,14 @@ def _has_permission(request, permission_key: str) -> bool:
 
 
 def _lims_navigation(request, active_key: str) -> dict[str, object]:
-    links = []
-    candidates = [
-        ("lims-dashboard", "Dashboard", "dashboard", "/lims/", "lims.dashboard.view"),
-        ("lims-tasks", "Tasks", "task", "/lims/tasks/", "lims.workflow_task.view"),
-        ("lims-reference", "Reference", "globe_location_pin", "/lims/reference/", "lims.reference.view"),
-        ("lims-metadata", "Metadata", "schema", "/lims/metadata/", "lims.metadata.view"),
-        ("lims-biospecimens", "Biospecimens", "biotech", "/lims/biospecimens/", "lims.artifact.view"),
-        ("lims-receiving", "Receiving", "inventory_2", "/lims/receiving/", "lims.artifact.view"),
-        ("lims-processing", "Processing", "science", "/lims/processing/", "lims.artifact.view"),
-        ("lims-storage", "Storage", "inventory", "/lims/storage/", "lims.storage.view"),
-    ]
-    for key, label, icon, href, permission_key in candidates:
-        if _has_permission(request, permission_key):
-            links.append(
-                {
-                    "key": key,
-                    "label": label,
-                    "icon": icon,
-                    "href": href,
-                    "is_active": key == active_key,
-                }
-            )
-    return {
-        "can_view_operations": _can_view_operations(request),
-        "lims_links": links,
-    }
+    return resolve_navigation(
+        request, active_key=active_key, descriptors=WORKSPACE_NAVIGATION_DESCRIPTORS
+    )
 
 
-def _page_payload_base(request, *, active_key: str, title: str, summary: str, kicker: str) -> dict[str, object]:
+def _page_payload_base(
+    request, *, active_key: str, title: str, summary: str, kicker: str
+) -> dict[str, object]:
     user_context = _user_context(request)
     return {
         "service_key": "lims",
@@ -198,8 +199,12 @@ def _page_payload_base(request, *, active_key: str, title: str, summary: str, ki
             "can_manage_artifacts": _has_permission(request, "lims.artifact.manage"),
             "can_view_operations": _has_permission(request, "lims.operation.view"),
             "can_manage_operations": _has_permission(request, "lims.operation.manage"),
-            "can_view_operation_runs": _has_permission(request, "lims.operation_run.view"),
-            "can_manage_operation_runs": _has_permission(request, "lims.operation_run.manage"),
+            "can_view_operation_runs": _has_permission(
+                request, "lims.operation_run.view"
+            ),
+            "can_manage_operation_runs": _has_permission(
+                request, "lims.operation_run.manage"
+            ),
             "can_view_tasks": _has_permission(request, "lims.workflow_task.view"),
             "can_execute_tasks": _has_permission(request, "lims.workflow_task.execute"),
             "can_assign_tasks": _has_permission(request, "lims.workflow_task.assign"),
@@ -221,7 +226,9 @@ def _page_payload_base(request, *, active_key: str, title: str, summary: str, ki
     }
 
 
-def _page_context(request, *, active_nav: str, payload: dict[str, object]) -> dict[str, object]:
+def _page_context(
+    request, *, active_nav: str, payload: dict[str, object]
+) -> dict[str, object]:
     return {
         "active_nav": active_nav,
         "payload": payload,
@@ -251,65 +258,29 @@ def _dashboard_payload(request) -> dict[str, object]:
         "batches": batch_count,
         "storage_locations": storage_location_count,
     }
-    payload["launchpad"] = [
-        {
-            "title": "Task inbox",
-            "description": "Review open runtime work, approval queues, and the next governed step for each operation run.",
-            "href": "/lims/tasks/",
-            "status": "ready" if payload["capabilities"]["can_view_tasks"] else "restricted",
-        },
-        {
-            "title": "Reference data",
-            "description": "Manage labs, studies, sites, and address sync runs for the tenant.",
-            "href": "/lims/reference/",
-            "status": "ready" if payload["capabilities"]["can_view_reference"] else "restricted",
-        },
-        {
-            "title": "Metadata schemas",
-            "description": "Define vocabularies, fields, schemas, and published bindings for configurable forms.",
-            "href": "/lims/metadata/",
-            "status": "ready" if payload["capabilities"]["can_view_metadata"] else "restricted",
-        },
-        {
-            "title": "Biospecimens",
-            "description": "Register sample types, create specimens, and assemble pools for downstream workflow steps.",
-            "href": "/lims/biospecimens/",
-            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
-        },
-        {
-            "title": "Receiving",
-            "description": "Receive single samples, track manifests, and capture discrepancy workflows.",
-            "href": "/lims/receiving/",
-            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
-        },
-        {
-            "title": "Processing",
-            "description": "Create plate-based batches, review assignments, and trigger worksheet print jobs.",
-            "href": "/lims/processing/",
-            "status": "ready" if payload["capabilities"]["can_view_artifacts"] else "restricted",
-        },
-        {
-            "title": "Storage and inventory",
-            "description": "Administer storage hierarchies, specimen placement, consumable materials, and stock-ledger activity.",
-            "href": "/lims/storage/",
-            "status": (
-                "ready"
-                if (payload["capabilities"]["can_view_storage"] or payload["capabilities"]["can_view_inventory"])
-                else "restricted"
-            ),
-        },
-    ]
+    dashboard_links = resolve_action_descriptors(
+        request,
+        descriptors=LIMS_DASHBOARD_ACTION_DESCRIPTORS,
+    )
+    payload["launchpad"] = dashboard_links
+    payload["card_links"] = {item["key"]: item for item in dashboard_links}
     payload["recent_manifests"] = [
         _accessioning_manifest_to_dict(item)
-        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:5]
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by(
+            "-created_at"
+        )[:5]
     ]
     payload["recent_batches"] = [
         _processing_batch_to_dict(item)
-        for item in ProcessingBatch.objects.select_related("sample_type").order_by("-created_at")[:5]
+        for item in ProcessingBatch.objects.select_related("sample_type").order_by(
+            "-created_at"
+        )[:5]
     ]
     payload["recent_specimens"] = [
         _biospecimen_to_dict(item)
-        for item in Biospecimen.objects.select_related("sample_type").order_by("-created_at")[:5]
+        for item in Biospecimen.objects.select_related("sample_type").order_by(
+            "-created_at"
+        )[:5]
     ]
     return payload
 
@@ -326,20 +297,26 @@ def _task_run_queryset():
 
 
 def _task_adapter_surface(task_run: TaskRun) -> str:
-    adapter_surface = str(task_run.node_template.config.get("adapter_surface") or "").strip()
-    if adapter_surface != "/lims/receiving/":
+    adapter_surface = str(
+        task_run.node_template.config.get("adapter_surface") or ""
+    ).strip()
+    if adapter_surface != reverse("lims_receiving_page"):
         return adapter_surface
     if task_run.operation_run.source_mode == OperationRun.SourceMode.BATCH:
-        return "/lims/receiving/batch/"
+        return reverse("lims_receiving_batch_page")
     if task_run.operation_run.source_mode == OperationRun.SourceMode.EDC_IMPORT:
-        return "/lims/receiving/edc-import/"
-    return "/lims/receiving/single/"
+        return reverse("lims_receiving_edc_import_page")
+    return reverse("lims_receiving_single_page")
 
 
 def _task_page_url(task_run: TaskRun) -> str:
-    return (
-        f"/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
-        f"{task_run.operation_run_id}/tasks/{task_run.id}/"
+    return reverse(
+        "lims_task_detail_page",
+        kwargs={
+            "operation_id": task_run.operation_run.operation_version.definition_id,
+            "run_id": task_run.operation_run_id,
+            "task_id": task_run.id,
+        },
     )
 
 
@@ -350,7 +327,9 @@ def _can_execute_task(request, task_run: TaskRun, *, user_id: str) -> bool:
     if not _has_permission(request, permission_key):
         return False
     if task_run.assignee and task_run.assignee != user_id:
-        return _has_permission(request, "lims.workflow_task.assign") or _has_permission(request, "lims.operation_run.manage")
+        return _has_permission(request, "lims.workflow_task.assign") or _has_permission(
+            request, "lims.operation_run.manage"
+        )
     return True
 
 
@@ -369,7 +348,9 @@ def _task_run_ui_dict(request, task_run: TaskRun, *, user_id: str) -> dict[str, 
     return {
         "id": str(task_run.id),
         "operation_run_id": str(task_run.operation_run_id),
-        "operation_definition_id": str(task_run.operation_run.operation_version.definition_id),
+        "operation_definition_id": str(
+            task_run.operation_run.operation_version.definition_id
+        ),
         "operation_code": task_run.operation_run.operation_version.definition.code,
         "operation_name": task_run.operation_run.operation_version.definition.name,
         "operation_run_status": task_run.operation_run.status,
@@ -389,33 +370,69 @@ def _task_run_ui_dict(request, task_run: TaskRun, *, user_id: str) -> dict[str, 
         "source_reference": task_run.operation_run.source_reference,
         "subject_identifier": task_run.operation_run.subject_identifier,
         "external_identifier": task_run.operation_run.external_identifier,
-        "biospecimen_id": str(task_run.operation_run.biospecimen_id) if task_run.operation_run.biospecimen_id else None,
-        "manifest_id": str(task_run.operation_run.manifest_id) if task_run.operation_run.manifest_id else None,
-        "manifest_item_id": str(task_run.operation_run.manifest_item_id) if task_run.operation_run.manifest_item_id else None,
+        "biospecimen_id": (
+            str(task_run.operation_run.biospecimen_id)
+            if task_run.operation_run.biospecimen_id
+            else None
+        ),
+        "manifest_id": (
+            str(task_run.operation_run.manifest_id)
+            if task_run.operation_run.manifest_id
+            else None
+        ),
+        "manifest_item_id": (
+            str(task_run.operation_run.manifest_item_id)
+            if task_run.operation_run.manifest_item_id
+            else None
+        ),
         "started_at": task_run.started_at.isoformat() if task_run.started_at else None,
-        "completed_at": task_run.completed_at.isoformat() if task_run.completed_at else None,
+        "completed_at": (
+            task_run.completed_at.isoformat() if task_run.completed_at else None
+        ),
         "input_context": dict(task_run.input_context or {}),
         "output_data": dict(task_run.output_data or {}),
         "config": dict(task_run.node_template.config or {}),
         "page_url": _task_page_url(task_run),
-        "submit_url": (
-            f"/api/v1/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
-            f"{task_run.operation_run_id}/tasks/{task_run.id}/submit"
+        "submit_url": reverse(
+            "lims:operation_task_submit",
+            kwargs={
+                "operation_id": task_run.operation_run.operation_version.definition_id,
+                "run_id": task_run.operation_run_id,
+                "task_id": task_run.id,
+            },
         ),
-        "approve_url": (
-            f"/api/v1/lims/operations/{task_run.operation_run.operation_version.definition_id}/runs/"
-            f"{task_run.operation_run_id}/tasks/{task_run.id}/approve"
+        "approve_url": reverse(
+            "lims:operation_task_approve",
+            kwargs={
+                "operation_id": task_run.operation_run.operation_version.definition_id,
+                "run_id": task_run.operation_run_id,
+                "task_id": task_run.id,
+            },
         ),
         "adapter_surface": _task_adapter_surface(task_run),
         "is_assigned_to_user": bool(user_id and task_run.assignee == user_id),
         "can_submit": can_submit,
         "can_approve": can_approve,
         "action_mode": action_mode,
-        "action_label": "Review approval" if can_approve else "Open task" if can_submit else "View details",
-        "latest_submission": _submission_record_to_dict(latest_submission) if latest_submission else None,
-        "latest_approval": _approval_record_to_dict(latest_approval) if latest_approval else None,
-        "submissions": [_submission_record_to_dict(item) for item in task_run.submissions.order_by("submission_index")],
-        "approvals": [_approval_record_to_dict(item) for item in task_run.approvals.order_by("approved_at", "created_at")],
+        "action_label": (
+            "Review approval"
+            if can_approve
+            else "Open task" if can_submit else "View details"
+        ),
+        "latest_submission": (
+            _submission_record_to_dict(latest_submission) if latest_submission else None
+        ),
+        "latest_approval": (
+            _approval_record_to_dict(latest_approval) if latest_approval else None
+        ),
+        "submissions": [
+            _submission_record_to_dict(item)
+            for item in task_run.submissions.order_by("submission_index")
+        ],
+        "approvals": [
+            _approval_record_to_dict(item)
+            for item in task_run.approvals.order_by("approved_at", "created_at")
+        ],
     }
 
 
@@ -430,42 +447,54 @@ def _task_inbox_page_payload(request) -> dict[str, object]:
     user_id = str(_user_context(request)["user_id"])
     task_items = [
         _task_run_ui_dict(request, item, user_id=user_id)
-        for item in _task_run_queryset().filter(
-            status__in=[TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL]
-        ).order_by("-operation_run__created_at", "node_template__position", "created_at")[:50]
+        for item in _task_run_queryset()
+        .filter(status__in=[TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL])
+        .order_by(
+            "-operation_run__created_at", "node_template__position", "created_at"
+        )[:50]
     ]
-    open_tasks = [item for item in task_items if item["status"] == TaskRun.Status.OPEN and item["can_submit"]]
-    approval_tasks = [item for item in task_items if item["status"] == TaskRun.Status.AWAITING_APPROVAL and item["can_approve"]]
+    open_tasks = [
+        item
+        for item in task_items
+        if item["status"] == TaskRun.Status.OPEN and item["can_submit"]
+    ]
+    approval_tasks = [
+        item
+        for item in task_items
+        if item["status"] == TaskRun.Status.AWAITING_APPROVAL and item["can_approve"]
+    ]
     assigned_tasks = [item for item in open_tasks if item["is_assigned_to_user"]]
     payload["cards"] = {
         "open_tasks": len(open_tasks),
         "approval_tasks": len(approval_tasks),
         "assigned_tasks": len(assigned_tasks),
         "recent_outcomes": OperationRun.objects.filter(
-            status__in=[OperationRun.Status.COMPLETED, OperationRun.Status.REJECTED, OperationRun.Status.CANCELLED]
+            status__in=[
+                OperationRun.Status.COMPLETED,
+                OperationRun.Status.REJECTED,
+                OperationRun.Status.CANCELLED,
+            ]
         ).count(),
     }
-    payload["actions"] = [
-        {
-            "title": "Open receiving",
-            "description": "Use the receiving launchpad while accession intake remains a transitional task-entry surface.",
-            "href": "/lims/receiving/",
-            "icon": "inventory_2",
-        },
-        {
-            "title": "Inspect operations",
-            "description": "Review governed operation bundles and runtime history behind the current inbox items.",
-            "href": "/lims/reference/operations/sample-accession/",
-            "icon": "conversion_path",
-        },
-    ]
+    payload["actions"] = resolve_action_descriptors(
+        request,
+        descriptors=TASK_INBOX_ACTION_DESCRIPTORS,
+        page_key="lims-tasks",
+        route_name="lims_task_inbox_page",
+    )
     payload["open_tasks"] = open_tasks
     payload["approval_tasks"] = approval_tasks
     payload["recent_runs"] = [
         _operation_run_to_dict(item)
-        for item in _operation_run_queryset().filter(
-            status__in=[OperationRun.Status.COMPLETED, OperationRun.Status.REJECTED, OperationRun.Status.CANCELLED]
-        ).order_by("-updated_at", "-created_at")[:8]
+        for item in _operation_run_queryset()
+        .filter(
+            status__in=[
+                OperationRun.Status.COMPLETED,
+                OperationRun.Status.REJECTED,
+                OperationRun.Status.CANCELLED,
+            ]
+        )
+        .order_by("-updated_at", "-created_at")[:8]
     ]
     return payload
 
@@ -485,17 +514,28 @@ def _task_detail_page_payload(request, task_run: TaskRun) -> dict[str, object]:
     payload["task_json"] = {
         "id": task_payload["id"],
         "page_url": task_payload["page_url"],
+        "inbox_url": reverse("lims_task_inbox_page"),
         "submit_url": task_payload["submit_url"],
         "approve_url": task_payload["approve_url"],
         "source_mode": task_payload["source_mode"],
         "adapter_surface": task_payload["adapter_surface"],
         "current_status": task_payload["status"],
-        "default_submission_payload": task_payload["latest_submission"]["payload"] if task_payload["latest_submission"] else {},
+        "default_submission_payload": (
+            task_payload["latest_submission"]["payload"]
+            if task_payload["latest_submission"]
+            else {}
+        ),
     }
-    payload["default_submission_json"] = json.dumps(payload["task_json"]["default_submission_payload"], indent=2, sort_keys=True)
+    payload["default_submission_json"] = json.dumps(
+        payload["task_json"]["default_submission_payload"], indent=2, sort_keys=True
+    )
     payload["operation_run"] = _operation_run_to_dict(operation_run)
     payload["current_task_count"] = len(
-        [item for item in payload["operation_run"]["tasks"] if item["status"] in {TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL}]
+        [
+            item
+            for item in payload["operation_run"]["tasks"]
+            if item["status"] in {TaskRun.Status.OPEN, TaskRun.Status.AWAITING_APPROVAL}
+        ]
     )
     return payload
 
@@ -513,47 +553,31 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
         "studies": Study.objects.count(),
         "sites": Site.objects.count(),
         "sync_runs": TanzaniaAddressSyncRun.objects.count(),
-        "sample_accession_runs": OperationRun.objects.filter(operation_version__definition__code="sample-accession").count(),
+        "sample_accession_runs": OperationRun.objects.filter(
+            operation_version__definition__code="sample-accession"
+        ).count(),
     }
     payload["labs"] = [_lab_to_dict(item) for item in Lab.objects.order_by("name")[:10]]
-    payload["studies"] = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")[:10]]
+    payload["studies"] = [
+        _study_to_dict(item)
+        for item in Study.objects.select_related("lead_lab").order_by("name")[:10]
+    ]
     payload["sites"] = [
         _site_to_dict(item)
-        for item in Site.objects.select_related("study", "lab").prefetch_related("studies").order_by("name")[:10]
+        for item in Site.objects.select_related("study", "lab")
+        .prefetch_related("studies")
+        .order_by("name")[:10]
     ]
-    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]]
-    payload["actions"] = [
-        {
-            "title": "Create lab",
-            "description": "Register one tenant lab at a time using a dedicated lab form.",
-            "href": "/lims/reference/labs/create/",
-            "icon": "add_business",
-        },
-        {
-            "title": "Create study",
-            "description": "Create one study and optionally attach its lead lab.",
-            "href": "/lims/reference/studies/create/",
-            "icon": "schema",
-        },
-        {
-            "title": "Create site",
-            "description": "Register one field or collection site and link it to study and lab selectors.",
-            "href": "/lims/reference/sites/create/",
-            "icon": "location_city",
-        },
-        {
-            "title": "Run geography sync",
-            "description": "Start the Tanzania-backed geography import from a single sync action page.",
-            "href": "/lims/reference/address-sync/",
-            "icon": "sync",
-        },
-        {
-            "title": "Provision sample accession",
-            "description": "Provision and inspect the canonical sample accession reference bundle used by the receiving adapters.",
-            "href": "/lims/reference/operations/sample-accession/",
-            "icon": "conversion_path",
-        },
+    payload["sync_runs"] = [
+        sync_run_to_dict(item)
+        for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]
     ]
+    payload["actions"] = resolve_action_descriptors(
+        request,
+        descriptors=REFERENCE_ACTION_DESCRIPTORS,
+        page_key="lims-reference",
+        route_name="lims_reference_page",
+    )
     return payload
 
 
@@ -588,7 +612,9 @@ def _reference_sample_accession_page_payload(request) -> dict[str, object]:
         .first()
     )
     operation_definition = (
-        OperationDefinition.objects.prefetch_related("versions__workflow_version__template")
+        OperationDefinition.objects.prefetch_related(
+            "versions__workflow_version__template"
+        )
         .filter(code="sample-accession")
         .first()
     )
@@ -603,29 +629,53 @@ def _reference_sample_accession_page_payload(request) -> dict[str, object]:
         else None
     )
     published_form_package_version = (
-        form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED).order_by("-version_number").first()
+        form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED)
+        .order_by("-version_number")
+        .first()
         if form_package
         else None
     )
     published_workflow_version = (
-        workflow_template.versions.filter(status=WorkflowTemplateVersion.Status.PUBLISHED).order_by("-version_number").first()
+        workflow_template.versions.filter(
+            status=WorkflowTemplateVersion.Status.PUBLISHED
+        )
+        .order_by("-version_number")
+        .first()
         if workflow_template
         else None
     )
     published_operation_version = (
-        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED).order_by("-version_number").first()
+        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED)
+        .order_by("-version_number")
+        .first()
         if operation_definition
         else None
     )
     payload["cards"] = {
-        "package_version": published_form_package_version.version_number if published_form_package_version else "—",
-        "workflow_version": published_workflow_version.version_number if published_workflow_version else "—",
-        "operation_version": published_operation_version.version_number if published_operation_version else "—",
-        "runs": OperationRun.objects.filter(operation_version__definition__code="sample-accession").count(),
+        "package_version": (
+            published_form_package_version.version_number
+            if published_form_package_version
+            else "—"
+        ),
+        "workflow_version": (
+            published_workflow_version.version_number
+            if published_workflow_version
+            else "—"
+        ),
+        "operation_version": (
+            published_operation_version.version_number
+            if published_operation_version
+            else "—"
+        ),
+        "runs": OperationRun.objects.filter(
+            operation_version__definition__code="sample-accession"
+        ).count(),
     }
     payload["recent_runs"] = [
         _operation_run_to_dict(item)
-        for item in _operation_run_queryset().filter(operation_version__definition__code="sample-accession").order_by("-created_at")[:8]
+        for item in _operation_run_queryset()
+        .filter(operation_version__definition__code="sample-accession")
+        .order_by("-created_at")[:8]
     ]
     return payload
 
@@ -650,7 +700,9 @@ def _reference_create_study_page_payload(request) -> dict[str, object]:
         summary="Create one study record and optionally assign a lead lab for routing and receiving defaults.",
         kicker="Reference setup",
     )
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     return payload
 
 
@@ -662,8 +714,12 @@ def _reference_create_site_page_payload(request) -> dict[str, object]:
         summary="Register one site at a time so downstream receiving and biospecimen forms stay focused.",
         kicker="Reference setup",
     )
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["address_country"] = Country.objects.filter(code="TZ").first()
     return payload
 
@@ -676,7 +732,10 @@ def _reference_address_sync_page_payload(request) -> dict[str, object]:
         summary="Queue one geography sync run at a time from a dedicated action page.",
         kicker="Reference setup",
     )
-    payload["sync_runs"] = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:8]]
+    payload["sync_runs"] = [
+        sync_run_to_dict(item)
+        for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:8]
+    ]
     return payload
 
 
@@ -697,13 +756,16 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
     }
     payload["vocabularies"] = [
         _vocabulary_to_dict(item)
-        for item in MetadataVocabulary.objects.select_related("domain").prefetch_related("items").order_by("name")[:8]
+        for item in MetadataVocabulary.objects.select_related("domain")
+        .prefetch_related("items")
+        .order_by("name")[:8]
     ]
     payload["draft_versions"] = [
         _schema_version_to_dict(item)
-        for item in MetadataSchemaVersion.objects.select_related("schema").prefetch_related("fields__vocabulary").filter(
-            status=MetadataSchemaVersion.Status.DRAFT
-        ).order_by("-updated_at")[:10]
+        for item in MetadataSchemaVersion.objects.select_related("schema")
+        .prefetch_related("fields__vocabulary")
+        .filter(status=MetadataSchemaVersion.Status.DRAFT)
+        .order_by("-updated_at")[:10]
     ]
     payload["schemas"] = [
         _schema_to_dict(item)
@@ -714,34 +776,16 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
     ]
     payload["bindings"] = [
         _schema_binding_to_dict(item)
-        for item in MetadataSchemaBinding.objects.select_related("schema_version__schema").order_by("target_type", "target_key")[:10]
+        for item in MetadataSchemaBinding.objects.select_related(
+            "schema_version__schema"
+        ).order_by("target_type", "target_key")[:10]
     ]
-    payload["actions"] = [
-        {
-            "title": "Create vocabulary",
-            "description": "Seed one controlled vocabulary from a dedicated create form.",
-            "href": "/lims/metadata/vocabularies/create/",
-            "icon": "list_alt",
-        },
-        {
-            "title": "Create form + draft",
-            "description": "Define form metadata first, then build the initial draft version with version-owned fields.",
-            "href": "/lims/metadata/schemas/create/",
-            "icon": "schema",
-        },
-        {
-            "title": "Create binding",
-            "description": "Attach one published schema version to one sample type or workflow target.",
-            "href": "/lims/metadata/bindings/create/",
-            "icon": "link",
-        },
-        {
-            "title": "Publish version",
-            "description": "Promote one draft schema version without mixing publishing with binding creation.",
-            "href": "/lims/metadata/versions/publish/",
-            "icon": "publish",
-        },
-    ]
+    payload["actions"] = resolve_action_descriptors(
+        request,
+        descriptors=METADATA_ACTION_DESCRIPTORS,
+        page_key="lims-metadata",
+        route_name="lims_metadata_page",
+    )
     return payload
 
 
@@ -753,7 +797,12 @@ def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
         summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
         kicker="Metadata setup",
     )
-    payload["domain_options"] = [_model_to_option(item) for item in MetadataVocabularyDomain.objects.filter(is_active=True).order_by("name")]
+    payload["domain_options"] = [
+        _model_to_option(item)
+        for item in MetadataVocabularyDomain.objects.filter(is_active=True).order_by(
+            "name"
+        )
+    ]
     return payload
 
 
@@ -765,12 +814,17 @@ def _metadata_create_field_page_payload(request) -> dict[str, object]:
         summary="Define one reusable field, including help text, placeholder, defaults, and wizard-step placement.",
         kicker="Metadata setup",
     )
-    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
+    payload["field_type_options"] = [
+        {"value": value, "label": label}
+        for value, label in MetadataFieldDefinition.FieldType.choices
+    ]
     payload["ui_step_options"] = [
         {"value": "metadata", "label": "Wizard metadata step"},
         {"value": "storage", "label": "Wizard storage step"},
     ]
-    payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.order_by("name")]
+    payload["vocabulary_options"] = [
+        _model_to_option(item) for item in MetadataVocabulary.objects.order_by("name")
+    ]
     return payload
 
 
@@ -782,19 +836,29 @@ def _metadata_create_schema_page_payload(request) -> dict[str, object]:
         summary="Step 1 creates the form definition and initial draft. Step 2 edits fields that belong directly to that draft version.",
         kicker="Metadata setup",
     )
-    payload["field_type_options"] = [{"value": value, "label": label} for value, label in MetadataFieldDefinition.FieldType.choices]
+    payload["field_type_options"] = [
+        {"value": value, "label": label}
+        for value, label in MetadataFieldDefinition.FieldType.choices
+    ]
     payload["ui_step_options"] = [
         {"value": "metadata", "label": "Wizard metadata step"},
         {"value": "storage", "label": "Wizard storage step"},
     ]
-    payload["vocabulary_options"] = [_model_to_option(item) for item in MetadataVocabulary.objects.filter(is_active=True).order_by("name")]
+    payload["vocabulary_options"] = [
+        _model_to_option(item)
+        for item in MetadataVocabulary.objects.filter(is_active=True).order_by("name")
+    ]
     payload["schema_options"] = [
         {
             "value": str(item.id),
             "label": item.name,
             "code": item.code,
             "draft_version_id": next(
-                (str(version.id) for version in item.versions.all() if version.status == MetadataSchemaVersion.Status.DRAFT),
+                (
+                    str(version.id)
+                    for version in item.versions.all()
+                    if version.status == MetadataSchemaVersion.Status.DRAFT
+                ),
                 "",
             ),
         }
@@ -811,7 +875,8 @@ def _metadata_create_schema_page_payload(request) -> dict[str, object]:
         .order_by("schema__name", "-version_number")
     ]
     payload["binding_target_type_options"] = [
-        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+        {"value": value, "label": label}
+        for value, label in MetadataSchemaBinding.TargetType.choices
     ]
     payload["sample_type_options"] = [
         {"value": item.key, "label": item.name}
@@ -829,7 +894,8 @@ def _metadata_create_binding_page_payload(request) -> dict[str, object]:
         kicker="Metadata setup",
     )
     payload["binding_target_type_options"] = [
-        {"value": value, "label": label} for value, label in MetadataSchemaBinding.TargetType.choices
+        {"value": value, "label": label}
+        for value, label in MetadataSchemaBinding.TargetType.choices
     ]
     payload["schema_version_options"] = [
         {
@@ -883,19 +949,34 @@ def _biospecimens_page_payload(request) -> dict[str, object]:
         "aliquots": Biospecimen.objects.filter(kind=Biospecimen.Kind.ALIQUOT).count(),
         "pools": BiospecimenPool.objects.count(),
     }
-    payload["sample_types"] = [_biospecimen_type_to_dict(item) for item in BiospecimenType.objects.order_by("name")[:10]]
+    payload["sample_types"] = [
+        _biospecimen_type_to_dict(item)
+        for item in BiospecimenType.objects.order_by("name")[:10]
+    ]
     payload["specimens"] = [
         _biospecimen_to_dict(item)
-        for item in Biospecimen.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+        for item in Biospecimen.objects.select_related(
+            "sample_type", "study", "site", "lab"
+        ).order_by("-created_at")[:10]
     ]
     payload["pools"] = [
         _biospecimen_pool_to_dict(item)
-        for item in BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:8]
+        for item in BiospecimenPool.objects.select_related(
+            "sample_type", "study", "site", "lab"
+        ).order_by("-created_at")[:8]
     ]
-    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
+    payload["sample_type_options"] = [
+        _model_to_option(item) for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["site_options"] = [
+        _model_to_option(item) for item in Site.objects.order_by("name")
+    ]
     payload["specimen_options"] = [
         {"value": str(item.id), "label": f"{item.sample_identifier} ({item.status})"}
         for item in Biospecimen.objects.order_by("-created_at")[:50]
@@ -915,40 +996,32 @@ def _receiving_launchpad_payload(request) -> dict[str, object]:
         "manifests": AccessioningManifest.objects.count(),
         "received_events": ReceivingEvent.objects.count(),
         "discrepancies": ReceivingDiscrepancy.objects.count(),
-        "pending_items": AccessioningManifestItem.objects.filter(status=AccessioningManifestItem.Status.PENDING).count(),
+        "pending_items": AccessioningManifestItem.objects.filter(
+            status=AccessioningManifestItem.Status.PENDING
+        ).count(),
     }
     payload["manifests"] = [
         _accessioning_manifest_to_dict(item)
-        for item in AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").order_by("-created_at")[:10]
+        for item in AccessioningManifest.objects.select_related(
+            "sample_type", "study", "site", "lab"
+        ).order_by("-created_at")[:10]
     ]
     payload["events"] = [
         _receiving_event_to_dict(item)
-        for item in ReceivingEvent.objects.select_related("biospecimen").order_by("-received_at")[:8]
+        for item in ReceivingEvent.objects.select_related("biospecimen").order_by(
+            "-received_at"
+        )[:8]
     ]
     payload["discrepancies"] = [
         _receiving_discrepancy_to_dict(item)
         for item in ReceivingDiscrepancy.objects.order_by("-created_at")[:8]
     ]
-    payload["actions"] = [
-        {
-            "title": "Single sample receipt",
-            "description": "Capture intake metadata, record a QC accept/reject decision, then log storage or rejection details.",
-            "href": "/lims/receiving/single/",
-            "icon": "move_to_inbox",
-        },
-        {
-            "title": "Batch manifest receipt",
-            "description": "Download an Excel-friendly CSV template, complete receipt/QC/storage columns, and import the batch.",
-            "href": "/lims/receiving/batch/",
-            "icon": "upload_file",
-        },
-        {
-            "title": "Retrieve from EDC",
-            "description": "Specify the lab form, expected sample, and external ID, then process the imported record through QC.",
-            "href": "/lims/receiving/edc-import/",
-            "icon": "cloud_download",
-        },
-    ]
+    payload["actions"] = resolve_action_descriptors(
+        request,
+        descriptors=RECEIVING_ACTION_DESCRIPTORS,
+        page_key="lims-receiving",
+        route_name="lims_receiving_page",
+    )
     return payload
 
 
@@ -964,11 +1037,18 @@ def _receiving_single_page_payload(request) -> dict[str, object]:
         {"value": str(item.id), "label": item.name, "key": item.key}
         for item in BiospecimenType.objects.order_by("name")
     ]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["site_options"] = [
+        _model_to_option(item) for item in Site.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["discrepancy_code_options"] = [
-        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+        {"value": value, "label": label}
+        for value, label in ReceivingDiscrepancy.Code.choices
     ]
     return payload
 
@@ -981,16 +1061,27 @@ def _receiving_batch_page_payload(request) -> dict[str, object]:
         summary="Use one batch import form to load intake metadata, QC outcomes, and storage instructions from a template.",
         kicker="Batch receipt",
     )
-    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["sample_type_options"] = [
+        _model_to_option(item) for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["site_options"] = [
+        _model_to_option(item) for item in Site.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["discrepancy_code_options"] = [
-        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+        {"value": value, "label": label}
+        for value, label in ReceivingDiscrepancy.Code.choices
     ]
     payload["recent_manifests"] = [
         _accessioning_manifest_to_dict(item)
-        for item in AccessioningManifest.objects.select_related("sample_type").order_by("-created_at")[:8]
+        for item in AccessioningManifest.objects.select_related("sample_type").order_by(
+            "-created_at"
+        )[:8]
     ]
     return payload
 
@@ -1003,12 +1094,21 @@ def _receiving_edc_import_page_payload(request) -> dict[str, object]:
         summary="Capture the lab form, expected sample, external ID import target, and QC/storage outcome in one flow.",
         kicker="EDC intake",
     )
-    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["sample_type_options"] = [
+        _model_to_option(item) for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["site_options"] = [
+        _model_to_option(item) for item in Site.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["discrepancy_code_options"] = [
-        {"value": value, "label": label} for value, label in ReceivingDiscrepancy.Code.choices
+        {"value": value, "label": label}
+        for value, label in ReceivingDiscrepancy.Code.choices
     ]
     payload["edc_source_options"] = [
         {"value": "redcap", "label": "REDCap"},
@@ -1029,21 +1129,41 @@ def _processing_page_payload(request) -> dict[str, object]:
     payload["cards"] = {
         "layouts": PlateLayoutTemplate.objects.count(),
         "batches": ProcessingBatch.objects.count(),
-        "draft_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.DRAFT).count(),
-        "printed_batches": ProcessingBatch.objects.filter(status=ProcessingBatch.Status.PRINTED).count(),
+        "draft_batches": ProcessingBatch.objects.filter(
+            status=ProcessingBatch.Status.DRAFT
+        ).count(),
+        "printed_batches": ProcessingBatch.objects.filter(
+            status=ProcessingBatch.Status.PRINTED
+        ).count(),
     }
-    payload["layouts"] = [_plate_layout_to_dict(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["layouts"] = [
+        _plate_layout_to_dict(item)
+        for item in PlateLayoutTemplate.objects.order_by("rows", "columns")
+    ]
     payload["batches"] = [
         _processing_batch_to_dict(item, include_plates=True)
-        for item in ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab")
+        for item in ProcessingBatch.objects.select_related(
+            "sample_type", "study", "site", "lab"
+        )
         .prefetch_related("plates__layout_template", "plates__assignments__biospecimen")
         .order_by("-created_at")[:8]
     ]
-    payload["sample_type_options"] = [_model_to_option(item) for item in BiospecimenType.objects.order_by("name")]
-    payload["study_options"] = [_model_to_option(item) for item in Study.objects.order_by("name")]
-    payload["site_options"] = [_model_to_option(item) for item in Site.objects.order_by("name")]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
-    payload["layout_options"] = [_model_to_option(item) for item in PlateLayoutTemplate.objects.order_by("rows", "columns")]
+    payload["sample_type_options"] = [
+        _model_to_option(item) for item in BiospecimenType.objects.order_by("name")
+    ]
+    payload["study_options"] = [
+        _model_to_option(item) for item in Study.objects.order_by("name")
+    ]
+    payload["site_options"] = [
+        _model_to_option(item) for item in Site.objects.order_by("name")
+    ]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
+    payload["layout_options"] = [
+        _model_to_option(item)
+        for item in PlateLayoutTemplate.objects.order_by("rows", "columns")
+    ]
     payload["batch_options"] = [
         {"value": str(item.id), "label": f"{item.batch_identifier} ({item.status})"}
         for item in ProcessingBatch.objects.order_by("-created_at")[:50]
@@ -1087,52 +1207,28 @@ def _storage_inventory_page_payload(request) -> dict[str, object]:
             "location__parent__parent__parent__parent",
         ).order_by("-created_at")[:8]
     ]
-    payload["materials"] = [_inventory_material_to_dict(item) for item in InventoryMaterial.objects.order_by("name")[:8]]
+    payload["materials"] = [
+        _inventory_material_to_dict(item)
+        for item in InventoryMaterial.objects.order_by("name")[:8]
+    ]
     payload["lots"] = [
         _inventory_lot_to_dict(item)
-        for item in InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")[:8]
+        for item in InventoryLot.objects.select_related(
+            "material", "lab", "storage_location"
+        ).order_by("-created_at")[:8]
     ]
     payload["recent_transactions"] = [
         _inventory_transaction_to_dict(item)
-        for item in InventoryTransaction.objects.select_related("lot", "lot__material", "location").order_by("-created_at")[:8]
+        for item in InventoryTransaction.objects.select_related(
+            "lot", "lot__material", "location"
+        ).order_by("-created_at")[:8]
     ]
-    payload["actions"] = [
-        {
-            "title": "Create storage location",
-            "description": "Build the storage hierarchy one node at a time so facilities, equipment, containers, and positions stay valid.",
-            "href": "/lims/storage/locations/create/",
-            "icon": "add_home_work",
-            "enabled": payload["capabilities"]["can_manage_storage"],
-        },
-        {
-            "title": "Record specimen placement",
-            "description": "Log a biospecimen or pool placement event against the immutable storage history ledger.",
-            "href": "/lims/storage/placements/create/",
-            "icon": "move_item",
-            "enabled": payload["capabilities"]["can_manage_storage"],
-        },
-        {
-            "title": "Create inventory material",
-            "description": "Register consumables, kits, reagents, labels, and other reusable catalog entries.",
-            "href": "/lims/storage/materials/create/",
-            "icon": "inventory_2",
-            "enabled": payload["capabilities"]["can_manage_inventory"],
-        },
-        {
-            "title": "Receive inventory lot",
-            "description": "Capture lot receipt, storage, expiry, and opening stock in one dedicated lot form.",
-            "href": "/lims/storage/lots/create/",
-            "icon": "local_shipping",
-            "enabled": payload["capabilities"]["can_manage_inventory"],
-        },
-        {
-            "title": "Record stock transaction",
-            "description": "Post adjustments, reservations, releases, transfers, consumptions, and disposals to the lot ledger.",
-            "href": "/lims/storage/transactions/create/",
-            "icon": "sync_alt",
-            "enabled": payload["capabilities"]["can_manage_inventory"],
-        },
-    ]
+    payload["actions"] = resolve_action_descriptors(
+        request,
+        descriptors=STORAGE_ACTION_DESCRIPTORS,
+        page_key="lims-storage",
+        route_name="lims_storage_inventory_page",
+    )
     return payload
 
 
@@ -1144,7 +1240,9 @@ def _storage_location_create_page_payload(request) -> dict[str, object]:
         summary="Add one storage node at a time so hierarchy validation, lab ownership, and level depth stay predictable.",
         kicker="Storage setup",
     )
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["parent_options"] = [
         {
             "value": str(item.id),
@@ -1159,9 +1257,13 @@ def _storage_location_create_page_payload(request) -> dict[str, object]:
             "parent__parent__parent__parent",
         ).order_by("lab__name", "level", "name")
     ]
-    payload["level_options"] = [{"value": value, "label": label} for value, label in StorageLocation.Level.choices]
+    payload["level_options"] = [
+        {"value": value, "label": label}
+        for value, label in StorageLocation.Level.choices
+    ]
     payload["temperature_zone_options"] = [{"value": "", "label": "None"}] + [
-        {"value": value, "label": label} for value, label in StorageLocation.TemperatureZone.choices
+        {"value": value, "label": label}
+        for value, label in StorageLocation.TemperatureZone.choices
     ]
     return payload
 
@@ -1195,7 +1297,10 @@ def _storage_placement_create_page_payload(request) -> dict[str, object]:
             "parent__parent__parent__parent",
         ).order_by("lab__name", "level", "name")
     ]
-    payload["reason_options"] = [{"value": value, "label": label} for value, label in BiospecimenStorageRecord.Reason.choices]
+    payload["reason_options"] = [
+        {"value": value, "label": label}
+        for value, label in BiospecimenStorageRecord.Reason.choices
+    ]
     payload["recent_records"] = [
         _biospecimen_storage_record_to_dict(item)
         for item in BiospecimenStorageRecord.objects.select_related(
@@ -1219,8 +1324,14 @@ def _inventory_material_create_page_payload(request) -> dict[str, object]:
         summary="Register one catalog material at a time so later lot receipt and stock transactions reuse the same controlled entry.",
         kicker="Inventory catalog",
     )
-    payload["category_options"] = [{"value": value, "label": label} for value, label in InventoryMaterial.Category.choices]
-    payload["recent_materials"] = [_inventory_material_to_dict(item) for item in InventoryMaterial.objects.order_by("name")[:10]]
+    payload["category_options"] = [
+        {"value": value, "label": label}
+        for value, label in InventoryMaterial.Category.choices
+    ]
+    payload["recent_materials"] = [
+        _inventory_material_to_dict(item)
+        for item in InventoryMaterial.objects.order_by("name")[:10]
+    ]
     return payload
 
 
@@ -1236,7 +1347,9 @@ def _inventory_lot_create_page_payload(request) -> dict[str, object]:
         {"value": str(item.id), "label": f"{item.name} ({item.code})"}
         for item in InventoryMaterial.objects.order_by("name")
     ]
-    payload["lab_options"] = [_model_to_option(item) for item in Lab.objects.order_by("name")]
+    payload["lab_options"] = [
+        _model_to_option(item) for item in Lab.objects.order_by("name")
+    ]
     payload["storage_location_options"] = [
         {
             "value": str(item.id),
@@ -1252,7 +1365,9 @@ def _inventory_lot_create_page_payload(request) -> dict[str, object]:
     ]
     payload["recent_lots"] = [
         _inventory_lot_to_dict(item)
-        for item in InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")[:8]
+        for item in InventoryLot.objects.select_related(
+            "material", "lab", "storage_location"
+        ).order_by("-created_at")[:8]
     ]
     return payload
 
@@ -1271,10 +1386,13 @@ def _inventory_transaction_create_page_payload(request) -> dict[str, object]:
             "label": f"{item.material.name} · {item.lot_number} ({item.on_hand_quantity} {item.unit_of_measure or item.material.default_unit})",
             "lab_id": str(item.lab_id),
         }
-        for item in InventoryLot.objects.select_related("material").order_by("-created_at")[:100]
+        for item in InventoryLot.objects.select_related("material").order_by(
+            "-created_at"
+        )[:100]
     ]
     payload["transaction_type_options"] = [
-        {"value": value, "label": label} for value, label in InventoryTransaction.TransactionType.choices
+        {"value": value, "label": label}
+        for value, label in InventoryTransaction.TransactionType.choices
     ]
     payload["location_options"] = [
         {
@@ -1299,7 +1417,9 @@ def _inventory_transaction_create_page_payload(request) -> dict[str, object]:
     ]
     payload["recent_transactions"] = [
         _inventory_transaction_to_dict(item)
-        for item in InventoryTransaction.objects.select_related("lot", "lot__material", "location").order_by("-created_at")[:8]
+        for item in InventoryTransaction.objects.select_related(
+            "lot", "lot__material", "location"
+        ).order_by("-created_at")[:8]
     ]
     return payload
 
@@ -1323,7 +1443,16 @@ def _option(value: str, label: str, description: str = "") -> dict[str, str]:
     return payload
 
 
-def _address_breadcrumb(*, country=None, region=None, district=None, ward=None, street=None, postcode: str = "", address_line: str = "") -> str:
+def _address_breadcrumb(
+    *,
+    country=None,
+    region=None,
+    district=None,
+    ward=None,
+    street=None,
+    postcode: str = "",
+    address_line: str = "",
+) -> str:
     parts = []
     if address_line:
         parts.append(address_line)
@@ -1368,7 +1497,9 @@ def _lab_to_dict(lab: Lab) -> dict[str, object]:
         "ward_label": lab.ward.name if lab.ward_id else "",
         "street_label": lab.street.name if lab.street_id else "",
         "address_breadcrumb": address_breadcrumb,
-        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
+        "address_badges": [
+            _badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part
+        ],
         "country_id": str(lab.country_id) if lab.country_id else None,
         "region_id": str(lab.region_id) if lab.region_id else None,
         "district_id": str(lab.district_id) if lab.district_id else None,
@@ -1388,7 +1519,9 @@ def _study_to_dict(study: Study) -> dict[str, object]:
         "sponsor": study.sponsor,
         "lead_lab_id": str(study.lead_lab_id) if study.lead_lab_id else None,
         "lead_lab_name": study.lead_lab.name if study.lead_lab_id else "",
-        "lead_lab_badge": _badge(study.lead_lab.name, "neutral") if study.lead_lab_id else None,
+        "lead_lab_badge": (
+            _badge(study.lead_lab.name, "neutral") if study.lead_lab_id else None
+        ),
         "status": study.status,
         "status_badge": _badge(study.get_status_display(), "info"),
     }
@@ -1396,7 +1529,11 @@ def _study_to_dict(study: Study) -> dict[str, object]:
 
 def _site_to_dict(site: Site) -> dict[str, object]:
     studies = sorted(site.studies.all(), key=lambda item: item.name)
-    primary_study_id = str(site.study_id) if site.study_id else (str(studies[0].id) if studies else None)
+    primary_study_id = (
+        str(site.study_id)
+        if site.study_id
+        else (str(studies[0].id) if studies else None)
+    )
     address_breadcrumb = _address_breadcrumb(
         country=site.country,
         region=site.region,
@@ -1424,7 +1561,9 @@ def _site_to_dict(site: Site) -> dict[str, object]:
         "ward_label": site.ward.name if site.ward_id else "",
         "street_label": site.street.name if site.street_id else "",
         "address_breadcrumb": address_breadcrumb,
-        "address_badges": [_badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part],
+        "address_badges": [
+            _badge(part, "neutral") for part in address_breadcrumb.split(" / ") if part
+        ],
         "country_id": str(site.country_id) if site.country_id else None,
         "region_id": str(site.region_id) if site.region_id else None,
         "district_id": str(site.district_id) if site.district_id else None,
@@ -1463,7 +1602,10 @@ def _parse_optional_date(value, *, field: str):
         return None, None
     raw = str(value).strip()
     try:
-        return datetime.fromisoformat(f"{raw}T00:00:00" if len(raw) == 10 else raw).date(), None
+        return (
+            datetime.fromisoformat(f"{raw}T00:00:00" if len(raw) == 10 else raw).date(),
+            None,
+        )
     except ValueError:
         return None, JsonResponse({"error": f"invalid_{field}"}, status=400)
 
@@ -1483,7 +1625,11 @@ def _biospecimen_type_to_dict(item: BiospecimenType) -> dict[str, object]:
 
 
 def _biospecimen_to_dict(item: Biospecimen) -> dict[str, object]:
-    latest_storage = item.storage_records.order_by("-created_at").first() if hasattr(item, "storage_records") else None
+    latest_storage = (
+        item.storage_records.order_by("-created_at").first()
+        if hasattr(item, "storage_records")
+        else None
+    )
     return {
         "id": str(item.id),
         "sample_type_id": str(item.sample_type_id),
@@ -1496,7 +1642,9 @@ def _biospecimen_to_dict(item: Biospecimen) -> dict[str, object]:
         "study_id": str(item.study_id) if item.study_id else None,
         "site_id": str(item.site_id) if item.site_id else None,
         "lab_id": str(item.lab_id) if item.lab_id else None,
-        "parent_specimen_id": str(item.parent_specimen_id) if item.parent_specimen_id else None,
+        "parent_specimen_id": (
+            str(item.parent_specimen_id) if item.parent_specimen_id else None
+        ),
         "lineage_root_id": str(item.lineage_root_id) if item.lineage_root_id else None,
         "quantity": str(item.quantity),
         "quantity_unit": item.quantity_unit,
@@ -1505,13 +1653,19 @@ def _biospecimen_to_dict(item: Biospecimen) -> dict[str, object]:
         "received_at": item.received_at.isoformat() if item.received_at else None,
         "aliquot_ids": [str(child.id) for child in item.aliquots.all()],
         "pool_ids": [str(member.pool_id) for member in item.pool_memberships.all()],
-        "current_storage_location_id": str(latest_storage.location_id) if latest_storage else None,
+        "current_storage_location_id": (
+            str(latest_storage.location_id) if latest_storage else None
+        ),
         "is_active": item.is_active,
     }
 
 
 def _biospecimen_pool_to_dict(item: BiospecimenPool) -> dict[str, object]:
-    latest_storage = item.storage_records.order_by("-created_at").first() if hasattr(item, "storage_records") else None
+    latest_storage = (
+        item.storage_records.order_by("-created_at").first()
+        if hasattr(item, "storage_records")
+        else None
+    )
     return {
         "id": str(item.id),
         "sample_type_id": str(item.sample_type_id),
@@ -1525,7 +1679,9 @@ def _biospecimen_pool_to_dict(item: BiospecimenPool) -> dict[str, object]:
         "quantity_unit": item.quantity_unit,
         "metadata": item.metadata,
         "member_ids": [str(member.specimen_id) for member in item.members.all()],
-        "current_storage_location_id": str(latest_storage.location_id) if latest_storage else None,
+        "current_storage_location_id": (
+            str(latest_storage.location_id) if latest_storage else None
+        ),
         "is_active": item.is_active,
     }
 
@@ -1572,7 +1728,9 @@ def _receiving_event_to_dict(item: ReceivingEvent) -> dict[str, object]:
     return {
         "id": str(item.id),
         "manifest_id": str(item.manifest_id) if item.manifest_id else None,
-        "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+        "manifest_item_id": (
+            str(item.manifest_item_id) if item.manifest_item_id else None
+        ),
         "biospecimen_id": str(item.biospecimen_id),
         "kind": item.kind,
         "received_by": item.received_by,
@@ -1587,7 +1745,9 @@ def _receiving_discrepancy_to_dict(item: ReceivingDiscrepancy) -> dict[str, obje
     return {
         "id": str(item.id),
         "manifest_id": str(item.manifest_id) if item.manifest_id else None,
-        "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+        "manifest_item_id": (
+            str(item.manifest_item_id) if item.manifest_item_id else None
+        ),
         "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
         "code": item.code,
         "status": item.status,
@@ -1635,21 +1795,31 @@ def _storage_location_to_dict(item: StorageLocation) -> dict[str, object]:
     }
 
 
-def _biospecimen_storage_record_to_dict(item: BiospecimenStorageRecord) -> dict[str, object]:
+def _biospecimen_storage_record_to_dict(
+    item: BiospecimenStorageRecord,
+) -> dict[str, object]:
     return {
         "id": str(item.id),
         "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
-        "biospecimen_pool_id": str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None,
+        "biospecimen_pool_id": (
+            str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None
+        ),
         "location": _storage_location_to_dict(item.location),
-        "previous_location_id": str(item.previous_location_id) if item.previous_location_id else None,
+        "previous_location_id": (
+            str(item.previous_location_id) if item.previous_location_id else None
+        ),
         "reason": item.reason,
         "quantity_snapshot": str(item.quantity_snapshot),
         "quantity_unit": item.quantity_unit,
         "notes": item.notes,
         "placed_by": item.placed_by,
-        "operation_run_id": str(item.operation_run_id) if item.operation_run_id else None,
+        "operation_run_id": (
+            str(item.operation_run_id) if item.operation_run_id else None
+        ),
         "task_run_id": str(item.task_run_id) if item.task_run_id else None,
-        "submission_record_id": str(item.submission_record_id) if item.submission_record_id else None,
+        "submission_record_id": (
+            str(item.submission_record_id) if item.submission_record_id else None
+        ),
         "created_at": item.created_at.isoformat(),
     }
 
@@ -1671,7 +1841,9 @@ def _inventory_lot_to_dict(item: InventoryLot) -> dict[str, object]:
         "id": str(item.id),
         "material_id": str(item.material_id),
         "lab_id": str(item.lab_id),
-        "storage_location_id": str(item.storage_location_id) if item.storage_location_id else None,
+        "storage_location_id": (
+            str(item.storage_location_id) if item.storage_location_id else None
+        ),
         "lot_number": item.lot_number,
         "vendor": item.vendor,
         "received_on": item.received_on.isoformat() if item.received_on else None,
@@ -1694,11 +1866,21 @@ def _inventory_transaction_to_dict(item: InventoryTransaction) -> dict[str, obje
         "resulting_quantity": str(item.resulting_quantity),
         "location_id": str(item.location_id) if item.location_id else None,
         "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
-        "biospecimen_pool_id": str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None,
-        "operation_run_id": str(item.operation_run_id) if item.operation_run_id else None,
+        "biospecimen_pool_id": (
+            str(item.biospecimen_pool_id) if item.biospecimen_pool_id else None
+        ),
+        "operation_run_id": (
+            str(item.operation_run_id) if item.operation_run_id else None
+        ),
         "task_run_id": str(item.task_run_id) if item.task_run_id else None,
-        "submission_record_id": str(item.submission_record_id) if item.submission_record_id else None,
-        "material_usage_record_id": str(item.material_usage_record_id) if item.material_usage_record_id else None,
+        "submission_record_id": (
+            str(item.submission_record_id) if item.submission_record_id else None
+        ),
+        "material_usage_record_id": (
+            str(item.material_usage_record_id)
+            if item.material_usage_record_id
+            else None
+        ),
         "notes": item.notes,
         "recorded_by": item.recorded_by,
         "created_at": item.created_at.isoformat(),
@@ -1743,12 +1925,16 @@ def _batch_plate_to_dict(item) -> dict[str, object]:
         "is_active": item.is_active,
         "assignments": [
             _batch_plate_assignment_to_dict(assignment)
-            for assignment in item.assignments.select_related("biospecimen").order_by("position_index")
+            for assignment in item.assignments.select_related("biospecimen").order_by(
+                "position_index"
+            )
         ],
     }
 
 
-def _processing_batch_to_dict(item: ProcessingBatch, *, include_plates: bool = False) -> dict[str, object]:
+def _processing_batch_to_dict(
+    item: ProcessingBatch, *, include_plates: bool = False
+) -> dict[str, object]:
     payload = {
         "id": str(item.id),
         "batch_identifier": item.batch_identifier,
@@ -1761,12 +1947,16 @@ def _processing_batch_to_dict(item: ProcessingBatch, *, include_plates: bool = F
         "metadata": item.metadata,
         "created_by": item.created_by,
         "plate_count": item.plates.count(),
-        "assigned_specimen_count": sum(plate.assignments.count() for plate in item.plates.all()),
+        "assigned_specimen_count": sum(
+            plate.assignments.count() for plate in item.plates.all()
+        ),
     }
     if include_plates:
         payload["plates"] = [
             _batch_plate_to_dict(plate)
-            for plate in item.plates.select_related("layout_template").order_by("sequence_number")
+            for plate in item.plates.select_related("layout_template").order_by(
+                "sequence_number"
+            )
         ]
     return payload
 
@@ -1793,7 +1983,9 @@ def _vocabulary_item_to_dict(item: MetadataVocabularyItem) -> dict[str, object]:
 
 
 def _vocabulary_domain_to_dict(domain: MetadataVocabularyDomain) -> dict[str, object]:
-    vocabulary_count = len(getattr(domain, "_prefetched_objects_cache", {}).get("vocabularies", []))
+    vocabulary_count = len(
+        getattr(domain, "_prefetched_objects_cache", {}).get("vocabularies", [])
+    )
     if not vocabulary_count:
         vocabulary_count = domain.vocabularies.count()
     return {
@@ -1816,7 +2008,10 @@ def _vocabulary_to_dict(vocabulary: MetadataVocabulary) -> dict[str, object]:
         "domain_code": vocabulary.domain.code,
         "domain_name": vocabulary.domain.name,
         "is_active": vocabulary.is_active,
-        "items": [_vocabulary_item_to_dict(item) for item in vocabulary.items.order_by("sort_order", "label")],
+        "items": [
+            _vocabulary_item_to_dict(item)
+            for item in vocabulary.items.order_by("sort_order", "label")
+        ],
     }
 
 
@@ -1825,7 +2020,9 @@ def _field_definition_to_dict(field: MetadataFieldDefinition) -> dict[str, objec
     if field.vocabulary_id:
         vocabulary_items = [
             {"label": item.label, "value": item.value}
-            for item in field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+            for item in field.vocabulary.items.filter(is_active=True).order_by(
+                "sort_order", "label"
+            )
         ]
     return {
         "id": str(field.id),
@@ -1862,12 +2059,16 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
     if field.vocabulary_id:
         vocabulary_items = [
             {"label": item.label, "value": item.value}
-            for item in field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label")
+            for item in field.vocabulary.items.filter(is_active=True).order_by(
+                "sort_order", "label"
+            )
         ]
     formbuilder_type = _formbuilder_type_from_field_type(field.field_type)
     return {
         "id": str(field.id),
-        "field_definition_id": str(field.field_definition_id) if field.field_definition_id else None,
+        "field_definition_id": (
+            str(field.field_definition_id) if field.field_definition_id else None
+        ),
         "field_definition_code": field.field_key,
         "field_definition_name": field.name,
         "field_type": field.field_type,
@@ -1896,7 +2097,8 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
                     if field.field_type == MetadataFieldDefinition.FieldType.INTEGER
                     else (
                         "datetime-local"
-                        if field.field_type == MetadataFieldDefinition.FieldType.DATETIME
+                        if field.field_type
+                        == MetadataFieldDefinition.FieldType.DATETIME
                         else "text"
                     )
                 )
@@ -1904,7 +2106,8 @@ def _schema_field_to_dict(field: MetadataSchemaField) -> dict[str, object]:
             "required": field.required,
             "placeholder": field.placeholder,
             "description": field.help_text,
-            "multiple": field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
+            "multiple": field.field_type
+            == MetadataFieldDefinition.FieldType.MULTI_CHOICE,
             "values": vocabulary_items,
             "value": field.default_value,
             "ui_step": str(field.config.get("ui_step") or "metadata"),
@@ -1922,14 +2125,36 @@ def _schema_version_to_dict(version: MetadataSchemaVersion) -> dict[str, object]
         "status": version.status,
         "is_editable": version.status == MetadataSchemaVersion.Status.DRAFT,
         "change_summary": version.change_summary,
-        "fields": [_schema_field_to_dict(item) for item in version.fields.select_related("vocabulary").order_by("position", "field_key")],
+        "fields": [
+            _schema_field_to_dict(item)
+            for item in version.fields.select_related("vocabulary").order_by(
+                "position", "field_key"
+            )
+        ],
     }
 
 
 def _schema_to_dict(schema: MetadataSchema) -> dict[str, object]:
-    versions = [_schema_version_to_dict(item) for item in schema.versions.order_by("-version_number")]
-    draft_version = next((item for item in versions if item["status"] == MetadataSchemaVersion.Status.DRAFT), None)
-    published_version = next((item for item in versions if item["status"] == MetadataSchemaVersion.Status.PUBLISHED), None)
+    versions = [
+        _schema_version_to_dict(item)
+        for item in schema.versions.order_by("-version_number")
+    ]
+    draft_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == MetadataSchemaVersion.Status.DRAFT
+        ),
+        None,
+    )
+    published_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == MetadataSchemaVersion.Status.PUBLISHED
+        ),
+        None,
+    )
     return {
         "id": str(schema.id),
         "name": schema.name,
@@ -1948,7 +2173,11 @@ def _workflow_step_binding_to_dict(binding: WorkflowStepBinding) -> dict[str, ob
     return {
         "id": str(binding.id),
         "node_id": str(binding.node_id),
-        "form_package_version_id": str(binding.form_package_version_id) if binding.form_package_version_id else None,
+        "form_package_version_id": (
+            str(binding.form_package_version_id)
+            if binding.form_package_version_id
+            else None
+        ),
         "form_package_id": str(package_version.package_id) if package_version else None,
         "form_package_code": package_version.package.code if package_version else "",
         "form_package_name": package_version.package.name if package_version else "",
@@ -1976,8 +2205,11 @@ def _workflow_node_to_dict(node: WorkflowNodeTemplate) -> dict[str, object]:
         "config": dict(node.config or {}),
         "step_bindings": [
             _workflow_step_binding_to_dict(binding)
-            for binding in node.step_bindings.select_related("form_package_version", "form_package_version__package").order_by(
-                "form_package_version__package__name", "form_package_version__version_number"
+            for binding in node.step_bindings.select_related(
+                "form_package_version", "form_package_version__package"
+            ).order_by(
+                "form_package_version__package__name",
+                "form_package_version__version_number",
             )
         ],
     }
@@ -1996,7 +2228,9 @@ def _workflow_edge_to_dict(edge: WorkflowEdgeTemplate) -> dict[str, object]:
     }
 
 
-def _workflow_template_version_to_dict(version: WorkflowTemplateVersion) -> dict[str, object]:
+def _workflow_template_version_to_dict(
+    version: WorkflowTemplateVersion,
+) -> dict[str, object]:
     return {
         "id": str(version.id),
         "template_id": str(version.template_id),
@@ -2009,23 +2243,40 @@ def _workflow_template_version_to_dict(version: WorkflowTemplateVersion) -> dict
         "compiled_definition": dict(version.compiled_definition or {}),
         "nodes": [
             _workflow_node_to_dict(node)
-            for node in version.nodes.prefetch_related("step_bindings__form_package_version__package").order_by(
-                "position", "node_key"
-            )
+            for node in version.nodes.prefetch_related(
+                "step_bindings__form_package_version__package"
+            ).order_by("position", "node_key")
         ],
         "edges": [
             _workflow_edge_to_dict(edge)
-            for edge in version.edges.select_related("source_node", "target_node").order_by(
-                "priority", "source_node__node_key", "target_node__node_key"
-            )
+            for edge in version.edges.select_related(
+                "source_node", "target_node"
+            ).order_by("priority", "source_node__node_key", "target_node__node_key")
         ],
     }
 
 
 def _workflow_template_to_dict(template: WorkflowTemplate) -> dict[str, object]:
-    versions = [_workflow_template_version_to_dict(item) for item in template.versions.order_by("-version_number")]
-    draft_version = next((item for item in versions if item["status"] == WorkflowTemplateVersion.Status.DRAFT), None)
-    published_version = next((item for item in versions if item["status"] == WorkflowTemplateVersion.Status.PUBLISHED), None)
+    versions = [
+        _workflow_template_version_to_dict(item)
+        for item in template.versions.order_by("-version_number")
+    ]
+    draft_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == WorkflowTemplateVersion.Status.DRAFT
+        ),
+        None,
+    )
+    published_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == WorkflowTemplateVersion.Status.PUBLISHED
+        ),
+        None,
+    )
     return {
         "id": str(template.id),
         "name": template.name,
@@ -2047,7 +2298,9 @@ def _submission_record_to_dict(record: SubmissionRecord) -> dict[str, object]:
         "status": record.status,
         "payload": dict(record.payload or {}),
         "submitted_by": record.submitted_by,
-        "submitted_at": record.submitted_at.isoformat() if record.submitted_at else None,
+        "submitted_at": (
+            record.submitted_at.isoformat() if record.submitted_at else None
+        ),
     }
 
 
@@ -2070,7 +2323,9 @@ def _qc_result_to_dict(record: QCResult) -> dict[str, object]:
         "id": str(record.id),
         "operation_run_id": str(record.operation_run_id),
         "task_run_id": str(record.task_run_id),
-        "submission_record_id": str(record.submission_record_id) if record.submission_record_id else None,
+        "submission_record_id": (
+            str(record.submission_record_id) if record.submission_record_id else None
+        ),
         "discrepancy_id": str(record.discrepancy_id) if record.discrepancy_id else None,
         "decision": record.decision,
         "notes": record.notes,
@@ -2087,8 +2342,12 @@ def _material_usage_record_to_dict(record: MaterialUsageRecord) -> dict[str, obj
         "task_run_id": str(record.task_run_id) if record.task_run_id else None,
         "biospecimen_id": str(record.biospecimen_id) if record.biospecimen_id else None,
         "manifest_id": str(record.manifest_id) if record.manifest_id else None,
-        "manifest_item_id": str(record.manifest_item_id) if record.manifest_item_id else None,
-        "receiving_event_id": str(record.receiving_event_id) if record.receiving_event_id else None,
+        "manifest_item_id": (
+            str(record.manifest_item_id) if record.manifest_item_id else None
+        ),
+        "receiving_event_id": (
+            str(record.receiving_event_id) if record.receiving_event_id else None
+        ),
         "discrepancy_id": str(record.discrepancy_id) if record.discrepancy_id else None,
         "action": record.action,
         "details": dict(record.details or {}),
@@ -2114,9 +2373,18 @@ def _task_run_to_dict(task_run: TaskRun) -> dict[str, object]:
         "input_context": dict(task_run.input_context or {}),
         "output_data": dict(task_run.output_data or {}),
         "started_at": task_run.started_at.isoformat() if task_run.started_at else None,
-        "completed_at": task_run.completed_at.isoformat() if task_run.completed_at else None,
-        "submissions": [_submission_record_to_dict(item) for item in task_run.submissions.order_by("submission_index")],
-        "approvals": [_approval_record_to_dict(item) for item in task_run.approvals.order_by("approved_at", "created_at")],
+        "completed_at": (
+            task_run.completed_at.isoformat() if task_run.completed_at else None
+        ),
+        "page_url": _task_page_url(task_run),
+        "submissions": [
+            _submission_record_to_dict(item)
+            for item in task_run.submissions.order_by("submission_index")
+        ],
+        "approvals": [
+            _approval_record_to_dict(item)
+            for item in task_run.approvals.order_by("approved_at", "created_at")
+        ],
     }
 
 
@@ -2147,14 +2415,21 @@ def _operation_run_to_dict(run: OperationRun) -> dict[str, object]:
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "tasks": [
             _task_run_to_dict(item)
-            for item in run.tasks.prefetch_related("submissions", "approvals", "node_template").order_by(
-                "node_template__position", "created_at"
-            )
+            for item in run.tasks.prefetch_related(
+                "submissions", "approvals", "node_template"
+            ).order_by("node_template__position", "created_at")
         ],
-        "approvals": [_approval_record_to_dict(item) for item in run.approvals.order_by("approved_at", "created_at")],
-        "qc_results": [_qc_result_to_dict(item) for item in run.qc_results.order_by("-reviewed_at", "-created_at")],
+        "approvals": [
+            _approval_record_to_dict(item)
+            for item in run.approvals.order_by("approved_at", "created_at")
+        ],
+        "qc_results": [
+            _qc_result_to_dict(item)
+            for item in run.qc_results.order_by("-reviewed_at", "-created_at")
+        ],
         "material_usages": [
-            _material_usage_record_to_dict(item) for item in run.material_usages.order_by("created_at")
+            _material_usage_record_to_dict(item)
+            for item in run.material_usages.order_by("created_at")
         ],
     }
 
@@ -2173,18 +2448,41 @@ def _operation_version_to_dict(version: OperationVersion) -> dict[str, object]:
         "status": version.status,
         "version_number": version.version_number,
         "change_summary": version.change_summary,
-        "sop_document_id": str(version.sop_document_id) if version.sop_document_id else None,
-        "sop_document_version_id": str(version.sop_document_version_id) if version.sop_document_version_id else None,
+        "sop_document_id": (
+            str(version.sop_document_id) if version.sop_document_id else None
+        ),
+        "sop_document_version_id": (
+            str(version.sop_document_version_id)
+            if version.sop_document_version_id
+            else None
+        ),
         "sop_version_label": version.sop_version_label,
-        "sop_effective_date": version.sop_effective_date.isoformat() if version.sop_effective_date else None,
+        "sop_effective_date": (
+            version.sop_effective_date.isoformat()
+            if version.sop_effective_date
+            else None
+        ),
         "runtime_defaults": dict(version.runtime_defaults or {}),
     }
 
 
 def _operation_definition_to_dict(definition: OperationDefinition) -> dict[str, object]:
-    versions = [_operation_version_to_dict(item) for item in definition.versions.order_by("-version_number")]
-    draft_version = next((item for item in versions if item["status"] == OperationVersion.Status.DRAFT), None)
-    published_version = next((item for item in versions if item["status"] == OperationVersion.Status.PUBLISHED), None)
+    versions = [
+        _operation_version_to_dict(item)
+        for item in definition.versions.order_by("-version_number")
+    ]
+    draft_version = next(
+        (item for item in versions if item["status"] == OperationVersion.Status.DRAFT),
+        None,
+    )
+    published_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == OperationVersion.Status.PUBLISHED
+        ),
+        None,
+    )
     return {
         "id": str(definition.id),
         "name": definition.name,
@@ -2207,7 +2505,11 @@ def _sample_accession_reference_bundle_to_dict(
     created: bool,
 ) -> dict[str, object]:
     published_form_package = next(
-        (item for item in form_package.versions.order_by("-version_number") if item.status == FormPackageVersion.Status.PUBLISHED),
+        (
+            item
+            for item in form_package.versions.order_by("-version_number")
+            if item.status == FormPackageVersion.Status.PUBLISHED
+        ),
         None,
     )
     published_workflow = next(
@@ -2230,11 +2532,23 @@ def _sample_accession_reference_bundle_to_dict(
         "reference_operation": "sample-accession",
         "created": created,
         "form_package": _form_package_to_dict(form_package),
-        "form_package_version": _form_package_version_to_dict(published_form_package) if published_form_package else None,
+        "form_package_version": (
+            _form_package_version_to_dict(published_form_package)
+            if published_form_package
+            else None
+        ),
         "workflow_template": _workflow_template_to_dict(workflow_template),
-        "workflow_version": _workflow_template_version_to_dict(published_workflow) if published_workflow else None,
+        "workflow_version": (
+            _workflow_template_version_to_dict(published_workflow)
+            if published_workflow
+            else None
+        ),
         "operation_definition": _operation_definition_to_dict(operation_definition),
-        "operation_version": _operation_version_to_dict(published_operation) if published_operation else None,
+        "operation_version": (
+            _operation_version_to_dict(published_operation)
+            if published_operation
+            else None
+        ),
     }
 
 
@@ -2262,17 +2576,24 @@ def _form_package_choice_to_dict(choice: FormPackageChoice) -> dict[str, object]
     }
 
 
-def _form_package_choice_list_to_dict(choice_list: FormPackageChoiceList) -> dict[str, object]:
+def _form_package_choice_list_to_dict(
+    choice_list: FormPackageChoiceList,
+) -> dict[str, object]:
     return {
         "id": str(choice_list.id),
         "version_id": str(choice_list.version_id),
-        "vocabulary_id": str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None,
+        "vocabulary_id": (
+            str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None
+        ),
         "list_key": choice_list.list_key,
         "oid": choice_list.oid,
         "title": choice_list.title,
         "description": choice_list.description,
         "position": choice_list.position,
-        "choices": [_form_package_choice_to_dict(choice) for choice in choice_list.choices.all().order_by("sort_order", "label")],
+        "choices": [
+            _form_package_choice_to_dict(choice)
+            for choice in choice_list.choices.all().order_by("sort_order", "label")
+        ],
     }
 
 
@@ -2327,7 +2648,9 @@ def _form_package_item_to_dict(item: FormPackageItem) -> dict[str, object]:
     }
 
 
-def _form_package_source_artifact_to_dict(artifact: FormPackageSourceArtifact) -> dict[str, object]:
+def _form_package_source_artifact_to_dict(
+    artifact: FormPackageSourceArtifact,
+) -> dict[str, object]:
     return {
         "id": str(artifact.id),
         "version_id": str(artifact.version_id),
@@ -2341,7 +2664,9 @@ def _form_package_source_artifact_to_dict(artifact: FormPackageSourceArtifact) -
     }
 
 
-def _form_package_diagnostic_to_dict(diagnostic: FormPackageCompilerDiagnostic) -> dict[str, object]:
+def _form_package_diagnostic_to_dict(
+    diagnostic: FormPackageCompilerDiagnostic,
+) -> dict[str, object]:
     return {
         "id": str(diagnostic.id),
         "version_id": str(diagnostic.version_id),
@@ -2371,39 +2696,73 @@ def _form_package_version_to_dict(version: FormPackageVersion) -> dict[str, obje
         "status": version.status,
         "is_editable": version.status == FormPackageVersion.Status.DRAFT,
         "change_summary": version.change_summary,
-        "source_schema_version_id": str(version.source_schema_version_id) if version.source_schema_version_id else None,
+        "source_schema_version_id": (
+            str(version.source_schema_version_id)
+            if version.source_schema_version_id
+            else None
+        ),
         "compiler_context": dict(version.compiler_context or {}),
-        "sections": [_form_package_section_to_dict(item) for item in version.sections.all().order_by("position", "section_key")],
+        "sections": [
+            _form_package_section_to_dict(item)
+            for item in version.sections.all().order_by("position", "section_key")
+        ],
         "choice_lists": [
             _form_package_choice_list_to_dict(item)
-            for item in version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key")
+            for item in version.choice_lists.prefetch_related("choices")
+            .all()
+            .order_by("position", "list_key")
         ],
         "item_groups": [
             _form_package_item_group_to_dict(item)
-            for item in version.item_groups.select_related("section").all().order_by("position", "group_key")
+            for item in version.item_groups.select_related("section")
+            .all()
+            .order_by("position", "group_key")
         ],
         "items": [
             _form_package_item_to_dict(item)
-            for item in version.items.select_related("section", "item_group", "choice_list").all().order_by(
-                "section__position", "position", "item_key"
+            for item in version.items.select_related(
+                "section", "item_group", "choice_list"
             )
+            .all()
+            .order_by("section__position", "position", "item_key")
         ],
         "source_artifacts": [
             _form_package_source_artifact_to_dict(item)
-            for item in version.source_artifacts.all().order_by("created_at", "filename")
+            for item in version.source_artifacts.all().order_by(
+                "created_at", "filename"
+            )
         ],
         "compiler_diagnostics": [
             _form_package_diagnostic_to_dict(item)
-            for item in version.compiler_diagnostics.all().order_by("created_at", "severity", "code")
+            for item in version.compiler_diagnostics.all().order_by(
+                "created_at", "severity", "code"
+            )
         ],
         "compiled_projection": projection,
     }
 
 
 def _form_package_to_dict(package: FormPackage) -> dict[str, object]:
-    versions = [_form_package_version_to_dict(item) for item in package.versions.order_by("-version_number")]
-    draft_version = next((item for item in versions if item["status"] == FormPackageVersion.Status.DRAFT), None)
-    published_version = next((item for item in versions if item["status"] == FormPackageVersion.Status.PUBLISHED), None)
+    versions = [
+        _form_package_version_to_dict(item)
+        for item in package.versions.order_by("-version_number")
+    ]
+    draft_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == FormPackageVersion.Status.DRAFT
+        ),
+        None,
+    )
+    published_version = next(
+        (
+            item
+            for item in versions
+            if item["status"] == FormPackageVersion.Status.PUBLISHED
+        ),
+        None,
+    )
     return {
         "id": str(package.id),
         "name": package.name,
@@ -2452,7 +2811,9 @@ def _normalize_code(name: str, raw_code: object) -> str:
     return slugify(str(raw_code or "").strip() or name)
 
 
-def _parse_positive_int_query(request, key: str, *, default: int, maximum: int) -> int | JsonResponse:
+def _parse_positive_int_query(
+    request, key: str, *, default: int, maximum: int
+) -> int | JsonResponse:
     raw_value = str(request.GET.get(key) or "").strip()
     if not raw_value:
         return default
@@ -2497,9 +2858,13 @@ def _expand_address_hierarchy(*, country, region, district, ward, street):
     }, None
 
 
-def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: Street | None):
+def _resolve_postcode_from_payload(
+    raw_postcode_id, raw_postcode_code, street: Street | None
+):
     if raw_postcode_id:
-        postcode, error = _resolve_optional_fk(Postcode, raw_postcode_id, "postcode_not_found")
+        postcode, error = _resolve_optional_fk(
+            Postcode, raw_postcode_id, "postcode_not_found"
+        )
         if error:
             return None, error
         return (postcode.code if postcode else ""), None
@@ -2522,19 +2887,27 @@ def _resolve_postcode_from_payload(raw_postcode_id, raw_postcode_code, street: S
 
 
 def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
-    country, error = _resolve_optional_fk(Country, payload.get("country_id"), "country_not_found")
+    country, error = _resolve_optional_fk(
+        Country, payload.get("country_id"), "country_not_found"
+    )
     if error:
         return error
-    region, error = _resolve_optional_fk(Region, payload.get("region_id"), "region_not_found")
+    region, error = _resolve_optional_fk(
+        Region, payload.get("region_id"), "region_not_found"
+    )
     if error:
         return error
-    district, error = _resolve_optional_fk(District, payload.get("district_id"), "district_not_found")
+    district, error = _resolve_optional_fk(
+        District, payload.get("district_id"), "district_not_found"
+    )
     if error:
         return error
     ward, error = _resolve_optional_fk(Ward, payload.get("ward_id"), "ward_not_found")
     if error:
         return error
-    street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
+    street, error = _resolve_optional_fk(
+        Street, payload.get("street_id"), "street_not_found"
+    )
     if error:
         return error
     hierarchy, error = _expand_address_hierarchy(
@@ -2546,7 +2919,9 @@ def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
     )
     if error:
         return error
-    postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
+    postcode, error = _resolve_postcode_from_payload(
+        payload.get("postcode_id"), payload.get("postcode"), street
+    )
     if error:
         return error
 
@@ -2572,7 +2947,9 @@ def _build_lab_from_payload(lab: Lab, payload: dict[str, object]):
 
 
 def _build_study_from_payload(study: Study, payload: dict[str, object]):
-    lead_lab, error = _resolve_optional_fk(Lab, payload.get("lead_lab_id"), "lab_not_found")
+    lead_lab, error = _resolve_optional_fk(
+        Lab, payload.get("lead_lab_id"), "lab_not_found"
+    )
     if error:
         return error
     name = str(payload.get("name") or "").strip()
@@ -2594,10 +2971,14 @@ def _build_study_from_payload(study: Study, payload: dict[str, object]):
 
 
 def _build_site_from_payload(site: Site, payload: dict[str, object]):
-    studies, error = _resolve_optional_fk_list(Study, payload.get("study_ids"), "study_not_found")
+    studies, error = _resolve_optional_fk_list(
+        Study, payload.get("study_ids"), "study_not_found"
+    )
     if error:
         return error
-    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    study, error = _resolve_optional_fk(
+        Study, payload.get("study_id"), "study_not_found"
+    )
     if error:
         return error
     if study and all(str(item.id) != str(study.id) for item in studies):
@@ -2605,19 +2986,27 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
-    country, error = _resolve_optional_fk(Country, payload.get("country_id"), "country_not_found")
+    country, error = _resolve_optional_fk(
+        Country, payload.get("country_id"), "country_not_found"
+    )
     if error:
         return error
-    region, error = _resolve_optional_fk(Region, payload.get("region_id"), "region_not_found")
+    region, error = _resolve_optional_fk(
+        Region, payload.get("region_id"), "region_not_found"
+    )
     if error:
         return error
-    district, error = _resolve_optional_fk(District, payload.get("district_id"), "district_not_found")
+    district, error = _resolve_optional_fk(
+        District, payload.get("district_id"), "district_not_found"
+    )
     if error:
         return error
     ward, error = _resolve_optional_fk(Ward, payload.get("ward_id"), "ward_not_found")
     if error:
         return error
-    street, error = _resolve_optional_fk(Street, payload.get("street_id"), "street_not_found")
+    street, error = _resolve_optional_fk(
+        Street, payload.get("street_id"), "street_not_found"
+    )
     if error:
         return error
     hierarchy, error = _expand_address_hierarchy(
@@ -2629,7 +3018,9 @@ def _build_site_from_payload(site: Site, payload: dict[str, object]):
     )
     if error:
         return error
-    postcode, error = _resolve_postcode_from_payload(payload.get("postcode_id"), payload.get("postcode"), street)
+    postcode, error = _resolve_postcode_from_payload(
+        payload.get("postcode_id"), payload.get("postcode"), street
+    )
     if error:
         return error
     name = str(payload.get("name") or "").strip()
@@ -2677,7 +3068,9 @@ def _save_site_model(site: Site):
     return None
 
 
-def _build_vocabulary_from_payload(vocabulary: MetadataVocabulary, payload: dict[str, object]):
+def _build_vocabulary_from_payload(
+    vocabulary: MetadataVocabulary, payload: dict[str, object]
+):
     if not payload.get("name"):
         return JsonResponse({"error": "name is required"}, status=400)
     if not payload.get("code"):
@@ -2686,7 +3079,9 @@ def _build_vocabulary_from_payload(vocabulary: MetadataVocabulary, payload: dict
     raw_domain_id = payload.get("domain_id")
     raw_domain_code = str(payload.get("domain_code") or "").strip()
     if raw_domain_id:
-        domain, error = _resolve_optional_fk(MetadataVocabularyDomain, raw_domain_id, "domain_not_found")
+        domain, error = _resolve_optional_fk(
+            MetadataVocabularyDomain, raw_domain_id, "domain_not_found"
+        )
         if error:
             return error
     elif raw_domain_code:
@@ -2716,11 +3111,15 @@ def _sync_vocabulary_items(vocabulary: MetadataVocabulary, items_payload: object
         value = str(item_payload.get("value") or "").strip()
         label = str(item_payload.get("label") or "").strip()
         if not value or not label:
-            return JsonResponse({"error": "item value and label are required"}, status=400)
+            return JsonResponse(
+                {"error": "item value and label are required"}, status=400
+            )
         item_id = item_payload.get("id")
         if item_id:
             try:
-                item = MetadataVocabularyItem.objects.get(id=item_id, vocabulary=vocabulary)
+                item = MetadataVocabularyItem.objects.get(
+                    id=item_id, vocabulary=vocabulary
+                )
             except (ValidationError, MetadataVocabularyItem.DoesNotExist):
                 return JsonResponse({"error": "vocabulary_item_not_found"}, status=404)
         else:
@@ -2733,12 +3132,18 @@ def _sync_vocabulary_items(vocabulary: MetadataVocabulary, items_payload: object
         if error:
             return error
         retained_ids.append(str(item.id))
-    MetadataVocabularyItem.objects.filter(vocabulary=vocabulary).exclude(id__in=retained_ids).delete()
+    MetadataVocabularyItem.objects.filter(vocabulary=vocabulary).exclude(
+        id__in=retained_ids
+    ).delete()
     return None
 
 
-def _build_field_definition_from_payload(field: MetadataFieldDefinition, payload: dict[str, object]):
-    vocabulary, error = _resolve_optional_fk(MetadataVocabulary, payload.get("vocabulary_id"), "vocabulary_not_found")
+def _build_field_definition_from_payload(
+    field: MetadataFieldDefinition, payload: dict[str, object]
+):
+    vocabulary, error = _resolve_optional_fk(
+        MetadataVocabulary, payload.get("vocabulary_id"), "vocabulary_not_found"
+    )
     if error:
         return error
     if not payload.get("name"):
@@ -2777,14 +3182,18 @@ def _build_schema_from_payload(schema: MetadataSchema, payload: dict[str, object
     return None
 
 
-def _build_form_package_from_payload(package: FormPackage, payload: dict[str, object]) -> JsonResponse | None:
+def _build_form_package_from_payload(
+    package: FormPackage, payload: dict[str, object]
+) -> JsonResponse | None:
     name = str(payload.get("name") or "").strip()
     if not name:
         return JsonResponse({"error": "name is required"}, status=400)
     code = str(payload.get("code") or "").strip()
     if not code:
         return JsonResponse({"error": "code is required"}, status=400)
-    module_scope = str(payload.get("module_scope") or FormPackage.ModuleScope.SHARED).strip()
+    module_scope = str(
+        payload.get("module_scope") or FormPackage.ModuleScope.SHARED
+    ).strip()
     if module_scope not in FormPackage.ModuleScope.values:
         return JsonResponse({"error": "invalid_module_scope"}, status=400)
     package.name = name
@@ -2805,7 +3214,9 @@ def _apply_form_package_version_from_payload(
     if "compiler_context" in payload:
         compiler_context = payload.get("compiler_context") or {}
         if not isinstance(compiler_context, dict):
-            return JsonResponse({"error": "compiler_context must be an object"}, status=400)
+            return JsonResponse(
+                {"error": "compiler_context must be an object"}, status=400
+            )
         version.compiler_context = compiler_context
     if "source_schema_version_id" in payload or not version.source_schema_version_id:
         raw_source_schema_version_id = payload.get("source_schema_version_id")
@@ -2818,14 +3229,18 @@ def _apply_form_package_version_from_payload(
             if error:
                 return error
             if source_schema_version is None:
-                return JsonResponse({"error": "source_schema_version_id is required"}, status=400)
+                return JsonResponse(
+                    {"error": "source_schema_version_id is required"}, status=400
+                )
             version.source_schema_version = source_schema_version
         elif "source_schema_version_id" in payload:
             version.source_schema_version = None
     return None
 
 
-def _sync_form_package_source_artifacts(version: FormPackageVersion, artifacts_payload: object) -> JsonResponse | None:
+def _sync_form_package_source_artifacts(
+    version: FormPackageVersion, artifacts_payload: object
+) -> JsonResponse | None:
     if artifacts_payload is None:
         return None
     if not isinstance(artifacts_payload, list):
@@ -2833,16 +3248,22 @@ def _sync_form_package_source_artifacts(version: FormPackageVersion, artifacts_p
     retained_ids: list[str] = []
     for artifact_payload in artifacts_payload:
         if not isinstance(artifact_payload, dict):
-            return JsonResponse({"error": "source_artifact must be an object"}, status=400)
+            return JsonResponse(
+                {"error": "source_artifact must be an object"}, status=400
+            )
         artifact_id = artifact_payload.get("id")
         if artifact_id:
             try:
-                artifact = FormPackageSourceArtifact.objects.get(id=artifact_id, version=version)
+                artifact = FormPackageSourceArtifact.objects.get(
+                    id=artifact_id, version=version
+                )
             except (ValidationError, FormPackageSourceArtifact.DoesNotExist):
                 return JsonResponse({"error": "source_artifact_not_found"}, status=404)
         else:
             artifact = FormPackageSourceArtifact(version=version)
-        role = str(artifact_payload.get("role") or FormPackageSourceArtifact.Role.SOURCE).strip()
+        role = str(
+            artifact_payload.get("role") or FormPackageSourceArtifact.Role.SOURCE
+        ).strip()
         if role not in FormPackageSourceArtifact.Role.values:
             return JsonResponse({"error": "invalid_source_artifact_role"}, status=400)
         artifact_type = str(artifact_payload.get("artifact_type") or "").strip()
@@ -2853,7 +3274,9 @@ def _sync_form_package_source_artifacts(version: FormPackageVersion, artifacts_p
             return JsonResponse({"error": "filename is required"}, status=400)
         artifact_metadata = artifact_payload.get("artifact_metadata") or {}
         if not isinstance(artifact_metadata, dict):
-            return JsonResponse({"error": "artifact_metadata must be an object"}, status=400)
+            return JsonResponse(
+                {"error": "artifact_metadata must be an object"}, status=400
+            )
         artifact.role = role
         artifact.artifact_type = artifact_type
         artifact.filename = filename
@@ -2865,16 +3288,25 @@ def _sync_form_package_source_artifacts(version: FormPackageVersion, artifacts_p
         if error:
             return error
         retained_ids.append(str(artifact.id))
-    FormPackageSourceArtifact.objects.filter(version=version).exclude(id__in=retained_ids).delete()
+    FormPackageSourceArtifact.objects.filter(version=version).exclude(
+        id__in=retained_ids
+    ).delete()
     return None
 
 
-def _sync_form_package_version_definition(version: FormPackageVersion, payload: dict[str, object]) -> JsonResponse | None:
+def _sync_form_package_version_definition(
+    version: FormPackageVersion, payload: dict[str, object]
+) -> JsonResponse | None:
     sections_payload = payload.get("sections")
     choice_lists_payload = payload.get("choice_lists")
     item_groups_payload = payload.get("item_groups")
     items_payload = payload.get("items")
-    if sections_payload is None and choice_lists_payload is None and item_groups_payload is None and items_payload is None:
+    if (
+        sections_payload is None
+        and choice_lists_payload is None
+        and item_groups_payload is None
+        and items_payload is None
+    ):
         return None
 
     if sections_payload is not None and not isinstance(sections_payload, list):
@@ -2898,21 +3330,34 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
             section_id = section_payload.get("id")
             if section_id:
                 try:
-                    section = FormPackageSection.objects.get(id=section_id, version=version)
+                    section = FormPackageSection.objects.get(
+                        id=section_id, version=version
+                    )
                 except (ValidationError, FormPackageSection.DoesNotExist):
-                    return JsonResponse({"error": "form_package_section_not_found"}, status=404)
+                    return JsonResponse(
+                        {"error": "form_package_section_not_found"}, status=404
+                    )
             else:
                 section = FormPackageSection(version=version)
-            section_key = str(section_payload.get("section_key") or slugify(str(section_payload.get("title") or "")) or "").strip()
+            section_key = str(
+                section_payload.get("section_key")
+                or slugify(str(section_payload.get("title") or ""))
+                or ""
+            ).strip()
             if not section_key:
                 return JsonResponse({"error": "section_key is required"}, status=400)
-            oid = str(section_payload.get("oid") or f"SEC.{section_key.replace('-', '_').upper()}").strip()
+            oid = str(
+                section_payload.get("oid")
+                or f"SEC.{section_key.replace('-', '_').upper()}"
+            ).strip()
             title = str(section_payload.get("title") or "").strip()
             if not title:
                 return JsonResponse({"error": "section title is required"}, status=400)
             config = section_payload.get("config") or {}
             if not isinstance(config, dict):
-                return JsonResponse({"error": "section config must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "section config must be an object"}, status=400
+                )
             section.section_key = section_key
             section.oid = oid
             section.title = title
@@ -2924,7 +3369,9 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
                 return error
             retained_section_ids.append(str(section.id))
             section_map[section.section_key] = section
-        FormPackageSection.objects.filter(version=version).exclude(id__in=retained_section_ids).delete()
+        FormPackageSection.objects.filter(version=version).exclude(
+            id__in=retained_section_ids
+        ).delete()
 
     choice_list_map: dict[str, FormPackageChoiceList] = {
         item.list_key: item for item in version.choice_lists.all()
@@ -2934,13 +3381,19 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
         choice_list_map = {}
         for index, choice_list_payload in enumerate(choice_lists_payload, start=1):
             if not isinstance(choice_list_payload, dict):
-                return JsonResponse({"error": "choice_list must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "choice_list must be an object"}, status=400
+                )
             choice_list_id = choice_list_payload.get("id")
             if choice_list_id:
                 try:
-                    choice_list = FormPackageChoiceList.objects.get(id=choice_list_id, version=version)
+                    choice_list = FormPackageChoiceList.objects.get(
+                        id=choice_list_id, version=version
+                    )
                 except (ValidationError, FormPackageChoiceList.DoesNotExist):
-                    return JsonResponse({"error": "form_package_choice_list_not_found"}, status=404)
+                    return JsonResponse(
+                        {"error": "form_package_choice_list_not_found"}, status=404
+                    )
             else:
                 choice_list = FormPackageChoiceList(version=version)
             vocabulary, error = _resolve_optional_fk(
@@ -2950,18 +3403,29 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
             )
             if error:
                 return error
-            list_key = str(choice_list_payload.get("list_key") or slugify(str(choice_list_payload.get("title") or "")) or "").strip()
+            list_key = str(
+                choice_list_payload.get("list_key")
+                or slugify(str(choice_list_payload.get("title") or ""))
+                or ""
+            ).strip()
             if not list_key:
                 return JsonResponse({"error": "list_key is required"}, status=400)
             title = str(choice_list_payload.get("title") or "").strip()
             if not title:
-                return JsonResponse({"error": "choice_list title is required"}, status=400)
+                return JsonResponse(
+                    {"error": "choice_list title is required"}, status=400
+                )
             choice_list.version = version
             choice_list.vocabulary = vocabulary
             choice_list.list_key = list_key
-            choice_list.oid = str(choice_list_payload.get("oid") or f"CL.{list_key.replace('-', '_').upper()}").strip()
+            choice_list.oid = str(
+                choice_list_payload.get("oid")
+                or f"CL.{list_key.replace('-', '_').upper()}"
+            ).strip()
             choice_list.title = title
-            choice_list.description = str(choice_list_payload.get("description") or "").strip()
+            choice_list.description = str(
+                choice_list_payload.get("description") or ""
+            ).strip()
             choice_list.position = int(choice_list_payload.get("position") or index)
             error = _save_model(choice_list)
             if error:
@@ -2975,29 +3439,43 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
                 retained_choice_ids: list[str] = []
                 for choice_index, choice_payload in enumerate(choices_payload, start=1):
                     if not isinstance(choice_payload, dict):
-                        return JsonResponse({"error": "choice must be an object"}, status=400)
+                        return JsonResponse(
+                            {"error": "choice must be an object"}, status=400
+                        )
                     choice_id = choice_payload.get("id")
                     if choice_id:
                         try:
-                            choice = FormPackageChoice.objects.get(id=choice_id, choice_list=choice_list)
+                            choice = FormPackageChoice.objects.get(
+                                id=choice_id, choice_list=choice_list
+                            )
                         except (ValidationError, FormPackageChoice.DoesNotExist):
-                            return JsonResponse({"error": "form_package_choice_not_found"}, status=404)
+                            return JsonResponse(
+                                {"error": "form_package_choice_not_found"}, status=404
+                            )
                     else:
                         choice = FormPackageChoice(choice_list=choice_list)
                     value = str(choice_payload.get("value") or "").strip()
                     label = str(choice_payload.get("label") or "").strip()
                     if not value or not label:
-                        return JsonResponse({"error": "choice value and label are required"}, status=400)
+                        return JsonResponse(
+                            {"error": "choice value and label are required"}, status=400
+                        )
                     choice.value = value
                     choice.label = label
-                    choice.sort_order = int(choice_payload.get("sort_order") or choice_index)
+                    choice.sort_order = int(
+                        choice_payload.get("sort_order") or choice_index
+                    )
                     choice.is_active = bool(choice_payload.get("is_active", True))
                     error = _save_model(choice)
                     if error:
                         return error
                     retained_choice_ids.append(str(choice.id))
-                FormPackageChoice.objects.filter(choice_list=choice_list).exclude(id__in=retained_choice_ids).delete()
-        FormPackageChoiceList.objects.filter(version=version).exclude(id__in=retained_choice_list_ids).delete()
+                FormPackageChoice.objects.filter(choice_list=choice_list).exclude(
+                    id__in=retained_choice_ids
+                ).delete()
+        FormPackageChoiceList.objects.filter(version=version).exclude(
+            id__in=retained_choice_list_ids
+        ).delete()
 
     group_map: dict[str, FormPackageItemGroup] = {
         item.group_key: item for item in version.item_groups.all()
@@ -3007,36 +3485,60 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
         group_map = {}
         for index, group_payload in enumerate(item_groups_payload, start=1):
             if not isinstance(group_payload, dict):
-                return JsonResponse({"error": "item_group must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "item_group must be an object"}, status=400
+                )
             group_id = group_payload.get("id")
             if group_id:
                 try:
-                    group = FormPackageItemGroup.objects.get(id=group_id, version=version)
+                    group = FormPackageItemGroup.objects.get(
+                        id=group_id, version=version
+                    )
                 except (ValidationError, FormPackageItemGroup.DoesNotExist):
-                    return JsonResponse({"error": "form_package_item_group_not_found"}, status=404)
+                    return JsonResponse(
+                        {"error": "form_package_item_group_not_found"}, status=404
+                    )
             else:
                 group = FormPackageItemGroup(version=version)
             section = None
             if group_payload.get("section_id"):
-                section, error = _resolve_optional_fk(FormPackageSection, group_payload.get("section_id"), "form_package_section_not_found")
+                section, error = _resolve_optional_fk(
+                    FormPackageSection,
+                    group_payload.get("section_id"),
+                    "form_package_section_not_found",
+                )
                 if error:
                     return error
             else:
-                section = section_map.get(str(group_payload.get("section_key") or "").strip())
+                section = section_map.get(
+                    str(group_payload.get("section_key") or "").strip()
+                )
             if section is None or section.version_id != version.id:
-                return JsonResponse({"error": "form_package_section_not_found"}, status=404)
-            group_key = str(group_payload.get("group_key") or slugify(str(group_payload.get("title") or "")) or "").strip()
+                return JsonResponse(
+                    {"error": "form_package_section_not_found"}, status=404
+                )
+            group_key = str(
+                group_payload.get("group_key")
+                or slugify(str(group_payload.get("title") or ""))
+                or ""
+            ).strip()
             if not group_key:
                 return JsonResponse({"error": "group_key is required"}, status=400)
             title = str(group_payload.get("title") or "").strip()
             if not title:
-                return JsonResponse({"error": "item_group title is required"}, status=400)
+                return JsonResponse(
+                    {"error": "item_group title is required"}, status=400
+                )
             config = group_payload.get("config") or {}
             if not isinstance(config, dict):
-                return JsonResponse({"error": "item_group config must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "item_group config must be an object"}, status=400
+                )
             group.section = section
             group.group_key = group_key
-            group.oid = str(group_payload.get("oid") or f"GRP.{group_key.replace('-', '_').upper()}").strip()
+            group.oid = str(
+                group_payload.get("oid") or f"GRP.{group_key.replace('-', '_').upper()}"
+            ).strip()
             group.title = title
             group.description = str(group_payload.get("description") or "").strip()
             group.position = int(group_payload.get("position") or index)
@@ -3047,7 +3549,9 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
                 return error
             retained_group_ids.append(str(group.id))
             group_map[group.group_key] = group
-        FormPackageItemGroup.objects.filter(version=version).exclude(id__in=retained_group_ids).delete()
+        FormPackageItemGroup.objects.filter(version=version).exclude(
+            id__in=retained_group_ids
+        ).delete()
 
     if items_payload is not None:
         retained_item_ids: list[str] = []
@@ -3059,17 +3563,27 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
                 try:
                     item = FormPackageItem.objects.get(id=item_id, version=version)
                 except (ValidationError, FormPackageItem.DoesNotExist):
-                    return JsonResponse({"error": "form_package_item_not_found"}, status=404)
+                    return JsonResponse(
+                        {"error": "form_package_item_not_found"}, status=404
+                    )
             else:
                 item = FormPackageItem(version=version)
             if item_payload.get("section_id"):
-                section, error = _resolve_optional_fk(FormPackageSection, item_payload.get("section_id"), "form_package_section_not_found")
+                section, error = _resolve_optional_fk(
+                    FormPackageSection,
+                    item_payload.get("section_id"),
+                    "form_package_section_not_found",
+                )
                 if error:
                     return error
             else:
-                section = section_map.get(str(item_payload.get("section_key") or "").strip())
+                section = section_map.get(
+                    str(item_payload.get("section_key") or "").strip()
+                )
             if section is None or section.version_id != version.id:
-                return JsonResponse({"error": "form_package_section_not_found"}, status=404)
+                return JsonResponse(
+                    {"error": "form_package_section_not_found"}, status=404
+                )
             item_group = None
             raw_group_key = str(item_payload.get("group_key") or "").strip()
             if item_payload.get("item_group_id"):
@@ -3094,7 +3608,11 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
                     return error
             elif raw_list_key:
                 choice_list = choice_list_map.get(raw_list_key)
-            item_key = str(item_payload.get("item_key") or slugify(str(item_payload.get("question_text") or "")) or "").strip()
+            item_key = str(
+                item_payload.get("item_key")
+                or slugify(str(item_payload.get("question_text") or ""))
+                or ""
+            ).strip()
             if not item_key:
                 return JsonResponse({"error": "item_key is required"}, status=400)
             field_type = str(item_payload.get("field_type") or "").strip()
@@ -3106,14 +3624,18 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
             validation_rules = item_payload.get("validation_rules") or {}
             config = item_payload.get("config") or {}
             if not isinstance(validation_rules, dict):
-                return JsonResponse({"error": "validation_rules must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "validation_rules must be an object"}, status=400
+                )
             if not isinstance(config, dict):
                 return JsonResponse({"error": "config must be an object"}, status=400)
             item.section = section
             item.item_group = item_group
             item.choice_list = choice_list
             item.item_key = item_key
-            item.oid = str(item_payload.get("oid") or f"ITEM.{item_key.replace('-', '_').upper()}").strip()
+            item.oid = str(
+                item_payload.get("oid") or f"ITEM.{item_key.replace('-', '_').upper()}"
+            ).strip()
             item.question_text = question_text
             item.prompt_text = str(item_payload.get("prompt_text") or "").strip()
             item.field_type = field_type
@@ -3124,16 +3646,22 @@ def _sync_form_package_version_definition(version: FormPackageVersion, payload: 
             item.required = bool(item_payload.get("required", False))
             item.validation_rules = validation_rules
             item.config = config
-            item.source_field_key = str(item_payload.get("source_field_key") or "").strip()
+            item.source_field_key = str(
+                item_payload.get("source_field_key") or ""
+            ).strip()
             error = _save_model(item)
             if error:
                 return error
             retained_item_ids.append(str(item.id))
-        FormPackageItem.objects.filter(version=version).exclude(id__in=retained_item_ids).delete()
+        FormPackageItem.objects.filter(version=version).exclude(
+            id__in=retained_item_ids
+        ).delete()
     return None
 
 
-def _build_workflow_template_from_payload(template: WorkflowTemplate, payload: dict[str, object]):
+def _build_workflow_template_from_payload(
+    template: WorkflowTemplate, payload: dict[str, object]
+):
     name = str(payload.get("name") or "").strip()
     if not name:
         return JsonResponse({"error": "name is required"}, status=400)
@@ -3158,7 +3686,9 @@ def _build_operation_definition_from_payload(
     code = str(payload.get("code") or "").strip()
     if not code:
         return JsonResponse({"error": "code is required"}, status=400)
-    module_scope = str(payload.get("module_scope") or OperationDefinition.ModuleScope.LIMS).strip()
+    module_scope = str(
+        payload.get("module_scope") or OperationDefinition.ModuleScope.LIMS
+    ).strip()
     if module_scope not in OperationDefinition.ModuleScope.values:
         return JsonResponse({"error": "invalid_module_scope"}, status=400)
     definition.name = name
@@ -3183,7 +3713,9 @@ def _apply_operation_version_from_payload(
         if error:
             return error
         if workflow_version is None:
-            return JsonResponse({"error": "workflow_version_id is required"}, status=400)
+            return JsonResponse(
+                {"error": "workflow_version_id is required"}, status=400
+            )
         version.workflow_version = workflow_version
     if "sop_document_id" in payload:
         sop_document, error = _resolve_optional_fk(
@@ -3216,13 +3748,17 @@ def _apply_operation_version_from_payload(
             version.sop_effective_date = None
         else:
             try:
-                version.sop_effective_date = datetime.fromisoformat(str(raw_effective_date)).date()
+                version.sop_effective_date = datetime.fromisoformat(
+                    str(raw_effective_date)
+                ).date()
             except ValueError:
                 return JsonResponse({"error": "invalid_sop_effective_date"}, status=400)
     if "runtime_defaults" in payload:
         runtime_defaults = payload.get("runtime_defaults") or {}
         if not isinstance(runtime_defaults, dict):
-            return JsonResponse({"error": "runtime_defaults must be an object"}, status=400)
+            return JsonResponse(
+                {"error": "runtime_defaults must be an object"}, status=400
+            )
         version.runtime_defaults = runtime_defaults
     if "change_summary" in payload:
         version.change_summary = str(payload.get("change_summary") or "").strip()
@@ -3235,7 +3771,9 @@ def _build_workflow_node_from_payload(
     *,
     index: int,
 ) -> JsonResponse | None:
-    node_key = str(payload.get("node_key") or slugify(str(payload.get("title") or "")) or "").strip()
+    node_key = str(
+        payload.get("node_key") or slugify(str(payload.get("title") or "")) or ""
+    ).strip()
     if not node_key:
         return JsonResponse({"error": "node_key is required"}, status=400)
     node_type = str(payload.get("node_type") or "").strip()
@@ -3260,7 +3798,9 @@ def _build_workflow_node_from_payload(
     return None
 
 
-def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: object) -> JsonResponse | None:
+def _sync_workflow_step_bindings(
+    node: WorkflowNodeTemplate, bindings_payload: object
+) -> JsonResponse | None:
     if bindings_payload is None:
         WorkflowStepBinding.objects.filter(node=node).delete()
         return None
@@ -3275,7 +3815,9 @@ def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: o
             try:
                 binding = WorkflowStepBinding.objects.get(id=binding_id, node=node)
             except (ValidationError, WorkflowStepBinding.DoesNotExist):
-                return JsonResponse({"error": "workflow_step_binding_not_found"}, status=404)
+                return JsonResponse(
+                    {"error": "workflow_step_binding_not_found"}, status=404
+                )
         else:
             binding = WorkflowStepBinding(node=node)
         form_package_version, error = _resolve_optional_fk(
@@ -3286,8 +3828,13 @@ def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: o
         if error:
             return error
         if form_package_version is None:
-            return JsonResponse({"error": "form_package_version_id is required"}, status=400)
-        binding_type = str(binding_payload.get("binding_type") or WorkflowStepBinding.BindingType.FULL_PACKAGE).strip()
+            return JsonResponse(
+                {"error": "form_package_version_id is required"}, status=400
+            )
+        binding_type = str(
+            binding_payload.get("binding_type")
+            or WorkflowStepBinding.BindingType.FULL_PACKAGE
+        ).strip()
         if binding_type not in WorkflowStepBinding.BindingType.values:
             return JsonResponse({"error": "invalid_binding_type"}, status=400)
         section_keys = binding_payload.get("section_keys") or []
@@ -3298,8 +3845,12 @@ def _sync_workflow_step_bindings(node: WorkflowNodeTemplate, bindings_payload: o
             ("item_group_keys", item_group_keys),
             ("item_keys", item_keys),
         ):
-            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-                return JsonResponse({"error": f"{field_name} must be a list of strings"}, status=400)
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) for item in value
+            ):
+                return JsonResponse(
+                    {"error": f"{field_name} must be a list of strings"}, status=400
+                )
         binding.form_package_version = form_package_version
         binding.binding_type = binding_type
         binding.section_keys = section_keys
@@ -3333,7 +3884,9 @@ def _sync_workflow_version_definition(
         node_id = node_payload.get("id")
         if node_id:
             try:
-                node = WorkflowNodeTemplate.objects.get(id=node_id, workflow_version=version)
+                node = WorkflowNodeTemplate.objects.get(
+                    id=node_id, workflow_version=version
+                )
             except (ValidationError, WorkflowNodeTemplate.DoesNotExist):
                 return JsonResponse({"error": "workflow_node_not_found"}, status=404)
         else:
@@ -3350,7 +3903,9 @@ def _sync_workflow_version_definition(
         retained_node_ids.append(str(node.id))
         node_by_key[node.node_key] = node
 
-    WorkflowNodeTemplate.objects.filter(workflow_version=version).exclude(id__in=retained_node_ids).delete()
+    WorkflowNodeTemplate.objects.filter(workflow_version=version).exclude(
+        id__in=retained_node_ids
+    ).delete()
 
     retained_edge_ids: list[str] = []
     for index, edge_payload in enumerate(edges_payload, start=1):
@@ -3359,7 +3914,9 @@ def _sync_workflow_version_definition(
         edge_id = edge_payload.get("id")
         if edge_id:
             try:
-                edge = WorkflowEdgeTemplate.objects.get(id=edge_id, workflow_version=version)
+                edge = WorkflowEdgeTemplate.objects.get(
+                    id=edge_id, workflow_version=version
+                )
             except (ValidationError, WorkflowEdgeTemplate.DoesNotExist):
                 return JsonResponse({"error": "workflow_edge_not_found"}, status=404)
         else:
@@ -3367,17 +3924,29 @@ def _sync_workflow_version_definition(
         source_node = None
         target_node = None
         if edge_payload.get("source_node_id"):
-            source_node, error = _resolve_optional_fk(WorkflowNodeTemplate, edge_payload.get("source_node_id"), "source_node_not_found")
+            source_node, error = _resolve_optional_fk(
+                WorkflowNodeTemplate,
+                edge_payload.get("source_node_id"),
+                "source_node_not_found",
+            )
             if error:
                 return error
         else:
-            source_node = node_by_key.get(str(edge_payload.get("source_node_key") or "").strip())
+            source_node = node_by_key.get(
+                str(edge_payload.get("source_node_key") or "").strip()
+            )
         if edge_payload.get("target_node_id"):
-            target_node, error = _resolve_optional_fk(WorkflowNodeTemplate, edge_payload.get("target_node_id"), "target_node_not_found")
+            target_node, error = _resolve_optional_fk(
+                WorkflowNodeTemplate,
+                edge_payload.get("target_node_id"),
+                "target_node_not_found",
+            )
             if error:
                 return error
         else:
-            target_node = node_by_key.get(str(edge_payload.get("target_node_key") or "").strip())
+            target_node = node_by_key.get(
+                str(edge_payload.get("target_node_key") or "").strip()
+            )
         if source_node is None or source_node.workflow_version_id != version.id:
             return JsonResponse({"error": "source_node_not_found"}, status=404)
         if target_node is None or target_node.workflow_version_id != version.id:
@@ -3393,7 +3962,9 @@ def _sync_workflow_version_definition(
         if error:
             return error
         retained_edge_ids.append(str(edge.id))
-    WorkflowEdgeTemplate.objects.filter(workflow_version=version).exclude(id__in=retained_edge_ids).delete()
+    WorkflowEdgeTemplate.objects.filter(workflow_version=version).exclude(
+        id__in=retained_edge_ids
+    ).delete()
     return None
 
 
@@ -3402,7 +3973,11 @@ def _clone_workflow_version_definition(
     target_version: WorkflowTemplateVersion,
 ) -> None:
     node_map: dict[str, WorkflowNodeTemplate] = {}
-    for node in source_version.nodes.prefetch_related("step_bindings").all().order_by("position", "node_key"):
+    for node in (
+        source_version.nodes.prefetch_related("step_bindings")
+        .all()
+        .order_by("position", "node_key")
+    ):
         cloned_node = WorkflowNodeTemplate.objects.create(
             workflow_version=target_version,
             node_key=node.node_key,
@@ -3427,7 +4002,11 @@ def _clone_workflow_version_definition(
                 item_keys=list(binding.item_keys or []),
                 is_required=binding.is_required,
             )
-    for edge in source_version.edges.select_related("source_node", "target_node").all().order_by("priority"):
+    for edge in (
+        source_version.edges.select_related("source_node", "target_node")
+        .all()
+        .order_by("priority")
+    ):
         WorkflowEdgeTemplate.objects.create(
             workflow_version=target_version,
             source_node=node_map[str(edge.source_node_id)],
@@ -3438,7 +4017,9 @@ def _clone_workflow_version_definition(
 
 
 def _operation_definition_queryset():
-    return OperationDefinition.objects.prefetch_related("versions__workflow_version__template").order_by("name")
+    return OperationDefinition.objects.prefetch_related(
+        "versions__workflow_version__template"
+    ).order_by("name")
 
 
 def _operation_run_queryset():
@@ -3458,7 +4039,9 @@ def _operation_run_queryset():
     )
 
 
-def _apply_field_definition_defaults(schema_field: MetadataSchemaField, field_definition: MetadataFieldDefinition) -> None:
+def _apply_field_definition_defaults(
+    schema_field: MetadataSchemaField, field_definition: MetadataFieldDefinition
+) -> None:
     schema_field.field_definition = field_definition
     schema_field.name = field_definition.name
     schema_field.description = field_definition.description
@@ -3489,7 +4072,9 @@ def _build_schema_field_from_payload(
             _apply_field_definition_defaults(schema_field, field_definition)
 
     name = str(field_payload.get("name") or schema_field.name or "").strip()
-    field_type = str(field_payload.get("field_type") or schema_field.field_type or "").strip()
+    field_type = str(
+        field_payload.get("field_type") or schema_field.field_type or ""
+    ).strip()
     field_key = str(field_payload.get("field_key") or slugify(name) or "").strip()
     if not name:
         return JsonResponse({"error": "field name is required"}, status=400)
@@ -3498,7 +4083,9 @@ def _build_schema_field_from_payload(
     if not field_key:
         return JsonResponse({"error": "field_key is required"}, status=400)
 
-    vocabulary, error = _resolve_optional_fk(MetadataVocabulary, field_payload.get("vocabulary_id"), "vocabulary_not_found")
+    vocabulary, error = _resolve_optional_fk(
+        MetadataVocabulary, field_payload.get("vocabulary_id"), "vocabulary_not_found"
+    )
     if error:
         return error
     if vocabulary is None and field_definition is not None:
@@ -3517,13 +4104,21 @@ def _build_schema_field_from_payload(
         return JsonResponse({"error": "config must be an object"}, status=400)
 
     schema_field.name = name
-    schema_field.description = str(field_payload.get("description") or schema_field.description or "").strip()
+    schema_field.description = str(
+        field_payload.get("description") or schema_field.description or ""
+    ).strip()
     schema_field.field_type = field_type
     schema_field.field_key = field_key
-    schema_field.help_text = str(field_payload.get("help_text") or schema_field.help_text or "").strip()
-    schema_field.placeholder = str(field_payload.get("placeholder") or schema_field.placeholder or "").strip()
+    schema_field.help_text = str(
+        field_payload.get("help_text") or schema_field.help_text or ""
+    ).strip()
+    schema_field.placeholder = str(
+        field_payload.get("placeholder") or schema_field.placeholder or ""
+    ).strip()
     schema_field.vocabulary = vocabulary
-    schema_field.default_value = field_payload.get("default_value", schema_field.default_value)
+    schema_field.default_value = field_payload.get(
+        "default_value", schema_field.default_value
+    )
     schema_field.config = config
     schema_field.position = int(field_payload.get("position") or index)
     schema_field.required = bool(field_payload.get("required", False))
@@ -3532,7 +4127,9 @@ def _build_schema_field_from_payload(
     return None
 
 
-def _sync_schema_version_fields(version: MetadataSchemaVersion, fields_payload: object) -> JsonResponse | None:
+def _sync_schema_version_fields(
+    version: MetadataSchemaVersion, fields_payload: object
+) -> JsonResponse | None:
     if not isinstance(fields_payload, list):
         return JsonResponse({"error": "fields must be a list"}, status=400)
     retained_ids: list[str] = []
@@ -3542,23 +4139,31 @@ def _sync_schema_version_fields(version: MetadataSchemaVersion, fields_payload: 
         field_id = field_payload.get("id")
         if field_id:
             try:
-                schema_field = MetadataSchemaField.objects.get(id=field_id, schema_version=version)
+                schema_field = MetadataSchemaField.objects.get(
+                    id=field_id, schema_version=version
+                )
             except (ValidationError, MetadataSchemaField.DoesNotExist):
                 return JsonResponse({"error": "schema_field_not_found"}, status=404)
         else:
             schema_field = MetadataSchemaField(schema_version=version)
-        error = _build_schema_field_from_payload(schema_field, field_payload, index=index)
+        error = _build_schema_field_from_payload(
+            schema_field, field_payload, index=index
+        )
         if error:
             return error
         error = _save_model(schema_field)
         if error:
             return error
         retained_ids.append(str(schema_field.id))
-    MetadataSchemaField.objects.filter(schema_version=version).exclude(id__in=retained_ids).delete()
+    MetadataSchemaField.objects.filter(schema_version=version).exclude(
+        id__in=retained_ids
+    ).delete()
     return None
 
 
-def _clone_schema_version_fields(source_version: MetadataSchemaVersion, target_version: MetadataSchemaVersion) -> None:
+def _clone_schema_version_fields(
+    source_version: MetadataSchemaVersion, target_version: MetadataSchemaVersion
+) -> None:
     for field in source_version.fields.all().order_by("position", "field_key"):
         MetadataSchemaField.objects.create(
             schema_version=target_version,
@@ -3581,9 +4186,9 @@ def _clone_schema_version_fields(source_version: MetadataSchemaVersion, target_v
 
 @csrf_exempt
 def lims_dashboard_summary(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.dashboard.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.dashboard.view")
     if forbidden:
         return forbidden
     return JsonResponse(_dashboard_payload(request))
@@ -3591,29 +4196,41 @@ def lims_dashboard_summary(request):
 
 @csrf_exempt
 def lims_dashboard_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.dashboard.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.dashboard.view")
     if forbidden:
         return forbidden
-    return render(request, 'lims/dashboard.html', _page_context(request, active_nav='lims-dashboard', payload=_dashboard_payload(request)))
+    return render(
+        request,
+        "lims/dashboard.html",
+        _page_context(
+            request, active_nav="lims-dashboard", payload=_dashboard_payload(request)
+        ),
+    )
 
 
 @csrf_exempt
 def lims_task_inbox_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.workflow_task.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.workflow_task.view")
     if forbidden:
         return forbidden
-    return render(request, 'lims/task_inbox.html', _page_context(request, active_nav='lims-tasks', payload=_task_inbox_page_payload(request)))
+    return render(
+        request,
+        "lims/task_inbox.html",
+        _page_context(
+            request, active_nav="lims-tasks", payload=_task_inbox_page_payload(request)
+        ),
+    )
 
 
 @csrf_exempt
 def lims_task_detail_page(request, operation_id: str, run_id: str, task_id: str):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.workflow_task.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.workflow_task.view")
     if forbidden:
         return forbidden
     try:
@@ -3623,354 +4240,457 @@ def lims_task_detail_page(request, operation_id: str, run_id: str, task_id: str)
             operation_run__operation_version__definition_id=operation_id,
         )
     except (ValidationError, TaskRun.DoesNotExist):
-        return JsonResponse({'error': 'task_run_not_found'}, status=404)
+        return JsonResponse({"error": "task_run_not_found"}, status=404)
     return render(
         request,
-        'lims/task_detail.html',
-        _page_context(request, active_nav='lims-tasks', payload=_task_detail_page_payload(request, task_run)),
+        "lims/task_detail.html",
+        _page_context(
+            request,
+            active_nav="lims-tasks",
+            payload=_task_detail_page_payload(request, task_run),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_launchpad_payload(request)),
+        "lims/reference.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_launchpad_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_sample_accession_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference_sample_accession.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_sample_accession_page_payload(request)),
+        "lims/reference_sample_accession.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_sample_accession_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_create_lab_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference_create_lab.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_create_lab_page_payload(request)),
+        "lims/reference_create_lab.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_create_lab_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_create_study_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference_create_study.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_create_study_page_payload(request)),
+        "lims/reference_create_study.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_create_study_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_create_site_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference_create_site.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_create_site_page_payload(request)),
+        "lims/reference_create_site.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_create_site_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_reference_address_sync_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.reference.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.reference.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/reference_address_sync.html',
-        _page_context(request, active_nav='lims-reference', payload=_reference_address_sync_page_payload(request)),
+        "lims/reference_address_sync.html",
+        _page_context(
+            request,
+            active_nav="lims-reference",
+            payload=_reference_address_sync_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_launchpad_payload(request)),
+        "lims/metadata.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_launchpad_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_create_vocabulary_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata_create_vocabulary.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_vocabulary_page_payload(request)),
+        "lims/metadata_create_vocabulary.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_create_vocabulary_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_create_field_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata_create_field.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_field_page_payload(request)),
+        "lims/metadata_create_field.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_create_field_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_create_schema_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata_create_schema.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_schema_page_payload(request)),
+        "lims/metadata_create_schema.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_create_schema_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_create_binding_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata_create_binding.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_create_binding_page_payload(request)),
+        "lims/metadata_create_binding.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_create_binding_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_metadata_publish_version_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.metadata.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.metadata.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/metadata_publish_version.html',
-        _page_context(request, active_nav='lims-metadata', payload=_metadata_publish_version_page_payload(request)),
+        "lims/metadata_publish_version.html",
+        _page_context(
+            request,
+            active_nav="lims-metadata",
+            payload=_metadata_publish_version_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_biospecimens_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/biospecimens.html',
-        _page_context(request, active_nav='lims-biospecimens', payload=_biospecimens_page_payload(request)),
+        "lims/biospecimens.html",
+        _page_context(
+            request,
+            active_nav="lims-biospecimens",
+            payload=_biospecimens_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_receiving_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/receiving.html',
-        _page_context(request, active_nav='lims-receiving', payload=_receiving_launchpad_payload(request)),
+        "lims/receiving.html",
+        _page_context(
+            request,
+            active_nav="lims-receiving",
+            payload=_receiving_launchpad_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_receiving_single_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/receiving_single.html',
-        _page_context(request, active_nav='lims-receiving', payload=_receiving_single_page_payload(request)),
+        "lims/receiving_single.html",
+        _page_context(
+            request,
+            active_nav="lims-receiving",
+            payload=_receiving_single_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_receiving_batch_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/receiving_batch.html',
-        _page_context(request, active_nav='lims-receiving', payload=_receiving_batch_page_payload(request)),
+        "lims/receiving_batch.html",
+        _page_context(
+            request,
+            active_nav="lims-receiving",
+            payload=_receiving_batch_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_receiving_edc_import_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/receiving_edc_import.html',
-        _page_context(request, active_nav='lims-receiving', payload=_receiving_edc_import_page_payload(request)),
+        "lims/receiving_edc_import.html",
+        _page_context(
+            request,
+            active_nav="lims-receiving",
+            payload=_receiving_edc_import_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_processing_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.artifact.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/processing.html',
-        _page_context(request, active_nav='lims-processing', payload=_processing_page_payload(request)),
+        "lims/processing.html",
+        _page_context(
+            request,
+            active_nav="lims-processing",
+            payload=_processing_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_inventory_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    if not (_has_permission(request, 'lims.storage.view') or _has_permission(request, 'lims.inventory.view')):
-        return JsonResponse({'error': 'forbidden'}, status=403)
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not (
+        _has_permission(request, "lims.storage.view")
+        or _has_permission(request, "lims.inventory.view")
+    ):
+        return JsonResponse({"error": "forbidden"}, status=403)
     return render(
         request,
-        'lims/storage_inventory.html',
-        _page_context(request, active_nav='lims-storage', payload=_storage_inventory_page_payload(request)),
+        "lims/storage_inventory.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_storage_inventory_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_create_location_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.storage.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.storage.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/storage_create_location.html',
-        _page_context(request, active_nav='lims-storage', payload=_storage_location_create_page_payload(request)),
+        "lims/storage_create_location.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_storage_location_create_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_create_placement_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.storage.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.storage.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/storage_create_placement.html',
-        _page_context(request, active_nav='lims-storage', payload=_storage_placement_create_page_payload(request)),
+        "lims/storage_create_placement.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_storage_placement_create_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_create_material_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.inventory.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/storage_create_material.html',
-        _page_context(request, active_nav='lims-storage', payload=_inventory_material_create_page_payload(request)),
+        "lims/storage_create_material.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_inventory_material_create_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_create_lot_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.inventory.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/storage_create_lot.html',
-        _page_context(request, active_nav='lims-storage', payload=_inventory_lot_create_page_payload(request)),
+        "lims/storage_create_lot.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_inventory_lot_create_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_storage_create_transaction_page(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.inventory.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.inventory.view")
     if forbidden:
         return forbidden
     return render(
         request,
-        'lims/storage_create_transaction.html',
-        _page_context(request, active_nav='lims-storage', payload=_inventory_transaction_create_page_payload(request)),
+        "lims/storage_create_transaction.html",
+        _page_context(
+            request,
+            active_nav="lims-storage",
+            payload=_inventory_transaction_create_page_payload(request),
+        ),
     )
 
 
 @csrf_exempt
 def lims_permissions_summary(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'method_not_allowed'}, status=405)
-    forbidden = require_lims_permission(request, 'lims.dashboard.view')
+    if request.method != "GET":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    forbidden = require_lims_permission(request, "lims.dashboard.view")
     if forbidden:
         return forbidden
     return JsonResponse(permission_summary_for_roles(request_roles(request)))
@@ -3984,7 +4704,9 @@ def lims_reference_labs(request):
             return forbidden
         items = [
             _lab_to_dict(item)
-            for item in Lab.objects.select_related("country", "region", "district", "ward", "street").order_by("name")
+            for item in Lab.objects.select_related(
+                "country", "region", "district", "ward", "street"
+            ).order_by("name")
         ]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -4039,7 +4761,10 @@ def lims_reference_studies(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [_study_to_dict(item) for item in Study.objects.select_related("lead_lab").order_by("name")]
+        items = [
+            _study_to_dict(item)
+            for item in Study.objects.select_related("lead_lab").order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -4095,7 +4820,9 @@ def lims_reference_sites(request):
             return forbidden
         items = [
             _site_to_dict(item)
-            for item in Site.objects.select_related("study", "lab", "country", "region", "district", "ward", "street")
+            for item in Site.objects.select_related(
+                "study", "lab", "country", "region", "district", "ward", "street"
+            )
             .prefetch_related("studies")
             .order_by("name")
         ]
@@ -4164,55 +4891,91 @@ def lims_reference_select_options(request):
     if source == "labs":
         queryset = Lab.objects.order_by("name")
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
-        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(code__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, item.code) for item in queryset[:limit]
+        ]
     elif source == "studies":
         queryset = Study.objects.order_by("name")
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
-        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(code__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, item.code) for item in queryset[:limit]
+        ]
     elif source == "sites":
         queryset = Site.objects.order_by("name")
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
-        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(code__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, item.code) for item in queryset[:limit]
+        ]
     elif source == "countries":
         queryset = Country.objects.order_by("name")
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_option(str(item.id), item.name, item.code) for item in queryset[:limit]]
+        items = [
+            _option(str(item.id), item.name, item.code) for item in queryset[:limit]
+        ]
     elif source == "regions":
         queryset = Region.objects.select_related("country").order_by("name")
         if request.GET.get("country_id"):
             queryset = queryset.filter(country_id=request.GET["country_id"])
         if query:
             queryset = queryset.filter(name__icontains=query)
-        items = [_option(str(item.id), item.name, item.country.name) for item in queryset[:limit]]
+        items = [
+            _option(str(item.id), item.name, item.country.name)
+            for item in queryset[:limit]
+        ]
     elif source == "districts":
-        queryset = District.objects.select_related("region", "region__country").order_by("name")
+        queryset = District.objects.select_related(
+            "region", "region__country"
+        ).order_by("name")
         if request.GET.get("region_id"):
             queryset = queryset.filter(region_id=request.GET["region_id"])
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(region__name__icontains=query))
-        items = [_option(str(item.id), item.name, item.region.name) for item in queryset[:limit]]
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(region__name__icontains=query)
+            )
+        items = [
+            _option(str(item.id), item.name, item.region.name)
+            for item in queryset[:limit]
+        ]
     elif source == "wards":
-        queryset = Ward.objects.select_related("district", "district__region").order_by("name")
+        queryset = Ward.objects.select_related("district", "district__region").order_by(
+            "name"
+        )
         if request.GET.get("district_id"):
             queryset = queryset.filter(district_id=request.GET["district_id"])
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(district__name__icontains=query))
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(district__name__icontains=query)
+            )
         items = [
-            _option(str(item.id), item.name, f"{item.district.name} / {item.district.region.name}")
+            _option(
+                str(item.id),
+                item.name,
+                f"{item.district.name} / {item.district.region.name}",
+            )
             for item in queryset[:limit]
         ]
     elif source == "streets":
-        queryset = Street.objects.select_related("ward", "ward__district", "ward__district__region").order_by("name")
+        queryset = Street.objects.select_related(
+            "ward", "ward__district", "ward__district__region"
+        ).order_by("name")
         if request.GET.get("ward_id"):
             queryset = queryset.filter(ward_id=request.GET["ward_id"])
         if request.GET.get("district_id"):
             queryset = queryset.filter(ward__district_id=request.GET["district_id"])
         if request.GET.get("region_id"):
-            queryset = queryset.filter(ward__district__region_id=request.GET["region_id"])
+            queryset = queryset.filter(
+                ward__district__region_id=request.GET["region_id"]
+            )
         if query:
             queryset = queryset.filter(
                 Q(name__icontains=query)
@@ -4221,16 +4984,25 @@ def lims_reference_select_options(request):
                 | Q(ward__district__region__name__icontains=query)
             )
         items = [
-            _option(str(item.id), item.name, f"{item.ward.name} / {item.ward.district.name} / {item.ward.district.region.name}")
+            _option(
+                str(item.id),
+                item.name,
+                f"{item.ward.name} / {item.ward.district.name} / {item.ward.district.region.name}",
+            )
             for item in queryset[:limit]
         ]
     elif source == "postcodes":
-        queryset = Postcode.objects.select_related("street", "street__ward", "street__ward__district").order_by("code")
+        queryset = Postcode.objects.select_related(
+            "street", "street__ward", "street__ward__district"
+        ).order_by("code")
         if request.GET.get("street_id"):
             queryset = queryset.filter(street_id=request.GET["street_id"])
         if query:
             queryset = queryset.filter(code__icontains=query)
-        items = [_option(str(item.id), item.code, item.street.name) for item in queryset[:limit]]
+        items = [
+            _option(str(item.id), item.code, item.street.name)
+            for item in queryset[:limit]
+        ]
     else:
         return JsonResponse({"error": "unsupported_source"}, status=400)
     return JsonResponse({"source": source, "items": items, "results": items})
@@ -4242,7 +5014,10 @@ def lims_reference_address_sync_runs(request):
         forbidden = require_lims_permission(request, "lims.reference.view")
         if forbidden:
             return forbidden
-        items = [sync_run_to_dict(item) for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")]
+        items = [
+            sync_run_to_dict(item)
+            for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.reference.manage")
@@ -4257,17 +5032,24 @@ def lims_reference_address_sync_runs(request):
         request_budget = int(payload.get("request_budget") or 10)
         throttle_seconds = int(payload.get("throttle_seconds") or 2)
         if request_budget < 1 or request_budget > 25:
-            return JsonResponse({"error": "request_budget must be between 1 and 25"}, status=400)
+            return JsonResponse(
+                {"error": "request_budget must be between 1 and 25"}, status=400
+            )
         if throttle_seconds < 1 or throttle_seconds > 30:
-            return JsonResponse({"error": "throttle_seconds must be between 1 and 30"}, status=400)
+            return JsonResponse(
+                {"error": "throttle_seconds must be between 1 and 30"}, status=400
+            )
         run = TanzaniaAddressSyncRun.objects.create(
             mode=mode,
             request_budget=request_budget,
             throttle_seconds=throttle_seconds,
-            triggered_by=getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", ""),
+            triggered_by=getattr(request, "auth_user_id", None)
+            or request.headers.get("X-User-Id", ""),
         )
         sync_tanzania_address_run.delay(
-            tenant_schema=getattr(getattr(request, "tenant", None), "schema_name", "public"),
+            tenant_schema=getattr(
+                getattr(request, "tenant", None), "schema_name", "public"
+            ),
             run_id=str(run.id),
         )
         return JsonResponse(sync_run_to_dict(run), status=201)
@@ -4280,15 +5062,21 @@ def lims_metadata_vocabulary_domains(request):
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
-        search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
-        queryset = MetadataVocabularyDomain.objects.prefetch_related("vocabularies").order_by("name")
+        search_term = str(
+            request.GET.get("search") or request.GET.get("q") or ""
+        ).strip()
+        queryset = MetadataVocabularyDomain.objects.prefetch_related(
+            "vocabularies"
+        ).order_by("name")
         if search_term:
             queryset = queryset.filter(
                 Q(name__icontains=search_term)
                 | Q(code__icontains=search_term)
                 | Q(description__icontains=search_term)
             )
-        return JsonResponse({"items": [_vocabulary_domain_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_vocabulary_domain_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.metadata.manage")
         if forbidden:
@@ -4318,7 +5106,9 @@ def lims_metadata_vocabulary_domains(request):
 @csrf_exempt
 def lims_metadata_vocabulary_domain_detail(request, domain_id: str):
     try:
-        domain = MetadataVocabularyDomain.objects.prefetch_related("vocabularies").get(id=domain_id)
+        domain = MetadataVocabularyDomain.objects.prefetch_related("vocabularies").get(
+            id=domain_id
+        )
     except (ValidationError, MetadataVocabularyDomain.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -4357,8 +5147,14 @@ def lims_metadata_vocabularies(request):
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
-        queryset = MetadataVocabulary.objects.select_related("domain").prefetch_related("items").order_by("name")
-        search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
+        queryset = (
+            MetadataVocabulary.objects.select_related("domain")
+            .prefetch_related("items")
+            .order_by("name")
+        )
+        search_term = str(
+            request.GET.get("search") or request.GET.get("q") or ""
+        ).strip()
         raw_domain_id = str(request.GET.get("domain_id") or "").strip()
         raw_domain_code = str(request.GET.get("domain_code") or "").strip()
         if raw_domain_id:
@@ -4402,7 +5198,11 @@ def lims_metadata_vocabularies(request):
 @csrf_exempt
 def lims_metadata_vocabulary_detail(request, vocabulary_id: str):
     try:
-        vocabulary = MetadataVocabulary.objects.select_related("domain").prefetch_related("items").get(id=vocabulary_id)
+        vocabulary = (
+            MetadataVocabulary.objects.select_related("domain")
+            .prefetch_related("items")
+            .get(id=vocabulary_id)
+        )
     except (ValidationError, MetadataVocabulary.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -4434,7 +5234,9 @@ def lims_metadata_vocabulary_detail(request, vocabulary_id: str):
 @csrf_exempt
 def lims_metadata_vocabulary_items(request, vocabulary_id: str):
     try:
-        vocabulary = MetadataVocabulary.objects.select_related("domain").get(id=vocabulary_id)
+        vocabulary = MetadataVocabulary.objects.select_related("domain").get(
+            id=vocabulary_id
+        )
     except (ValidationError, MetadataVocabulary.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method != "GET":
@@ -4449,14 +5251,20 @@ def lims_metadata_vocabulary_items(request, vocabulary_id: str):
     if isinstance(offset, JsonResponse):
         return offset
     search_term = str(request.GET.get("search") or request.GET.get("q") or "").strip()
-    include_inactive = str(request.GET.get("include_inactive") or "").strip().lower() in {"1", "true", "yes"}
+    include_inactive = str(
+        request.GET.get("include_inactive") or ""
+    ).strip().lower() in {"1", "true", "yes"}
     queryset = vocabulary.items.order_by("sort_order", "label")
     if not include_inactive:
         queryset = queryset.filter(is_active=True)
     if search_term:
-        queryset = queryset.filter(Q(label__icontains=search_term) | Q(value__icontains=search_term))
+        queryset = queryset.filter(
+            Q(label__icontains=search_term) | Q(value__icontains=search_term)
+        )
     total_count = queryset.count()
-    items = [_vocabulary_item_to_dict(item) for item in queryset[offset: offset + limit]]
+    items = [
+        _vocabulary_item_to_dict(item) for item in queryset[offset : offset + limit]
+    ]
     return JsonResponse(
         {
             "vocabulary": _vocabulary_to_dict(vocabulary),
@@ -4495,7 +5303,9 @@ def lims_metadata_field_definitions(request):
             return forbidden
         items = [
             _field_definition_to_dict(item)
-            for item in MetadataFieldDefinition.objects.select_related("vocabulary").order_by("name")
+            for item in MetadataFieldDefinition.objects.select_related(
+                "vocabulary"
+            ).order_by("name")
         ]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -4519,7 +5329,9 @@ def lims_metadata_field_definitions(request):
 @csrf_exempt
 def lims_metadata_field_definition_detail(request, definition_id: str):
     try:
-        field = MetadataFieldDefinition.objects.select_related("vocabulary").get(id=definition_id)
+        field = MetadataFieldDefinition.objects.select_related("vocabulary").get(
+            id=definition_id
+        )
     except (ValidationError, MetadataFieldDefinition.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -4550,7 +5362,10 @@ def lims_operations(request):
         forbidden = require_lims_permission(request, "lims.operation.view")
         if forbidden:
             return forbidden
-        items = [_operation_definition_to_dict(item) for item in _operation_definition_queryset()]
+        items = [
+            _operation_definition_to_dict(item)
+            for item in _operation_definition_queryset()
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.operation.manage")
@@ -4570,7 +5385,9 @@ def lims_operations(request):
             definition=definition,
             version_number=1,
             status=OperationVersion.Status.DRAFT,
-            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+            change_summary=str(
+                payload.get("change_summary") or "Initial draft"
+            ).strip(),
         )
         error = _apply_operation_version_from_payload(version, payload)
         if error:
@@ -4624,13 +5441,17 @@ def lims_operation_versions(request, operation_id: str):
         forbidden = require_lims_permission(request, "lims.operation.view")
         if forbidden:
             return forbidden
-        queryset = definition.versions.select_related("workflow_version__template").order_by("-version_number")
+        queryset = definition.versions.select_related(
+            "workflow_version__template"
+        ).order_by("-version_number")
         status_filter = str(request.GET.get("status") or "").strip()
         if status_filter:
             if status_filter not in OperationVersion.Status.values:
                 return JsonResponse({"error": "invalid_status"}, status=400)
             queryset = queryset.filter(status=status_filter)
-        return JsonResponse({"items": [_operation_version_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_operation_version_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.operation.manage")
         if forbidden:
@@ -4643,13 +5464,17 @@ def lims_operation_versions(request, operation_id: str):
         source_version = None
         if payload.get("source_version_id"):
             try:
-                source_version = definition.versions.get(id=payload["source_version_id"])
+                source_version = definition.versions.get(
+                    id=payload["source_version_id"]
+                )
             except (ValidationError, OperationVersion.DoesNotExist):
                 return JsonResponse({"error": "source_version_not_found"}, status=404)
         version_number = payload.get("version_number")
         if version_number is None:
             latest_version = definition.versions.order_by("-version_number").first()
-            version_number = (latest_version.version_number if latest_version else 0) + 1
+            version_number = (
+                latest_version.version_number if latest_version else 0
+            ) + 1
         try:
             version_number = int(version_number)
         except (TypeError, ValueError):
@@ -4699,7 +5524,9 @@ def lims_operation_version_detail(request, operation_id: str, version_id: str):
         if forbidden:
             return forbidden
         if version.status != OperationVersion.Status.DRAFT:
-            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+            return JsonResponse(
+                {"error": "published_versions_are_immutable"}, status=400
+            )
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
@@ -4722,17 +5549,24 @@ def lims_operation_version_publish(request, operation_id: str, version_id: str):
     if forbidden:
         return forbidden
     try:
-        version = OperationVersion.objects.select_related("definition", "workflow_version__template").get(
+        version = OperationVersion.objects.select_related(
+            "definition", "workflow_version__template"
+        ).get(
             id=version_id,
             definition_id=operation_id,
         )
     except (ValidationError, OperationVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if version.status != OperationVersion.Status.DRAFT:
-        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+        return JsonResponse(
+            {"error": "only_draft_versions_can_be_published"}, status=400
+        )
     result = validate_operation_version(version)
     if not result.valid:
-        return JsonResponse({"error": "operation_validation_failed", "details": result.errors}, status=400)
+        return JsonResponse(
+            {"error": "operation_validation_failed", "details": result.errors},
+            status=400,
+        )
     OperationVersion.objects.filter(
         definition_id=operation_id,
         status=OperationVersion.Status.PUBLISHED,
@@ -4753,13 +5587,19 @@ def lims_operation_runs(request, operation_id: str):
         forbidden = require_lims_permission(request, "lims.operation_run.view")
         if forbidden:
             return forbidden
-        queryset = _operation_run_queryset().filter(operation_version__definition_id=operation_id).order_by("-created_at")
+        queryset = (
+            _operation_run_queryset()
+            .filter(operation_version__definition_id=operation_id)
+            .order_by("-created_at")
+        )
         status_filter = str(request.GET.get("status") or "").strip()
         if status_filter:
             if status_filter not in OperationRun.Status.values:
                 return JsonResponse({"error": "invalid_status"}, status=400)
             queryset = queryset.filter(status=status_filter)
-        return JsonResponse({"items": [_operation_run_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_operation_run_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.operation_run.manage")
         if forbidden:
@@ -4770,21 +5610,32 @@ def lims_operation_runs(request, operation_id: str):
         operation_version = None
         if payload.get("operation_version_id"):
             try:
-                operation_version = definition.versions.select_related("workflow_version__template").get(
-                    id=payload["operation_version_id"]
-                )
+                operation_version = definition.versions.select_related(
+                    "workflow_version__template"
+                ).get(id=payload["operation_version_id"])
             except (ValidationError, OperationVersion.DoesNotExist):
-                return JsonResponse({"error": "operation_version_not_found"}, status=404)
+                return JsonResponse(
+                    {"error": "operation_version_not_found"}, status=404
+                )
         else:
-            operation_version = definition.versions.select_related("workflow_version__template").filter(
-                status=OperationVersion.Status.PUBLISHED
-            ).order_by("-version_number").first()
+            operation_version = (
+                definition.versions.select_related("workflow_version__template")
+                .filter(status=OperationVersion.Status.PUBLISHED)
+                .order_by("-version_number")
+                .first()
+            )
             if operation_version is None:
-                return JsonResponse({"error": "published_operation_version_not_found"}, status=404)
-        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+                return JsonResponse(
+                    {"error": "published_operation_version_not_found"}, status=404
+                )
+        biospecimen, error = _resolve_optional_fk(
+            Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found"
+        )
         if error:
             return error
-        manifest, error = _resolve_optional_fk(AccessioningManifest, payload.get("manifest_id"), "manifest_not_found")
+        manifest, error = _resolve_optional_fk(
+            AccessioningManifest, payload.get("manifest_id"), "manifest_not_found"
+        )
         if error:
             return error
         manifest_item, error = _resolve_optional_fk(
@@ -4802,8 +5653,12 @@ def lims_operation_runs(request, operation_id: str):
                 operation_version,
                 initiated_by=(request.headers.get("X-User-Id") or "").strip(),
                 subject_identifier=str(payload.get("subject_identifier") or "").strip(),
-                external_identifier=str(payload.get("external_identifier") or "").strip(),
-                source_mode=str(payload.get("source_mode") or OperationRun.SourceMode.SINGLE).strip(),
+                external_identifier=str(
+                    payload.get("external_identifier") or ""
+                ).strip(),
+                source_mode=str(
+                    payload.get("source_mode") or OperationRun.SourceMode.SINGLE
+                ).strip(),
                 source_reference=str(payload.get("source_reference") or "").strip(),
                 biospecimen=biospecimen,
                 manifest=manifest,
@@ -4820,7 +5675,9 @@ def lims_operation_runs(request, operation_id: str):
 @csrf_exempt
 def lims_operation_run_detail(request, operation_id: str, run_id: str):
     try:
-        run = _operation_run_queryset().get(id=run_id, operation_version__definition_id=operation_id)
+        run = _operation_run_queryset().get(
+            id=run_id, operation_version__definition_id=operation_id
+        )
     except (ValidationError, OperationRun.DoesNotExist):
         return JsonResponse({"error": "run_not_found"}, status=404)
     if request.method == "GET":
@@ -4839,14 +5696,16 @@ def lims_operation_run_qc_results(request, operation_id: str, run_id: str):
     if forbidden:
         return forbidden
     try:
-        run = OperationRun.objects.get(id=run_id, operation_version__definition_id=operation_id)
+        run = OperationRun.objects.get(
+            id=run_id, operation_version__definition_id=operation_id
+        )
     except (ValidationError, OperationRun.DoesNotExist):
         return JsonResponse({"error": "run_not_found"}, status=404)
     items = [
         _qc_result_to_dict(item)
-        for item in QCResult.objects.select_related("submission_record", "discrepancy").filter(
-            operation_run=run
-        ).order_by("-reviewed_at", "-created_at")
+        for item in QCResult.objects.select_related("submission_record", "discrepancy")
+        .filter(operation_run=run)
+        .order_by("-reviewed_at", "-created_at")
     ]
     return JsonResponse({"items": items})
 
@@ -4862,7 +5721,11 @@ def lims_operation_task_submit(request, operation_id: str, run_id: str, task_id:
         task_run = TaskRun.objects.select_related(
             "operation_run",
             "node_template",
-        ).get(id=task_id, operation_run_id=run_id, operation_run__operation_version__definition_id=operation_id)
+        ).get(
+            id=task_id,
+            operation_run_id=run_id,
+            operation_run__operation_version__definition_id=operation_id,
+        )
     except (ValidationError, TaskRun.DoesNotExist):
         return JsonResponse({"error": "task_run_not_found"}, status=404)
     payload = _parse_json_body(request)
@@ -4913,7 +5776,9 @@ def lims_operation_task_approve(request, operation_id: str, run_id: str, task_id
             task_run,
             outcome=outcome,
             approved_by=(request.headers.get("X-User-Id") or "").strip(),
-            approver_role=(request.headers.get("X-User-Roles") or "").split(",")[0].strip(),
+            approver_role=(request.headers.get("X-User-Roles") or "")
+            .split(",")[0]
+            .strip(),
             meaning=str(payload.get("meaning") or "").strip(),
             comments=str(payload.get("comments") or "").strip(),
         )
@@ -4956,7 +5821,9 @@ def lims_workflow_templates(request):
             template=template,
             version_number=1,
             status=WorkflowTemplateVersion.Status.DRAFT,
-            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+            change_summary=str(
+                payload.get("change_summary") or "Initial draft"
+            ).strip(),
         )
         error = _save_model(initial_version)
         if error:
@@ -5031,7 +5898,9 @@ def lims_workflow_template_versions(request, template_id: str):
             if status_filter not in WorkflowTemplateVersion.Status.values:
                 return JsonResponse({"error": "invalid_status"}, status=400)
             queryset = queryset.filter(status=status_filter)
-        return JsonResponse({"items": [_workflow_template_version_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_workflow_template_version_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.workflow_config.manage")
         if forbidden:
@@ -5039,7 +5908,9 @@ def lims_workflow_template_versions(request, template_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        if template.versions.filter(status=WorkflowTemplateVersion.Status.DRAFT).exists():
+        if template.versions.filter(
+            status=WorkflowTemplateVersion.Status.DRAFT
+        ).exists():
             return JsonResponse({"error": "draft_version_already_exists"}, status=409)
         source_version = None
         if payload.get("source_version_id"):
@@ -5054,7 +5925,9 @@ def lims_workflow_template_versions(request, template_id: str):
         version_number = payload.get("version_number")
         if version_number is None:
             latest_version = template.versions.order_by("-version_number").first()
-            version_number = (latest_version.version_number if latest_version else 0) + 1
+            version_number = (
+                latest_version.version_number if latest_version else 0
+            ) + 1
         try:
             version_number = int(version_number)
         except (TypeError, ValueError):
@@ -5106,7 +5979,9 @@ def lims_workflow_template_version_detail(request, template_id: str, version_id:
         if forbidden:
             return forbidden
         if version.status != WorkflowTemplateVersion.Status.DRAFT:
-            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+            return JsonResponse(
+                {"error": "published_versions_are_immutable"}, status=400
+            )
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
@@ -5118,8 +5993,14 @@ def lims_workflow_template_version_detail(request, template_id: str, version_id:
         if "nodes" in payload or "edges" in payload:
             error = _sync_workflow_version_definition(
                 version,
-                nodes_payload=payload.get("nodes", [_workflow_node_to_dict(node) for node in version.nodes.all()]),
-                edges_payload=payload.get("edges", [_workflow_edge_to_dict(edge) for edge in version.edges.all()]),
+                nodes_payload=payload.get(
+                    "nodes",
+                    [_workflow_node_to_dict(node) for node in version.nodes.all()],
+                ),
+                edges_payload=payload.get(
+                    "edges",
+                    [_workflow_edge_to_dict(edge) for edge in version.edges.all()],
+                ),
             )
             if error:
                 return error
@@ -5147,10 +6028,15 @@ def lims_workflow_template_version_publish(request, template_id: str, version_id
     except (ValidationError, WorkflowTemplateVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if version.status != WorkflowTemplateVersion.Status.DRAFT:
-        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+        return JsonResponse(
+            {"error": "only_draft_versions_can_be_published"}, status=400
+        )
     result = validate_workflow_template_version(version)
     if not result.valid:
-        return JsonResponse({"error": "workflow_validation_failed", "details": result.errors}, status=400)
+        return JsonResponse(
+            {"error": "workflow_validation_failed", "details": result.errors},
+            status=400,
+        )
     WorkflowTemplateVersion.objects.filter(
         template_id=template_id,
         status=WorkflowTemplateVersion.Status.PUBLISHED,
@@ -5199,7 +6085,9 @@ def lims_form_packages(request):
             package=package,
             version_number=1,
             status=FormPackageVersion.Status.DRAFT,
-            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+            change_summary=str(
+                payload.get("change_summary") or "Initial draft"
+            ).strip(),
         )
         error = _apply_form_package_version_from_payload(initial_version, payload)
         if error:
@@ -5221,8 +6109,12 @@ def lims_form_packages(request):
                 filename=f"{initial_version.source_schema_version.schema.code}-v{initial_version.source_schema_version.version_number}.json",
                 content_type="application/json",
                 artifact_metadata={
-                    "source_schema_id": str(initial_version.source_schema_version.schema_id),
-                    "source_schema_version_id": str(initial_version.source_schema_version_id),
+                    "source_schema_id": str(
+                        initial_version.source_schema_version.schema_id
+                    ),
+                    "source_schema_version_id": str(
+                        initial_version.source_schema_version_id
+                    ),
                     "source_kind": "metadata_schema_version",
                 },
             )
@@ -5232,7 +6124,9 @@ def lims_form_packages(request):
                 initial_version.delete()
                 package.delete()
                 return error
-            error = _sync_form_package_source_artifacts(initial_version, payload.get("source_artifacts"))
+            error = _sync_form_package_source_artifacts(
+                initial_version, payload.get("source_artifacts")
+            )
             if error:
                 initial_version.delete()
                 package.delete()
@@ -5302,7 +6196,9 @@ def lims_form_package_versions(request, package_id: str):
             if status_filter not in FormPackageVersion.Status.values:
                 return JsonResponse({"error": "invalid_status"}, status=400)
             queryset = queryset.filter(status=status_filter)
-        return JsonResponse({"items": [_form_package_version_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_form_package_version_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.metadata.manage")
         if forbidden:
@@ -5315,13 +6211,17 @@ def lims_form_package_versions(request, package_id: str):
         source_version = None
         if payload.get("source_version_id"):
             try:
-                source_version = FormPackageVersion.objects.get(id=payload["source_version_id"], package=package)
+                source_version = FormPackageVersion.objects.get(
+                    id=payload["source_version_id"], package=package
+                )
             except (ValidationError, FormPackageVersion.DoesNotExist):
                 return JsonResponse({"error": "source_version_not_found"}, status=404)
         version_number = payload.get("version_number")
         if version_number is None:
             latest_version = package.versions.order_by("-version_number").first()
-            version_number = (latest_version.version_number if latest_version else 0) + 1
+            version_number = (
+                latest_version.version_number if latest_version else 0
+            ) + 1
         try:
             version_number = int(version_number)
         except (TypeError, ValueError):
@@ -5339,7 +6239,9 @@ def lims_form_package_versions(request, package_id: str):
         if error:
             return error
         if source_version is not None:
-            clone_form_package_version(source_version=source_version, target_version=version)
+            clone_form_package_version(
+                source_version=source_version, target_version=version
+            )
         elif version.source_schema_version_id:
             bootstrap_form_package_version_from_schema_version(
                 schema_version=version.source_schema_version,
@@ -5362,7 +6264,9 @@ def lims_form_package_versions(request, package_id: str):
             if error:
                 version.delete()
                 return error
-            error = _sync_form_package_source_artifacts(version, payload.get("source_artifacts"))
+            error = _sync_form_package_source_artifacts(
+                version, payload.get("source_artifacts")
+            )
             if error:
                 version.delete()
                 return error
@@ -5374,15 +6278,21 @@ def lims_form_package_versions(request, package_id: str):
 @csrf_exempt
 def lims_form_package_version_detail(request, package_id: str, version_id: str):
     try:
-        version = FormPackageVersion.objects.prefetch_related(
-            "sections",
-            "choice_lists__choices",
-            "item_groups",
-            "items",
-            "source_artifacts",
-            "compiler_diagnostics",
-            "compiled_projection",
-        ).select_related("package", "source_schema_version", "source_schema_version__schema").get(id=version_id, package_id=package_id)
+        version = (
+            FormPackageVersion.objects.prefetch_related(
+                "sections",
+                "choice_lists__choices",
+                "item_groups",
+                "items",
+                "source_artifacts",
+                "compiler_diagnostics",
+                "compiled_projection",
+            )
+            .select_related(
+                "package", "source_schema_version", "source_schema_version__schema"
+            )
+            .get(id=version_id, package_id=package_id)
+        )
     except (ValidationError, FormPackageVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if request.method == "GET":
@@ -5395,7 +6305,9 @@ def lims_form_package_version_detail(request, package_id: str, version_id: str):
         if forbidden:
             return forbidden
         if version.status != FormPackageVersion.Status.DRAFT:
-            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+            return JsonResponse(
+                {"error": "published_versions_are_immutable"}, status=400
+            )
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
@@ -5408,7 +6320,9 @@ def lims_form_package_version_detail(request, package_id: str, version_id: str):
         error = _sync_form_package_version_definition(version, payload)
         if error:
             return error
-        error = _sync_form_package_source_artifacts(version, payload.get("source_artifacts"))
+        error = _sync_form_package_source_artifacts(
+            version, payload.get("source_artifacts")
+        )
         if error:
             return error
         version.refresh_from_db()
@@ -5424,14 +6338,21 @@ def lims_form_package_version_publish(request, package_id: str, version_id: str)
     if forbidden:
         return forbidden
     try:
-        version = FormPackageVersion.objects.select_related("package").get(id=version_id, package_id=package_id)
+        version = FormPackageVersion.objects.select_related("package").get(
+            id=version_id, package_id=package_id
+        )
     except (ValidationError, FormPackageVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if version.status != FormPackageVersion.Status.DRAFT:
-        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+        return JsonResponse(
+            {"error": "only_draft_versions_can_be_published"}, status=400
+        )
     result = publish_form_package_version(version)
     if not result.valid:
-        return JsonResponse({"error": "form_package_validation_failed", "details": result.errors}, status=400)
+        return JsonResponse(
+            {"error": "form_package_validation_failed", "details": result.errors},
+            status=400,
+        )
     version.refresh_from_db()
     return JsonResponse(_form_package_version_to_dict(version))
 
@@ -5444,7 +6365,9 @@ def lims_metadata_schemas(request):
             return forbidden
         items = [
             _schema_to_dict(item)
-            for item in MetadataSchema.objects.prefetch_related("versions__fields__vocabulary").order_by("name")
+            for item in MetadataSchema.objects.prefetch_related(
+                "versions__fields__vocabulary"
+            ).order_by("name")
         ]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -5465,7 +6388,9 @@ def lims_metadata_schemas(request):
             schema=schema,
             version_number=1,
             status=MetadataSchemaVersion.Status.DRAFT,
-            change_summary=str(payload.get("change_summary") or "Initial draft").strip(),
+            change_summary=str(
+                payload.get("change_summary") or "Initial draft"
+            ).strip(),
         )
         error = _save_model(initial_version)
         if error:
@@ -5486,7 +6411,9 @@ def lims_metadata_schemas(request):
 @csrf_exempt
 def lims_metadata_schema_detail(request, schema_id: str):
     try:
-        schema = MetadataSchema.objects.prefetch_related("versions__fields__vocabulary").get(id=schema_id)
+        schema = MetadataSchema.objects.prefetch_related(
+            "versions__fields__vocabulary"
+        ).get(id=schema_id)
     except (ValidationError, MetadataSchema.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -5521,16 +6448,15 @@ def lims_metadata_schema_versions(request, schema_id: str):
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
-        queryset = schema.versions.prefetch_related("fields__vocabulary").order_by("-version_number")
+        queryset = schema.versions.prefetch_related("fields__vocabulary").order_by(
+            "-version_number"
+        )
         status_filter = str(request.GET.get("status") or "").strip()
         if status_filter:
             if status_filter not in MetadataSchemaVersion.Status.values:
                 return JsonResponse({"error": "invalid_status"}, status=400)
             queryset = queryset.filter(status=status_filter)
-        items = [
-            _schema_version_to_dict(item)
-            for item in queryset
-        ]
+        items = [_schema_version_to_dict(item) for item in queryset]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.metadata.manage")
@@ -5545,7 +6471,9 @@ def lims_metadata_schema_versions(request, schema_id: str):
         source_version = None
         if payload.get("source_version_id"):
             try:
-                source_version = MetadataSchemaVersion.objects.prefetch_related("fields__vocabulary").get(
+                source_version = MetadataSchemaVersion.objects.prefetch_related(
+                    "fields__vocabulary"
+                ).get(
                     id=payload["source_version_id"],
                     schema=schema,
                 )
@@ -5554,7 +6482,9 @@ def lims_metadata_schema_versions(request, schema_id: str):
         version_number = payload.get("version_number")
         if version_number is None:
             latest_version = schema.versions.order_by("-version_number").first()
-            version_number = (latest_version.version_number if latest_version else 0) + 1
+            version_number = (
+                latest_version.version_number if latest_version else 0
+            ) + 1
         try:
             version_number = int(version_number)
         except (TypeError, ValueError):
@@ -5583,7 +6513,9 @@ def lims_metadata_schema_versions(request, schema_id: str):
 @csrf_exempt
 def lims_metadata_schema_version_detail(request, schema_id: str, version_id: str):
     try:
-        version = MetadataSchemaVersion.objects.prefetch_related("fields__vocabulary").get(id=version_id, schema_id=schema_id)
+        version = MetadataSchemaVersion.objects.prefetch_related(
+            "fields__vocabulary"
+        ).get(id=version_id, schema_id=schema_id)
     except (ValidationError, MetadataSchemaVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if request.method == "GET":
@@ -5596,7 +6528,9 @@ def lims_metadata_schema_version_detail(request, schema_id: str, version_id: str
         if forbidden:
             return forbidden
         if version.status != MetadataSchemaVersion.Status.DRAFT:
-            return JsonResponse({"error": "published_versions_are_immutable"}, status=400)
+            return JsonResponse(
+                {"error": "published_versions_are_immutable"}, status=400
+            )
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
@@ -5626,12 +6560,14 @@ def lims_metadata_schema_version_publish(request, schema_id: str, version_id: st
     except (ValidationError, MetadataSchemaVersion.DoesNotExist):
         return JsonResponse({"error": "version_not_found"}, status=404)
     if version.status != MetadataSchemaVersion.Status.DRAFT:
-        return JsonResponse({"error": "only_draft_versions_can_be_published"}, status=400)
+        return JsonResponse(
+            {"error": "only_draft_versions_can_be_published"}, status=400
+        )
     if not version.fields.exists():
         return JsonResponse({"error": "version_requires_fields"}, status=400)
-    MetadataSchemaVersion.objects.filter(schema_id=schema_id, status=MetadataSchemaVersion.Status.PUBLISHED).exclude(
-        id=version.id
-    ).update(status=MetadataSchemaVersion.Status.DEPRECATED)
+    MetadataSchemaVersion.objects.filter(
+        schema_id=schema_id, status=MetadataSchemaVersion.Status.PUBLISHED
+    ).exclude(id=version.id).update(status=MetadataSchemaVersion.Status.DEPRECATED)
     version.status = MetadataSchemaVersion.Status.PUBLISHED
     version.save(update_fields=["status", "updated_at"])
     version.refresh_from_db()
@@ -5644,9 +6580,9 @@ def lims_metadata_schema_bindings(request):
         forbidden = require_lims_permission(request, "lims.metadata.view")
         if forbidden:
             return forbidden
-        queryset = MetadataSchemaBinding.objects.select_related("schema_version", "schema_version__schema").order_by(
-            "target_type", "target_key"
-        )
+        queryset = MetadataSchemaBinding.objects.select_related(
+            "schema_version", "schema_version__schema"
+        ).order_by("target_type", "target_key")
         if request.GET.get("target_type"):
             queryset = queryset.filter(target_type=request.GET["target_type"])
         if request.GET.get("target_key"):
@@ -5670,7 +6606,9 @@ def lims_metadata_schema_bindings(request):
         if schema_version is None:
             return JsonResponse({"error": "schema_version_id is required"}, status=400)
         if schema_version.status != MetadataSchemaVersion.Status.PUBLISHED:
-            return JsonResponse({"error": "schema_version_must_be_published"}, status=400)
+            return JsonResponse(
+                {"error": "schema_version_must_be_published"}, status=400
+            )
         target_type = str(payload.get("target_type") or "").strip()
         if target_type not in MetadataSchemaBinding.TargetType.values:
             return JsonResponse({"error": "invalid_target_type"}, status=400)
@@ -5710,15 +6648,21 @@ def lims_metadata_validate(request):
     schema_version = None
     if payload.get("schema_version_id"):
         try:
-            schema_version = MetadataSchemaVersion.objects.get(id=payload["schema_version_id"])
+            schema_version = MetadataSchemaVersion.objects.get(
+                id=payload["schema_version_id"]
+            )
         except (ValidationError, MetadataSchemaVersion.DoesNotExist):
             return JsonResponse({"error": "schema_version_not_found"}, status=404)
     else:
         target_type = str(payload.get("target_type") or "").strip()
         target_key = str(payload.get("target_key") or "").strip()
         if not target_type or not target_key:
-            return JsonResponse({"error": "schema_version_id or target binding is required"}, status=400)
-        schema_version = resolve_schema_version_for_binding(target_type=target_type, target_key=target_key)
+            return JsonResponse(
+                {"error": "schema_version_id or target binding is required"}, status=400
+            )
+        schema_version = resolve_schema_version_for_binding(
+            target_type=target_type, target_key=target_key
+        )
         if schema_version is None:
             return JsonResponse({"error": "binding_not_found"}, status=404)
 
@@ -5734,7 +6678,9 @@ def lims_metadata_validate(request):
     )
 
 
-def _build_biospecimen_type_from_payload(sample_type: BiospecimenType, payload: dict[str, object]):
+def _build_biospecimen_type_from_payload(
+    sample_type: BiospecimenType, payload: dict[str, object]
+):
     name = str(payload.get("name") or "").strip()
     key = str(payload.get("key") or "").strip()
     if not name:
@@ -5748,7 +6694,9 @@ def _build_biospecimen_type_from_payload(sample_type: BiospecimenType, payload: 
     sample_type.name = name
     sample_type.key = key
     sample_type.description = str(payload.get("description") or "").strip()
-    sample_type.identifier_prefix = str(payload.get("identifier_prefix") or "SPEC").strip()
+    sample_type.identifier_prefix = str(
+        payload.get("identifier_prefix") or "SPEC"
+    ).strip()
     sample_type.barcode_prefix = str(payload.get("barcode_prefix") or "BC").strip()
     sample_type.sequence_padding = sequence_padding
     if payload.get("next_sequence") is not None:
@@ -5761,10 +6709,14 @@ def _build_biospecimen_type_from_payload(sample_type: BiospecimenType, payload: 
 
 
 def _build_biospecimen_from_payload(specimen: Biospecimen, payload: dict[str, object]):
-    sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+    sample_type, error = _resolve_optional_fk(
+        BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found"
+    )
     if error:
         return error
-    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    study, error = _resolve_optional_fk(
+        Study, payload.get("study_id"), "study_not_found"
+    )
     if error:
         return error
     site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
@@ -5780,7 +6732,9 @@ def _build_biospecimen_from_payload(specimen: Biospecimen, payload: dict[str, ob
         return error
     if sample_type is None:
         return JsonResponse({"error": "sample_type_id is required"}, status=400)
-    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    quantity, error = _parse_decimal(
+        payload.get("quantity"), field="quantity", default="0"
+    )
     if error:
         return error
     metadata = payload.get("metadata") or {}
@@ -5796,7 +6750,11 @@ def _build_biospecimen_from_payload(specimen: Biospecimen, payload: dict[str, ob
     specimen.site = site
     specimen.lab = lab
     specimen.parent_specimen = parent_specimen
-    specimen.lineage_root = parent_specimen.lineage_root if parent_specimen and parent_specimen.lineage_root_id else parent_specimen
+    specimen.lineage_root = (
+        parent_specimen.lineage_root
+        if parent_specimen and parent_specimen.lineage_root_id
+        else parent_specimen
+    )
     specimen.quantity = quantity
     specimen.quantity_unit = str(payload.get("quantity_unit") or "mL").strip()
     specimen.metadata = metadata
@@ -5804,11 +6762,17 @@ def _build_biospecimen_from_payload(specimen: Biospecimen, payload: dict[str, ob
     return None
 
 
-def _build_accessioning_manifest_from_payload(manifest: AccessioningManifest, payload: dict[str, object], *, request):
-    sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+def _build_accessioning_manifest_from_payload(
+    manifest: AccessioningManifest, payload: dict[str, object], *, request
+):
+    sample_type, error = _resolve_optional_fk(
+        BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found"
+    )
     if error:
         return error
-    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    study, error = _resolve_optional_fk(
+        Study, payload.get("study_id"), "study_not_found"
+    )
     if error:
         return error
     site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
@@ -5830,17 +6794,28 @@ def _build_accessioning_manifest_from_payload(manifest: AccessioningManifest, pa
     manifest.source_reference = str(payload.get("source_reference") or "").strip()
     manifest.notes = str(payload.get("notes") or "").strip()
     manifest.metadata = metadata
-    manifest.created_by = str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip()
+    manifest.created_by = str(
+        getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")
+    ).strip()
     if not manifest.manifest_identifier:
-        manifest.manifest_identifier = str(payload.get("manifest_identifier") or "").strip() or generate_manifest_identifier()
+        manifest.manifest_identifier = (
+            str(payload.get("manifest_identifier") or "").strip()
+            or generate_manifest_identifier()
+        )
     return None
 
 
-def _build_manifest_item_from_payload(item: AccessioningManifestItem, payload: dict[str, object]):
-    biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+def _build_manifest_item_from_payload(
+    item: AccessioningManifestItem, payload: dict[str, object]
+):
+    biospecimen, error = _resolve_optional_fk(
+        Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found"
+    )
     if error:
         return error
-    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    quantity, error = _parse_decimal(
+        payload.get("quantity"), field="quantity", default="0"
+    )
     if error:
         return error
     metadata = payload.get("metadata") or {}
@@ -5852,8 +6827,12 @@ def _build_manifest_item_from_payload(item: AccessioningManifestItem, payload: d
         return JsonResponse({"error": "invalid_position"}, status=400)
     item.biospecimen = biospecimen
     item.position = position
-    item.expected_subject_identifier = str(payload.get("expected_subject_identifier") or "").strip()
-    item.expected_sample_identifier = str(payload.get("expected_sample_identifier") or "").strip()
+    item.expected_subject_identifier = str(
+        payload.get("expected_subject_identifier") or ""
+    ).strip()
+    item.expected_sample_identifier = str(
+        payload.get("expected_sample_identifier") or ""
+    ).strip()
     item.expected_barcode = str(payload.get("expected_barcode") or "").strip()
     item.quantity = quantity
     item.quantity_unit = str(payload.get("quantity_unit") or "mL").strip()
@@ -5882,13 +6861,17 @@ def _storage_inventory_error_response(exc: StorageInventoryError):
     return JsonResponse({"error": str(exc)}, status=400)
 
 
-def _build_storage_location_from_payload(location: StorageLocation, payload: dict[str, object]):
+def _build_storage_location_from_payload(
+    location: StorageLocation, payload: dict[str, object]
+):
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
     if lab is None:
         return JsonResponse({"error": "lab_id is required"}, status=400)
-    parent, error = _resolve_optional_fk(StorageLocation, payload.get("parent_id"), "parent_not_found")
+    parent, error = _resolve_optional_fk(
+        StorageLocation, payload.get("parent_id"), "parent_not_found"
+    )
     if error:
         return error
     name = str(payload.get("name") or "").strip()
@@ -5898,7 +6881,10 @@ def _build_storage_location_from_payload(location: StorageLocation, payload: dic
     if level not in StorageLocation.Level.values:
         return JsonResponse({"error": "invalid_level"}, status=400)
     temperature_zone = str(payload.get("temperature_zone") or "").strip()
-    if temperature_zone and temperature_zone not in StorageLocation.TemperatureZone.values:
+    if (
+        temperature_zone
+        and temperature_zone not in StorageLocation.TemperatureZone.values
+    ):
         return JsonResponse({"error": "invalid_temperature_zone"}, status=400)
     capacity = payload.get("capacity")
     if capacity in ("", None):
@@ -5923,11 +6909,15 @@ def _build_storage_location_from_payload(location: StorageLocation, payload: dic
     return None
 
 
-def _build_inventory_material_from_payload(material: InventoryMaterial, payload: dict[str, object]):
+def _build_inventory_material_from_payload(
+    material: InventoryMaterial, payload: dict[str, object]
+):
     name = str(payload.get("name") or "").strip()
     if not name:
         return JsonResponse({"error": "name is required"}, status=400)
-    category = str(payload.get("category") or InventoryMaterial.Category.CONSUMABLE).strip()
+    category = str(
+        payload.get("category") or InventoryMaterial.Category.CONSUMABLE
+    ).strip()
     if category not in InventoryMaterial.Category.values:
         return JsonResponse({"error": "invalid_category"}, status=400)
     material.name = name
@@ -5945,7 +6935,10 @@ def lims_biospecimen_types(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        items = [_biospecimen_type_to_dict(item) for item in BiospecimenType.objects.order_by("name")]
+        items = [
+            _biospecimen_type_to_dict(item)
+            for item in BiospecimenType.objects.order_by("name")
+        ]
         return JsonResponse({"items": items})
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.artifact.manage")
@@ -5999,15 +6992,23 @@ def lims_biospecimens(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        queryset = Biospecimen.objects.select_related(
-            "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
-        ).prefetch_related("aliquots", "pool_memberships", "storage_records__location").order_by("-created_at")
+        queryset = (
+            Biospecimen.objects.select_related(
+                "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
+            )
+            .prefetch_related(
+                "aliquots", "pool_memberships", "storage_records__location"
+            )
+            .order_by("-created_at")
+        )
         if request.GET.get("sample_type_id"):
             queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
         if request.GET.get("status"):
             queryset = queryset.filter(status=request.GET["status"])
         if request.GET.get("subject_identifier"):
-            queryset = queryset.filter(subject_identifier=request.GET["subject_identifier"])
+            queryset = queryset.filter(
+                subject_identifier=request.GET["subject_identifier"]
+            )
         items = [_biospecimen_to_dict(item) for item in queryset[:200]]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -6022,7 +7023,9 @@ def lims_biospecimens(request):
         if error:
             return error
         if not specimen.sample_identifier:
-            sample_identifier, barcode = allocate_biospecimen_identifiers(specimen.sample_type)
+            sample_identifier, barcode = allocate_biospecimen_identifiers(
+                specimen.sample_type
+            )
             specimen.sample_identifier = sample_identifier
             specimen.barcode = barcode
         error = _save_model(specimen)
@@ -6036,9 +7039,15 @@ def lims_biospecimens(request):
 @csrf_exempt
 def lims_biospecimen_detail(request, specimen_id: str):
     try:
-        specimen = Biospecimen.objects.select_related(
-            "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
-        ).prefetch_related("aliquots", "pool_memberships", "storage_records__location").get(id=specimen_id)
+        specimen = (
+            Biospecimen.objects.select_related(
+                "sample_type", "study", "site", "lab", "parent_specimen", "lineage_root"
+            )
+            .prefetch_related(
+                "aliquots", "pool_memberships", "storage_records__location"
+            )
+            .get(id=specimen_id)
+        )
     except (ValidationError, Biospecimen.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -6111,15 +7120,23 @@ def lims_biospecimen_aliquots(request, specimen_id: str):
         count = int(payload.get("count") or 1)
     except (TypeError, ValueError):
         return JsonResponse({"error": "invalid_count"}, status=400)
-    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    quantity, error = _parse_decimal(
+        payload.get("quantity"), field="quantity", default="0"
+    )
     if error:
         return error
-    quantity_unit = str(payload.get("quantity_unit") or specimen.quantity_unit or "mL").strip()
+    quantity_unit = str(
+        payload.get("quantity_unit") or specimen.quantity_unit or "mL"
+    ).strip()
     try:
-        items = create_aliquots(specimen, count=count, quantity=quantity, quantity_unit=quantity_unit)
+        items = create_aliquots(
+            specimen, count=count, quantity=quantity, quantity_unit=quantity_unit
+        )
     except BiospecimenTransitionError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
-    return JsonResponse({"items": [_biospecimen_to_dict(item) for item in items]}, status=201)
+    return JsonResponse(
+        {"items": [_biospecimen_to_dict(item) for item in items]}, status=201
+    )
 
 
 @csrf_exempt
@@ -6128,9 +7145,13 @@ def lims_biospecimen_pools(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        queryset = BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "members", "storage_records__location"
-        ).order_by("-created_at")
+        queryset = (
+            BiospecimenPool.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related("members", "storage_records__location")
+            .order_by("-created_at")
+        )
         if request.GET.get("sample_type_id"):
             queryset = queryset.filter(sample_type_id=request.GET["sample_type_id"])
         if request.GET.get("status"):
@@ -6144,15 +7165,21 @@ def lims_biospecimen_pools(request):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+        sample_type, error = _resolve_optional_fk(
+            BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found"
+        )
         if error:
             return error
         if sample_type is None:
             return JsonResponse({"error": "sample_type_id is required"}, status=400)
-        study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+        study, error = _resolve_optional_fk(
+            Study, payload.get("study_id"), "study_not_found"
+        )
         if error:
             return error
-        site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+        site, error = _resolve_optional_fk(
+            Site, payload.get("site_id"), "site_not_found"
+        )
         if error:
             return error
         lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
@@ -6160,11 +7187,15 @@ def lims_biospecimen_pools(request):
             return error
         specimen_ids = payload.get("specimen_ids")
         if not isinstance(specimen_ids, list) or not specimen_ids:
-            return JsonResponse({"error": "specimen_ids must be a non-empty list"}, status=400)
+            return JsonResponse(
+                {"error": "specimen_ids must be a non-empty list"}, status=400
+            )
         specimens = list(Biospecimen.objects.filter(id__in=specimen_ids))
         if len(specimens) != len(specimen_ids):
             return JsonResponse({"error": "specimen_not_found"}, status=404)
-        quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+        quantity, error = _parse_decimal(
+            payload.get("quantity"), field="quantity", default="0"
+        )
         if error:
             return error
         quantity_unit = str(payload.get("quantity_unit") or "mL").strip()
@@ -6192,9 +7223,13 @@ def lims_biospecimen_pools(request):
 @csrf_exempt
 def lims_biospecimen_pool_detail(request, pool_id: str):
     try:
-        pool = BiospecimenPool.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "members", "storage_records__location"
-        ).get(id=pool_id)
+        pool = (
+            BiospecimenPool.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related("members", "storage_records__location")
+            .get(id=pool_id)
+        )
     except (ValidationError, BiospecimenPool.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -6321,7 +7356,9 @@ def lims_biospecimen_storage_records(request, specimen_id: str):
             "location__parent__parent",
             "previous_location",
         ).order_by("-created_at")
-        return JsonResponse({"items": [_biospecimen_storage_record_to_dict(item) for item in records]})
+        return JsonResponse(
+            {"items": [_biospecimen_storage_record_to_dict(item) for item in records]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.storage.manage")
         if forbidden:
@@ -6329,19 +7366,27 @@ def lims_biospecimen_storage_records(request, specimen_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
+        location, error = _resolve_optional_fk(
+            StorageLocation, payload.get("location_id"), "location_not_found"
+        )
         if error:
             return error
         if location is None:
             return JsonResponse({"error": "location_id is required"}, status=400)
-        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        operation_run, error = _resolve_optional_fk(
+            OperationRun, payload.get("operation_run_id"), "operation_run_not_found"
+        )
         if error:
             return error
-        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        task_run, error = _resolve_optional_fk(
+            TaskRun, payload.get("task_run_id"), "task_run_not_found"
+        )
         if error:
             return error
         submission_record, error = _resolve_optional_fk(
-            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+            SubmissionRecord,
+            payload.get("submission_record_id"),
+            "submission_record_not_found",
         )
         if error:
             return error
@@ -6352,7 +7397,10 @@ def lims_biospecimen_storage_records(request, specimen_id: str):
             record = place_artifact_in_storage(
                 biospecimen=specimen,
                 location=location,
-                placed_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                placed_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
                 reason=reason,
                 notes=str(payload.get("notes") or "").strip(),
                 operation_run=operation_run,
@@ -6382,7 +7430,9 @@ def lims_biospecimen_pool_storage_records(request, pool_id: str):
             "location__parent__parent",
             "previous_location",
         ).order_by("-created_at")
-        return JsonResponse({"items": [_biospecimen_storage_record_to_dict(item) for item in records]})
+        return JsonResponse(
+            {"items": [_biospecimen_storage_record_to_dict(item) for item in records]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.storage.manage")
         if forbidden:
@@ -6390,19 +7440,27 @@ def lims_biospecimen_pool_storage_records(request, pool_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
+        location, error = _resolve_optional_fk(
+            StorageLocation, payload.get("location_id"), "location_not_found"
+        )
         if error:
             return error
         if location is None:
             return JsonResponse({"error": "location_id is required"}, status=400)
-        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        operation_run, error = _resolve_optional_fk(
+            OperationRun, payload.get("operation_run_id"), "operation_run_not_found"
+        )
         if error:
             return error
-        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        task_run, error = _resolve_optional_fk(
+            TaskRun, payload.get("task_run_id"), "task_run_not_found"
+        )
         if error:
             return error
         submission_record, error = _resolve_optional_fk(
-            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+            SubmissionRecord,
+            payload.get("submission_record_id"),
+            "submission_record_not_found",
         )
         if error:
             return error
@@ -6413,7 +7471,10 @@ def lims_biospecimen_pool_storage_records(request, pool_id: str):
             record = place_artifact_in_storage(
                 biospecimen_pool=pool,
                 location=location,
-                placed_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                placed_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
                 reason=reason,
                 notes=str(payload.get("notes") or "").strip(),
                 operation_run=operation_run,
@@ -6492,13 +7553,17 @@ def lims_inventory_lots(request):
         forbidden = require_lims_permission(request, "lims.inventory.view")
         if forbidden:
             return forbidden
-        queryset = InventoryLot.objects.select_related("material", "lab", "storage_location").order_by("-created_at")
+        queryset = InventoryLot.objects.select_related(
+            "material", "lab", "storage_location"
+        ).order_by("-created_at")
         if request.GET.get("material_id"):
             queryset = queryset.filter(material_id=request.GET["material_id"])
         if request.GET.get("lab_id"):
             queryset = queryset.filter(lab_id=request.GET["lab_id"])
         if request.GET.get("storage_location_id"):
-            queryset = queryset.filter(storage_location_id=request.GET["storage_location_id"])
+            queryset = queryset.filter(
+                storage_location_id=request.GET["storage_location_id"]
+            )
         items = [_inventory_lot_to_dict(item) for item in queryset[:300]]
         return JsonResponse({"items": items})
     if request.method == "POST":
@@ -6508,7 +7573,9 @@ def lims_inventory_lots(request):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        material, error = _resolve_optional_fk(InventoryMaterial, payload.get("material_id"), "material_not_found")
+        material, error = _resolve_optional_fk(
+            InventoryMaterial, payload.get("material_id"), "material_not_found"
+        )
         if error:
             return error
         if material is None:
@@ -6519,17 +7586,25 @@ def lims_inventory_lots(request):
         if lab is None:
             return JsonResponse({"error": "lab_id is required"}, status=400)
         storage_location, error = _resolve_optional_fk(
-            StorageLocation, payload.get("storage_location_id"), "storage_location_not_found"
+            StorageLocation,
+            payload.get("storage_location_id"),
+            "storage_location_not_found",
         )
         if error:
             return error
-        received_quantity, error = _parse_decimal(payload.get("received_quantity"), field="received_quantity", default="0")
+        received_quantity, error = _parse_decimal(
+            payload.get("received_quantity"), field="received_quantity", default="0"
+        )
         if error:
             return error
-        received_on, error = _parse_optional_date(payload.get("received_on"), field="received_on")
+        received_on, error = _parse_optional_date(
+            payload.get("received_on"), field="received_on"
+        )
         if error:
             return error
-        expires_on, error = _parse_optional_date(payload.get("expires_on"), field="expires_on")
+        expires_on, error = _parse_optional_date(
+            payload.get("expires_on"), field="expires_on"
+        )
         if error:
             return error
         metadata = payload.get("metadata") or {}
@@ -6541,8 +7616,13 @@ def lims_inventory_lots(request):
                 lab=lab,
                 lot_number=str(payload.get("lot_number") or "").strip(),
                 received_quantity=received_quantity,
-                unit_of_measure=str(payload.get("unit_of_measure") or material.default_unit).strip(),
-                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                unit_of_measure=str(
+                    payload.get("unit_of_measure") or material.default_unit
+                ).strip(),
+                recorded_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
                 storage_location=storage_location,
                 vendor=str(payload.get("vendor") or "").strip(),
                 received_on=received_on,
@@ -6554,7 +7634,10 @@ def lims_inventory_lots(request):
             return _storage_inventory_error_response(exc)
         lot.refresh_from_db()
         return JsonResponse(
-            {"lot": _inventory_lot_to_dict(lot), "initial_transaction": _inventory_transaction_to_dict(transaction)},
+            {
+                "lot": _inventory_lot_to_dict(lot),
+                "initial_transaction": _inventory_transaction_to_dict(transaction),
+            },
             status=201,
         )
     return JsonResponse({"error": "method_not_allowed"}, status=405)
@@ -6563,7 +7646,9 @@ def lims_inventory_lots(request):
 @csrf_exempt
 def lims_inventory_lot_detail(request, lot_id: str):
     try:
-        lot = InventoryLot.objects.select_related("material", "lab", "storage_location").get(id=lot_id)
+        lot = InventoryLot.objects.select_related(
+            "material", "lab", "storage_location"
+        ).get(id=lot_id)
     except (ValidationError, InventoryLot.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -6577,17 +7662,23 @@ def lims_inventory_lot_detail(request, lot_id: str):
 @csrf_exempt
 def lims_inventory_lot_transactions(request, lot_id: str):
     try:
-        lot = InventoryLot.objects.select_related("material", "lab", "storage_location").get(id=lot_id)
+        lot = InventoryLot.objects.select_related(
+            "material", "lab", "storage_location"
+        ).get(id=lot_id)
     except (ValidationError, InventoryLot.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
         forbidden = require_lims_permission(request, "lims.inventory.view")
         if forbidden:
             return forbidden
-        queryset = lot.transactions.select_related("location", "biospecimen", "biospecimen_pool").order_by("-created_at")
+        queryset = lot.transactions.select_related(
+            "location", "biospecimen", "biospecimen_pool"
+        ).order_by("-created_at")
         if request.GET.get("transaction_type"):
             queryset = queryset.filter(transaction_type=request.GET["transaction_type"])
-        return JsonResponse({"items": [_inventory_transaction_to_dict(item) for item in queryset]})
+        return JsonResponse(
+            {"items": [_inventory_transaction_to_dict(item) for item in queryset]}
+        )
     if request.method == "POST":
         forbidden = require_lims_permission(request, "lims.inventory.manage")
         if forbidden:
@@ -6595,34 +7686,50 @@ def lims_inventory_lot_transactions(request, lot_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        location, error = _resolve_optional_fk(StorageLocation, payload.get("location_id"), "location_not_found")
-        if error:
-            return error
-        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
-        if error:
-            return error
-        biospecimen_pool, error = _resolve_optional_fk(
-            BiospecimenPool, payload.get("biospecimen_pool_id"), "biospecimen_pool_not_found"
+        location, error = _resolve_optional_fk(
+            StorageLocation, payload.get("location_id"), "location_not_found"
         )
         if error:
             return error
-        operation_run, error = _resolve_optional_fk(OperationRun, payload.get("operation_run_id"), "operation_run_not_found")
+        biospecimen, error = _resolve_optional_fk(
+            Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found"
+        )
         if error:
             return error
-        task_run, error = _resolve_optional_fk(TaskRun, payload.get("task_run_id"), "task_run_not_found")
+        biospecimen_pool, error = _resolve_optional_fk(
+            BiospecimenPool,
+            payload.get("biospecimen_pool_id"),
+            "biospecimen_pool_not_found",
+        )
+        if error:
+            return error
+        operation_run, error = _resolve_optional_fk(
+            OperationRun, payload.get("operation_run_id"), "operation_run_not_found"
+        )
+        if error:
+            return error
+        task_run, error = _resolve_optional_fk(
+            TaskRun, payload.get("task_run_id"), "task_run_not_found"
+        )
         if error:
             return error
         submission_record, error = _resolve_optional_fk(
-            SubmissionRecord, payload.get("submission_record_id"), "submission_record_not_found"
+            SubmissionRecord,
+            payload.get("submission_record_id"),
+            "submission_record_not_found",
         )
         if error:
             return error
         material_usage_record, error = _resolve_optional_fk(
-            MaterialUsageRecord, payload.get("material_usage_record_id"), "material_usage_record_not_found"
+            MaterialUsageRecord,
+            payload.get("material_usage_record_id"),
+            "material_usage_record_not_found",
         )
         if error:
             return error
-        quantity_delta, error = _parse_decimal(payload.get("quantity_delta"), field="quantity_delta", default="0")
+        quantity_delta, error = _parse_decimal(
+            payload.get("quantity_delta"), field="quantity_delta", default="0"
+        )
         if error:
             return error
         try:
@@ -6630,7 +7737,10 @@ def lims_inventory_lot_transactions(request, lot_id: str):
                 lot=lot,
                 transaction_type=str(payload.get("transaction_type") or "").strip(),
                 quantity_delta=quantity_delta,
-                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                recorded_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
                 location=location,
                 notes=str(payload.get("notes") or "").strip(),
                 biospecimen=biospecimen,
@@ -6675,9 +7785,11 @@ def lims_reference_sample_accession_provision(request):
         "versions__edges__source_node",
         "versions__edges__target_node",
     ).get(id=bundle.workflow_template.id)
-    operation_definition = OperationDefinition.objects.select_related().prefetch_related(
-        "versions__workflow_version__template"
-    ).get(id=bundle.operation_definition.id)
+    operation_definition = (
+        OperationDefinition.objects.select_related()
+        .prefetch_related("versions__workflow_version__template")
+        .get(id=bundle.operation_definition.id)
+    )
     return JsonResponse(
         _sample_accession_reference_bundle_to_dict(
             form_package=form_package,
@@ -6698,12 +7810,16 @@ def lims_accessioning_receive_single(request):
     payload = _parse_json_body(request)
     if payload is None:
         return JsonResponse({"error": "invalid_json"}, status=400)
-    sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+    sample_type, error = _resolve_optional_fk(
+        BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found"
+    )
     if error:
         return error
     if sample_type is None:
         return JsonResponse({"error": "sample_type_id is required"}, status=400)
-    study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+    study, error = _resolve_optional_fk(
+        Study, payload.get("study_id"), "study_not_found"
+    )
     if error:
         return error
     site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
@@ -6712,7 +7828,9 @@ def lims_accessioning_receive_single(request):
     lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
     if error:
         return error
-    quantity, error = _parse_decimal(payload.get("quantity"), field="quantity", default="0")
+    quantity, error = _parse_decimal(
+        payload.get("quantity"), field="quantity", default="0"
+    )
     if error:
         return error
     metadata = payload.get("metadata") or {}
@@ -6721,7 +7839,9 @@ def lims_accessioning_receive_single(request):
     receipt_context = payload.get("receipt_context") or {}
     if not isinstance(receipt_context, dict):
         return JsonResponse({"error": "receipt_context must be an object"}, status=400)
-    source_mode = str(payload.get("source_mode") or OperationRun.SourceMode.SINGLE).strip()
+    source_mode = str(
+        payload.get("source_mode") or OperationRun.SourceMode.SINGLE
+    ).strip()
     if source_mode not in OperationRun.SourceMode.values:
         return JsonResponse({"error": "invalid_source_mode"}, status=400)
     received_at, error = _parse_optional_received_at(payload.get("received_at"))
@@ -6738,7 +7858,10 @@ def lims_accessioning_receive_single(request):
             quantity=quantity,
             quantity_unit=str(payload.get("quantity_unit") or "mL").strip(),
             metadata=metadata,
-            received_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+            received_by=str(
+                getattr(request, "auth_user_id", None)
+                or request.headers.get("X-User-Id", "")
+            ).strip(),
             sample_identifier=str(payload.get("sample_identifier") or "").strip(),
             barcode=str(payload.get("barcode") or "").strip(),
             scan_value=str(payload.get("scan_value") or "").strip(),
@@ -6750,7 +7873,9 @@ def lims_accessioning_receive_single(request):
         )
     except (AccessioningError, ReferenceOperationProvisionError) as exc:
         if isinstance(exc, ReferenceOperationProvisionError):
-            return JsonResponse({"error": exc.code, "details": exc.details or []}, status=400)
+            return JsonResponse(
+                {"error": exc.code, "details": exc.details or []}, status=400
+            )
         return _accessioning_error_response(exc)
     run = _operation_run_queryset().get(id=result.operation_run.id)
     specimen_payload = None
@@ -6761,8 +7886,14 @@ def lims_accessioning_receive_single(request):
         {
             "biospecimen": specimen_payload,
             "event": _receiving_event_to_dict(result.event) if result.event else None,
-            "discrepancy": _receiving_discrepancy_to_dict(result.discrepancy) if result.discrepancy else None,
-            "qc_result": _qc_result_to_dict(result.qc_result) if result.qc_result else None,
+            "discrepancy": (
+                _receiving_discrepancy_to_dict(result.discrepancy)
+                if result.discrepancy
+                else None
+            ),
+            "qc_result": (
+                _qc_result_to_dict(result.qc_result) if result.qc_result else None
+            ),
             "operation_run": _operation_run_to_dict(run),
         },
         status=201,
@@ -6775,9 +7906,13 @@ def lims_accessioning_manifests(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        queryset = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "items"
-        ).order_by("-created_at")
+        queryset = (
+            AccessioningManifest.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related("items")
+            .order_by("-created_at")
+        )
         if request.GET.get("status"):
             queryset = queryset.filter(status=request.GET["status"])
         if request.GET.get("sample_type_id"):
@@ -6792,7 +7927,9 @@ def lims_accessioning_manifests(request):
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
         manifest = AccessioningManifest()
-        error = _build_accessioning_manifest_from_payload(manifest, payload, request=request)
+        error = _build_accessioning_manifest_from_payload(
+            manifest, payload, request=request
+        )
         if error:
             return error
         error = _save_model(manifest)
@@ -6805,7 +7942,10 @@ def lims_accessioning_manifests(request):
             if not isinstance(item_payload, dict):
                 return JsonResponse({"error": "item must be an object"}, status=400)
             item = AccessioningManifestItem(manifest=manifest, position=index)
-            error = _build_manifest_item_from_payload(item, {**item_payload, "position": item_payload.get("position") or index})
+            error = _build_manifest_item_from_payload(
+                item,
+                {**item_payload, "position": item_payload.get("position") or index},
+            )
             if error:
                 manifest.delete()
                 return error
@@ -6826,9 +7966,13 @@ def lims_accessioning_manifests(request):
 @csrf_exempt
 def lims_accessioning_manifest_detail(request, manifest_id: str):
     try:
-        manifest = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "items"
-        ).get(id=manifest_id)
+        manifest = (
+            AccessioningManifest.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related("items")
+            .get(id=manifest_id)
+        )
     except (ValidationError, AccessioningManifest.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -6838,7 +7982,10 @@ def lims_accessioning_manifest_detail(request, manifest_id: str):
         return JsonResponse(
             {
                 **_accessioning_manifest_to_dict(manifest),
-                "items": [_manifest_item_to_dict(item) for item in manifest.items.order_by("position", "created_at")],
+                "items": [
+                    _manifest_item_to_dict(item)
+                    for item in manifest.items.order_by("position", "created_at")
+                ],
             }
         )
     if request.method == "PUT":
@@ -6848,7 +7995,9 @@ def lims_accessioning_manifest_detail(request, manifest_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        error = _build_accessioning_manifest_from_payload(manifest, payload, request=request)
+        error = _build_accessioning_manifest_from_payload(
+            manifest, payload, request=request
+        )
         if error:
             return error
         error = _save_model(manifest)
@@ -6886,9 +8035,9 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     if forbidden:
         return forbidden
     try:
-        item = AccessioningManifestItem.objects.select_related("manifest", "biospecimen", "manifest__sample_type").get(
-            id=item_id, manifest_id=manifest_id
-        )
+        item = AccessioningManifestItem.objects.select_related(
+            "manifest", "biospecimen", "manifest__sample_type"
+        ).get(id=item_id, manifest_id=manifest_id)
     except (ValidationError, AccessioningManifestItem.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
@@ -6900,7 +8049,9 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     receipt_context = payload.get("receipt_context") or {}
     if not isinstance(receipt_context, dict):
         return JsonResponse({"error": "receipt_context must be an object"}, status=400)
-    source_mode = str(payload.get("source_mode") or OperationRun.SourceMode.BATCH).strip()
+    source_mode = str(
+        payload.get("source_mode") or OperationRun.SourceMode.BATCH
+    ).strip()
     if source_mode not in OperationRun.SourceMode.values:
         return JsonResponse({"error": "invalid_source_mode"}, status=400)
     received_at, error = _parse_optional_received_at(payload.get("received_at"))
@@ -6909,7 +8060,10 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
     try:
         result = adapt_manifest_item_receive_to_sample_accession(
             item,
-            received_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+            received_by=str(
+                getattr(request, "auth_user_id", None)
+                or request.headers.get("X-User-Id", "")
+            ).strip(),
             scan_value=str(payload.get("scan_value") or "").strip(),
             notes=str(payload.get("notes") or "").strip(),
             metadata=metadata,
@@ -6920,7 +8074,9 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
         )
     except (AccessioningError, ReferenceOperationProvisionError) as exc:
         if isinstance(exc, ReferenceOperationProvisionError):
-            return JsonResponse({"error": exc.code, "details": exc.details or []}, status=400)
+            return JsonResponse(
+                {"error": exc.code, "details": exc.details or []}, status=400
+            )
         return _accessioning_error_response(exc)
     result.manifest_item.refresh_from_db()
     run = _operation_run_queryset().get(id=result.operation_run.id)
@@ -6928,8 +8084,14 @@ def lims_accessioning_manifest_item_receive(request, manifest_id: str, item_id: 
         {
             "item": _manifest_item_to_dict(result.manifest_item),
             "event": _receiving_event_to_dict(result.event) if result.event else None,
-            "discrepancy": _receiving_discrepancy_to_dict(result.discrepancy) if result.discrepancy else None,
-            "qc_result": _qc_result_to_dict(result.qc_result) if result.qc_result else None,
+            "discrepancy": (
+                _receiving_discrepancy_to_dict(result.discrepancy)
+                if result.discrepancy
+                else None
+            ),
+            "qc_result": (
+                _qc_result_to_dict(result.qc_result) if result.qc_result else None
+            ),
             "operation_run": _operation_run_to_dict(run),
         }
     )
@@ -6943,7 +8105,9 @@ def lims_accessioning_manifest_report(request, manifest_id: str):
     if forbidden:
         return forbidden
     try:
-        manifest = AccessioningManifest.objects.select_related("sample_type", "study", "site", "lab").get(id=manifest_id)
+        manifest = AccessioningManifest.objects.select_related(
+            "sample_type", "study", "site", "lab"
+        ).get(id=manifest_id)
     except (ValidationError, AccessioningManifest.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(accessioning_report(manifest))
@@ -6955,9 +8119,9 @@ def lims_receiving_discrepancies(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        queryset = ReceivingDiscrepancy.objects.select_related("manifest", "manifest_item", "biospecimen").order_by(
-            "-created_at"
-        )
+        queryset = ReceivingDiscrepancy.objects.select_related(
+            "manifest", "manifest_item", "biospecimen"
+        ).order_by("-created_at")
         if request.GET.get("manifest_id"):
             queryset = queryset.filter(manifest_id=request.GET["manifest_id"])
         if request.GET.get("status"):
@@ -6971,13 +8135,21 @@ def lims_receiving_discrepancies(request):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        manifest, error = _resolve_optional_fk(AccessioningManifest, payload.get("manifest_id"), "manifest_not_found")
+        manifest, error = _resolve_optional_fk(
+            AccessioningManifest, payload.get("manifest_id"), "manifest_not_found"
+        )
         if error:
             return error
-        item, error = _resolve_optional_fk(AccessioningManifestItem, payload.get("manifest_item_id"), "manifest_item_not_found")
+        item, error = _resolve_optional_fk(
+            AccessioningManifestItem,
+            payload.get("manifest_item_id"),
+            "manifest_item_not_found",
+        )
         if error:
             return error
-        biospecimen, error = _resolve_optional_fk(Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found")
+        biospecimen, error = _resolve_optional_fk(
+            Biospecimen, payload.get("biospecimen_id"), "biospecimen_not_found"
+        )
         if error:
             return error
         code = str(payload.get("code") or "").strip()
@@ -6986,11 +8158,16 @@ def lims_receiving_discrepancies(request):
         expected_data = payload.get("expected_data") or {}
         actual_data = payload.get("actual_data") or {}
         if not isinstance(expected_data, dict) or not isinstance(actual_data, dict):
-            return JsonResponse({"error": "expected_data and actual_data must be objects"}, status=400)
+            return JsonResponse(
+                {"error": "expected_data and actual_data must be objects"}, status=400
+            )
         try:
             discrepancy = create_receiving_discrepancy(
                 code=code,
-                recorded_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                recorded_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
                 manifest=manifest,
                 manifest_item=item,
                 biospecimen=biospecimen,
@@ -7011,7 +8188,12 @@ def lims_plate_layouts(request):
     forbidden = require_lims_permission(request, "lims.artifact.view")
     if forbidden:
         return forbidden
-    items = [_plate_layout_to_dict(item) for item in PlateLayoutTemplate.objects.filter(is_active=True).order_by("rows", "columns")]
+    items = [
+        _plate_layout_to_dict(item)
+        for item in PlateLayoutTemplate.objects.filter(is_active=True).order_by(
+            "rows", "columns"
+        )
+    ]
     return JsonResponse({"items": items})
 
 
@@ -7035,9 +8217,13 @@ def lims_processing_batches(request):
         forbidden = require_lims_permission(request, "lims.artifact.view")
         if forbidden:
             return forbidden
-        queryset = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "plates", "plates__assignments"
-        ).order_by("-created_at")
+        queryset = (
+            ProcessingBatch.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related("plates", "plates__assignments")
+            .order_by("-created_at")
+        )
         if request.GET.get("status"):
             queryset = queryset.filter(status=request.GET["status"])
         if request.GET.get("sample_type_id"):
@@ -7051,15 +8237,21 @@ def lims_processing_batches(request):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        sample_type, error = _resolve_optional_fk(BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found")
+        sample_type, error = _resolve_optional_fk(
+            BiospecimenType, payload.get("sample_type_id"), "sample_type_not_found"
+        )
         if error:
             return error
         if sample_type is None:
             return JsonResponse({"error": "sample_type_id is required"}, status=400)
-        study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+        study, error = _resolve_optional_fk(
+            Study, payload.get("study_id"), "study_not_found"
+        )
         if error:
             return error
-        site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+        site, error = _resolve_optional_fk(
+            Site, payload.get("site_id"), "site_not_found"
+        )
         if error:
             return error
         lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
@@ -7083,17 +8275,23 @@ def lims_processing_batches(request):
             if error:
                 return error
             if layout_template is None:
-                return JsonResponse({"error": "layout_template_id is required"}, status=400)
+                return JsonResponse(
+                    {"error": "layout_template_id is required"}, status=400
+                )
             plate_metadata = plate_payload.get("metadata") or {}
             if not isinstance(plate_metadata, dict):
-                return JsonResponse({"error": "plate metadata must be an object"}, status=400)
+                return JsonResponse(
+                    {"error": "plate metadata must be an object"}, status=400
+                )
             assignments_payload = plate_payload.get("assignments") or []
             if not isinstance(assignments_payload, list):
                 return JsonResponse({"error": "assignments must be a list"}, status=400)
             prepared_assignments: list[dict[str, object]] = []
             for assignment_payload in assignments_payload:
                 if not isinstance(assignment_payload, dict):
-                    return JsonResponse({"error": "assignment must be an object"}, status=400)
+                    return JsonResponse(
+                        {"error": "assignment must be an object"}, status=400
+                    )
                 biospecimen, error = _resolve_optional_fk(
                     Biospecimen,
                     assignment_payload.get("biospecimen_id"),
@@ -7102,10 +8300,14 @@ def lims_processing_batches(request):
                 if error:
                     return error
                 if biospecimen is None:
-                    return JsonResponse({"error": "biospecimen_id is required"}, status=400)
+                    return JsonResponse(
+                        {"error": "biospecimen_id is required"}, status=400
+                    )
                 assignment_metadata = assignment_payload.get("metadata") or {}
                 if not isinstance(assignment_metadata, dict):
-                    return JsonResponse({"error": "assignment metadata must be an object"}, status=400)
+                    return JsonResponse(
+                        {"error": "assignment metadata must be an object"}, status=400
+                    )
                 raw_position = assignment_payload.get("position_index")
                 if raw_position in ("", None):
                     position_index = None
@@ -7113,12 +8315,16 @@ def lims_processing_batches(request):
                     try:
                         position_index = int(raw_position)
                     except (TypeError, ValueError):
-                        return JsonResponse({"error": "invalid_position_index"}, status=400)
+                        return JsonResponse(
+                            {"error": "invalid_position_index"}, status=400
+                        )
                 prepared_assignments.append(
                     {
                         "biospecimen": biospecimen,
                         "position_index": position_index,
-                        "well_label": str(assignment_payload.get("well_label") or "").strip(),
+                        "well_label": str(
+                            assignment_payload.get("well_label") or ""
+                        ).strip(),
                         "metadata": assignment_metadata,
                     }
                 )
@@ -7139,21 +8345,35 @@ def lims_processing_batches(request):
                 lab=lab,
                 notes=str(payload.get("notes") or "").strip(),
                 metadata=metadata,
-                created_by=str(getattr(request, "auth_user_id", None) or request.headers.get("X-User-Id", "")).strip(),
+                created_by=str(
+                    getattr(request, "auth_user_id", None)
+                    or request.headers.get("X-User-Id", "")
+                ).strip(),
             )
         except BatchPlateError as exc:
             return _batch_plate_error_response(exc)
         batch.refresh_from_db()
-        return JsonResponse(_processing_batch_to_dict(batch, include_plates=True), status=201)
+        return JsonResponse(
+            _processing_batch_to_dict(batch, include_plates=True), status=201
+        )
     return JsonResponse({"error": "method_not_allowed"}, status=405)
 
 
 @csrf_exempt
 def lims_processing_batch_detail(request, batch_id: str):
     try:
-        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
-        ).get(id=batch_id)
+        batch = (
+            ProcessingBatch.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related(
+                "plates",
+                "plates__layout_template",
+                "plates__assignments",
+                "plates__assignments__biospecimen",
+            )
+            .get(id=batch_id)
+        )
     except (ValidationError, ProcessingBatch.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     if request.method == "GET":
@@ -7168,10 +8388,14 @@ def lims_processing_batch_detail(request, batch_id: str):
         payload = _parse_json_body(request)
         if payload is None:
             return JsonResponse({"error": "invalid_json"}, status=400)
-        study, error = _resolve_optional_fk(Study, payload.get("study_id"), "study_not_found")
+        study, error = _resolve_optional_fk(
+            Study, payload.get("study_id"), "study_not_found"
+        )
         if error:
             return error
-        site, error = _resolve_optional_fk(Site, payload.get("site_id"), "site_not_found")
+        site, error = _resolve_optional_fk(
+            Site, payload.get("site_id"), "site_not_found"
+        )
         if error:
             return error
         lab, error = _resolve_optional_fk(Lab, payload.get("lab_id"), "lab_not_found")
@@ -7226,9 +8450,18 @@ def lims_processing_batch_worksheet(request, batch_id: str):
     if forbidden:
         return forbidden
     try:
-        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
-        ).get(id=batch_id)
+        batch = (
+            ProcessingBatch.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related(
+                "plates",
+                "plates__layout_template",
+                "plates__assignments",
+                "plates__assignments__biospecimen",
+            )
+            .get(id=batch_id)
+        )
     except (ValidationError, ProcessingBatch.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     return JsonResponse(processing_batch_worksheet(batch))
@@ -7242,9 +8475,18 @@ def lims_processing_batch_worksheet_print_job(request, batch_id: str):
     if forbidden:
         return forbidden
     try:
-        batch = ProcessingBatch.objects.select_related("sample_type", "study", "site", "lab").prefetch_related(
-            "plates", "plates__layout_template", "plates__assignments", "plates__assignments__biospecimen"
-        ).get(id=batch_id)
+        batch = (
+            ProcessingBatch.objects.select_related(
+                "sample_type", "study", "site", "lab"
+            )
+            .prefetch_related(
+                "plates",
+                "plates__layout_template",
+                "plates__assignments",
+                "plates__assignments__biospecimen",
+            )
+            .get(id=batch_id)
+        )
     except (ValidationError, ProcessingBatch.DoesNotExist):
         return JsonResponse({"error": "not_found"}, status=404)
     payload = _parse_json_body(request)
@@ -7256,7 +8498,9 @@ def lims_processing_batch_worksheet_print_job(request, batch_id: str):
             destination=str(payload.get("destination") or "worksheet-preview").strip(),
             template_ref=str(payload.get("template_ref") or "a4/batch-rows").strip(),
             output_format=str(payload.get("output_format") or "pdf").strip(),
-            pdf_sheet_preset=str(payload.get("pdf_sheet_preset") or "a4-38x21.2").strip(),
+            pdf_sheet_preset=str(
+                payload.get("pdf_sheet_preset") or "a4-38x21.2"
+            ).strip(),
         )
     except BatchPlateError as exc:
         return _batch_plate_error_response(exc)

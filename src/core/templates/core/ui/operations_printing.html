@@ -1,8 +1,11 @@
 {% extends base_template %}
 {% block title %}Printing Operations{% endblock %}
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Printing Operations" page_summary="Admin-style printing workspace for templates, jobs, and gateways with blue-shaded emphasis on operational actions." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Printing" %}
-{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Manage templates, run test prints, and keep gateway heartbeats current from one workspace." form_aria_label="Printing filters" clear_url="/ui/operations/printing" first_name="job_status" first_label="Job status" first_options=job_status_options first_value=job_status_filter first_empty_label="All job statuses" second_name="gateway_status" second_label="Gateway status" second_options=gateway_status_options second_value=gateway_status_filter second_empty_label="All gateway statuses" submit_label="Apply" %}
+{% url 'ui_operations_dashboard_page' as operations_dashboard_url %}
+{% url 'ui_operations_printing_page' as operations_printing_url %}
+{% url 'ui_model_select_options' as ui_model_select_options_url %}
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Printing Operations" page_summary="Admin-style printing workspace for templates, jobs, and gateways with blue-shaded emphasis on operational actions." parent_label="Operations" parent_url=operations_dashboard_url current_label="Printing" %}
+{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Manage templates, run test prints, and keep gateway heartbeats current from one workspace." form_aria_label="Printing filters" clear_url=operations_printing_url first_name="job_status" first_label="Job status" first_options=job_status_options first_value=job_status_filter first_empty_label="All job statuses" second_name="gateway_status" second_label="Gateway status" second_options=gateway_status_options second_value=gateway_status_filter second_empty_label="All gateway statuses" submit_label="Apply" %}
 {{ payload.templates|json_script:"printing-templates-data" }}
 
 <div class="cards">
@@ -41,8 +44,8 @@
   {% include "core/ui/includes/panel_header.html" with panel_title="Run test print" panel_description="Select a template, destination, and optional payload override before submitting a test job." %}
   <div class="section-stack" data-ui-action-form="print-job-test">
     <div class="field-grid field-grid--wide">
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url="/api/v1/ui/model-select-options?source=print_templates" placeholder="Search templates by name, ref, or format" %}
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Destination" endpoint_url="/api/v1/ui/model-select-options?source=print_gateways" placeholder="Search printers by name, ref, or site" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url=ui_model_select_options_url|add:'?source=print_templates' placeholder="Search templates by name, ref, or format" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Destination" endpoint_url=ui_model_select_options_url|add:'?source=print_gateways' placeholder="Search printers by name, ref, or site" %}
     </div>
     <label class="field-group"><span class="field-label">Payload JSON</span><input class="input" data-field="payload" placeholder='payload JSON (optional; defaults to template sample)' aria-label="Payload JSON"></label>
     <p class="form-hint">Leave payload blank to reuse the selected template sample payload.</p>

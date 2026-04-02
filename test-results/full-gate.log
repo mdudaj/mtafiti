@@ -1,0 +1,13 @@
+Writing validation artifacts to /home/jmduda/KodeX.2026/mtafiti/test-results
+Docs workflow gate passed.
+OpenAPI contract drift gate passed.
+Knowledge graph artifacts are up to date.
+ Container mtafiti-postgres-1 Running 
+ Container mtafiti-postgres-1 Waiting 
+ Container mtafiti-postgres-1 Healthy 
+........................................................................ [ 26%]
+........................................................................ [ 52%]
+........................................................................ [ 79%]
+........................................................                 [100%]
+- generated xml file: /home/jmduda/KodeX.2026/mtafiti/test-results/pytest-full-gate.xml -
+272 passed, 2 deselected in 7441.76s (2:04:01)

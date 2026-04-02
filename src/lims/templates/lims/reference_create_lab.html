@@ -1,7 +1,9 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Create lab" %}
+{% url 'lims_reference_page' as lims_reference_url %}
+{% url 'lims:reference_select_options' as lims_reference_select_options_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url=lims_reference_url current_label="Create lab" %}
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-lab-create">
@@ -10,11 +12,11 @@
     <label class="field-group"><span class="field-label">Lab name</span><input class="input" data-lims-field="lab-name" /></label>
     <label class="field-group"><span class="field-label">Lab code</span><input class="input" data-lims-field="lab-code" placeholder="Auto-generated from lab name, but editable" /></label>
     <label class="field-group"><span class="field-label">Address line</span><input class="input" data-lims-field="lab-address" /></label>
-    {% include "core/ui/includes/ajax_model_select.html" with field_name="street_id" hidden_data_field="lab-street-id" field_label="Street" endpoint_url="/api/v1/lims/reference/select-options?source=streets" placeholder="Search street, ward, district, or region" %}
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="street_id" hidden_data_field="lab-street-id" field_label="Street" endpoint_url=lims_reference_select_options_url|add:'?source=streets' placeholder="Search street, ward, district, or region" %}
     <p class="muted">Selecting a street will automatically infer ward, district, region, country, and postcode when possible.</p>
     <div class="button-row">
       <button class="button" type="button" onclick="createLab()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_business</span><span>Create lab</span></button>
-      <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+      <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
     </div>
   </div>
 </section>

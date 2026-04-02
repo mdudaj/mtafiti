@@ -1,7 +1,9 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Create site" %}
+{% url 'lims_reference_page' as lims_reference_url %}
+{% url 'lims:reference_select_options' as lims_reference_select_options_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url=lims_reference_url current_label="Create site" %}
 
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-site-create">
@@ -27,12 +29,12 @@
       </select>
     </label>
     <label class="field-group"><span class="field-label">Address line</span><input class="input" data-lims-field="site-address" /></label>
-    {% include "core/ui/includes/ajax_model_select.html" with field_name="region_id" hidden_data_field="site-region-id" field_label="City / region" endpoint_url="/api/v1/lims/reference/select-options?source=regions" placeholder="Search city or region" %}
-    {% include "core/ui/includes/ajax_model_select.html" with field_name="district_id" hidden_data_field="site-district-id" field_label="District" endpoint_url="/api/v1/lims/reference/select-options?source=districts" placeholder="Search district" %}
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="region_id" hidden_data_field="site-region-id" field_label="City / region" endpoint_url=lims_reference_select_options_url|add:'?source=regions' placeholder="Search city or region" %}
+    {% include "core/ui/includes/ajax_model_select.html" with field_name="district_id" hidden_data_field="site-district-id" field_label="District" endpoint_url=lims_reference_select_options_url|add:'?source=districts' placeholder="Search district" %}
     <p class="muted">Choose either a city / region for a coarse site location or a district when you need more detail. Ward, street, country, and postcode are derived through the saved relationships.</p>
     <div class="button-row">
       <button class="button" type="button" onclick="createSite()"><span class="material-symbols-outlined button-icon" aria-hidden="true">location_city</span><span>Create site</span></button>
-      <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+      <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
     </div>
   </div>
 </section>

@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Tasks" parent_url="/lims/tasks/" current_label=payload.task.title %}
+{% url 'lims_task_inbox_page' as lims_task_inbox_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Tasks" parent_url=lims_task_inbox_url current_label=payload.task.title %}
 {{ payload.task_json|json_script:"lims-task-runtime" }}
 
 <div class="stat-grid">
@@ -37,7 +38,7 @@
       </article>
     </div>
     <div class="button-row">
-      <a class="button button-secondary" href="/lims/tasks/">Back to inbox</a>
+      <a class="button button-secondary" href="{{ lims_task_inbox_url }}">Back to inbox</a>
       {% if payload.task.adapter_surface %}
       <a class="button button-secondary" href="{{ payload.task.adapter_surface }}">Open receiving {{ payload.task.source_mode|default:"workflow" }} surface</a>
       {% endif %}
@@ -152,7 +153,7 @@
             {% if item.id == payload.task.id %}
             Current task
             {% elif item.status == "open" or item.status == "awaiting_approval" %}
-            <a href="/lims/operations/{{ payload.task.operation_definition_id }}/runs/{{ payload.task.operation_run_id }}/tasks/{{ item.id }}/">Open task →</a>
+            <a href="{{ item.page_url }}">Open task →</a>
             {% else %}
             -
             {% endif %}
@@ -184,7 +185,7 @@ function limsNextTaskUrl(runPayload) {
   if (!nextTask) {
     return "";
   }
-  return `/lims/operations/${runPayload.operation_definition_id}/runs/${runPayload.id}/tasks/${nextTask.id}/`;
+  return nextTask.page_url || "";
 }
 
 async function submitCurrentTask() {
@@ -202,7 +203,7 @@ async function submitCurrentTask() {
     limsFeedback(error.message || "Task submission failed", true);
     return;
   }
-  limsTaskRedirect(limsNextTaskUrl(runPayload) || "/lims/tasks/", "Task submitted", false);
+  limsTaskRedirect(limsNextTaskUrl(runPayload) || limsTaskRuntime.inbox_url, "Task submitted", false);
 }
 
 async function approveCurrentTask() {
@@ -218,6 +219,6 @@ async function approveCurrentTask() {
     limsFeedback(error.message || "Task approval failed", true);
     return;
   }
-  limsTaskRedirect(limsNextTaskUrl(runPayload) || "/lims/tasks/", "Task approval recorded", false);
+  limsTaskRedirect(limsNextTaskUrl(runPayload) || limsTaskRuntime.inbox_url, "Task approval recorded", false);
 }
 {% endblock %}

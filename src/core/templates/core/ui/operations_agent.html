@@ -1,8 +1,10 @@
 {% extends base_template %}
 {% block title %}Agent Monitor{% endblock %}
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Agent Monitor" page_summary="Review recent agent runs, inspect status, and apply lifecycle actions from a table-first operations surface." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Agent monitor" %}
-{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to narrow the monitor before applying complete/fail actions." form_aria_label="Project filter" clear_url="/ui/operations/agent" submit_label="Filter" %}
+{% url 'ui_operations_dashboard_page' as operations_dashboard_url %}
+{% url 'ui_operations_agent_page' as operations_agent_url %}
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Agent Monitor" page_summary="Review recent agent runs, inspect status, and apply lifecycle actions from a table-first operations surface." parent_label="Operations" parent_url=operations_dashboard_url current_label="Agent monitor" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to narrow the monitor before applying complete/fail actions." form_aria_label="Project filter" clear_url=operations_agent_url submit_label="Filter" %}
 <section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Recent agent runs" panel_description="Operational list view with inline controls for permitted actions." %}
   <div class="table-wrap">

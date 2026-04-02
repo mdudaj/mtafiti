@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Author form" %}
+{% url 'lims_metadata_page' as lims_metadata_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url=lims_metadata_url current_label="Author form" %}
 
 {% if payload.capabilities.can_manage_metadata %}
 <section class="panel" data-lims-action="metadata-schema-create">
@@ -28,7 +29,7 @@
     <label class="field-group"><span class="field-label">Draft change summary</span><input class="input" data-lims-field="schema-change-summary" value="Initial draft" /></label>
     <div class="button-row">
       <button class="button" type="button" onclick="createDraftForm()"><span class="material-symbols-outlined button-icon" aria-hidden="true">schema</span><span>Create form + draft</span></button>
-      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+      <a class="button button-secondary" href="{{ lims_metadata_url }}">Back to metadata</a>
     </div>
   </div>
 </section>
