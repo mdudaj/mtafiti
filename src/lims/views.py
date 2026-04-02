@@ -263,6 +263,8 @@ def _dashboard_payload(request) -> dict[str, object]:
     dashboard_links = resolve_action_descriptors(
         request,
         descriptors=LIMS_DASHBOARD_ACTION_DESCRIPTORS,
+        page_key="lims-dashboard",
+        route_name="lims_dashboard_page",
     )
     payload["launchpad"] = dashboard_links
     payload["card_links"] = {item["key"]: item for item in dashboard_links}
