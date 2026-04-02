@@ -25,6 +25,7 @@ from core.navigation import (
     resolve_action_descriptors,
     resolve_navigation,
 )
+from core.ui_shell import resolve_ui_base_template
 
 from .models import (
     AccessioningManifest,
@@ -231,6 +232,7 @@ def _page_context(
 ) -> dict[str, object]:
     return {
         "active_nav": active_nav,
+        "base_template": resolve_ui_base_template(),
         "payload": payload,
         **_ui_feedback_context(request),
     }
@@ -789,23 +791,6 @@ def _metadata_launchpad_payload(request) -> dict[str, object]:
     return payload
 
 
-def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
-    payload = _page_payload_base(
-        request,
-        active_key="lims-metadata",
-        title="Create vocabulary",
-        summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
-        kicker="Metadata setup",
-    )
-    payload["domain_options"] = [
-        _model_to_option(item)
-        for item in MetadataVocabularyDomain.objects.filter(is_active=True).order_by(
-            "name"
-        )
-    ]
-    return payload
-
-
 def _metadata_create_field_page_payload(request) -> dict[str, object]:
     payload = _page_payload_base(
         request,
@@ -881,6 +866,23 @@ def _metadata_create_schema_page_payload(request) -> dict[str, object]:
     payload["sample_type_options"] = [
         {"value": item.key, "label": item.name}
         for item in BiospecimenType.objects.order_by("name")
+    ]
+    return payload
+
+
+def _metadata_create_vocabulary_page_payload(request) -> dict[str, object]:
+    payload = _page_payload_base(
+        request,
+        active_key="lims-metadata",
+        title="Create vocabulary",
+        summary="Seed one controlled vocabulary and its initial items on a dedicated setup page.",
+        kicker="Metadata setup",
+    )
+    payload["domain_options"] = [
+        _model_to_option(item)
+        for item in MetadataVocabularyDomain.objects.filter(is_active=True).order_by(
+            "name"
+        )
     ]
     return payload
 

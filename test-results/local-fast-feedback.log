@@ -1,7 +1,0 @@
-Writing validation artifacts to /home/jmduda/KodeX.2026/mtafiti/test-results
- Container mtafiti-postgres-1 Running 
- Container mtafiti-postgres-1 Waiting 
- Container mtafiti-postgres-1 Healthy 
-...                                                                      [100%]
-- generated xml file: /home/jmduda/KodeX.2026/mtafiti/test-results/pytest-targeted.xml -
-3 passed, 29 deselected in 41.97s

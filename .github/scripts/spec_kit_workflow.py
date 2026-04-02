@@ -9,9 +9,38 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
-REPO_ROOT = Path(os.environ.get("SPEC_KIT_WORKFLOW_ROOT", Path(__file__).resolve().parents[2])).resolve()
+REPO_ROOT = Path(
+    os.environ.get("SPEC_KIT_WORKFLOW_ROOT", Path(__file__).resolve().parents[2])
+).resolve()
 TASK_RE = re.compile(r"^- \[(?P<done>[ xX])\]\s+(?P<body>.+)$")
+
+REQUIRED_SPEC_SECTIONS: list[tuple[str, tuple[str, ...]]] = [
+    ("Intent", ("Intent",)),
+    ("System Context", ("System Context",)),
+    ("Repository Context", ("Repository Context",)),
+    ("Goals", ("Goals",)),
+    ("Non-Goals", ("Non-Goals",)),
+    ("Success Criteria", ("Success Criteria", "Measurable Outcomes")),
+    ("Delivery Mapping", ("Delivery Mapping",)),
+]
+
+REQUIRED_PLAN_SECTIONS: list[tuple[str, tuple[str, ...]]] = [
+    ("Summary", ("Summary",)),
+    ("Technical Context", ("Technical Context",)),
+    ("Constitution Check", ("Constitution Check",)),
+    ("Research & Repository Evidence", ("Research & Repository Evidence",)),
+    ("Resolved Design Decisions", ("Resolved Design Decisions",)),
+    ("Implementation Readiness Anchors", ("Implementation Readiness Anchors",)),
+    ("Initial Issue Split", ("Initial Issue Split",)),
+    ("Planned Validation", ("Planned Validation",)),
+]
+
+REQUIRED_TASK_PREFIXES = (
+    "phase 1",
+    "phase 2",
+    "phase 3",
+    "notes",
+)
 
 
 @dataclass(frozen=True)
@@ -57,7 +86,10 @@ def relative_to_repo(path: Path) -> str:
 
 
 def normalize_heading(value: str) -> str:
-    return re.sub(r"\s+", " ", value.strip().lower())
+    cleaned = value.strip().lower()
+    cleaned = re.sub(r"\*", "", cleaned)
+    cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def extract_title(text: str) -> str:
@@ -91,6 +123,20 @@ def extract_section(text: str, *candidate_titles: str) -> str:
             collected.append(body_line)
         return "\n".join(collected).strip()
     return ""
+
+
+def extract_heading_titles(text: str) -> list[str]:
+    titles: list[str] = []
+    for line in text.splitlines():
+        match = re.match(r"^(#{1,6})\s+(.*)$", line)
+        if match:
+            titles.append(normalize_heading(match.group(2)))
+    return titles
+
+
+def has_heading_prefix(headings: list[str], prefix: str) -> bool:
+    normalized_prefix = normalize_heading(prefix)
+    return any(item.startswith(normalized_prefix) for item in headings)
 
 
 def first_meaningful_line(text: str) -> str:
@@ -142,13 +188,16 @@ def build_issue_body(feature: str) -> str:
     tasks_text = read_text(bundle.tasks_path)
 
     title = clean_feature_title(extract_title(spec_text))
+    intent = extract_section(spec_text, "Intent")
     summary = extract_section(plan_text, "Summary")
     success = extract_section(spec_text, "Success Criteria", "Measurable Outcomes")
     delivery = extract_section(spec_text, "Delivery Mapping")
     repository_context = extract_section(spec_text, "Repository Context")
     total_tasks, done_tasks, previews = parse_tasks(tasks_text)
 
-    deliverables = previews[:5] or ["Convert the approved plan into implementation-sized tasks."]
+    deliverables = previews[:5] or [
+        "Convert the approved plan into implementation-sized tasks."
+    ]
     acceptance_items = bulletize(
         success,
         fallback="Feature behavior matches the approved spec and plan.",
@@ -159,9 +208,15 @@ def build_issue_body(feature: str) -> str:
         f"`{relative_to_repo(bundle.tasks_path)}`",
     ]
     if repository_context:
-        reference_items.extend(bulletize(repository_context, fallback="Repository context captured in the spec."))
+        reference_items.extend(
+            bulletize(
+                repository_context, fallback="Repository context captured in the spec."
+            )
+        )
 
-    objective = first_meaningful_line(summary) or f"Implement `{title}` from the approved spec-kit bundle."
+    objective = first_meaningful_line(intent) or first_meaningful_line(summary)
+    if not objective:
+        objective = f"Implement `{title}` from the approved spec-kit bundle."
     dependency_items = bulletize(delivery, fallback="Depends on: None")
 
     lines = [
@@ -236,8 +291,15 @@ def build_pr_body(feature: str, issue_number: str | None = None) -> str:
     )
     total_tasks, done_tasks, _ = parse_tasks(tasks_text)
 
-    issue_line = f"- [ ] Linked issue: #{issue_number}" if issue_number else "- [ ] Linked issue:"
-    summary_line = first_meaningful_line(summary) or f"This PR implements `{title}` from the approved spec-kit bundle."
+    issue_line = (
+        f"- [ ] Linked issue: #{issue_number}"
+        if issue_number
+        else "- [ ] Linked issue:"
+    )
+    summary_line = (
+        first_meaningful_line(summary)
+        or f"This PR implements `{title}` from the approved spec-kit bundle."
+    )
 
     lines = [
         "## Summary",
@@ -297,24 +359,60 @@ def validate(feature: str) -> list[str]:
     for path in (bundle.spec_path, bundle.plan_path, bundle.tasks_path):
         if not path.exists():
             errors.append(f"missing required file: {relative_to_repo(path)}")
+    if errors:
+        return errors
+
+    spec_text = read_text(bundle.spec_path)
+    plan_text = read_text(bundle.plan_path)
+    tasks_text = read_text(bundle.tasks_path)
+
+    for label, candidate_titles in REQUIRED_SPEC_SECTIONS:
+        if not extract_section(spec_text, *candidate_titles):
+            errors.append(
+                f"missing required spec section '{label}': {relative_to_repo(bundle.spec_path)}"
+            )
+
+    for label, candidate_titles in REQUIRED_PLAN_SECTIONS:
+        if not extract_section(plan_text, *candidate_titles):
+            errors.append(
+                f"missing required plan section '{label}': {relative_to_repo(bundle.plan_path)}"
+            )
+
+    task_headings = extract_heading_titles(tasks_text)
+    for prefix in REQUIRED_TASK_PREFIXES:
+        if not has_heading_prefix(task_headings, prefix):
+            errors.append(
+                f"missing required task heading starting with '{prefix}': {relative_to_repo(bundle.tasks_path)}"
+            )
     return errors
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Bridge spec-kit feature bundles into GitHub issue and PR workflows.")
+    parser = argparse.ArgumentParser(
+        description="Bridge spec-kit feature bundles into GitHub issue and PR workflows."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    validate_parser = subparsers.add_parser("validate", help="Validate that a feature directory has the required spec-kit files.")
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Validate that a feature directory has the required spec-kit files.",
+    )
     validate_parser.add_argument("feature")
 
-    issue_parser = subparsers.add_parser("issue-body", help="Render a GitHub issue body from a feature bundle.")
+    issue_parser = subparsers.add_parser(
+        "issue-body", help="Render a GitHub issue body from a feature bundle."
+    )
     issue_parser.add_argument("feature")
 
-    pr_parser = subparsers.add_parser("pr-body", help="Render a GitHub PR body from a feature bundle.")
+    pr_parser = subparsers.add_parser(
+        "pr-body", help="Render a GitHub PR body from a feature bundle."
+    )
     pr_parser.add_argument("feature")
     pr_parser.add_argument("--issue-number")
 
-    summary_parser = subparsers.add_parser("summary", help="Emit a JSON summary for a feature bundle.")
+    summary_parser = subparsers.add_parser(
+        "summary", help="Emit a JSON summary for a feature bundle."
+    )
     summary_parser.add_argument("feature")
 
     return parser

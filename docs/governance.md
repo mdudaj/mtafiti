@@ -44,3 +44,6 @@ Policy enforcement should be introduced only after identity is in place. Start w
 * API-level checks for read/write operations
 * Task-level checks for background work (Celery) using the same tenant-aware request context
 
+## Repository workflow governance
+
+Repository-level merge controls such as branch protection and required CI checks are operational policy, not informal maintainer preference. The maintainer runbook in `docs/operations-runbooks.md` and the helper in `.github/scripts/configure_branch_protection.py` define the auditable way to apply those controls.

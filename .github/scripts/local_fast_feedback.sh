@@ -4,11 +4,25 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+REPORTS_DIR="$ROOT_DIR/test-results"
+mkdir -p "$REPORTS_DIR"
+
 FULL_GATE=0
 if [[ "${1:-}" == "--full-gate" ]]; then
   FULL_GATE=1
   shift
 fi
+
+LOG_FILE="$REPORTS_DIR/local-fast-feedback.log"
+PYTEST_REPORT="$REPORTS_DIR/pytest-targeted.xml"
+if [[ $FULL_GATE -eq 1 ]]; then
+  LOG_FILE="$REPORTS_DIR/full-gate.log"
+  PYTEST_REPORT="$REPORTS_DIR/pytest-full-gate.xml"
+fi
+
+exec > >(tee "$LOG_FILE") 2>&1
+
+echo "Writing validation artifacts to $REPORTS_DIR"
 
 if [[ $FULL_GATE -eq 1 ]]; then
   RELEVANT_PENDING_FILES="$(
@@ -37,8 +51,21 @@ if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
 fi
 
 cd src
+PYTEST_ARGS=("$@")
+HAS_JUNITXML=0
+for arg in "${PYTEST_ARGS[@]}"; do
+  if [[ "$arg" == "--junitxml" || "$arg" == --junitxml=* ]]; then
+    HAS_JUNITXML=1
+    break
+  fi
+done
+
+if [[ $HAS_JUNITXML -eq 0 ]]; then
+  PYTEST_ARGS+=("--junitxml=$PYTEST_REPORT")
+fi
+
 if [[ $# -gt 0 ]]; then
-  "$PYTHON_BIN" -m pytest -q "$@"
+  "$PYTHON_BIN" -m pytest -q "${PYTEST_ARGS[@]}"
 else
-  "$PYTHON_BIN" -m pytest -q -k "not performance_baseline"
+  "$PYTHON_BIN" -m pytest -q -k "not performance_baseline" "${PYTEST_ARGS[@]}"
 fi

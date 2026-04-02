@@ -1,8 +1,10 @@
 {% extends "lims/base.html" %}
 
-{% block content %}
+{% block page_heading %}
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Workspace" current_label="LIMS dashboard" %}
+{% endblock %}
 
+{% block page_content %}
 <div class="stat-grid">
   {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="records" count_value=payload.cards.labs link_href=payload.card_links.reference.href link_label="Open reference" %}
   {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="published + draft" count_value=payload.cards.schemas link_href=payload.card_links.metadata.href link_label="Open metadata" %}
