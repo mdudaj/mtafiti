@@ -16,20 +16,7 @@
 
 <section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="LIMS launchpad" panel_description="Move across the major operational areas without dropping back to raw JSON APIs." %}
-  <div class="cards">
-    {% for item in payload.launchpad %}
-    <article class="card">
-      <div class="panel-header">
-        <div>
-          <h2 class="panel-title">{{ item.title }}</h2>
-          <p class="panel-description">{{ item.description }}</p>
-        </div>
-        <span class="utility-chip">{{ item.enabled|yesno:"ready,restricted" }}</span>
-      </div>
-      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
-    </article>
-    {% endfor %}
-  </div>
+  {% include "core/ui/includes/action_card_grid.html" with items=payload.launchpad action_namespace="lims" show_state_chip=True empty_title="No launchpad actions available" empty_description="No LIMS launchpad actions are currently available for this workspace." %}
 </section>
 
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">

@@ -374,6 +374,50 @@ def test_lims_launchpads_render_canonical_action_links():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_lims_launchpads_use_shared_action_card_grid_markup():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-action-card-grid")
+
+    reference = client.get(
+        reverse("lims_reference_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    metadata = client.get(
+        reverse("lims_metadata_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    task_inbox = client.get(
+        reverse("lims_task_inbox_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    receiving = client.get(
+        reverse("lims_receiving_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    storage = client.get(
+        reverse("lims_storage_inventory_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    for response in (reference, metadata, task_inbox, receiving, storage):
+        assert response.status_code == 200
+        assert b"action-card-grid" in response.content
+        assert b'class="card action-card' in response.content
+
+    assert b'data-action-card="reference-create-lab"' in reference.content
+    assert b'data-lims-action="reference-create-lab"' in reference.content
+    assert b'data-action-card="metadata-create-vocabulary"' in metadata.content
+    assert b'data-action-card="task-open-receiving"' in task_inbox.content
+    assert b'data-action-card="receiving-single"' in receiving.content
+    assert b'data-action-card="storage-create-location"' in storage.content
+
+
+@pytest.mark.django_db(transaction=True)
 def test_lims_dashboard_renders_canonical_quick_links():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-dashboard-links")

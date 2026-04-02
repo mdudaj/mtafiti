@@ -1,0 +1,11 @@
+<div class="row action-card-grid" role="list">
+  {% for item in items %}
+  <div class="col s12 m6 l4 action-card-grid__item" role="listitem">
+    {% include "core/ui/includes/action_card.html" with item=item action_namespace=action_namespace show_state_chip=show_state_chip action_label=action_label disabled_label=disabled_label %}
+  </div>
+  {% empty %}
+  <div class="action-card-grid__empty">
+    {% include "core/ui/includes/empty_state.html" with empty_icon=empty_icon|default:"dashboard_customize" empty_title=empty_title|default:"No actions available" empty_description=empty_description|default:"No operational actions are currently available for this page." %}
+  </div>
+  {% endfor %}
+</div>
