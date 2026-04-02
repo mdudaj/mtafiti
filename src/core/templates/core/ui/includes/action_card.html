@@ -1,0 +1,45 @@
+{% with resolved_url=item.resolved_url|default:item.href is_enabled=item.enabled|default:True %}
+{% if is_enabled and resolved_url %}
+<a href="{{ resolved_url }}"
+   class="card action-card"
+   data-action-card="{{ item.key }}"
+   {% if action_namespace == "lims" %}data-lims-action="{{ item.key }}"{% endif %}
+   aria-label="{{ item.title }}">
+  <div class="action-card__header">
+    <div class="action-card__copy">
+      <h2 class="panel-title action-card__title">{{ item.title }}</h2>
+      <p class="panel-description action-card__description">{{ item.description }}</p>
+    </div>
+    {% if show_state_chip %}
+    <span class="utility-chip action-card__chip">{{ is_enabled|yesno:"ready,restricted" }}</span>
+    {% elif item.icon %}
+    <span class="nav-icon material-symbols-outlined action-card__icon" aria-hidden="true">{{ item.icon }}</span>
+    {% endif %}
+  </div>
+  <div class="action-card__footer">
+    <span class="action-card__action-label">{{ action_label|default:"Open" }} {{ item.title|lower }}</span>
+    <span class="material-symbols-outlined action-card__arrow" aria-hidden="true">arrow_forward</span>
+  </div>
+</a>
+{% else %}
+<div class="card action-card action-card--disabled"
+     data-action-card="{{ item.key }}"
+     {% if action_namespace == "lims" %}data-lims-action="{{ item.key }}"{% endif %}
+     aria-disabled="true"
+     tabindex="0">
+  <div class="action-card__header">
+    <div class="action-card__copy">
+      <h2 class="panel-title action-card__title">{{ item.title }}</h2>
+      <p class="panel-description action-card__description">{{ item.description }}</p>
+    </div>
+    {% if item.icon %}
+    <span class="nav-icon material-symbols-outlined action-card__icon" aria-hidden="true">{{ item.icon }}</span>
+    {% endif %}
+  </div>
+  <div class="action-card__footer">
+    <span class="action-card__action-label">{{ disabled_label|default:"Unavailable for current role" }}</span>
+    <span class="utility-chip action-card__chip">restricted</span>
+  </div>
+</div>
+{% endif %}
+{% endwith %}

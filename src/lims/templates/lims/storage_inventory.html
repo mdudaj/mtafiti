@@ -13,24 +13,7 @@
 
 <section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Choose a storage or inventory workflow" panel_description="Administration stays split into focused pages so hierarchy, placement, catalog, lot, and ledger actions are not mixed together." %}
-  <div class="cards">
-    {% for item in payload.actions %}
-    {% if item.enabled %}
-    <article class="card">
-      <div class="panel-header">
-        <div>
-          <h2 class="panel-title">{{ item.title }}</h2>
-          <p class="panel-description">{{ item.description }}</p>
-        </div>
-        <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
-      </div>
-      <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
-    </article>
-    {% endif %}
-    {% empty %}
-    <article class="card"><p>No storage or inventory admin actions are available for your current role.</p></article>
-    {% endfor %}
-  </div>
+  {% include "core/ui/includes/action_card_grid.html" with items=payload.actions action_namespace="lims" empty_title="No storage or inventory actions available" empty_description="No storage or inventory administration actions are currently available for this role." %}
 </section>
 
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
