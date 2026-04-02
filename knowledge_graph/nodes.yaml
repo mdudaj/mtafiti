@@ -4798,6 +4798,12 @@ nodes:
     description: "Python module at src/core/tests.py."
     path: src/core/tests.py
   -
+    id: module:core_ui_shell
+    type: Module
+    name: core.ui_shell
+    description: "Python module at src/core/ui_shell.py."
+    path: src/core/ui_shell.py
+  -
     id: module:core_views
     type: Module
     name: core.views

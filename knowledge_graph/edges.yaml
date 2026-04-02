@@ -1160,6 +1160,10 @@ edges:
     from: module:core_tests
     to: framework:django
   -
+    relationship: uses
+    from: module:core_ui_shell
+    to: framework:django
+  -
     relationship: implements
     from: module:core_views
     to: skill:compose_operations_dashboard_contract
@@ -1249,6 +1253,10 @@ edges:
     to: module:core_tasks
   -
     relationship: uses
+    from: module:core_views
+    to: module:core_ui_shell
+  -
+    relationship: uses
     from: module:lims_apps
     to: framework:django
   -
@@ -1311,6 +1319,10 @@ edges:
     relationship: uses
     from: module:lims_views
     to: module:core_navigation
+  -
+    relationship: uses
+    from: module:lims_views
+    to: module:core_ui_shell
   -
     relationship: uses
     from: module:tenants_admin

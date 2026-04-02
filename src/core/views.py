@@ -8,15 +8,12 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.models import Max, Q
 from django.db.utils import DatabaseError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
-from django.template import TemplateDoesNotExist
-from django.template.loader import get_template
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
@@ -85,6 +82,7 @@ from .navigation import (
 from .notifications import dispatch_notification, process_notification_queue
 from .printing_renderers import render_label_preview
 from .tasks import evaluate_quality_rule, execute_connector_run, execute_retention_run
+from .ui_shell import resolve_ui_base_template
 
 DEFAULT_PRINT_TEMPLATE_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
@@ -7578,13 +7576,7 @@ def _user_portal_dashboard_payload(request) -> dict[str, Any]:
 
 
 def _ui_base_template() -> str:
-    if settings.EDMP_UI_MATERIAL_ENABLED:
-        try:
-            get_template("material/base.html")
-            return "material/base.html"
-        except TemplateDoesNotExist:
-            pass
-    return "core/ui/base_fallback.html"
+    return resolve_ui_base_template()
 
 
 def _ui_feedback_context(request) -> dict[str, Any]:
@@ -7788,6 +7780,7 @@ def user_portal_dashboard_page(request):
         "core/ui/user_dashboard.html",
         {
             "active_nav": "home",
+            "base_template": _ui_base_template(),
             "payload": with_navigation(
                 _user_portal_dashboard_payload(request),
                 resolve_navigation(

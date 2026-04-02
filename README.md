@@ -265,6 +265,13 @@ See `docs/spec-kit-workflow.md` for the repository-specific workflow, branch nam
 .github/scripts/local_fast_feedback.sh --full-gate
 ```
 
+Validation artifacts are written to `./test-results/` by default:
+
+* `test-results/local-fast-feedback.log`
+* `test-results/full-gate.log`
+* `test-results/pytest-targeted.xml`
+* `test-results/pytest-full-gate.xml`
+
 ### Local operations UI preview (django-material optional)
 
 ```bash

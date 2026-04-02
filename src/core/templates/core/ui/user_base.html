@@ -1,11 +1,11 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Mtafiti Workspace{% endblock %}</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" />
-    <style>
+{% extends base_template %}
+
+{% block title %}Mtafiti Workspace{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1" />
+<style>
       :root {
         --color-primary: #0277bd;
         --color-primary-strong: #01579b;
@@ -83,6 +83,7 @@
       .nav a.active, .nav a:hover { background: rgba(219, 234, 254, 0.14); border-color: rgba(191, 219, 254, 0.3); color: #fff; }
       .content { padding: 28px; }
       .page-shell { display: flex; flex-direction: column; gap: 18px; }
+      .shell-slot:empty { display: none; }
       .page-shell--flush {
         margin: -28px 0 0;
       }
@@ -434,9 +435,13 @@
         .fab { right: 16px; bottom: 16px; }
       }
     </style>
-  </head>
-  <body>
+{% endblock %}
+
+{% block bodyclass %}with-sidebar mtafiti-ui-shell{% endblock %}
+
+{% block body %}
     <a href="#main-content" class="skip-link">Skip to content</a>
+    {% block shell_frame %}
     <div class="layout" data-sidebar-collapsed="false" data-ui-shell="workspace">
       <aside class="sidebar">
         <div class="sidebar-account">
@@ -478,8 +483,10 @@
               </div>
               <div class="topbar-right">
                 {% block topbar_actions %}
-                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">notifications</span><span>Notifications</span> <span class="utility-count">2</span></span>
-                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">description</span><span>Templates</span> <span class="utility-count">{{ payload.cards.templates }}</span></span>
+                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">apartment</span><span>{{ payload.user_context.tenant_schema }}</span></span>
+                {% if payload.user_context.roles %}
+                <span class="utility-chip"><span class="icon-badge material-symbols-outlined" aria-hidden="true">verified_user</span><span>{{ payload.user_context.roles|length }} role{% if payload.user_context.roles|length != 1 %}s{% endif %}</span></span>
+                {% endif %}
                 <details class="account-menu">
                   <summary class="utility-button"><span class="icon-badge material-symbols-outlined" aria-hidden="true">manage_accounts</span><span>Account</span></summary>
                   <div class="account-dropdown">
@@ -494,11 +501,15 @@
             {% if ui_message %}
               {% include "core/ui/includes/snackbar.html" with message=ui_message is_error=ui_error %}
             {% endif %}
-            {% block content %}{% endblock %}
+            <section class="shell-slot" data-shell-slot="heading">{% block page_heading %}{% endblock %}</section>
+            <section class="shell-slot actions" data-shell-slot="actions">{% block page_actions %}{% endblock %}</section>
+            <aside class="shell-slot panel" data-shell-slot="workflow-guidance">{% block workflow_guidance %}{% endblock %}</aside>
+            <section class="shell-slot" data-shell-slot="main-content">{% block page_content %}{% block content %}{% endblock %}{% endblock %}</section>
           </div>
           {% block floating_action %}{% endblock %}
         </main>
       </div>
+    {% endblock %}
     <script>
       (function initializeUiShell() {
         const layout = document.querySelector('[data-ui-shell="workspace"]');
@@ -715,5 +726,4 @@
       }
       {% block extra_scripts %}{% endblock %}
     </script>
-  </body>
-</html>
+{% endblock %}

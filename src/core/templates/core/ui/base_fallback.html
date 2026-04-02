@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    {% block head %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Mtafiti Operations{% endblock %}</title>
@@ -444,8 +445,11 @@
         .fab { right: 16px; bottom: 16px; }
       }
     </style>
+    {% block extrahead %}{% endblock %}
+    {% endblock %}
   </head>
-  <body>
+  <body class="{% block bodyclass %}{% endblock %}">
+    {% block body %}
     <a href="#main-content" class="skip-link">Skip to content</a>
     <div class="layout" data-sidebar-collapsed="false" data-ui-shell="operations">
       <aside class="sidebar">
@@ -774,5 +778,6 @@
         edmpUiAction(`/api/v1/agent/runs/${runId}/transition`, payload);
       }
     </script>
+    {% endblock %}
   </body>
 </html>
