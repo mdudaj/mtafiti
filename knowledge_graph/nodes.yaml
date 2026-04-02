@@ -4768,6 +4768,12 @@ nodes:
     description: "Python module at src/core/models.py."
     path: src/core/models.py
   -
+    id: module:core_navigation
+    type: Module
+    name: core.navigation
+    description: "Python module at src/core/navigation.py."
+    path: src/core/navigation.py
+  -
     id: module:core_notifications
     type: Module
     name: core.notifications

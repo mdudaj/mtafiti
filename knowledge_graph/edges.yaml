@@ -1113,6 +1113,14 @@ edges:
     to: framework:django
   -
     relationship: uses
+    from: module:core_navigation
+    to: framework:django
+  -
+    relationship: uses
+    from: module:core_navigation
+    to: module:core_identity
+  -
+    relationship: uses
     from: module:core_notifications
     to: framework:django
   -
@@ -1226,6 +1234,10 @@ edges:
   -
     relationship: uses
     from: module:core_views
+    to: module:core_navigation
+  -
+    relationship: uses
+    from: module:core_views
     to: module:core_notifications
   -
     relationship: uses
@@ -1295,6 +1307,10 @@ edges:
     relationship: uses
     from: module:lims_views
     to: module:core_models
+  -
+    relationship: uses
+    from: module:lims_views
+    to: module:core_navigation
   -
     relationship: uses
     from: module:tenants_admin
