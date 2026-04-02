@@ -140,13 +140,16 @@ def validate_branch_policy(branch_name: str, event_name: str) -> list[str]:
     ]
 
 
-def validate_commit_subjects(commit_subjects: list[str], branch_name: str) -> list[str]:
+def validate_commit_subjects(
+    commit_subjects: list[str], branch_name: str, event_name: str = ""
+) -> list[str]:
     if not commit_subjects or branch_name in {"", "main", "master", "HEAD"}:
         return []
 
     invalid_subjects = [
         subject
         for subject in commit_subjects
+        if not (event_name == "pull_request" and subject.startswith("Merge "))
         if not COMMIT_SUBJECT_PATTERN.match(subject)
     ]
     if not invalid_subjects:
@@ -276,7 +279,9 @@ def main() -> int:
     errors.extend(validate_branch_policy(branch_name, args.event_name))
     errors.extend(
         validate_commit_subjects(
-            run_git_log_subjects(args.base_ref or None), branch_name
+            run_git_log_subjects(args.base_ref or None),
+            branch_name,
+            args.event_name,
         )
     )
     errors.extend(

@@ -53,6 +53,30 @@ def test_commit_subjects_require_conventional_commits():
     assert "address feedback" in errors[0]
 
 
+def test_pull_request_commit_subjects_ignore_synthetic_merge_subjects():
+    module = _load_module()
+    errors = module.validate_commit_subjects(
+        [
+            "Merge abcdef0123456789 into 1234567890abcdef",
+            "feat(shell): add navigation resolver",
+        ],
+        "feat/spec-kit-workflow",
+        "pull_request",
+    )
+    assert errors == []
+
+    errors = module.validate_commit_subjects(
+        [
+            "Merge branch 'main' into feat/spec-kit-workflow",
+            "feat(shell): add navigation resolver",
+        ],
+        "feat/spec-kit-workflow",
+        "push",
+    )
+    assert errors
+    assert "Merge branch 'main' into feat/spec-kit-workflow" in errors[0]
+
+
 def test_pull_request_metadata_requires_template_sections_and_non_wip_title(
     tmp_path,
 ):
