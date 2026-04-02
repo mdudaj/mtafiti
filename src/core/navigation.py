@@ -18,6 +18,8 @@ class ShellResolutionContext:
     tenant_schema: str
     user_id: str
     roles: frozenset[str]
+    page_states: frozenset[str]
+    data_facts: Mapping[str, Any]
 
 
 ResolutionGate = Callable[[ShellResolutionContext], bool]
@@ -63,12 +65,31 @@ class ActionDescriptor:
     workflow_key: str | None = None
     permission_gate: ResolutionGate | None = None
     enabled_gate: ResolutionGate | None = None
+    data_gate: ResolutionGate | None = None
     status: str | None = None
+    sequence: int | None = None
+    primary_action: bool = False
+    required_states: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if bool(self.route_name) == bool(self.workflow_key):
             raise ValueError(
                 "action descriptors must define exactly one of route_name or workflow_key"
+            )
+
+
+@dataclass(frozen=True)
+class OperationPageDescriptor:
+    key: str
+    title: str
+    route_name: str | None = None
+    navigation_key: str | None = None
+    action_descriptors: tuple[ActionDescriptor, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.route_name and not self.navigation_key:
+            raise ValueError(
+                "operation pages must define at least one of route_name or navigation_key"
             )
 
 
@@ -577,6 +598,8 @@ def build_resolution_context(
     *,
     page_key: str | None = None,
     route_name: str | None = None,
+    page_states: Iterable[str] | None = None,
+    data_facts: Mapping[str, Any] | None = None,
 ) -> ShellResolutionContext:
     tenant = getattr(request, "tenant", None)
     return ShellResolutionContext(
@@ -586,6 +609,8 @@ def build_resolution_context(
         tenant_schema=getattr(tenant, "schema_name", "public"),
         user_id=(request.headers.get("X-User-Id") or "anonymous").strip(),
         roles=frozenset(request_roles(request)),
+        page_states=frozenset(page_states or ()),
+        data_facts=dict(data_facts or {}),
     )
 
 
@@ -676,22 +701,81 @@ def resolve_action_descriptors(
     descriptors: Iterable[ActionDescriptor],
     page_key: str | None = None,
     route_name: str | None = None,
+    page_states: Iterable[str] | None = None,
+    data_facts: Mapping[str, Any] | None = None,
+    workflow_entries: Mapping[str, WorkflowEntry] | None = None,
+) -> list[dict[str, Any]]:
+    return resolve_operation_cards(
+        request,
+        descriptors=descriptors,
+        page_key=page_key,
+        route_name=route_name,
+        page_states=page_states,
+        data_facts=data_facts,
+        workflow_entries=workflow_entries,
+    )
+
+
+def resolve_operation_page(
+    request: HttpRequest,
+    *,
+    descriptor: OperationPageDescriptor,
+    page_states: Iterable[str] | None = None,
+    data_facts: Mapping[str, Any] | None = None,
+    allowed_action_payloads: Iterable[Mapping[str, Any]] | None = None,
+    workflow_entries: Mapping[str, WorkflowEntry] | None = None,
+) -> dict[str, Any]:
+    return {
+        "key": descriptor.key,
+        "title": descriptor.title,
+        "route_name": descriptor.route_name,
+        "navigation_key": descriptor.navigation_key,
+        "action_cards": resolve_operation_cards(
+            request,
+            descriptors=descriptor.action_descriptors,
+            page_key=descriptor.key,
+            route_name=descriptor.route_name,
+            page_states=page_states,
+            data_facts=data_facts,
+            allowed_action_payloads=allowed_action_payloads,
+            workflow_entries=workflow_entries,
+        ),
+    }
+
+
+def resolve_operation_cards(
+    request: HttpRequest,
+    *,
+    descriptors: Iterable[ActionDescriptor] = (),
+    page_key: str | None = None,
+    route_name: str | None = None,
+    page_states: Iterable[str] | None = None,
+    data_facts: Mapping[str, Any] | None = None,
+    allowed_action_payloads: Iterable[Mapping[str, Any]] | None = None,
     workflow_entries: Mapping[str, WorkflowEntry] | None = None,
 ) -> list[dict[str, Any]]:
     context = build_resolution_context(
         request,
         page_key=page_key,
         route_name=route_name,
+        page_states=page_states,
+        data_facts=data_facts,
     )
     effective_workflow_entries = workflow_entries or resolve_workflow_entries(
         request,
         page_key=page_key,
         route_name=route_name,
     )
-    items: list[dict[str, Any]] = []
-    for descriptor in descriptors:
+    items: list[tuple[tuple[int, int], dict[str, Any]]] = []
+    for index, descriptor in enumerate(descriptors):
         if descriptor.permission_gate is not None and not descriptor.permission_gate(
             context
+        ):
+            continue
+        if descriptor.data_gate is not None and not descriptor.data_gate(context):
+            continue
+        if not _matches_required_states(
+            descriptor.required_states, context.page_states
         ):
             continue
         href = _resolve_descriptor_href(
@@ -702,21 +786,38 @@ def resolve_action_descriptors(
         if href is None:
             continue
         items.append(
-            {
-                "key": descriptor.key,
-                "title": descriptor.title,
-                "description": descriptor.description,
-                "icon": descriptor.icon,
-                "href": href,
-                "enabled": (
-                    True
-                    if descriptor.enabled_gate is None
-                    else descriptor.enabled_gate(context)
-                ),
-                "status": descriptor.status,
-            }
+            (
+                _operation_card_sort_key(descriptor.sequence, index),
+                {
+                    "key": descriptor.key,
+                    "title": descriptor.title,
+                    "description": descriptor.description,
+                    "icon": descriptor.icon,
+                    "href": href,
+                    "resolved_url": href,
+                    "enabled": (
+                        True
+                        if descriptor.enabled_gate is None
+                        else descriptor.enabled_gate(context)
+                    ),
+                    "status": descriptor.status,
+                    "sequence": descriptor.sequence,
+                    "primary_action": descriptor.primary_action,
+                    "workflow_key": descriptor.workflow_key,
+                    "route_name": descriptor.route_name,
+                },
+            )
         )
-    return items
+    for index, payload in enumerate(allowed_action_payloads or ()):  # pragma: no branch
+        normalized = _normalize_allowed_action_payload(
+            payload,
+            workflow_entries=effective_workflow_entries,
+            fallback_index=index + len(items),
+        )
+        if normalized is None:
+            continue
+        items.append(normalized)
+    return [item for _, item in sorted(items, key=lambda entry: entry[0])]
 
 
 def _resolve_descriptor_href(
@@ -737,3 +838,56 @@ def _reverse_route(route_name: str) -> str | None:
         return reverse(route_name)
     except NoReverseMatch:
         return None
+
+
+def _matches_required_states(
+    required_states: tuple[str, ...], page_states: frozenset[str]
+) -> bool:
+    if not required_states:
+        return True
+    return bool(page_states.intersection(required_states))
+
+
+def _operation_card_sort_key(
+    sequence: int | None, fallback_index: int
+) -> tuple[int, int]:
+    if sequence is None:
+        return (1, fallback_index)
+    return (0, sequence)
+
+
+def _normalize_allowed_action_payload(
+    payload: Mapping[str, Any],
+    *,
+    workflow_entries: Mapping[str, WorkflowEntry],
+    fallback_index: int,
+) -> tuple[tuple[int, int], dict[str, Any]] | None:
+    route_name = payload.get("route_name")
+    workflow_key = payload.get("workflow_key")
+    resolved_url = payload.get("resolved_url") or payload.get("href")
+    if route_name and workflow_key:
+        raise ValueError(
+            "operation action payloads must define at most one of route_name or workflow_key"
+        )
+    if resolved_url is None:
+        resolved_url = _resolve_descriptor_href(
+            route_name, workflow_key, workflow_entries
+        )
+    if not resolved_url:
+        return None
+    sequence = payload.get("sequence")
+    item = {
+        "key": str(payload.get("key") or payload.get("id") or fallback_index),
+        "title": str(payload.get("title") or payload.get("label") or "Action"),
+        "description": str(payload.get("description") or ""),
+        "icon": str(payload.get("icon") or "play_arrow"),
+        "href": resolved_url,
+        "resolved_url": resolved_url,
+        "enabled": bool(payload.get("enabled", True)),
+        "status": payload.get("status"),
+        "sequence": sequence,
+        "primary_action": bool(payload.get("primary_action", False)),
+        "workflow_key": workflow_key,
+        "route_name": route_name,
+    }
+    return (_operation_card_sort_key(sequence, fallback_index), item)

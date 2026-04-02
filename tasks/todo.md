@@ -1,4 +1,8 @@
 # Task Tracking
 
-- Issue #132: extend the ontology-driven shell registry to resolve one real contextual action surface through canonical workflow entries.
-- Status: completed for the shell navigation registry, the LIMS reference, task inbox, metadata, receiving, storage launchpads, the remaining LIMS and operations dashboard quick links, the follow-on local route normalization for parent, clear, back, and task-detail links, the cleanup that removed the last page-route literal and switched route-sensitive navigation regressions to named-route expectations, the final Python-side normalization of task mutation URLs plus the canonical receiving adapter surface, the remaining LIMS and operations UI page-request tests that were still asserting against literal page paths, and the low-risk template cleanup that replaced static selector API endpoint literals with named API routes.
+- Issue #135: implement operation-page descriptor resolution and deterministic action filtering.
+- Plan:
+	- define the operation-page and action-card resolver contract in `src/core/navigation.py`
+	- route existing launchpad payloads through the shared resolver without expanding into rendering-only work
+	- add targeted resolver and launchpad regression tests
+	- run targeted validation for navigation and LIMS/operations UI payloads

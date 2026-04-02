@@ -7298,6 +7298,8 @@ def _ui_operations_dashboard_payload(request) -> dict[str, Any]:
     dashboard_links = resolve_action_descriptors(
         request,
         descriptors=OPERATIONS_DASHBOARD_ACTION_DESCRIPTORS,
+        page_key="dashboard",
+        route_name="ui_operations_dashboard_page",
     )
     return {
         "project_id": project_id,

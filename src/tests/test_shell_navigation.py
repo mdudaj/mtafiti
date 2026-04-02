@@ -5,9 +5,12 @@ from django.urls import reverse
 from core.navigation import (
     ActionDescriptor,
     NavigationDescriptor,
+    OperationPageDescriptor,
     WorkflowEntry,
     resolve_action_descriptors,
     resolve_navigation,
+    resolve_operation_cards,
+    resolve_operation_page,
 )
 
 
@@ -128,6 +131,14 @@ def test_action_descriptor_requires_exactly_one_target():
         )
 
 
+def test_operation_page_descriptor_requires_surface_binding():
+    with pytest.raises(ValueError):
+        OperationPageDescriptor(
+            key="receiving",
+            title="Receiving",
+        )
+
+
 def test_resolve_action_descriptors_supports_workflow_entries():
     request = RequestFactory().get("/")
     sample_accession_url = reverse("lims_reference_sample_accession_page")
@@ -164,8 +175,13 @@ def test_resolve_action_descriptors_supports_workflow_entries():
             "description": "Open the canonical workflow entry.",
             "icon": "conversion_path",
             "href": sample_accession_url,
+            "resolved_url": sample_accession_url,
             "enabled": True,
             "status": None,
+            "sequence": None,
+            "primary_action": False,
+            "workflow_key": "sample-accession",
+            "route_name": None,
         }
     ]
 
@@ -201,8 +217,13 @@ def test_resolve_action_descriptors_reports_enabled_state():
             "description": "This action is enabled.",
             "icon": "check",
             "href": user_portal_url,
+            "resolved_url": user_portal_url,
             "enabled": True,
             "status": None,
+            "sequence": None,
+            "primary_action": False,
+            "workflow_key": None,
+            "route_name": "user_portal_dashboard_page",
         },
         {
             "key": "disabled",
@@ -210,7 +231,159 @@ def test_resolve_action_descriptors_reports_enabled_state():
             "description": "This action is disabled.",
             "icon": "block",
             "href": user_portal_url,
+            "resolved_url": user_portal_url,
             "enabled": False,
             "status": None,
+            "sequence": None,
+            "primary_action": False,
+            "workflow_key": None,
+            "route_name": "user_portal_dashboard_page",
         },
     ]
+
+
+def test_resolve_operation_cards_orders_sequences_before_fallback_order():
+    request = RequestFactory().get("/")
+    user_portal_url = reverse("user_portal_dashboard_page")
+
+    cards = resolve_operation_cards(
+        request,
+        descriptors=(
+            ActionDescriptor(
+                key="fallback-first",
+                title="Fallback first",
+                description="First authored fallback.",
+                icon="looks_one",
+                route_name="user_portal_dashboard_page",
+            ),
+            ActionDescriptor(
+                key="sequenced-two",
+                title="Sequenced two",
+                description="Second by sequence.",
+                icon="filter_2",
+                route_name="user_portal_dashboard_page",
+                sequence=20,
+            ),
+            ActionDescriptor(
+                key="sequenced-one",
+                title="Sequenced one",
+                description="First by sequence.",
+                icon="filter_1",
+                route_name="user_portal_dashboard_page",
+                sequence=10,
+                primary_action=True,
+            ),
+            ActionDescriptor(
+                key="fallback-second",
+                title="Fallback second",
+                description="Second authored fallback.",
+                icon="looks_two",
+                route_name="user_portal_dashboard_page",
+            ),
+        ),
+    )
+
+    assert [card["key"] for card in cards] == [
+        "sequenced-one",
+        "sequenced-two",
+        "fallback-first",
+        "fallback-second",
+    ]
+    assert cards[0]["resolved_url"] == user_portal_url
+    assert cards[0]["primary_action"] is True
+
+
+def test_resolve_operation_cards_filters_by_required_state_and_data_gate():
+    request = RequestFactory().get("/")
+
+    cards = resolve_operation_cards(
+        request,
+        descriptors=(
+            ActionDescriptor(
+                key="open-only",
+                title="Open only",
+                description="Only visible while open.",
+                icon="draft",
+                route_name="user_portal_dashboard_page",
+                required_states=("open",),
+            ),
+            ActionDescriptor(
+                key="data-only",
+                title="Data only",
+                description="Only visible when data is available.",
+                icon="database",
+                route_name="user_portal_dashboard_page",
+                data_gate=lambda context: bool(context.data_facts.get("has_batches")),
+            ),
+        ),
+        page_states=("open",),
+        data_facts={"has_batches": False},
+    )
+
+    assert [card["key"] for card in cards] == ["open-only"]
+
+
+def test_resolve_operation_cards_supports_allowed_action_payloads():
+    request = RequestFactory().get("/")
+    sample_accession_url = reverse("lims_reference_sample_accession_page")
+
+    cards = resolve_operation_cards(
+        request,
+        allowed_action_payloads=(
+            {
+                "key": "missing-route",
+                "title": "Missing route",
+                "route_name": "does_not_exist",
+            },
+            {
+                "key": "workflow-card",
+                "title": "Workflow card",
+                "description": "Uses workflow resolution.",
+                "icon": "conversion_path",
+                "workflow_key": "sample-accession",
+                "sequence": 5,
+            },
+            {
+                "key": "resolved-card",
+                "title": "Resolved card",
+                "description": "Uses a direct resolved URL.",
+                "icon": "link",
+                "resolved_url": reverse("user_portal_dashboard_page"),
+            },
+        ),
+        workflow_entries={
+            "sample-accession": WorkflowEntry(
+                key="sample-accession",
+                href=sample_accession_url,
+            )
+        },
+    )
+
+    assert [card["key"] for card in cards] == ["workflow-card", "resolved-card"]
+    assert cards[0]["resolved_url"] == sample_accession_url
+
+
+def test_resolve_operation_page_uses_descriptor_identity_for_context():
+    request = RequestFactory().get("/")
+    operation_page = resolve_operation_page(
+        request,
+        descriptor=OperationPageDescriptor(
+            key="receiving-operations",
+            title="Receiving operations",
+            route_name="lims_receiving_page",
+            action_descriptors=(
+                ActionDescriptor(
+                    key="stateful-card",
+                    title="Stateful card",
+                    description="Only visible for queued state.",
+                    icon="hourglass_top",
+                    route_name="lims_receiving_single_page",
+                    required_states=("queued",),
+                ),
+            ),
+        ),
+        page_states=("queued",),
+    )
+
+    assert operation_page["key"] == "receiving-operations"
+    assert [card["key"] for card in operation_page["action_cards"]] == ["stateful-card"]
