@@ -4,12 +4,12 @@
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Workspace" current_label="LIMS dashboard" %}
 
 <div class="stat-grid">
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="records" count_value=payload.cards.labs link_href="/lims/reference/" link_label="Open reference" %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="published + draft" count_value=payload.cards.schemas link_href="/lims/metadata/" link_label="Open metadata" %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Biospecimens" count_label="registered" count_value=payload.cards.biospecimens link_href="/lims/biospecimens/" link_label="Open biospecimens" %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Manifests" count_label="intake runs" count_value=payload.cards.manifests link_href="/lims/receiving/" link_label="Open receiving" %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Batches" count_label="processing sets" count_value=payload.cards.batches link_href="/lims/processing/" link_label="Open processing" %}
-  {% include "core/ui/includes/count_stat_card.html" with card_title="Storage nodes" count_label="tracked locations" count_value=payload.cards.storage_locations link_href="/lims/storage/" link_label="Open storage" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="records" count_value=payload.cards.labs link_href=payload.card_links.reference.href link_label="Open reference" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Schemas" count_label="published + draft" count_value=payload.cards.schemas link_href=payload.card_links.metadata.href link_label="Open metadata" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Biospecimens" count_label="registered" count_value=payload.cards.biospecimens link_href=payload.card_links.biospecimens.href link_label="Open biospecimens" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Manifests" count_label="intake runs" count_value=payload.cards.manifests link_href=payload.card_links.receiving.href link_label="Open receiving" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Batches" count_label="processing sets" count_value=payload.cards.batches link_href=payload.card_links.processing.href link_label="Open processing" %}
+  {% include "core/ui/includes/count_stat_card.html" with card_title="Storage nodes" count_label="tracked locations" count_value=payload.cards.storage_locations link_href=payload.card_links.storage.href link_label="Open storage" %}
 </div>
 
 <section class="panel">
@@ -22,7 +22,7 @@
           <h2 class="panel-title">{{ item.title }}</h2>
           <p class="panel-description">{{ item.description }}</p>
         </div>
-        <span class="utility-chip">{{ item.status }}</span>
+        <span class="utility-chip">{{ item.enabled|yesno:"ready,restricted" }}</span>
       </div>
       <p><a href="{{ item.href }}">Open {{ item.title|lower }} →</a></p>
     </article>

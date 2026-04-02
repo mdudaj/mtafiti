@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url="/lims/reference/" current_label="Sample accession" %}
+{% url 'lims_reference_page' as lims_reference_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url=lims_reference_url current_label="Sample accession" %}
 {{ payload.reference_bundle|json_script:"lims-sample-accession-bundle" }}
 {{ payload.recent_runs|json_script:"lims-sample-accession-runs" }}
 
@@ -10,7 +11,7 @@
   {% include "core/ui/includes/panel_header.html" with panel_title="Provision reference bundle" panel_description="Create or repair the canonical sample-accession package, workflow, and published operation used by transitional receiving adapters." %}
   <div class="button-row">
     <button class="button" type="button" onclick="provisionSampleAccessionBundle()"><span class="material-symbols-outlined button-icon" aria-hidden="true">conversion_path</span><span>Provision sample accession bundle</span></button>
-    <a class="button button-secondary" href="/lims/reference/">Back to reference</a>
+    <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
   </div>
 </section>
 {% endif %}

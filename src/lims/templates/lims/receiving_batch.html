@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url="/lims/receiving/" current_label="Batch manifest" %}
+{% url 'lims_receiving_page' as lims_receiving_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url=lims_receiving_url current_label="Batch manifest" %}
 
 {% if payload.capabilities.can_manage_artifacts %}
 <section class="panel" data-lims-action="receiving-manifest-create">
@@ -36,7 +37,7 @@
     <label class="field-group"><span class="field-label">Notes</span><textarea class="textarea" rows="4" data-lims-field="manifest-notes"></textarea></label>
     <div class="button-row">
       <button class="button" type="button" onclick="importBatchManifest()"><span class="material-symbols-outlined button-icon" aria-hidden="true">upload_file</span><span>Import batch receipt</span></button>
-      <a class="button button-secondary" href="/lims/receiving/">Back to receiving</a>
+      <a class="button button-secondary" href="{{ lims_receiving_url }}">Back to receiving</a>
     </div>
   </div>
 </section>

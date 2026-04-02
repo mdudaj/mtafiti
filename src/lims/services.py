@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from datetime import date, datetime
-from datetime import timedelta
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Callable
@@ -14,6 +13,7 @@ from urllib import request as urllib_request
 from urllib.parse import urljoin, urlsplit
 
 from django.db import IntegrityError, transaction
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -27,10 +27,9 @@ from .models import (
     BatchPlate,
     BatchPlateAssignment,
     Biospecimen,
-    BiospecimenStorageRecord,
     BiospecimenPool,
     BiospecimenPoolMember,
-    MaterialUsageRecord,
+    BiospecimenStorageRecord,
     BiospecimenType,
     Country,
     District,
@@ -47,28 +46,29 @@ from .models import (
     InventoryLot,
     InventoryMaterial,
     InventoryTransaction,
+    MaterialUsageRecord,
     MetadataFieldDefinition,
     MetadataSchemaBinding,
-    OperationDefinition,
-    OperationRun,
-    OperationVersion,
     MetadataSchemaField,
     MetadataSchemaVersion,
     MetadataVocabulary,
     MetadataVocabularyDomain,
     MetadataVocabularyItem,
-    SubmissionRecord,
-    QCResult,
-    StorageLocation,
-    TaskRun,
+    OperationDefinition,
+    OperationRun,
+    OperationVersion,
     PlateLayoutTemplate,
     Postcode,
     ProcessingBatch,
-    Region,
+    QCResult,
     ReceivingDiscrepancy,
     ReceivingEvent,
+    Region,
+    StorageLocation,
     Street,
+    SubmissionRecord,
     TanzaniaAddressSyncRun,
+    TaskRun,
     Ward,
     WorkflowEdgeTemplate,
     WorkflowNodeTemplate,
@@ -403,7 +403,13 @@ def _save_existing_sync_record(instance, values: dict[str, object]):
     return instance, False
 
 
-def _update_or_create_sync_record(model, *, lookup: dict[str, object], defaults: dict[str, object], fallbacks: list[dict[str, object]]):
+def _update_or_create_sync_record(
+    model,
+    *,
+    lookup: dict[str, object],
+    defaults: dict[str, object],
+    fallbacks: list[dict[str, object]],
+):
     for fallback in fallbacks:
         candidate = model.objects.filter(**fallback).first()
         if candidate is not None:
@@ -543,7 +549,9 @@ def _process_item(
         district_items: list[dict[str, str]] = []
         for link in parse_directory_links(html, item["url"]):
             district, created = _upsert_district(region, link)
-            _increment_stat(run, "districts_created" if created else "districts_updated")
+            _increment_stat(
+                run, "districts_created" if created else "districts_updated"
+            )
             district_items.append(
                 {
                     "level": "district",
@@ -598,7 +606,9 @@ def _process_item(
         postcode_code = parse_postcode(html)
         if postcode_code:
             postcode, created = _upsert_postcode(street, link, postcode_code)
-            _increment_stat(run, "postcodes_created" if created else "postcodes_updated")
+            _increment_stat(
+                run, "postcodes_created" if created else "postcodes_updated"
+            )
         return
 
     raise ValueError(f"unsupported_sync_level:{level}")
@@ -621,7 +631,9 @@ def sync_run_to_dict(run: TanzaniaAddressSyncRun) -> dict[str, object]:
         "triggered_by": run.triggered_by or None,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
-        "next_not_before_at": run.next_not_before_at.isoformat() if run.next_not_before_at else None,
+        "next_not_before_at": (
+            run.next_not_before_at.isoformat() if run.next_not_before_at else None
+        ),
     }
 
 
@@ -650,7 +662,16 @@ def process_tanzania_address_sync_run(
 
     run.status = TanzaniaAddressSyncRun.Status.RUNNING
     run.last_error = ""
-    run.save(update_fields=["checkpoint", "stats", "started_at", "status", "last_error", "updated_at"])
+    run.save(
+        update_fields=[
+            "checkpoint",
+            "stats",
+            "started_at",
+            "status",
+            "last_error",
+            "updated_at",
+        ]
+    )
 
     remaining_budget = max(1, run.request_budget)
     try:
@@ -680,7 +701,9 @@ def process_tanzania_address_sync_run(
                 _increment_stat(run, "failure_count")
                 run.status = TanzaniaAddressSyncRun.Status.PAUSED
                 run.last_error = str(exc)
-                run.next_not_before_at = timezone.now() + timedelta(seconds=max(run.throttle_seconds, 5))
+                run.next_not_before_at = timezone.now() + timedelta(
+                    seconds=max(run.throttle_seconds, 5)
+                )
                 run.save(
                     update_fields=[
                         "checkpoint",
@@ -696,7 +719,9 @@ def process_tanzania_address_sync_run(
             with transaction.atomic():
                 _process_item(run, item, html)
                 run.pages_processed += 1
-                run.next_not_before_at = timezone.now() + timedelta(seconds=run.throttle_seconds)
+                run.next_not_before_at = timezone.now() + timedelta(
+                    seconds=run.throttle_seconds
+                )
                 run.save(
                     update_fields=[
                         "checkpoint",
@@ -782,7 +807,9 @@ class OperationTaskTransitionResult:
     approval: ApprovalRecord | None = None
 
 
-def _condition_matches(condition: dict[str, object], payload: dict[str, object]) -> bool:
+def _condition_matches(
+    condition: dict[str, object], payload: dict[str, object]
+) -> bool:
     if not condition:
         return True
     field_key = str(condition.get("field") or "").strip()
@@ -833,8 +860,10 @@ def bootstrap_form_package_version_from_schema_version(
 ) -> None:
     section_map: dict[str, FormPackageSection] = {}
     choice_list_map: dict[str, FormPackageChoiceList] = {}
-    fields = schema_version.fields.select_related("vocabulary").prefetch_related("vocabulary__items").order_by(
-        "position", "field_key"
+    fields = (
+        schema_version.fields.select_related("vocabulary")
+        .prefetch_related("vocabulary__items")
+        .order_by("position", "field_key")
     )
     for index, field in enumerate(fields, start=1):
         ui_step = str((field.config or {}).get("ui_step") or "main").strip() or "main"
@@ -851,7 +880,9 @@ def bootstrap_form_package_version_from_schema_version(
             )
         choice_list = None
         if field.vocabulary_id:
-            choice_list_key = slugify(field.vocabulary.code or field.field_key) or f"choices-{index}"
+            choice_list_key = (
+                slugify(field.vocabulary.code or field.field_key) or f"choices-{index}"
+            )
             choice_list = choice_list_map.get(choice_list_key)
             if choice_list is None:
                 choice_list = FormPackageChoiceList.objects.create(
@@ -865,7 +896,9 @@ def bootstrap_form_package_version_from_schema_version(
                 )
                 choice_list_map[choice_list_key] = choice_list
                 for choice_index, vocabulary_item in enumerate(
-                    field.vocabulary.items.filter(is_active=True).order_by("sort_order", "label"),
+                    field.vocabulary.items.filter(is_active=True).order_by(
+                        "sort_order", "label"
+                    ),
                     start=1,
                 ):
                     FormPackageChoice.objects.create(
@@ -914,7 +947,11 @@ def clone_form_package_version(
             config=dict(section.config or {}),
         )
         section_map[str(section.id)] = cloned_section
-    for choice_list in source_version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key"):
+    for choice_list in (
+        source_version.choice_lists.prefetch_related("choices")
+        .all()
+        .order_by("position", "list_key")
+    ):
         cloned_choice_list = FormPackageChoiceList.objects.create(
             version=target_version,
             vocabulary=choice_list.vocabulary,
@@ -933,7 +970,11 @@ def clone_form_package_version(
                 sort_order=choice.sort_order,
                 is_active=choice.is_active,
             )
-    for group in source_version.item_groups.select_related("section").all().order_by("position", "group_key"):
+    for group in (
+        source_version.item_groups.select_related("section")
+        .all()
+        .order_by("position", "group_key")
+    ):
         cloned_group = FormPackageItemGroup.objects.create(
             version=target_version,
             section=section_map[str(group.section_id)],
@@ -946,14 +987,24 @@ def clone_form_package_version(
             config=dict(group.config or {}),
         )
         item_group_map[str(group.id)] = cloned_group
-    for item in source_version.items.select_related("section", "item_group", "choice_list").all().order_by(
-        "section__position", "position", "item_key"
+    for item in (
+        source_version.items.select_related("section", "item_group", "choice_list")
+        .all()
+        .order_by("section__position", "position", "item_key")
     ):
         FormPackageItem.objects.create(
             version=target_version,
             section=section_map[str(item.section_id)],
-            item_group=item_group_map.get(str(item.item_group_id)) if item.item_group_id else None,
-            choice_list=choice_list_map.get(str(item.choice_list_id)) if item.choice_list_id else None,
+            item_group=(
+                item_group_map.get(str(item.item_group_id))
+                if item.item_group_id
+                else None
+            ),
+            choice_list=(
+                choice_list_map.get(str(item.choice_list_id))
+                if item.choice_list_id
+                else None
+            ),
             item_key=item.item_key,
             oid=item.oid,
             question_text=item.question_text,
@@ -968,7 +1019,9 @@ def clone_form_package_version(
             config=dict(item.config or {}),
             source_field_key=item.source_field_key,
         )
-    for artifact in source_version.source_artifacts.all().order_by("created_at", "filename"):
+    for artifact in source_version.source_artifacts.all().order_by(
+        "created_at", "filename"
+    ):
         FormPackageSourceArtifact.objects.create(
             version=target_version,
             role=artifact.role,
@@ -981,14 +1034,24 @@ def clone_form_package_version(
         )
 
 
-def validate_form_package_version(version: FormPackageVersion) -> FormPackageValidationResult:
+def validate_form_package_version(
+    version: FormPackageVersion,
+) -> FormPackageValidationResult:
     sections = list(version.sections.all().order_by("position", "section_key"))
-    choice_lists = list(version.choice_lists.prefetch_related("choices").all().order_by("position", "list_key"))
-    item_groups = list(version.item_groups.select_related("section").all().order_by("position", "group_key"))
+    choice_lists = list(
+        version.choice_lists.prefetch_related("choices")
+        .all()
+        .order_by("position", "list_key")
+    )
+    item_groups = list(
+        version.item_groups.select_related("section")
+        .all()
+        .order_by("position", "group_key")
+    )
     items = list(
-        version.items.select_related("section", "item_group", "choice_list").all().order_by(
-            "section__position", "position", "item_key"
-        )
+        version.items.select_related("section", "item_group", "choice_list")
+        .all()
+        .order_by("section__position", "position", "item_key")
     )
     errors: list[dict[str, str]] = []
 
@@ -1005,9 +1068,23 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
         ("item", items),
     ):
         for item in collection:
-            key = getattr(item, "section_key", getattr(item, "list_key", getattr(item, "group_key", getattr(item, "item_key", "unknown"))))
+            key = getattr(
+                item,
+                "section_key",
+                getattr(
+                    item,
+                    "list_key",
+                    getattr(item, "group_key", getattr(item, "item_key", "unknown")),
+                ),
+            )
             if item.oid in seen_oids:
-                errors.append({"field": f"{prefix}s.{key}", "code": "duplicate_oid", "detail": item.oid})
+                errors.append(
+                    {
+                        "field": f"{prefix}s.{key}",
+                        "code": "duplicate_oid",
+                        "detail": item.oid,
+                    }
+                )
             else:
                 seen_oids[item.oid] = prefix
 
@@ -1017,11 +1094,20 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
     }
     for item in items:
         if item.field_type in choice_types and not item.choice_list_id:
-            errors.append({"field": f"items.{item.item_key}", "code": "choice_list_required"})
+            errors.append(
+                {"field": f"items.{item.item_key}", "code": "choice_list_required"}
+            )
         if item.field_type not in choice_types and item.choice_list_id:
-            errors.append({"field": f"items.{item.item_key}", "code": "choice_list_not_allowed"})
+            errors.append(
+                {"field": f"items.{item.item_key}", "code": "choice_list_not_allowed"}
+            )
         if item.item_group_id and item.item_group.section_id != item.section_id:
-            errors.append({"field": f"items.{item.item_key}", "code": "item_group_section_mismatch"})
+            errors.append(
+                {
+                    "field": f"items.{item.item_key}",
+                    "code": "item_group_section_mismatch",
+                }
+            )
 
     choice_projection = {
         str(choice_list.id): {
@@ -1030,7 +1116,9 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
             "oid": choice_list.oid,
             "title": choice_list.title,
             "description": choice_list.description,
-            "vocabulary_id": str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None,
+            "vocabulary_id": (
+                str(choice_list.vocabulary_id) if choice_list.vocabulary_id else None
+            ),
             "choices": [
                 {
                     "id": str(choice.id),
@@ -1044,9 +1132,15 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
         }
         for choice_list in choice_lists
     }
-    groups_by_section: dict[str, list[dict[str, object]]] = {str(section.id): [] for section in sections}
-    group_items: dict[str, list[dict[str, object]]] = {str(group.id): [] for group in item_groups}
-    section_items: dict[str, list[dict[str, object]]] = {str(section.id): [] for section in sections}
+    groups_by_section: dict[str, list[dict[str, object]]] = {
+        str(section.id): [] for section in sections
+    }
+    group_items: dict[str, list[dict[str, object]]] = {
+        str(group.id): [] for group in item_groups
+    }
+    section_items: dict[str, list[dict[str, object]]] = {
+        str(section.id): [] for section in sections
+    }
 
     for item in items:
         item_dict = {
@@ -1092,7 +1186,11 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
         "package_name": version.package.name,
         "version_id": str(version.id),
         "version_number": version.version_number,
-        "source_schema_version_id": str(version.source_schema_version_id) if version.source_schema_version_id else None,
+        "source_schema_version_id": (
+            str(version.source_schema_version_id)
+            if version.source_schema_version_id
+            else None
+        ),
         "sections": [
             {
                 "id": str(section.id),
@@ -1110,7 +1208,9 @@ def validate_form_package_version(version: FormPackageVersion) -> FormPackageVal
         "choice_lists": list(choice_projection.values()),
         "compiler_context": dict(version.compiler_context or {}),
     }
-    return FormPackageValidationResult(valid=not errors, errors=errors, compiled_projection=compiled_projection)
+    return FormPackageValidationResult(
+        valid=not errors, errors=errors, compiled_projection=compiled_projection
+    )
 
 
 def replace_form_package_diagnostics(
@@ -1127,7 +1227,9 @@ def replace_form_package_diagnostics(
                 stage=FormPackageCompilerDiagnostic.Stage.VALIDATE,
                 code=str(error.get("code") or "validation_error"),
                 pointer=str(error.get("field") or ""),
-                message=str(error.get("detail") or error.get("code") or "Validation error"),
+                message=str(
+                    error.get("detail") or error.get("code") or "Validation error"
+                ),
                 details=dict(error),
             )
         return
@@ -1142,7 +1244,9 @@ def replace_form_package_diagnostics(
     )
 
 
-def publish_form_package_version(version: FormPackageVersion) -> FormPackageValidationResult:
+def publish_form_package_version(
+    version: FormPackageVersion,
+) -> FormPackageValidationResult:
     result = validate_form_package_version(version)
     with transaction.atomic():
         replace_form_package_diagnostics(version=version, errors=result.errors)
@@ -1160,10 +1264,14 @@ def publish_form_package_version(version: FormPackageVersion) -> FormPackageVali
     return result
 
 
-def _publish_workflow_template_version(version: WorkflowTemplateVersion) -> WorkflowTemplateValidationResult:
+def _publish_workflow_template_version(
+    version: WorkflowTemplateVersion,
+) -> WorkflowTemplateValidationResult:
     result = validate_workflow_template_version(version)
     if not result.valid:
-        raise ReferenceOperationProvisionError("workflow_validation_failed", result.errors)
+        raise ReferenceOperationProvisionError(
+            "workflow_validation_failed", result.errors
+        )
     WorkflowTemplateVersion.objects.filter(
         template_id=version.template_id,
         status=WorkflowTemplateVersion.Status.PUBLISHED,
@@ -1174,10 +1282,14 @@ def _publish_workflow_template_version(version: WorkflowTemplateVersion) -> Work
     return result
 
 
-def _publish_operation_version(version: OperationVersion) -> OperationVersionValidationResult:
+def _publish_operation_version(
+    version: OperationVersion,
+) -> OperationVersionValidationResult:
     result = validate_operation_version(version)
     if not result.valid:
-        raise ReferenceOperationProvisionError("operation_validation_failed", result.errors)
+        raise ReferenceOperationProvisionError(
+            "operation_validation_failed", result.errors
+        )
     OperationVersion.objects.filter(
         definition_id=version.definition_id,
         status=OperationVersion.Status.PUBLISHED,
@@ -1187,10 +1299,18 @@ def _publish_operation_version(version: OperationVersion) -> OperationVersionVal
     return result
 
 
-def _create_sample_accession_form_package_version(*, package: FormPackage) -> FormPackageVersion:
+def _create_sample_accession_form_package_version(
+    *, package: FormPackage
+) -> FormPackageVersion:
     version = FormPackageVersion.objects.create(
         package=package,
-        version_number=(package.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0) + 1,
+        version_number=(
+            package.versions.order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+            or 0
+        )
+        + 1,
         change_summary="Canonical sample accession reference package.",
         compiler_context={
             "reference_operation": "sample-accession",
@@ -1244,8 +1364,12 @@ def _create_sample_accession_form_package_version(*, package: FormPackage) -> Fo
     )
     FormPackageChoice.objects.bulk_create(
         [
-            FormPackageChoice(choice_list=qc_choice_list, value="accept", label="Accept", sort_order=1),
-            FormPackageChoice(choice_list=qc_choice_list, value="reject", label="Reject", sort_order=2),
+            FormPackageChoice(
+                choice_list=qc_choice_list, value="accept", label="Accept", sort_order=1
+            ),
+            FormPackageChoice(
+                choice_list=qc_choice_list, value="reject", label="Reject", sort_order=2
+            ),
         ]
     )
     FormPackageItem.objects.bulk_create(
@@ -1422,7 +1546,9 @@ def _create_sample_accession_form_package_version(*, package: FormPackage) -> Fo
     )
     result = publish_form_package_version(version)
     if not result.valid:
-        raise ReferenceOperationProvisionError("form_package_validation_failed", result.errors)
+        raise ReferenceOperationProvisionError(
+            "form_package_validation_failed", result.errors
+        )
     version.refresh_from_db()
     return version
 
@@ -1434,7 +1560,13 @@ def _create_sample_accession_workflow_version(
 ) -> WorkflowTemplateVersion:
     version = WorkflowTemplateVersion.objects.create(
         template=template,
-        version_number=(template.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0) + 1,
+        version_number=(
+            template.versions.order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+            or 0
+        )
+        + 1,
         change_summary="Canonical sample accession reference workflow.",
     )
     start_node = WorkflowNodeTemplate.objects.create(
@@ -1453,7 +1585,10 @@ def _create_sample_accession_workflow_version(
         position=2,
         assignment_role="lims.operator",
         permission_key="lims.workflow_task.execute",
-        config={"source_modes": ["single", "batch", "edc_import"], "adapter_surface": "/lims/receiving/"},
+        config={
+            "source_modes": ["single", "batch", "edc_import"],
+            "adapter_surface": reverse("lims_receiving_page"),
+        },
     )
     qc_node = WorkflowNodeTemplate.objects.create(
         workflow_version=version,
@@ -1515,23 +1650,46 @@ def _create_sample_accession_workflow_version(
     )
     WorkflowEdgeTemplate.objects.bulk_create(
         [
-            WorkflowEdgeTemplate(workflow_version=version, source_node=start_node, target_node=intake_node, priority=1),
-            WorkflowEdgeTemplate(workflow_version=version, source_node=intake_node, target_node=qc_node, priority=1),
+            WorkflowEdgeTemplate(
+                workflow_version=version,
+                source_node=start_node,
+                target_node=intake_node,
+                priority=1,
+            ),
+            WorkflowEdgeTemplate(
+                workflow_version=version,
+                source_node=intake_node,
+                target_node=qc_node,
+                priority=1,
+            ),
             WorkflowEdgeTemplate(
                 workflow_version=version,
                 source_node=qc_node,
                 target_node=storage_node,
                 priority=1,
-                condition={"item_key": "qc_decision", "operator": "equals", "value": "accept"},
+                condition={
+                    "item_key": "qc_decision",
+                    "operator": "equals",
+                    "value": "accept",
+                },
             ),
             WorkflowEdgeTemplate(
                 workflow_version=version,
                 source_node=qc_node,
                 target_node=rejected_end,
                 priority=2,
-                condition={"item_key": "qc_decision", "operator": "equals", "value": "reject"},
+                condition={
+                    "item_key": "qc_decision",
+                    "operator": "equals",
+                    "value": "reject",
+                },
             ),
-            WorkflowEdgeTemplate(workflow_version=version, source_node=storage_node, target_node=accepted_end, priority=1),
+            WorkflowEdgeTemplate(
+                workflow_version=version,
+                source_node=storage_node,
+                target_node=accepted_end,
+                priority=1,
+            ),
         ]
     )
     _publish_workflow_template_version(version)
@@ -1547,7 +1705,12 @@ def _create_sample_accession_operation_version(
     version = OperationVersion.objects.create(
         definition=definition,
         workflow_version=workflow_version,
-        version_number=(definition.versions.order_by("-version_number").values_list("version_number", flat=True).first() or 0)
+        version_number=(
+            definition.versions.order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+            or 0
+        )
         + 1,
         change_summary="Canonical sample accession reference operation.",
         runtime_defaults={
@@ -1583,9 +1746,15 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
         },
     )
     created = created or package_created
-    form_package_version = form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED).order_by("-version_number").first()
+    form_package_version = (
+        form_package.versions.filter(status=FormPackageVersion.Status.PUBLISHED)
+        .order_by("-version_number")
+        .first()
+    )
     if form_package_version is None:
-        form_package_version = _create_sample_accession_form_package_version(package=form_package)
+        form_package_version = _create_sample_accession_form_package_version(
+            package=form_package
+        )
         created = True
 
     workflow_template, template_created = WorkflowTemplate.objects.get_or_create(
@@ -1599,7 +1768,11 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
     )
     created = created or template_created
     workflow_version = (
-        workflow_template.versions.filter(status=WorkflowTemplateVersion.Status.PUBLISHED).order_by("-version_number").first()
+        workflow_template.versions.filter(
+            status=WorkflowTemplateVersion.Status.PUBLISHED
+        )
+        .order_by("-version_number")
+        .first()
     )
     if workflow_version is None:
         workflow_version = _create_sample_accession_workflow_version(
@@ -1608,19 +1781,23 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
         )
         created = True
 
-    operation_definition, definition_created = OperationDefinition.objects.get_or_create(
-        code="sample-accession",
-        defaults={
-            "name": "Sample accession",
-            "description": "Canonical sample accession reference operation.",
-            "purpose": "Reference accessioning operation",
-            "module_scope": OperationDefinition.ModuleScope.LIMS,
-            "is_active": True,
-        },
+    operation_definition, definition_created = (
+        OperationDefinition.objects.get_or_create(
+            code="sample-accession",
+            defaults={
+                "name": "Sample accession",
+                "description": "Canonical sample accession reference operation.",
+                "purpose": "Reference accessioning operation",
+                "module_scope": OperationDefinition.ModuleScope.LIMS,
+                "is_active": True,
+            },
+        )
     )
     created = created or definition_created
     operation_version = (
-        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED).order_by("-version_number").first()
+        operation_definition.versions.filter(status=OperationVersion.Status.PUBLISHED)
+        .order_by("-version_number")
+        .first()
     )
     if operation_version is None:
         operation_version = _create_sample_accession_operation_version(
@@ -1649,14 +1826,18 @@ def _task_for_node_key(tasks: list[TaskRun], node_key: str) -> TaskRun:
     for task in tasks:
         if task.node_template.node_key == node_key:
             return task
-    raise ReferenceOperationProvisionError("workflow_task_not_found", [{"field": "node_key", "detail": node_key}])
+    raise ReferenceOperationProvisionError(
+        "workflow_task_not_found", [{"field": "node_key", "detail": node_key}]
+    )
 
 
 def _storage_reference_from_context(receipt_context: dict[str, object] | None) -> str:
     storage = (receipt_context or {}).get("storage")
     if not isinstance(storage, dict):
         return ""
-    explicit_reference = str(storage.get("storage_reference") or storage.get("reference") or "").strip()
+    explicit_reference = str(
+        storage.get("storage_reference") or storage.get("reference") or ""
+    ).strip()
     if explicit_reference:
         return explicit_reference
     parts = [
@@ -1673,7 +1854,11 @@ def _source_reference_for_single_receive(
     barcode: str,
     external_identifier: str,
 ) -> str:
-    for candidate in (sample_identifier.strip(), barcode.strip(), external_identifier.strip()):
+    for candidate in (
+        sample_identifier.strip(),
+        barcode.strip(),
+        external_identifier.strip(),
+    ):
         if candidate:
             return candidate
     return ""
@@ -1729,8 +1914,13 @@ def _drive_sample_accession_runtime(
         )
     else:
         qc_transition_result = qc_submit_result
-    if str(qc_payload.get("qc_decision") or "").strip().lower() != QCResult.Decision.REJECT:
-        storage_task = _task_for_node_key(qc_transition_result.created_tasks, "storage_logging")
+    if (
+        str(qc_payload.get("qc_decision") or "").strip().lower()
+        != QCResult.Decision.REJECT
+    ):
+        storage_task = _task_for_node_key(
+            qc_transition_result.created_tasks, "storage_logging"
+        )
         submit_task_run(
             storage_task,
             payload=storage_payload or {},
@@ -1746,7 +1936,9 @@ def _drive_sample_accession_runtime(
     return SampleAccessionAdapterResult(
         operation_run=operation_run,
         qc_result=qc_result,
-        discrepancy=qc_result.discrepancy if qc_result and qc_result.discrepancy_id else None,
+        discrepancy=(
+            qc_result.discrepancy if qc_result and qc_result.discrepancy_id else None
+        ),
         biospecimen=biospecimen,
         manifest_item=manifest_item,
     )
@@ -1776,7 +1968,10 @@ def adapt_single_receive_to_sample_accession(
     qc = (receipt_context or {}).get("qc") if isinstance(receipt_context, dict) else {}
     if not isinstance(qc, dict):
         qc = {}
-    qc_decision = str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower() or QCResult.Decision.ACCEPT
+    qc_decision = (
+        str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower()
+        or QCResult.Decision.ACCEPT
+    )
     if qc_decision not in QCResult.Decision.values:
         qc_decision = QCResult.Decision.ACCEPT
     normalized_metadata = _validate_sample_type_metadata(sample_type, metadata)
@@ -1805,15 +2000,22 @@ def adapt_single_receive_to_sample_accession(
             received_at=received_at,
         )
 
-    resolved_source_reference = source_reference.strip() or _source_reference_for_single_receive(
-        sample_identifier=specimen.sample_identifier if specimen else sample_identifier,
-        barcode=specimen.barcode if specimen else barcode,
-        external_identifier=external_identifier,
+    resolved_source_reference = (
+        source_reference.strip()
+        or _source_reference_for_single_receive(
+            sample_identifier=(
+                specimen.sample_identifier if specimen else sample_identifier
+            ),
+            barcode=specimen.barcode if specimen else barcode,
+            external_identifier=external_identifier,
+        )
     )
     intake_payload = {
         "subject_identifier": subject_identifier.strip(),
         "external_identifier": external_identifier.strip(),
-        "sample_identifier": specimen.sample_identifier if specimen else sample_identifier.strip(),
+        "sample_identifier": (
+            specimen.sample_identifier if specimen else sample_identifier.strip()
+        ),
         "barcode": specimen.barcode if specimen else barcode.strip(),
         "received_at": received_at.isoformat() if received_at else None,
         "quantity": str(quantity),
@@ -1830,9 +2032,13 @@ def adapt_single_receive_to_sample_accession(
     storage_reference = _storage_reference_from_context(receipt_context)
     storage_payload = {
         "storage_reference": storage_reference,
-        "storage_notes": str(((receipt_context or {}).get("storage") or {}).get("notes") or "").strip()
-        if isinstance((receipt_context or {}).get("storage"), dict)
-        else "",
+        "storage_notes": (
+            str(
+                ((receipt_context or {}).get("storage") or {}).get("notes") or ""
+            ).strip()
+            if isinstance((receipt_context or {}).get("storage"), dict)
+            else ""
+        ),
     }
     context = {
         "adapter_kind": "single_receive",
@@ -1890,12 +2096,17 @@ def adapt_manifest_item_receive_to_sample_accession(
     qc = (receipt_context or {}).get("qc") if isinstance(receipt_context, dict) else {}
     if not isinstance(qc, dict):
         qc = {}
-    qc_decision = str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower() or QCResult.Decision.ACCEPT
+    qc_decision = (
+        str(qc.get("decision") or QCResult.Decision.ACCEPT).strip().lower()
+        or QCResult.Decision.ACCEPT
+    )
     if qc_decision not in QCResult.Decision.values:
         qc_decision = QCResult.Decision.ACCEPT
     payload_metadata = dict(item.metadata or {})
     payload_metadata.update(metadata or {})
-    normalized_metadata = _validate_sample_type_metadata(item.manifest.sample_type, payload_metadata)
+    normalized_metadata = _validate_sample_type_metadata(
+        item.manifest.sample_type, payload_metadata
+    )
 
     updated_item = item
     event = None
@@ -1912,11 +2123,21 @@ def adapt_manifest_item_receive_to_sample_accession(
         )
         specimen = updated_item.biospecimen
 
-    resolved_source_reference = source_reference.strip() or manifest.source_reference or manifest.manifest_identifier
+    resolved_source_reference = (
+        source_reference.strip()
+        or manifest.source_reference
+        or manifest.manifest_identifier
+    )
     intake_payload = {
         "subject_identifier": updated_item.expected_subject_identifier,
-        "external_identifier": str((normalized_metadata or {}).get("external_id") or "").strip(),
-        "sample_identifier": specimen.sample_identifier if specimen else updated_item.expected_sample_identifier,
+        "external_identifier": str(
+            (normalized_metadata or {}).get("external_id") or ""
+        ).strip(),
+        "sample_identifier": (
+            specimen.sample_identifier
+            if specimen
+            else updated_item.expected_sample_identifier
+        ),
         "barcode": specimen.barcode if specimen else updated_item.expected_barcode,
         "received_at": received_at.isoformat() if received_at else None,
         "quantity": str(updated_item.quantity),
@@ -1933,9 +2154,13 @@ def adapt_manifest_item_receive_to_sample_accession(
     storage_reference = _storage_reference_from_context(receipt_context)
     storage_payload = {
         "storage_reference": storage_reference,
-        "storage_notes": str(((receipt_context or {}).get("storage") or {}).get("notes") or "").strip()
-        if isinstance((receipt_context or {}).get("storage"), dict)
-        else "",
+        "storage_notes": (
+            str(
+                ((receipt_context or {}).get("storage") or {}).get("notes") or ""
+            ).strip()
+            if isinstance((receipt_context or {}).get("storage"), dict)
+            else ""
+        ),
     }
     context = {
         "adapter_kind": "manifest_item_receive",
@@ -1951,7 +2176,9 @@ def adapt_manifest_item_receive_to_sample_accession(
         source_reference=resolved_source_reference,
         initiated_by=received_by,
         subject_identifier=updated_item.expected_subject_identifier,
-        external_identifier=str((normalized_metadata or {}).get("external_id") or "").strip(),
+        external_identifier=str(
+            (normalized_metadata or {}).get("external_id") or ""
+        ).strip(),
         intake_payload=intake_payload,
         qc_payload=qc_payload,
         storage_payload=storage_payload,
@@ -2025,13 +2252,15 @@ def _normalize_field_value(field: MetadataSchemaField, value: object) -> object:
     raise ValueError("unsupported_field_type")
 
 
-def _validate_vocabulary(field: MetadataSchemaField, normalized_value: object) -> str | None:
+def _validate_vocabulary(
+    field: MetadataSchemaField, normalized_value: object
+) -> str | None:
     if not field.vocabulary_id:
         return None
     allowed_values = set(
-        MetadataVocabularyItem.objects.filter(vocabulary_id=field.vocabulary_id, is_active=True).values_list(
-            "value", flat=True
-        )
+        MetadataVocabularyItem.objects.filter(
+            vocabulary_id=field.vocabulary_id, is_active=True
+        ).values_list("value", flat=True)
     )
     if field.field_type == MetadataFieldDefinition.FieldType.MULTI_CHOICE:
         invalid = [item for item in normalized_value if item not in allowed_values]
@@ -2082,7 +2311,9 @@ def provision_default_metadata_vocabularies() -> dict[str, object]:
                 domain.is_active = True
                 changed = True
             if changed:
-                domain.save(update_fields=["name", "description", "is_active", "updated_at"])
+                domain.save(
+                    update_fields=["name", "description", "is_active", "updated_at"]
+                )
         else:
             created_domains += 1
 
@@ -2110,11 +2341,21 @@ def provision_default_metadata_vocabularies() -> dict[str, object]:
                     vocabulary.is_active = True
                     changed = True
                 if changed:
-                    vocabulary.save(update_fields=["domain", "name", "description", "is_active", "updated_at"])
+                    vocabulary.save(
+                        update_fields=[
+                            "domain",
+                            "name",
+                            "description",
+                            "is_active",
+                            "updated_at",
+                        ]
+                    )
             else:
                 created_vocabularies += 1
 
-            for sort_order, (value, label) in enumerate(vocabulary_payload["items"], start=1):
+            for sort_order, (value, label) in enumerate(
+                vocabulary_payload["items"], start=1
+            ):
                 _, item_created = MetadataVocabularyItem.objects.update_or_create(
                     vocabulary=vocabulary,
                     value=value,
@@ -2134,7 +2375,9 @@ def provision_default_metadata_vocabularies() -> dict[str, object]:
     }
 
 
-def _compare_min_max(field: MetadataSchemaField, normalized_value: object, rules: dict[str, object]) -> str | None:
+def _compare_min_max(
+    field: MetadataSchemaField, normalized_value: object, rules: dict[str, object]
+) -> str | None:
     if field.field_type in {
         MetadataFieldDefinition.FieldType.TEXT,
         MetadataFieldDefinition.FieldType.LONG_TEXT,
@@ -2177,7 +2420,9 @@ def validate_metadata_payload(
     errors: list[dict[str, str]] = []
     normalized_data: dict[str, object] = {}
     schema_fields = list(
-        schema_version.fields.select_related("vocabulary").order_by("position", "field_key")
+        schema_version.fields.select_related("vocabulary").order_by(
+            "position", "field_key"
+        )
     )
 
     for schema_field in schema_fields:
@@ -2206,19 +2451,27 @@ def validate_metadata_payload(
             errors.append({"field": schema_field.field_key, "code": vocabulary_error})
             continue
 
-        range_error = _compare_min_max(schema_field, normalized_value, dict(schema_field.validation_rules or {}))
+        range_error = _compare_min_max(
+            schema_field, normalized_value, dict(schema_field.validation_rules or {})
+        )
         if range_error:
             errors.append({"field": schema_field.field_key, "code": range_error})
             continue
 
         normalized_data[schema_field.field_key] = normalized_value
 
-    return MetadataValidationResult(valid=not errors, errors=errors, normalized_data=normalized_data)
+    return MetadataValidationResult(
+        valid=not errors, errors=errors, normalized_data=normalized_data
+    )
 
 
-def resolve_schema_version_for_binding(*, target_type: str, target_key: str) -> MetadataSchemaVersion | None:
+def resolve_schema_version_for_binding(
+    *, target_type: str, target_key: str
+) -> MetadataSchemaVersion | None:
     binding = (
-        MetadataSchemaBinding.objects.select_related("schema_version", "schema_version__schema")
+        MetadataSchemaBinding.objects.select_related(
+            "schema_version", "schema_version__schema"
+        )
         .filter(target_type=target_type, target_key=target_key, is_active=True)
         .first()
     )
@@ -2239,7 +2492,9 @@ def validate_workflow_template_version(
         ).order_by("position", "node_key")
     )
     edges = list(
-        workflow_version.edges.select_related("source_node", "target_node").order_by("priority", "source_node__node_key")
+        workflow_version.edges.select_related("source_node", "target_node").order_by(
+            "priority", "source_node__node_key"
+        )
     )
     errors: list[dict[str, str]] = []
 
@@ -2249,15 +2504,23 @@ def validate_workflow_template_version(
         errors.append({"field": "edges", "code": "version_requires_edges"})
 
     node_by_id = {node.id: node for node in nodes}
-    start_nodes = [node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.START]
-    end_nodes = [node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.END]
+    start_nodes = [
+        node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.START
+    ]
+    end_nodes = [
+        node for node in nodes if node.node_type == WorkflowNodeTemplate.NodeType.END
+    ]
     if len(start_nodes) != 1:
         errors.append({"field": "nodes", "code": "requires_exactly_one_start"})
     if not end_nodes:
         errors.append({"field": "nodes", "code": "requires_end_node"})
 
-    incoming: dict[str, list[WorkflowEdgeTemplate]] = {str(node.id): [] for node in nodes}
-    outgoing: dict[str, list[WorkflowEdgeTemplate]] = {str(node.id): [] for node in nodes}
+    incoming: dict[str, list[WorkflowEdgeTemplate]] = {
+        str(node.id): [] for node in nodes
+    }
+    outgoing: dict[str, list[WorkflowEdgeTemplate]] = {
+        str(node.id): [] for node in nodes
+    }
     for edge in edges:
         source_key = str(edge.source_node_id)
         target_key = str(edge.target_node_id)
@@ -2289,26 +2552,66 @@ def validate_workflow_template_version(
         outbound = outgoing[node_id]
         if node.node_type == WorkflowNodeTemplate.NodeType.START:
             if inbound:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "start_cannot_have_incoming_edges"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "start_cannot_have_incoming_edges",
+                    }
+                )
             if len(outbound) != 1:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "start_requires_one_outgoing_edge"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "start_requires_one_outgoing_edge",
+                    }
+                )
         elif node.node_type == WorkflowNodeTemplate.NodeType.END:
             if outbound:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "end_cannot_have_outgoing_edges"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "end_cannot_have_outgoing_edges",
+                    }
+                )
             if not inbound:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "end_requires_incoming_edge"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "end_requires_incoming_edge",
+                    }
+                )
         else:
             if not inbound:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "node_requires_incoming_edge"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "node_requires_incoming_edge",
+                    }
+                )
             if node.node_type in branch_types and len(outbound) < 2:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "branch_node_requires_multiple_outgoing_edges"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "branch_node_requires_multiple_outgoing_edges",
+                    }
+                )
             if node.node_type in linear_types and len(outbound) != 1:
-                errors.append({"field": f"nodes.{node.node_key}", "code": "linear_node_requires_one_outgoing_edge"})
+                errors.append(
+                    {
+                        "field": f"nodes.{node.node_key}",
+                        "code": "linear_node_requires_one_outgoing_edge",
+                    }
+                )
 
         for binding in node.step_bindings.all():
             package_version = binding.form_package_version
             if package_version is None:
-                errors.append({"field": f"bindings.{node.node_key}", "code": "form_package_version_required"})
+                errors.append(
+                    {
+                        "field": f"bindings.{node.node_key}",
+                        "code": "form_package_version_required",
+                    }
+                )
                 continue
             package_section_keys = {
                 item.section_key for item in package_version.sections.all()
@@ -2316,9 +2619,7 @@ def validate_workflow_template_version(
             package_group_keys = {
                 item.group_key for item in package_version.item_groups.all()
             }
-            package_item_keys = {
-                item.item_key for item in package_version.items.all()
-            }
+            package_item_keys = {item.item_key for item in package_version.items.all()}
             if binding.binding_type == WorkflowStepBinding.BindingType.SECTION_SET:
                 missing = sorted(set(binding.section_keys or []) - package_section_keys)
                 if missing:
@@ -2337,7 +2638,9 @@ def validate_workflow_template_version(
                         if item.section.section_key in selected_sections
                     )
             elif binding.binding_type == WorkflowStepBinding.BindingType.GROUP_SET:
-                missing = sorted(set(binding.item_group_keys or []) - package_group_keys)
+                missing = sorted(
+                    set(binding.item_group_keys or []) - package_group_keys
+                )
                 if missing:
                     errors.append(
                         {
@@ -2351,7 +2654,8 @@ def validate_workflow_template_version(
                     available_condition_item_keys.update(
                         item.item_key
                         for item in package_version.items.all()
-                        if item.item_group_id and item.item_group.group_key in selected_groups
+                        if item.item_group_id
+                        and item.item_group.group_key in selected_groups
                     )
             elif binding.binding_type == WorkflowStepBinding.BindingType.ITEM_SET:
                 missing = sorted(set(binding.item_keys or []) - package_item_keys)
@@ -2369,8 +2673,15 @@ def validate_workflow_template_version(
                 available_condition_item_keys.update(package_item_keys)
 
     for edge in edges:
-        condition_item_key = str(edge.condition.get("item_key") or "").strip() if isinstance(edge.condition, dict) else ""
-        if condition_item_key and condition_item_key not in available_condition_item_keys:
+        condition_item_key = (
+            str(edge.condition.get("item_key") or "").strip()
+            if isinstance(edge.condition, dict)
+            else ""
+        )
+        if (
+            condition_item_key
+            and condition_item_key not in available_condition_item_keys
+        ):
             errors.append(
                 {
                     "field": f"edges.{edge.source_node.node_key}->{edge.target_node.node_key}",
@@ -2390,7 +2701,13 @@ def validate_workflow_template_version(
             pending.extend(str(edge.target_node_id) for edge in outgoing[current])
         unreachable = [node.node_key for node in nodes if str(node.id) not in visited]
         if unreachable:
-            errors.append({"field": "nodes", "code": "unreachable_nodes", "detail": ",".join(sorted(unreachable))})
+            errors.append(
+                {
+                    "field": "nodes",
+                    "code": "unreachable_nodes",
+                    "detail": ",".join(sorted(unreachable)),
+                }
+            )
 
     compiled_definition = {
         "template_id": str(workflow_version.template_id),
@@ -2423,19 +2740,29 @@ def validate_workflow_template_version(
                     {
                         "id": str(binding.id),
                         "form_package_version_id": (
-                            str(binding.form_package_version_id) if binding.form_package_version_id else None
+                            str(binding.form_package_version_id)
+                            if binding.form_package_version_id
+                            else None
                         ),
                         "form_package_id": (
-                            str(binding.form_package_version.package_id) if binding.form_package_version_id else None
+                            str(binding.form_package_version.package_id)
+                            if binding.form_package_version_id
+                            else None
                         ),
                         "form_package_code": (
-                            binding.form_package_version.package.code if binding.form_package_version_id else ""
+                            binding.form_package_version.package.code
+                            if binding.form_package_version_id
+                            else ""
                         ),
                         "form_package_name": (
-                            binding.form_package_version.package.name if binding.form_package_version_id else ""
+                            binding.form_package_version.package.name
+                            if binding.form_package_version_id
+                            else ""
                         ),
                         "version_number": (
-                            binding.form_package_version.version_number if binding.form_package_version_id else None
+                            binding.form_package_version.version_number
+                            if binding.form_package_version_id
+                            else None
                         ),
                         "binding_type": binding.binding_type,
                         "section_keys": list(binding.section_keys or []),
@@ -2459,22 +2786,34 @@ def validate_workflow_template_version(
             for edge in edges
         ],
     }
-    return WorkflowTemplateValidationResult(valid=not errors, errors=errors, compiled_definition=compiled_definition)
+    return WorkflowTemplateValidationResult(
+        valid=not errors, errors=errors, compiled_definition=compiled_definition
+    )
 
 
-def validate_operation_version(operation_version: OperationVersion) -> OperationVersionValidationResult:
+def validate_operation_version(
+    operation_version: OperationVersion,
+) -> OperationVersionValidationResult:
     errors: list[dict[str, str]] = []
     workflow_version = operation_version.workflow_version
     if workflow_version.status != WorkflowTemplateVersion.Status.PUBLISHED:
-        errors.append({"field": "workflow_version", "code": "workflow_version_must_be_published"})
+        errors.append(
+            {"field": "workflow_version", "code": "workflow_version_must_be_published"}
+        )
     if not workflow_version.compiled_definition:
-        errors.append({"field": "workflow_version", "code": "workflow_version_must_be_compiled"})
+        errors.append(
+            {"field": "workflow_version", "code": "workflow_version_must_be_compiled"}
+        )
     if workflow_version.template.code != operation_version.definition.code:
-        errors.append({"field": "workflow_version", "code": "workflow_template_code_mismatch"})
+        errors.append(
+            {"field": "workflow_version", "code": "workflow_template_code_mismatch"}
+        )
     return OperationVersionValidationResult(valid=not errors, errors=errors)
 
 
-def _evaluate_workflow_condition(condition: dict[str, object], payload: dict[str, object]) -> bool:
+def _evaluate_workflow_condition(
+    condition: dict[str, object], payload: dict[str, object]
+) -> bool:
     if not condition:
         return True
     field = str(condition.get("item_key") or condition.get("field") or "").strip()
@@ -2496,9 +2835,17 @@ def _evaluate_workflow_condition(condition: dict[str, object], payload: dict[str
     return False
 
 
-def _select_outgoing_edges(node: WorkflowNodeTemplate, payload: dict[str, object]) -> list[WorkflowEdgeTemplate]:
-    outgoing_edges = list(node.outgoing_edges.all().order_by("priority", "target_node__node_key"))
-    matched_edges = [edge for edge in outgoing_edges if _evaluate_workflow_condition(dict(edge.condition or {}), payload)]
+def _select_outgoing_edges(
+    node: WorkflowNodeTemplate, payload: dict[str, object]
+) -> list[WorkflowEdgeTemplate]:
+    outgoing_edges = list(
+        node.outgoing_edges.all().order_by("priority", "target_node__node_key")
+    )
+    matched_edges = [
+        edge
+        for edge in outgoing_edges
+        if _evaluate_workflow_condition(dict(edge.condition or {}), payload)
+    ]
     if node.node_type in {
         WorkflowNodeTemplate.NodeType.IF,
         WorkflowNodeTemplate.NodeType.SWITCH,
@@ -2510,7 +2857,9 @@ def _select_outgoing_edges(node: WorkflowNodeTemplate, payload: dict[str, object
     return outgoing_edges[:1]
 
 
-def _create_task_run_for_node(operation_run: OperationRun, node: WorkflowNodeTemplate) -> TaskRun:
+def _create_task_run_for_node(
+    operation_run: OperationRun, node: WorkflowNodeTemplate
+) -> TaskRun:
     return TaskRun.objects.create(
         operation_run=operation_run,
         node_template=node,
@@ -2523,7 +2872,12 @@ def _create_task_run_for_node(operation_run: OperationRun, node: WorkflowNodeTem
     )
 
 
-def _complete_operation_run(operation_run: OperationRun, *, payload: dict[str, object], terminal_node: WorkflowNodeTemplate) -> None:
+def _complete_operation_run(
+    operation_run: OperationRun,
+    *,
+    payload: dict[str, object],
+    terminal_node: WorkflowNodeTemplate,
+) -> None:
     outcome = str(payload.get("qc_decision") or "").strip().lower()
     if outcome == "reject" or "reject" in terminal_node.node_key:
         operation_run.status = OperationRun.Status.REJECTED
@@ -2532,7 +2886,9 @@ def _complete_operation_run(operation_run: OperationRun, *, payload: dict[str, o
         operation_run.status = OperationRun.Status.COMPLETED
         operation_run.outcome = outcome or terminal_node.node_key
     operation_run.completed_at = timezone.now()
-    operation_run.save(update_fields=["status", "outcome", "completed_at", "updated_at"])
+    operation_run.save(
+        update_fields=["status", "outcome", "completed_at", "updated_at"]
+    )
 
 
 def _advance_task_run(task_run: TaskRun, payload: dict[str, object]) -> list[TaskRun]:
@@ -2542,7 +2898,9 @@ def _advance_task_run(task_run: TaskRun, payload: dict[str, object]) -> list[Tas
     for edge in _select_outgoing_edges(node, payload):
         target_node = edge.target_node
         if target_node.node_type == WorkflowNodeTemplate.NodeType.END:
-            _complete_operation_run(operation_run, payload=payload, terminal_node=target_node)
+            _complete_operation_run(
+                operation_run, payload=payload, terminal_node=target_node
+            )
             continue
         created_tasks.append(_create_task_run_for_node(operation_run, target_node))
     return created_tasks
@@ -2560,11 +2918,15 @@ def _record_qc_result(
     decision = str(payload.get("qc_decision") or "").strip().lower()
     if decision not in QCResult.Decision.values:
         return None
-    existing = QCResult.objects.filter(task_run=task_run).select_related("discrepancy").first()
+    existing = (
+        QCResult.objects.filter(task_run=task_run).select_related("discrepancy").first()
+    )
     discrepancy = None
     rejection_code = ""
     if decision == QCResult.Decision.REJECT:
-        rejection_code = str(payload.get("rejection_code") or ReceivingDiscrepancy.Code.OTHER).strip()
+        rejection_code = str(
+            payload.get("rejection_code") or ReceivingDiscrepancy.Code.OTHER
+        ).strip()
         if rejection_code not in ReceivingDiscrepancy.Code.values:
             rejection_code = ReceivingDiscrepancy.Code.OTHER
         discrepancy = existing.discrepancy if existing else None
@@ -2627,14 +2989,11 @@ def start_operation_run(
 ) -> OperationTaskTransitionResult:
     if operation_version.status != OperationVersion.Status.PUBLISHED:
         raise ValueError("operation_version_must_be_published")
-    workflow_version = (
-        WorkflowTemplateVersion.objects.prefetch_related(
-            "nodes__outgoing_edges__target_node",
-            "edges__source_node",
-            "edges__target_node",
-        )
-        .get(id=operation_version.workflow_version_id)
-    )
+    workflow_version = WorkflowTemplateVersion.objects.prefetch_related(
+        "nodes__outgoing_edges__target_node",
+        "edges__source_node",
+        "edges__target_node",
+    ).get(id=operation_version.workflow_version_id)
     operation_run = OperationRun.objects.create(
         operation_version=operation_version,
         workflow_version=workflow_version,
@@ -2658,18 +3017,30 @@ def start_operation_run(
             action="bound",
             details={"source_mode": source_mode},
         )
-    start_node = workflow_version.nodes.get(node_type=WorkflowNodeTemplate.NodeType.START)
+    start_node = workflow_version.nodes.get(
+        node_type=WorkflowNodeTemplate.NodeType.START
+    )
     created_tasks: list[TaskRun] = []
-    for edge in start_node.outgoing_edges.all().order_by("priority", "target_node__node_key"):
+    for edge in start_node.outgoing_edges.all().order_by(
+        "priority", "target_node__node_key"
+    ):
         if edge.target_node.node_type == WorkflowNodeTemplate.NodeType.END:
-            _complete_operation_run(operation_run, payload={}, terminal_node=edge.target_node)
+            _complete_operation_run(
+                operation_run, payload={}, terminal_node=edge.target_node
+            )
             continue
         created_tasks.append(_create_task_run_for_node(operation_run, edge.target_node))
-    primary_task = created_tasks[0] if created_tasks else TaskRun(
-        operation_run=operation_run,
-        node_template=start_node,
+    primary_task = (
+        created_tasks[0]
+        if created_tasks
+        else TaskRun(
+            operation_run=operation_run,
+            node_template=start_node,
+        )
     )
-    return OperationTaskTransitionResult(task_run=primary_task, operation_run=operation_run, created_tasks=created_tasks)
+    return OperationTaskTransitionResult(
+        task_run=primary_task, operation_run=operation_run, created_tasks=created_tasks
+    )
 
 
 @transaction.atomic
@@ -2681,7 +3052,10 @@ def submit_task_run(
     status: str = SubmissionRecord.Status.SUBMITTED,
 ) -> OperationTaskTransitionResult:
     latest_index = (
-        task_run.submissions.order_by("-submission_index").values_list("submission_index", flat=True).first() or 0
+        task_run.submissions.order_by("-submission_index")
+        .values_list("submission_index", flat=True)
+        .first()
+        or 0
     )
     submission = SubmissionRecord.objects.create(
         task_run=task_run,
@@ -2691,7 +3065,9 @@ def submit_task_run(
         submitted_by=submitted_by,
     )
     task_run.output_data = dict(payload or {})
-    task_run.outcome = str(payload.get("qc_decision") or payload.get("outcome") or "").strip()
+    task_run.outcome = str(
+        payload.get("qc_decision") or payload.get("outcome") or ""
+    ).strip()
     if task_run.requires_approval:
         task_run.status = TaskRun.Status.AWAITING_APPROVAL
         task_run.save(update_fields=["status", "output_data", "outcome", "updated_at"])
@@ -2703,7 +3079,9 @@ def submit_task_run(
         )
     task_run.status = TaskRun.Status.COMPLETED
     task_run.completed_at = timezone.now()
-    task_run.save(update_fields=["status", "output_data", "outcome", "completed_at", "updated_at"])
+    task_run.save(
+        update_fields=["status", "output_data", "outcome", "completed_at", "updated_at"]
+    )
     _record_qc_result(
         task_run,
         payload=dict(payload or {}),
@@ -2719,7 +3097,11 @@ def submit_task_run(
             manifest=task_run.operation_run.manifest,
             manifest_item=task_run.operation_run.manifest_item,
             action="stored",
-            details={"storage_reference": payload.get("storage_reference") or payload.get("storage_slot") or ""},
+            details={
+                "storage_reference": payload.get("storage_reference")
+                or payload.get("storage_slot")
+                or ""
+            },
         )
     return OperationTaskTransitionResult(
         task_run=task_run,
@@ -2875,9 +3257,13 @@ def _next_sequence_payload(sample_type_id: str) -> tuple[str, str, int]:
     return locked.identifier_prefix.strip(), locked.barcode_prefix.strip(), padded
 
 
-def allocate_biospecimen_identifiers(sample_type: BiospecimenType, *, pooled: bool = False) -> tuple[str, str]:
+def allocate_biospecimen_identifiers(
+    sample_type: BiospecimenType, *, pooled: bool = False
+) -> tuple[str, str]:
     with transaction.atomic():
-        identifier_prefix, barcode_prefix, padded = _next_sequence_payload(str(sample_type.id))
+        identifier_prefix, barcode_prefix, padded = _next_sequence_payload(
+            str(sample_type.id)
+        )
     if pooled:
         return f"{identifier_prefix}-POOL-{padded}", f"{barcode_prefix}-POOL-{padded}"
     return f"{identifier_prefix}-{padded}", f"{barcode_prefix}-{padded}"
@@ -2923,7 +3309,9 @@ def create_aliquots(
     lineage_root = specimen.lineage_root or specimen
     created: list[Biospecimen] = []
     for _ in range(count):
-        sample_identifier, barcode = allocate_biospecimen_identifiers(specimen.sample_type)
+        sample_identifier, barcode = allocate_biospecimen_identifiers(
+            specimen.sample_type
+        )
         aliquot = Biospecimen(
             sample_type=specimen.sample_type,
             sample_identifier=sample_identifier,
@@ -2979,7 +3367,9 @@ def create_pool(
         }:
             raise BiospecimenTransitionError("specimen_not_poolable")
 
-    pool_identifier, barcode = allocate_biospecimen_identifiers(sample_type, pooled=True)
+    pool_identifier, barcode = allocate_biospecimen_identifiers(
+        sample_type, pooled=True
+    )
     with transaction.atomic():
         pool = BiospecimenPool(
             sample_type=sample_type,
@@ -3010,12 +3400,22 @@ def create_pool(
     return pool
 
 
-def _latest_storage_record_for_biospecimen(specimen: Biospecimen) -> BiospecimenStorageRecord | None:
-    return specimen.storage_records.select_related("location").order_by("-created_at").first()
+def _latest_storage_record_for_biospecimen(
+    specimen: Biospecimen,
+) -> BiospecimenStorageRecord | None:
+    return (
+        specimen.storage_records.select_related("location")
+        .order_by("-created_at")
+        .first()
+    )
 
 
-def _latest_storage_record_for_pool(pool: BiospecimenPool) -> BiospecimenStorageRecord | None:
-    return pool.storage_records.select_related("location").order_by("-created_at").first()
+def _latest_storage_record_for_pool(
+    pool: BiospecimenPool,
+) -> BiospecimenStorageRecord | None:
+    return (
+        pool.storage_records.select_related("location").order_by("-created_at").first()
+    )
 
 
 @transaction.atomic
@@ -3037,7 +3437,9 @@ def place_artifact_in_storage(
         task_run = submission_record.task_run
     if task_run and operation_run is None:
         operation_run = task_run.operation_run
-    artifact_lab_id = biospecimen.lab_id if biospecimen is not None else biospecimen_pool.lab_id
+    artifact_lab_id = (
+        biospecimen.lab_id if biospecimen is not None else biospecimen_pool.lab_id
+    )
     if artifact_lab_id != location.lab_id:
         raise StorageInventoryError("location_lab_mismatch")
     latest_record = (
@@ -3051,8 +3453,16 @@ def place_artifact_in_storage(
         location=location,
         previous_location=latest_record.location if latest_record else None,
         reason=reason,
-        quantity_snapshot=(biospecimen.quantity if biospecimen is not None else biospecimen_pool.quantity),
-        quantity_unit=(biospecimen.quantity_unit if biospecimen is not None else biospecimen_pool.quantity_unit),
+        quantity_snapshot=(
+            biospecimen.quantity
+            if biospecimen is not None
+            else biospecimen_pool.quantity
+        ),
+        quantity_unit=(
+            biospecimen.quantity_unit
+            if biospecimen is not None
+            else biospecimen_pool.quantity_unit
+        ),
         notes=notes.strip(),
         placed_by=placed_by.strip(),
         operation_run=operation_run,
@@ -3138,21 +3548,35 @@ def record_inventory_transaction(
         task_run = material_usage_record.task_run
     if transaction_type not in InventoryTransaction.TransactionType.values:
         raise StorageInventoryError("invalid_transaction_type")
-    if transaction_type == InventoryTransaction.TransactionType.TRANSFER and location is None:
+    if (
+        transaction_type == InventoryTransaction.TransactionType.TRANSFER
+        and location is None
+    ):
         raise StorageInventoryError("transfer_location_required")
-    if transaction_type in {
-        InventoryTransaction.TransactionType.RECEIPT,
-        InventoryTransaction.TransactionType.RELEASE,
-    } and quantity_delta <= 0:
+    if (
+        transaction_type
+        in {
+            InventoryTransaction.TransactionType.RECEIPT,
+            InventoryTransaction.TransactionType.RELEASE,
+        }
+        and quantity_delta <= 0
+    ):
         raise StorageInventoryError("quantity_delta_must_be_positive")
-    if transaction_type in {
-        InventoryTransaction.TransactionType.RESERVATION,
-        InventoryTransaction.TransactionType.CONSUMPTION,
-        InventoryTransaction.TransactionType.DISPOSAL,
-        InventoryTransaction.TransactionType.EXPIRY,
-    } and quantity_delta >= 0:
+    if (
+        transaction_type
+        in {
+            InventoryTransaction.TransactionType.RESERVATION,
+            InventoryTransaction.TransactionType.CONSUMPTION,
+            InventoryTransaction.TransactionType.DISPOSAL,
+            InventoryTransaction.TransactionType.EXPIRY,
+        }
+        and quantity_delta >= 0
+    ):
         raise StorageInventoryError("quantity_delta_must_be_negative")
-    if transaction_type == InventoryTransaction.TransactionType.ADJUSTMENT and quantity_delta == 0:
+    if (
+        transaction_type == InventoryTransaction.TransactionType.ADJUSTMENT
+        and quantity_delta == 0
+    ):
         raise StorageInventoryError("quantity_delta_required")
 
     locked_lot = InventoryLot.objects.select_for_update().get(id=lot.id)
@@ -3163,7 +3587,9 @@ def record_inventory_transaction(
     if location is not None:
         locked_lot.storage_location = location
     locked_lot.full_clean()
-    locked_lot.save(update_fields=["on_hand_quantity", "storage_location", "updated_at"])
+    locked_lot.save(
+        update_fields=["on_hand_quantity", "storage_location", "updated_at"]
+    )
     transaction_record = InventoryTransaction(
         lot=locked_lot,
         transaction_type=transaction_type,
@@ -3188,13 +3614,19 @@ def generate_manifest_identifier() -> str:
     return f"ACC-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
-def _validate_sample_type_metadata(sample_type: BiospecimenType, metadata: dict[str, object]) -> dict[str, object]:
-    schema_version = resolve_schema_version_for_binding(target_type="sample_type", target_key=sample_type.key)
+def _validate_sample_type_metadata(
+    sample_type: BiospecimenType, metadata: dict[str, object]
+) -> dict[str, object]:
+    schema_version = resolve_schema_version_for_binding(
+        target_type="sample_type", target_key=sample_type.key
+    )
     if schema_version is None:
         return metadata
     result = validate_metadata_payload(schema_version, metadata)
     if not result.valid:
-        raise AccessioningError(f"metadata_invalid:{json.dumps(result.errors, sort_keys=True)}")
+        raise AccessioningError(
+            f"metadata_invalid:{json.dumps(result.errors, sort_keys=True)}"
+        )
     return result.normalized_data
 
 
@@ -3227,9 +3659,13 @@ def _build_manifest_biospecimen(
     sample_identifier = item.expected_sample_identifier.strip()
     barcode = item.expected_barcode.strip()
     if not sample_identifier and not barcode:
-        sample_identifier, barcode = allocate_biospecimen_identifiers(manifest.sample_type)
+        sample_identifier, barcode = allocate_biospecimen_identifiers(
+            manifest.sample_type
+        )
     elif not sample_identifier:
-        sample_identifier, generated_barcode = allocate_biospecimen_identifiers(manifest.sample_type)
+        sample_identifier, generated_barcode = allocate_biospecimen_identifiers(
+            manifest.sample_type
+        )
         barcode = barcode or generated_barcode
     elif not barcode:
         _, barcode = allocate_biospecimen_identifiers(manifest.sample_type)
@@ -3277,17 +3713,23 @@ def receive_manifest_item(
 
     payload_metadata = dict(item.metadata or {})
     payload_metadata.update(metadata or {})
-    normalized_metadata = _validate_sample_type_metadata(manifest.sample_type, payload_metadata)
+    normalized_metadata = _validate_sample_type_metadata(
+        manifest.sample_type, payload_metadata
+    )
     with transaction.atomic():
         specimen = item.biospecimen
         if specimen is None:
-            specimen = _build_manifest_biospecimen(manifest, item, metadata=normalized_metadata)
+            specimen = _build_manifest_biospecimen(
+                manifest, item, metadata=normalized_metadata
+            )
         else:
             specimen.metadata = normalized_metadata
             specimen.quantity = item.quantity
             specimen.quantity_unit = item.quantity_unit
             specimen.full_clean()
-            specimen.save(update_fields=["metadata", "quantity", "quantity_unit", "updated_at"])
+            specimen.save(
+                update_fields=["metadata", "quantity", "quantity_unit", "updated_at"]
+            )
         if specimen.status == Biospecimen.Status.REGISTERED:
             transition_biospecimen(specimen, Biospecimen.Status.RECEIVED)
         elif specimen.status != Biospecimen.Status.RECEIVED:
@@ -3304,7 +3746,16 @@ def receive_manifest_item(
         item.notes = notes or item.notes
         item.metadata = normalized_metadata
         item.full_clean()
-        item.save(update_fields=["biospecimen", "status", "received_at", "notes", "metadata", "updated_at"])
+        item.save(
+            update_fields=[
+                "biospecimen",
+                "status",
+                "received_at",
+                "notes",
+                "metadata",
+                "updated_at",
+            ]
+        )
 
         manifest.status = _manifest_status_from_items(manifest)
         if manifest.status == AccessioningManifest.Status.RECEIVED:
@@ -3324,7 +3775,10 @@ def receive_manifest_item(
             scan_value=scan_value.strip(),
             notes=notes,
             metadata=(
-                {"sample_metadata": normalized_metadata, "receipt_context": dict(receipt_context or {})}
+                {
+                    "sample_metadata": normalized_metadata,
+                    "receipt_context": dict(receipt_context or {}),
+                }
                 if receipt_context
                 else normalized_metadata
             ),
@@ -3391,7 +3845,10 @@ def receive_single_biospecimen(
             scan_value=scan_value.strip(),
             notes=notes,
             metadata=(
-                {"sample_metadata": normalized_metadata, "receipt_context": dict(receipt_context or {})}
+                {
+                    "sample_metadata": normalized_metadata,
+                    "receipt_context": dict(receipt_context or {}),
+                }
                 if receipt_context
                 else normalized_metadata
             ),
@@ -3426,7 +3883,10 @@ def create_receiving_discrepancy(
     )
     discrepancy.full_clean()
     discrepancy.save()
-    if manifest_item and manifest_item.status == AccessioningManifestItem.Status.PENDING:
+    if (
+        manifest_item
+        and manifest_item.status == AccessioningManifestItem.Status.PENDING
+    ):
         manifest_item.status = AccessioningManifestItem.Status.DISCREPANT
         manifest_item.full_clean()
         manifest_item.save(update_fields=["status", "updated_at"])
@@ -3439,9 +3899,15 @@ def create_receiving_discrepancy(
 
 
 def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
-    items = list(manifest.items.select_related("biospecimen").order_by("position", "created_at"))
+    items = list(
+        manifest.items.select_related("biospecimen").order_by("position", "created_at")
+    )
     discrepancies = list(manifest.discrepancies.order_by("-created_at"))
-    events = list(manifest.receiving_events.select_related("biospecimen", "manifest_item").order_by("-received_at"))
+    events = list(
+        manifest.receiving_events.select_related(
+            "biospecimen", "manifest_item"
+        ).order_by("-received_at")
+    )
     return {
         "manifest": {
             "id": str(manifest.id),
@@ -3453,13 +3919,27 @@ def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
             "lab_id": str(manifest.lab_id) if manifest.lab_id else None,
             "source_system": manifest.source_system,
             "source_reference": manifest.source_reference,
-            "received_at": manifest.received_at.isoformat() if manifest.received_at else None,
+            "received_at": (
+                manifest.received_at.isoformat() if manifest.received_at else None
+            ),
         },
         "summary": {
             "total_items": len(items),
-            "received_items": sum(1 for item in items if item.status == AccessioningManifestItem.Status.RECEIVED),
-            "discrepant_items": sum(1 for item in items if item.status == AccessioningManifestItem.Status.DISCREPANT),
-            "open_discrepancies": sum(1 for item in discrepancies if item.status == ReceivingDiscrepancy.Status.OPEN),
+            "received_items": sum(
+                1
+                for item in items
+                if item.status == AccessioningManifestItem.Status.RECEIVED
+            ),
+            "discrepant_items": sum(
+                1
+                for item in items
+                if item.status == AccessioningManifestItem.Status.DISCREPANT
+            ),
+            "open_discrepancies": sum(
+                1
+                for item in discrepancies
+                if item.status == ReceivingDiscrepancy.Status.OPEN
+            ),
             "receiving_events": len(events),
         },
         "items": [
@@ -3470,8 +3950,12 @@ def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
                 "expected_subject_identifier": item.expected_subject_identifier,
                 "expected_sample_identifier": item.expected_sample_identifier,
                 "expected_barcode": item.expected_barcode,
-                "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
-                "received_at": item.received_at.isoformat() if item.received_at else None,
+                "biospecimen_id": (
+                    str(item.biospecimen_id) if item.biospecimen_id else None
+                ),
+                "received_at": (
+                    item.received_at.isoformat() if item.received_at else None
+                ),
                 "notes": item.notes,
             }
             for item in items
@@ -3481,8 +3965,12 @@ def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
                 "id": str(item.id),
                 "code": item.code,
                 "status": item.status,
-                "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
-                "biospecimen_id": str(item.biospecimen_id) if item.biospecimen_id else None,
+                "manifest_item_id": (
+                    str(item.manifest_item_id) if item.manifest_item_id else None
+                ),
+                "biospecimen_id": (
+                    str(item.biospecimen_id) if item.biospecimen_id else None
+                ),
                 "notes": item.notes,
                 "expected_data": item.expected_data,
                 "actual_data": item.actual_data,
@@ -3494,7 +3982,9 @@ def accessioning_report(manifest: AccessioningManifest) -> dict[str, object]:
                 "id": str(item.id),
                 "kind": item.kind,
                 "biospecimen_id": str(item.biospecimen_id),
-                "manifest_item_id": str(item.manifest_item_id) if item.manifest_item_id else None,
+                "manifest_item_id": (
+                    str(item.manifest_item_id) if item.manifest_item_id else None
+                ),
                 "received_by": item.received_by,
                 "scan_value": item.scan_value,
                 "received_at": item.received_at.isoformat(),
@@ -3508,7 +3998,9 @@ def _plate_capacity(layout_template: PlateLayoutTemplate) -> int:
     return layout_template.rows * layout_template.columns
 
 
-def _well_label_from_position(layout_template: PlateLayoutTemplate, position_index: int) -> str:
+def _well_label_from_position(
+    layout_template: PlateLayoutTemplate, position_index: int
+) -> str:
     capacity = _plate_capacity(layout_template)
     if position_index < 1 or position_index > capacity:
         raise BatchPlateError("invalid_position_index")
@@ -3517,7 +4009,9 @@ def _well_label_from_position(layout_template: PlateLayoutTemplate, position_ind
     return f"{chr(ord('A') + row_index)}{column_index}"
 
 
-def _position_from_well_label(layout_template: PlateLayoutTemplate, well_label: str) -> int:
+def _position_from_well_label(
+    layout_template: PlateLayoutTemplate, well_label: str
+) -> int:
     normalized = str(well_label or "").strip().upper()
     match = re.fullmatch(r"([A-Z])(\d{1,2})", normalized)
     if not match:
@@ -3557,7 +4051,9 @@ def generate_batch_plate_identifier(batch_identifier: str, sequence_number: int)
     return f"{batch_identifier}-P{sequence_number:02d}"
 
 
-def transition_processing_batch(batch: ProcessingBatch, next_status: str) -> ProcessingBatch:
+def transition_processing_batch(
+    batch: ProcessingBatch, next_status: str
+) -> ProcessingBatch:
     allowed = ALLOWED_BATCH_TRANSITIONS.get(batch.status, set())
     if next_status not in allowed:
         raise BatchPlateError("invalid_transition")
@@ -3567,7 +4063,9 @@ def transition_processing_batch(batch: ProcessingBatch, next_status: str) -> Pro
     return batch
 
 
-def _validate_assignable_specimen(specimen: Biospecimen, sample_type: BiospecimenType) -> None:
+def _validate_assignable_specimen(
+    specimen: Biospecimen, sample_type: BiospecimenType
+) -> None:
     if specimen.sample_type_id != sample_type.id:
         raise BatchPlateError("sample_type_mismatch")
     if specimen.status not in {
@@ -3615,9 +4113,13 @@ def create_processing_batch(
             plate = BatchPlate(
                 batch=batch,
                 layout_template=layout_template,
-                plate_identifier=generate_batch_plate_identifier(batch.batch_identifier, sequence_number),
+                plate_identifier=generate_batch_plate_identifier(
+                    batch.batch_identifier, sequence_number
+                ),
                 sequence_number=sequence_number,
-                label=str(plate_spec.get("label") or f"Plate {sequence_number}").strip(),
+                label=str(
+                    plate_spec.get("label") or f"Plate {sequence_number}"
+                ).strip(),
                 metadata=dict(plate_spec.get("metadata") or {}),
             )
             plate.full_clean()
@@ -3659,12 +4161,16 @@ def create_processing_batch(
 
 def processing_batch_worksheet(batch: ProcessingBatch) -> dict[str, object]:
     plates = list(
-        batch.plates.select_related("layout_template").prefetch_related("assignments__biospecimen").order_by("sequence_number")
+        batch.plates.select_related("layout_template")
+        .prefetch_related("assignments__biospecimen")
+        .order_by("sequence_number")
     )
     assignment_count = sum(plate.assignments.count() for plate in plates)
     plate_payloads: list[dict[str, object]] = []
     for plate in plates:
-        assignments = list(plate.assignments.select_related("biospecimen").order_by("position_index"))
+        assignments = list(
+            plate.assignments.select_related("biospecimen").order_by("position_index")
+        )
         plate_payloads.append(
             {
                 "id": str(plate.id),

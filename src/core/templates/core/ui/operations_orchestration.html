@@ -1,15 +1,18 @@
 {% extends base_template %}
 {% block title %}Orchestration Monitor{% endblock %}
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Orchestration Monitor" page_summary="Track workflow catalog entries and runs in a compact admin-style monitor with blue-themed controls." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Orchestration" %}
-{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Filter by project and act on runs directly from the monitor." form_aria_label="Project filter" clear_url="/ui/operations/orchestration" submit_label="Filter" %}
+{% url 'ui_operations_dashboard_page' as operations_dashboard_url %}
+{% url 'ui_operations_orchestration_page' as operations_orchestration_url %}
+{% url 'ui_model_select_options' as ui_model_select_options_url %}
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Orchestration Monitor" page_summary="Track workflow catalog entries and runs in a compact admin-style monitor with blue-themed controls." parent_label="Operations" parent_url=operations_dashboard_url current_label="Orchestration" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Filter by project and act on runs directly from the monitor." form_aria_label="Project filter" clear_url=operations_orchestration_url submit_label="Filter" %}
 {% if payload.capabilities.can_create_workflow_runs %}
 <section class="panel" id="workflow-run-create-panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Queue workflow run" panel_description="Search governance workflow definitions and optionally bind a catalog asset as the workflow subject before creating a draft run." %}
   <div class="section-stack" data-ui-action-form="workflow-run-create">
     <div class="field-grid field-grid--wide">
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="definition_id" hidden_data_field="definition_id" field_label="Workflow definition" endpoint_url="/api/v1/ui/model-select-options?source=workflow_definitions" placeholder="Search definitions by name, domain, or description" %}
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="definition_id" hidden_data_field="definition_id" field_label="Workflow definition" endpoint_url=ui_model_select_options_url|add:'?source=workflow_definitions' placeholder="Search definitions by name, domain, or description" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url=ui_model_select_options_url|add:'?source=assets' placeholder="Search assets by name, qualified name, type, or owner" %}
     </div>
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>

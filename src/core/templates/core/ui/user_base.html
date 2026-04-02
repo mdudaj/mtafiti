@@ -455,20 +455,15 @@
           </div>
         </div>
         <nav class="nav" aria-label="Workspace navigation">
-          <div class="nav-section-label">Applications</div>
-          <a href="/app" class="{% if active_nav == 'home' %}active{% endif %}"><span class="nav-icon material-symbols-outlined" aria-hidden="true">home</span><span class="nav-label">Home</span></a>
-          {% if payload.navigation.can_view_operations %}
-          <a href="/ui/operations/printing"><span class="nav-icon material-symbols-outlined" aria-hidden="true">print</span><span class="nav-label">Operations printing</span></a>
-          {% endif %}
-          {% if payload.navigation.lims_links %}
-          <div class="nav-section-label">LIMS</div>
-          {% for item in payload.navigation.lims_links %}
-          <a href="{{ item.href }}" class="{% if active_nav == item.key %}active{% endif %}">
+          {% for section in payload.navigation.sections %}
+          <div class="nav-section-label">{{ section.label }}</div>
+          {% for item in section.items %}
+          <a href="{{ item.href }}" class="{% if item.is_active %}active{% endif %}">
             <span class="nav-icon material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
             <span class="nav-label">{{ item.label }}</span>
           </a>
           {% endfor %}
-          {% endif %}
+          {% endfor %}
         </nav>
       </aside>
         <main class="content" id="main-content">

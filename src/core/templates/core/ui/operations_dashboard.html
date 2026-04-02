@@ -1,13 +1,14 @@
 {% extends base_template %}
 {% block title %}Operations Dashboard{% endblock %}
 {% block content %}
+{% url 'ui_operations_dashboard_page' as operations_dashboard_url %}
 {% include "core/ui/includes/page_intro.html" with section_label="Operations site" page_title="Operations Dashboard" page_summary="Summary-first view with quick links into active work queues, aligned to an admin-style dashboard shell." parent_label="Operations" current_label="Dashboard" %}
-{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to scope cards and jump directly into the relevant application area." form_aria_label="Project filter" clear_url="/ui/operations/dashboard" submit_label="Filter" %}
+{% include "core/ui/includes/project_filter_toolbar.html" with toolbar_description="Use the project filter to scope cards and jump directly into the relevant application area." form_aria_label="Project filter" clear_url=operations_dashboard_url submit_label="Filter" %}
 <div class="stat-grid">
-  {% include "core/ui/includes/stat_card.html" with card_title="Stewardship" metrics=payload.cards.stewardship link_href="/ui/operations/stewardship" link_label="Open workbench" %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Stewardship" metrics=payload.cards.stewardship link_href=payload.card_links.stewardship.href link_label="Open workbench" %}
   {% include "core/ui/includes/stat_card.html" with card_title="Workflow" metrics=payload.cards.workflow %}
-  {% include "core/ui/includes/stat_card.html" with card_title="Orchestration" metrics=payload.cards.orchestration link_href="/ui/operations/orchestration" link_label="Open monitor" %}
-  {% include "core/ui/includes/stat_card.html" with card_title="Agents" metrics=payload.cards.agent link_href="/ui/operations/agent" link_label="Open agent monitor" %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Orchestration" metrics=payload.cards.orchestration link_href=payload.card_links.orchestration.href link_label="Open monitor" %}
+  {% include "core/ui/includes/stat_card.html" with card_title="Agents" metrics=payload.cards.agent link_href=payload.card_links.agent.href link_label="Open agent monitor" %}
   <section class="stat-card card">
     <h3>Printing jobs</h3>
     <div class="metric-list">{% for status, count in payload.cards.printing.jobs.items %}
@@ -19,7 +20,7 @@
     {% endfor %}
       <div class="metric-row"><span class="chip">templates</span><strong>{{ payload.cards.printing.templates }}</strong></div>
     </div>
-    <p><a href="/ui/operations/printing">Open printing monitor →</a></p>
+    <p><a href="{{ payload.card_links.printing.href }}">Open printing monitor →</a></p>
   </section>
 </div>
 {% endblock %}

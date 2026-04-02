@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url="/lims/receiving/" current_label="Single sample" %}
+{% url 'lims_receiving_page' as lims_receiving_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Receiving" parent_url=lims_receiving_url current_label="Single sample" %}
 
 {% if payload.capabilities.can_manage_artifacts %}
 <section class="panel" data-lims-action="receiving-single-create">
@@ -56,7 +57,7 @@
         <label class="field-group"><span class="field-label">Receipt notes</span><textarea class="textarea" rows="3" data-lims-field="receive-notes"></textarea></label>
         <div class="button-row">
           <button class="button" type="button" onclick="advanceSingleReceiptInitialStep()"><span class="material-symbols-outlined button-icon" aria-hidden="true">navigate_next</span><span>Continue</span></button>
-          <a class="button button-secondary" href="/lims/receiving/">Back to receiving</a>
+          <a class="button button-secondary" href="{{ lims_receiving_url }}">Back to receiving</a>
         </div>
       </div>
     </section>

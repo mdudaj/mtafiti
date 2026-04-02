@@ -1,6 +1,7 @@
 {% extends "core/ui/user_base.html" %}
 {% block title %}User Workspace{% endblock %}
 {% block content %}
+{% url 'ui_model_select_options' as ui_model_select_options_url %}
 {% include "core/ui/includes/page_intro.html" with section_label="Workspace application" page_title="User Workspace" page_summary="Portal-style printing workspace with blue theme tokens and admin-inspired forms for templates, printers, and test jobs." parent_label="Workspace" current_label="Home" %}
 
 <div class="stat-grid">
@@ -15,8 +16,8 @@
   {{ payload.templates|json_script:"user-print-templates-data" }}
   <div class="section-stack" data-user-action-form="test-print">
     <div class="field-grid field-grid--wide">
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url="/api/v1/ui/model-select-options?source=print_templates" placeholder="Search templates by name, ref, or format" %}
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Printer destination" endpoint_url="/api/v1/ui/model-select-options?source=print_gateways" placeholder="Search printers by name, ref, or site" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="template_id" hidden_data_field="template_id" field_label="Template" endpoint_url=ui_model_select_options_url|add:'?source=print_templates' placeholder="Search templates by name, ref, or format" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="destination" hidden_data_field="destination" field_label="Printer destination" endpoint_url=ui_model_select_options_url|add:'?source=print_gateways' placeholder="Search printers by name, ref, or site" %}
     </div>
     <div class="field-grid field-grid--wide">
       <label class="field-group"><span class="field-label">Participant prefix</span><input class="input" data-field="participant_prefix" placeholder="participant prefix (e.g. MLTP2-MBY-KWJ-)" aria-label="Participant prefix"></label>

@@ -1,14 +1,17 @@
 {% extends base_template %}
 {% block title %}Stewardship Workbench{% endblock %}
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Stewardship Workbench" page_summary="Queue-oriented CRUD workbench with action controls driven by API capabilities and allowed actions." parent_label="Operations" parent_url="/ui/operations/dashboard" current_label="Stewardship" %}
-{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Filter the workbench, review severities, and execute lifecycle actions from one screen." form_aria_label="Stewardship filters" clear_url="/ui/operations/stewardship" first_name="status" first_label="Status" first_options=status_options first_value=status_filter first_empty_label="All statuses" second_name="severity" second_label="Severity" second_options=severity_options second_value=severity_filter second_empty_label="All severities" submit_label="Apply" %}
+{% url 'ui_operations_dashboard_page' as operations_dashboard_url %}
+{% url 'ui_operations_stewardship_page' as operations_stewardship_url %}
+{% url 'ui_model_select_options' as ui_model_select_options_url %}
+{% include "core/ui/includes/page_intro.html" with section_label="Application" page_title="Stewardship Workbench" page_summary="Queue-oriented CRUD workbench with action controls driven by API capabilities and allowed actions." parent_label="Operations" parent_url=operations_dashboard_url current_label="Stewardship" %}
+{% include "core/ui/includes/dual_select_filter_toolbar.html" with toolbar_description="Filter the workbench, review severities, and execute lifecycle actions from one screen." form_aria_label="Stewardship filters" clear_url=operations_stewardship_url first_name="status" first_label="Status" first_options=status_options first_value=status_filter first_empty_label="All statuses" second_name="severity" second_label="Severity" second_options=severity_options second_value=severity_filter second_empty_label="All severities" submit_label="Apply" %}
 {% if payload.capabilities.can_create_stewardship %}
 <section class="panel" id="stewardship-create-panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Create stewardship item" panel_description="Search catalog assets for the subject and create a review item without relying on manual raw identifiers." %}
   <div class="section-stack" data-ui-action-form="stewardship-create">
     <div class="field-grid field-grid--wide">
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url=ui_model_select_options_url|add:'?source=assets' placeholder="Search assets by name, qualified name, type, or owner" %}
       <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>
     </div>
     <div class="field-grid field-grid--wide">
@@ -35,7 +38,7 @@
   {% include "core/ui/includes/panel_header.html" with panel_title="Submit access request" panel_description="Search the governed asset catalog and submit a scoped access request without relying on raw subject identifiers." %}
   <div class="section-stack" data-ui-action-form="access-request-create">
     <div class="field-grid field-grid--wide">
-      {% include "core/ui/includes/ajax_model_select.html" with field_name="access_request_asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url="/api/v1/ui/model-select-options?source=assets" placeholder="Search assets by name, qualified name, type, or owner" %}
+      {% include "core/ui/includes/ajax_model_select.html" with field_name="access_request_asset_id" hidden_data_field="asset_id" field_label="Asset subject" endpoint_url=ui_model_select_options_url|add:'?source=assets' placeholder="Search assets by name, qualified name, type, or owner" %}
       <label class="field-group"><span class="field-label">Manual subject ref</span><input class="input" data-field="subject_ref" placeholder="subject_ref override (optional)" aria-label="Manual subject ref"></label>
     </div>
     <div class="field-grid field-grid--wide">

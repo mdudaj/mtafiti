@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url="/lims/metadata/" current_label="Create vocabulary" %}
+{% url 'lims_metadata_page' as lims_metadata_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Metadata" parent_url=lims_metadata_url current_label="Create vocabulary" %}
 
 {% if payload.capabilities.can_manage_metadata %}
 <section class="panel" data-lims-action="metadata-vocabulary-create">
@@ -22,7 +23,7 @@
     <div class="button-row">
       <button class="button" type="button" onclick="createVocabulary()"><span class="material-symbols-outlined button-icon" aria-hidden="true">list_alt</span><span>Create vocabulary</span></button>
       <button class="button button-secondary" type="button" onclick="provisionDefaults()"><span class="material-symbols-outlined button-icon" aria-hidden="true">publish</span><span>Provision defaults</span></button>
-      <a class="button button-secondary" href="/lims/metadata/">Back to metadata</a>
+      <a class="button button-secondary" href="{{ lims_metadata_url }}">Back to metadata</a>
     </div>
   </div>
 </section>

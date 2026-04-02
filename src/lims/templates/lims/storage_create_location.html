@@ -1,7 +1,8 @@
 {% extends "lims/base.html" %}
 
 {% block content %}
-{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url="/lims/storage/" current_label="Create location" %}
+{% url 'lims_storage_inventory_page' as lims_storage_url %}
+{% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Storage" parent_url=lims_storage_url current_label="Create location" %}
 
 {% if payload.capabilities.can_manage_storage %}
 <section class="panel" data-lims-action="storage-location-create">
@@ -22,7 +23,7 @@
     <label class="field-group"><span class="field-label">Metadata JSON</span><textarea class="textarea" rows="5" data-lims-field="storage-location-metadata">{}</textarea></label>
     <div class="button-row">
       <button class="button" type="button" onclick="createStorageLocation()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_home_work</span><span>Create storage location</span></button>
-      <a class="button button-secondary" href="/lims/storage/">Back to storage</a>
+      <a class="button button-secondary" href="{{ lims_storage_url }}">Back to storage</a>
     </div>
   </div>
 </section>
