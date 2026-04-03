@@ -6,6 +6,55 @@
 **Status**: Draft  
 **Input**: GitHub issue `#111` "Define Sample Accession as reference operation" plus the merged operation, runtime, ODM-engine, and workflow-builder foundation slices.
 
+## Intent
+
+Anchor the already-emerging Sample Accession behavior to one explicit,
+governed reference-operation contract so future LIMS work can build on a stable
+operation, workflow, form-package, and runtime model instead of continuing to
+extend transitional receiving flows ad hoc.
+
+## System Context
+
+### In scope
+
+- define Sample Accession as the first governed LIMS reference operation
+- define the canonical intake, QC, storage, and rejection/disposition shape
+- define compiler-owned package binding expectations for accession tasks
+- define the current-to-target mapping from `/lims/receiving/*` into governed
+  runtime adapters
+- define the follow-on implementation split needed to complete the remaining
+  work safely
+
+### Out of scope
+
+- replacing every current receiving endpoint in one implementation slice
+- designing a generalized operation builder UI
+- implementing all downstream specimen-handling operations
+- redefining the shared ODM engine or workflow-builder foundations
+
+### Interfaces
+
+- `/api/v1/lims/accessioning/*`
+- `/api/v1/lims/reference/operations/sample-accession/provision`
+- `/api/v1/lims/operations/*`
+- `/lims/receiving/*`
+- `/lims/reference/operations/sample-accession/`
+
+### Constraints
+
+- preserve tenant-scoped runtime behavior and auditability
+- keep compiler, workflow-builder, runtime, and UI boundaries explicit
+- treat current receiving flows as transitional adapters where practical
+- keep implementation slices independently reviewable and bounded to one PR each
+
+### Dependencies
+
+- `specs/002-operation-driven-lims-edcs-foundation/spec.md`
+- `specs/003-operation-runtime-domain/spec.md`
+- `specs/004-odm-form-engine-foundation/spec.md`
+- `specs/005-workflow-builder-foundation/spec.md`
+- current Sample Accession runtime and adapter surfaces already merged on `main`
+
 ## Repository Context *(mandatory)*
 
 - **Service area**: `lims` reference operation on the LIMS-specific operation foundation, with shared form-engine standards remaining available to future `edcs` work
@@ -398,6 +447,9 @@ As a platform architect, I want Sample Accession to be specific enough that late
 - **Issue title**: Define Sample Accession as reference operation
 - **Issue reference**: `#111`
 - **Parent issue**: `#107`
+- **Recommended issue role**: keep `#111` as the umbrella reference-operation
+  definition issue and split remaining implementation work into narrower
+  delivery issues before more coding starts
 - **Issue generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py issue-body specs/006-sample-accession-reference-operation`
 - **PR generation command**: `./.venv/bin/python .github/scripts/spec_kit_workflow.py pr-body specs/006-sample-accession-reference-operation --issue-number 111`
 - **Branch naming**: `docs/sample-accession-reference-operation`
