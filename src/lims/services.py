@@ -2074,6 +2074,10 @@ def _source_reference_for_single_receive(
     return ""
 
 
+def _sample_accession_qc_notes(*, qc: dict[str, object], notes: str = "") -> str:
+    return str(qc.get("qc_notes") or qc.get("notes") or notes or "").strip()
+
+
 def _drive_sample_accession_runtime(
     *,
     source_mode: str,
@@ -2086,6 +2090,7 @@ def _drive_sample_accession_runtime(
     storage_payload: dict[str, object] | None = None,
     context: dict[str, object] | None = None,
     biospecimen: Biospecimen | None = None,
+    receiving_event: ReceivingEvent | None = None,
     manifest: AccessioningManifest | None = None,
     manifest_item: AccessioningManifestItem | None = None,
 ) -> SampleAccessionAdapterResult:
@@ -2098,6 +2103,7 @@ def _drive_sample_accession_runtime(
         source_mode=source_mode,
         source_reference=source_reference,
         biospecimen=biospecimen,
+        receiving_event=receiving_event,
         manifest=manifest,
         manifest_item=manifest_item,
         context=context or {},
@@ -2220,6 +2226,8 @@ def adapt_single_receive_to_sample_accession(
             external_identifier=external_identifier,
         )
     )
+    resolved_received_at = event.received_at if event else received_at
+    qc_notes = _sample_accession_qc_notes(qc=qc, notes=notes)
     intake_payload = {
         "subject_identifier": subject_identifier.strip(),
         "external_identifier": external_identifier.strip(),
@@ -2227,7 +2235,9 @@ def adapt_single_receive_to_sample_accession(
             specimen.sample_identifier if specimen else sample_identifier.strip()
         ),
         "barcode": specimen.barcode if specimen else barcode.strip(),
-        "received_at": received_at.isoformat() if received_at else None,
+        "received_at": (
+            resolved_received_at.isoformat() if resolved_received_at else None
+        ),
         "quantity": str(quantity),
         "quantity_unit": quantity_unit.strip(),
         "brought_by": str((receipt_context or {}).get("brought_by") or "").strip(),
@@ -2235,9 +2245,9 @@ def adapt_single_receive_to_sample_accession(
     }
     qc_payload = {
         "qc_decision": qc_decision,
-        "notes": str(qc.get("notes") or notes or "").strip(),
+        "qc_notes": qc_notes,
         "rejection_code": str(qc.get("rejection_code") or "").strip(),
-        "reason": str(qc.get("reason") or qc.get("notes") or notes or "").strip(),
+        "reason": str(qc.get("reason") or qc_notes or "").strip(),
     }
     storage_reference = _storage_reference_from_context(receipt_context)
     storage_payload = {
@@ -2269,6 +2279,7 @@ def adapt_single_receive_to_sample_accession(
         storage_payload=storage_payload,
         context=context,
         biospecimen=specimen,
+        receiving_event=event,
     )
     return SampleAccessionAdapterResult(
         operation_run=result.operation_run,
@@ -2338,6 +2349,8 @@ def adapt_manifest_item_receive_to_sample_accession(
         or manifest.source_reference
         or manifest.manifest_identifier
     )
+    resolved_received_at = event.received_at if event else received_at
+    qc_notes = _sample_accession_qc_notes(qc=qc, notes=notes)
     intake_payload = {
         "subject_identifier": updated_item.expected_subject_identifier,
         "external_identifier": str(
@@ -2349,7 +2362,9 @@ def adapt_manifest_item_receive_to_sample_accession(
             else updated_item.expected_sample_identifier
         ),
         "barcode": specimen.barcode if specimen else updated_item.expected_barcode,
-        "received_at": received_at.isoformat() if received_at else None,
+        "received_at": (
+            resolved_received_at.isoformat() if resolved_received_at else None
+        ),
         "quantity": str(updated_item.quantity),
         "quantity_unit": updated_item.quantity_unit,
         "brought_by": str((receipt_context or {}).get("brought_by") or "").strip(),
@@ -2357,9 +2372,9 @@ def adapt_manifest_item_receive_to_sample_accession(
     }
     qc_payload = {
         "qc_decision": qc_decision,
-        "notes": str(qc.get("notes") or notes or "").strip(),
+        "qc_notes": qc_notes,
         "rejection_code": str(qc.get("rejection_code") or "").strip(),
-        "reason": str(qc.get("reason") or qc.get("notes") or notes or "").strip(),
+        "reason": str(qc.get("reason") or qc_notes or "").strip(),
     }
     storage_reference = _storage_reference_from_context(receipt_context)
     storage_payload = {
@@ -2394,6 +2409,7 @@ def adapt_manifest_item_receive_to_sample_accession(
         storage_payload=storage_payload,
         context=context,
         biospecimen=specimen,
+        receiving_event=event,
         manifest=manifest,
         manifest_item=updated_item,
     )
@@ -3131,6 +3147,9 @@ def _record_qc_result(
     existing = (
         QCResult.objects.filter(task_run=task_run).select_related("discrepancy").first()
     )
+    qc_notes = str(
+        payload.get("qc_notes") or payload.get("notes") or payload.get("reason") or ""
+    ).strip()
     discrepancy = None
     rejection_code = ""
     if decision == QCResult.Decision.REJECT:
@@ -3147,7 +3166,7 @@ def _record_qc_result(
                 manifest=task_run.operation_run.manifest,
                 manifest_item=task_run.operation_run.manifest_item,
                 biospecimen=task_run.operation_run.biospecimen,
-                notes=str(payload.get("reason") or payload.get("notes") or "").strip(),
+                notes=str(payload.get("reason") or qc_notes or "").strip(),
                 expected_data={},
                 actual_data=dict(payload or {}),
             )
@@ -3158,7 +3177,7 @@ def _record_qc_result(
             "submission_record": submission,
             "discrepancy": discrepancy,
             "decision": decision,
-            "notes": str(payload.get("notes") or payload.get("reason") or "").strip(),
+            "notes": qc_notes,
             "rejection_code": rejection_code,
             "recorded_by": recorded_by,
             "reviewed_at": timezone.now(),
@@ -3175,7 +3194,8 @@ def _record_qc_result(
             "discrepancy": discrepancy,
             "details": {
                 "decision": decision,
-                "reason": payload.get("reason") or payload.get("notes") or "",
+                "reason": payload.get("reason") or qc_notes or "",
+                "qc_notes": qc_notes,
                 "rejection_code": rejection_code,
             },
         },
@@ -3193,6 +3213,7 @@ def start_operation_run(
     source_mode: str = OperationRun.SourceMode.SINGLE,
     source_reference: str = "",
     biospecimen: Biospecimen | None = None,
+    receiving_event: ReceivingEvent | None = None,
     manifest: AccessioningManifest | None = None,
     manifest_item: AccessioningManifestItem | None = None,
     context: dict[str, object] | None = None,
@@ -3222,10 +3243,14 @@ def start_operation_run(
         MaterialUsageRecord.objects.create(
             operation_run=operation_run,
             biospecimen=biospecimen,
+            receiving_event=receiving_event,
             manifest=manifest,
             manifest_item=manifest_item,
             action="bound",
-            details={"source_mode": source_mode},
+            details={
+                "source_mode": source_mode,
+                "source_reference": source_reference,
+            },
         )
     start_node = workflow_version.nodes.get(
         node_type=WorkflowNodeTemplate.NodeType.START

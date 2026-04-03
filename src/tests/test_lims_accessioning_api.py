@@ -52,7 +52,9 @@ def _create_reference_bundle(client: Client, host: str) -> tuple[str, str, str]:
 
     created_study = client.post(
         "/api/v1/lims/reference/studies",
-        data=json.dumps({"name": "DBS Pilot", "code": "STUDY-001", "lead_lab_id": lab_id}),
+        data=json.dumps(
+            {"name": "DBS Pilot", "code": "STUDY-001", "lead_lab_id": lab_id}
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -62,7 +64,14 @@ def _create_reference_bundle(client: Client, host: str) -> tuple[str, str, str]:
 
     created_site = client.post(
         "/api/v1/lims/reference/sites",
-        data=json.dumps({"name": "Moshi Site", "code": "SITE-001", "study_id": study_id, "lab_id": lab_id}),
+        data=json.dumps(
+            {
+                "name": "Moshi Site",
+                "code": "SITE-001",
+                "study_id": study_id,
+                "lab_id": lab_id,
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -94,7 +103,13 @@ def _create_sample_type(client: Client, host: str) -> str:
 def _bind_sample_type_metadata_schema(client: Client, host: str) -> None:
     schema = client.post(
         "/api/v1/lims/metadata/schemas",
-        data=json.dumps({"name": "DBS receiving", "code": "dbs-receiving", "change_summary": "Initial draft"}),
+        data=json.dumps(
+            {
+                "name": "DBS receiving",
+                "code": "dbs-receiving",
+                "change_summary": "Initial draft",
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.admin",
@@ -148,7 +163,9 @@ def _bind_sample_type_metadata_schema(client: Client, host: str) -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_lims_accessioning_supports_single_receive_with_metadata_validation(monkeypatch):
+def test_lims_accessioning_supports_single_receive_with_metadata_validation(
+    monkeypatch,
+):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-accessioning-single")
@@ -215,16 +232,48 @@ def test_lims_accessioning_supports_single_receive_with_metadata_validation(monk
     assert received.status_code == 201
     assert received.json()["biospecimen"]["status"] == "received"
     assert received.json()["biospecimen"]["metadata"]["tube_count"] == 2
-    assert received.json()["biospecimen"]["received_at"].startswith("2026-03-18T00:00:00")
-    assert received.json()["event"]["metadata"]["receipt_context"]["qc"]["decision"] == "accept"
-    assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Courier Alpha"
-    assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
+    assert received.json()["biospecimen"]["received_at"].startswith(
+        "2026-03-18T00:00:00"
+    )
+    assert (
+        received.json()["event"]["metadata"]["receipt_context"]["qc"]["decision"]
+        == "accept"
+    )
+    assert (
+        received.json()["event"]["metadata"]["receipt_context"]["brought_by"]
+        == "Courier Alpha"
+    )
+    assert (
+        received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"]
+        == "Freezer A"
+    )
     assert received.json()["event"]["kind"] == "single"
     assert received.json()["operation_run"]["operation_code"] == "sample-accession"
     assert received.json()["operation_run"]["source_mode"] == "single"
     assert received.json()["operation_run"]["status"] == "completed"
     assert received.json()["qc_result"]["decision"] == "accept"
+    assert received.json()["qc_result"]["notes"] == "visual QC ok"
     assert received.json()["discrepancy"] is None
+    qc_task = next(
+        item
+        for item in received.json()["operation_run"]["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
+    assert qc_task["submissions"][0]["payload"]["qc_notes"] == "visual QC ok"
+    assert qc_task["approvals"][0]["approved_by"] == ""
+    intake_task = next(
+        item
+        for item in received.json()["operation_run"]["tasks"]
+        if item["node_key"] == "intake_capture"
+    )
+    assert intake_task["submissions"][0]["payload"]["received_at"].startswith(
+        "2026-03-18"
+    )
+    assert any(
+        item["action"] == "bound"
+        and item["receiving_event_id"] == received.json()["event"]["id"]
+        for item in received.json()["operation_run"]["material_usages"]
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -271,10 +320,23 @@ def test_lims_accessioning_single_reject_creates_governed_operation_run(monkeypa
     assert rejected.json()["qc_result"]["decision"] == "reject"
     assert rejected.json()["discrepancy"]["status"] == "open"
     assert rejected.json()["discrepancy"]["notes"] == "tube leaked"
+    qc_task = next(
+        item
+        for item in rejected.json()["operation_run"]["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
+    assert qc_task["submissions"][0]["payload"]["qc_notes"] == "tube leaked"
+    assert qc_task["approvals"][0]["approved_by"] == ""
+    assert not any(
+        item["node_key"] == "storage_logging"
+        for item in rejected.json()["operation_run"]["tasks"]
+    )
 
 
 @pytest.mark.django_db(transaction=True)
-def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(monkeypatch):
+def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(
+    monkeypatch,
+):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-accessioning-manifest")
@@ -359,14 +421,40 @@ def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(m
     assert received.status_code == 200
     assert received.json()["item"]["status"] == "received"
     assert received.json()["item"]["received_at"].startswith("2026-03-19T00:00:00")
-    assert received.json()["event"]["metadata"]["receipt_context"]["brought_by"] == "Site runner"
-    assert received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"] == "Freezer A"
+    assert (
+        received.json()["event"]["metadata"]["receipt_context"]["brought_by"]
+        == "Site runner"
+    )
+    assert (
+        received.json()["event"]["metadata"]["receipt_context"]["storage"]["location"]
+        == "Freezer A"
+    )
     assert received.json()["event"]["kind"] == "manifest_item"
     assert received.json()["operation_run"]["operation_code"] == "sample-accession"
     assert received.json()["operation_run"]["source_mode"] == "batch"
     assert received.json()["operation_run"]["status"] == "completed"
     assert received.json()["qc_result"]["decision"] == "accept"
+    assert received.json()["qc_result"]["notes"] == "visual QC ok"
     assert received.json()["discrepancy"] is None
+    qc_task = next(
+        item
+        for item in received.json()["operation_run"]["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
+    assert qc_task["submissions"][0]["payload"]["qc_notes"] == "visual QC ok"
+    intake_task = next(
+        item
+        for item in received.json()["operation_run"]["tasks"]
+        if item["node_key"] == "intake_capture"
+    )
+    assert intake_task["submissions"][0]["payload"]["received_at"].startswith(
+        "2026-03-19"
+    )
+    assert any(
+        item["action"] == "bound"
+        and item["receiving_event_id"] == received.json()["event"]["id"]
+        for item in received.json()["operation_run"]["material_usages"]
+    )
 
     discrepancy = client.post(
         "/api/v1/lims/receiving/discrepancies",
@@ -400,7 +488,9 @@ def test_lims_accessioning_supports_manifest_receive_discrepancies_and_reports(m
 
 
 @pytest.mark.django_db(transaction=True)
-def test_lims_accessioning_manifest_reject_path_uses_governed_operation_runtime(monkeypatch):
+def test_lims_accessioning_manifest_reject_path_uses_governed_operation_runtime(
+    monkeypatch,
+):
     monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
     client = Client()
     host = _create_lims_host(client, "tenant-accessioning-manifest-reject")
@@ -473,4 +563,20 @@ def test_lims_accessioning_manifest_reject_path_uses_governed_operation_runtime(
     assert rejected.json()["operation_run"]["source_mode"] == "edc_import"
     assert rejected.json()["operation_run"]["status"] == "rejected"
     assert rejected.json()["qc_result"]["decision"] == "reject"
+    assert rejected.json()["qc_result"]["notes"] == "sample missing from shipment"
     assert rejected.json()["discrepancy"]["code"] == "missing_sample"
+    qc_task = next(
+        item
+        for item in rejected.json()["operation_run"]["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
+    assert (
+        qc_task["submissions"][0]["payload"]["qc_notes"]
+        == "sample missing from shipment"
+    )
+    assert qc_task["submissions"][0]["payload"]["rejection_code"] == "missing_sample"
+    assert qc_task["approvals"][0]["approved_by"] == ""
+    assert not any(
+        item["node_key"] == "storage_logging"
+        for item in rejected.json()["operation_run"]["tasks"]
+    )
