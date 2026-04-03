@@ -172,7 +172,7 @@ def test_lims_html_pages_render_with_role_aware_actions():
         (
             reverse("lims_receiving_page"),
             b"Receiving and accessioning",
-            b"Choose a receiving workflow",
+            b"Choose a receiving adapter",
         ),
         (
             reverse("lims_receiving_single_page"),
@@ -332,6 +332,62 @@ def test_reference_launchpad_renders_sample_accession_workflow_entry():
     assert response.status_code == 200
     assert b"Provision sample accession" in response.content
     assert sample_accession_url.encode() in response.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_sample_accession_ui_surfaces_explain_governed_runtime_relationship():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-sample-accession-migration-copy")
+
+    reference_page = client.get(
+        reverse("lims_reference_sample_accession_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    receiving_page = client.get(
+        reverse("lims_receiving_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    single_page = client.get(
+        reverse("lims_receiving_single_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    batch_page = client.get(
+        reverse("lims_receiving_batch_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    edc_page = client.get(
+        reverse("lims_receiving_edc_import_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert reference_page.status_code == 200
+    assert (
+        b"governs runtime execution across the receiving adapters"
+        in reference_page.content
+    )
+
+    assert receiving_page.status_code == 200
+    assert (
+        b"entry adapter into the governed Sample Accession runtime"
+        in receiving_page.content
+    )
+
+    assert single_page.status_code == 200
+    assert b"launch the governed Sample Accession runtime" in single_page.content
+
+    assert batch_page.status_code == 200
+    assert b"launch governed Sample Accession runs" in batch_page.content
+
+    assert edc_page.status_code == 200
+    assert (
+        b"import EDC context, then launch the governed Sample Accession runtime"
+        in edc_page.content
+    )
 
 
 @pytest.mark.django_db(transaction=True)

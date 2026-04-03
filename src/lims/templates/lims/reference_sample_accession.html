@@ -8,7 +8,7 @@
 
 {% if payload.capabilities.can_manage_operations %}
 <section class="panel" data-lims-action="reference-sample-accession-provision">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Provision reference bundle" panel_description="Create or repair the canonical sample-accession package, workflow, and published operation used by transitional receiving adapters." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Provision reference bundle" panel_description="Create or repair the canonical sample-accession package, workflow, and published operation that governs runtime execution across the receiving adapters." %}
   <div class="button-row">
     <button class="button" type="button" onclick="provisionSampleAccessionBundle()"><span class="material-symbols-outlined button-icon" aria-hidden="true">conversion_path</span><span>Provision sample accession bundle</span></button>
     <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
@@ -17,7 +17,7 @@
 {% endif %}
 
 <section class="panel">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Current reference status" panel_description="Published bundle state and adapter activity update on demand after provisioning." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Current reference status" panel_description="Published bundle state and governed runtime activity update on demand after provisioning." %}
   <div class="stat-grid">
     <article class="card"><strong>Form package</strong><p data-sample-accession-package-status>{% if payload.reference_bundle %}Published v{{ payload.cards.package_version }}{% else %}Not provisioned{% endif %}</p></article>
     <article class="card"><strong>Workflow</strong><p data-sample-accession-workflow-status>{% if payload.reference_bundle %}Published v{{ payload.cards.workflow_version }}{% else %}Not provisioned{% endif %}</p></article>
@@ -28,7 +28,7 @@
 
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
   <section class="panel">
-    {% include "core/ui/includes/panel_header.html" with panel_title="Reference contract" panel_description="Canonical codes, supported source modes, and transitional adapter targets." %}
+    {% include "core/ui/includes/panel_header.html" with panel_title="Reference contract" panel_description="Canonical codes, supported source modes, and the governed runtime relationship exposed through receiving adapters." %}
     <div data-sample-accession-contract>
       {% if payload.reference_bundle %}
       <div class="section-stack">

@@ -12,7 +12,7 @@
 </div>
 
 <section class="panel">
-  {% include "core/ui/includes/panel_header.html" with panel_title="Choose a receiving workflow" panel_description="Operator input starts from a dedicated page per task, rather than a mixed multi-form dashboard." %}
+  {% include "core/ui/includes/panel_header.html" with panel_title="Choose a receiving adapter" panel_description="Each receiving page is an entry adapter into the governed Sample Accession runtime rather than an isolated standalone workflow." %}
   {% include "core/ui/includes/action_card_grid.html" with items=payload.operation_page.action_cards action_namespace="lims" empty_title="No receiving workflows available" empty_description="No receiving workflows are currently available for your role." %}
 </section>
 
