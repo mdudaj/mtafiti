@@ -46,6 +46,91 @@ Define Sample Accession as the first concrete reference operation on the LIMS-sp
 - task-level bindings to compiler-owned package outputs are not yet demonstrated by one canonical example
 - the current receiving pages and APIs need a clear target-state mapping into future runtime concepts
 
+### Current merged evidence that changes issue shape
+
+- `src/lims/services.py` already provisions the `sample-accession` reference
+   bundle and publishes a workflow, package, and operation version
+- `src/lims/services.py` already contains transitional runtime adapters for
+   single, batch, and EDC-linked initiation modes
+- `src/tests/test_lims_sample_accession_reference_api.py` and
+   `src/tests/test_lims_accessioning_api.py` already prove significant portions
+   of the behavior originally described as future work
+- `src/lims/views.py` and `src/lims/templates/lims/reference_sample_accession.html`
+   already expose a reference-operation inspection and provisioning surface
+
+These facts mean `#111` is no longer a clean single implementation issue.
+Large portions of the intended proof case already exist on `main`, so the
+remaining work should be decomposed into narrower follow-on delivery slices.
+
+## Resolved Design Decisions
+
+### 1. Keep `#111` as an umbrella reference-operation issue
+
+- `#111` should continue to define the canonical Sample Accession contract
+- it should not be treated as the next direct coding issue because its original
+   scope now overlaps heavily with already-merged runtime and adapter work
+
+### 2. Split remaining execution work by boundary, not by intake mode
+
+- single, batch, and EDC-linked intake are already defined as one governed
+   operation family in the spec and current code
+- the better split is by architecture boundary: publication invariants,
+   runtime-adapter hardening, and UI migration/cleanup
+
+### 3. Preserve receiving as a transitional adapter surface
+
+- the split should not assume immediate removal of `/lims/receiving/*`
+- instead, receiving pages and APIs should be treated as governed runtime entry
+   adapters until a later migration slice retires or narrows them
+
+## Implementation Readiness Anchors
+
+- the bundle must validate under the current `spec-kit` rules before any new
+   implementation issues are generated from it
+- the next coding issue must map to one independently reviewable PR and one
+   explicit architecture boundary
+- each follow-on issue must carry the full delivery-work-item contract:
+   objective, spec artifacts, deliverables, acceptance criteria, dependencies,
+   references, and handoff state
+- the split must avoid duplicating work already shipped in the current Sample
+   Accession bundle, runtime adapters, or proving UI
+
+## Initial Issue Split
+
+Recommended split for the remaining Sample Accession implementation work:
+
+1. **Reference bundle and publication invariants**
+    - objective: harden the authored `sample-accession` operation, workflow, and
+       form-package publication contract so version identity, SOP linkage, and
+       runtime defaults are explicit and stable
+    - likely surfaces: `src/lims/services.py`, `src/lims/models.py`, reference
+       bundle API/tests, any missing SOP/version metadata wiring
+    - acceptance focus: published-version immutability, reference-bundle
+       idempotence, explicit authored invariants, and reviewable publication rules
+
+2. **Receiving adapters to governed runtime hardening**
+    - objective: tighten the single, batch, and EDC transitional adapters so all
+       accession execution semantics are consistently expressed through
+       `OperationRun`, `TaskRun`, `SubmissionRecord`, approvals, discrepancies,
+       and storage/disposition outcomes
+    - likely surfaces: `src/lims/services.py`, receiving/accessioning APIs,
+       runtime services, runtime-facing tests
+    - acceptance focus: adapter parity across modes, explicit branching and audit
+       evidence, and removal of remaining ad hoc capture behavior
+
+3. **Reference and receiving UI migration cleanup**
+    - objective: align `/lims/reference/operations/sample-accession/` and
+       `/lims/receiving/*` with the governed reference-operation model so the UI
+       communicates adapter status and runtime ownership clearly
+    - likely surfaces: `src/lims/views.py`, receiving and reference templates,
+       UI tests, possibly operations launchpad entrypoints
+    - acceptance focus: reference-operation visibility, clearer current-to-target
+       mapping, and removal of misleading transitional/final boundary mixing
+
+This split matches the repository convention of one independently reviewable
+execution issue per PR and avoids reopening already-merged work as one broad
+umbrella implementation branch.
+
 ## Proposed Design Direction
 
 ### 1. Stable operation identity
@@ -81,23 +166,6 @@ Define Sample Accession as the first concrete reference operation on the LIMS-sp
 - keep `/lims/receiving/` as the launchpad
 - keep `/lims/receiving/single/`, `/lims/receiving/batch/`, and `/lims/receiving/edc-import/` as operator entrypoints
 - reinterpret them as adapters that initiate governed accession runs and submit task-scoped data
-
-## Reviewable Slices
-
-1. **Operation identity and lifecycle**
-   - define the stable `sample-accession` operation identity and published version behavior
-
-2. **Workflow and branch contract**
-   - define the canonical intake -> QC -> storage/rejection shape
-
-3. **Compiler binding contract**
-   - define package sections/items consumed by each task
-
-4. **Runtime evidence contract**
-   - define runs, task runs, submissions, audit events, and material links
-
-5. **Current-to-target migration**
-   - define how current APIs and UI surfaces become governed runtime adapters
 
 ## Open Design Decisions
 
