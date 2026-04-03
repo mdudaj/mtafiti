@@ -4,6 +4,8 @@ import uuid
 import pytest
 from django.test import Client
 
+from lims.models import OperationVersion
+
 
 def _create_lims_host(client: Client, route_slug: str) -> str:
     control_host = "control.example"
@@ -60,18 +62,41 @@ def test_lims_reference_sample_accession_provision_is_idempotent(monkeypatch):
     assert payload["workflow_version"]["status"] == "published"
     assert payload["operation_definition"]["code"] == "sample-accession"
     assert payload["operation_version"]["status"] == "published"
-    assert payload["operation_version"]["runtime_defaults"]["source_modes"] == ["single", "batch", "edc_import"]
-    assert [section["section_key"] for section in payload["form_package_version"]["compiled_projection"]["sections"]] == [
+    assert (
+        payload["operation_version"]["sop_version_label"]
+        == "sample-accession-reference-sop-v1"
+    )
+    assert payload["operation_version"]["runtime_defaults"]["source_modes"] == [
+        "single",
+        "batch",
+        "edc_import",
+    ]
+    assert (
+        payload["operation_version"]["runtime_defaults"]["sop_context_required"] is True
+    )
+    assert [
+        section["section_key"]
+        for section in payload["form_package_version"]["compiled_projection"][
+            "sections"
+        ]
+    ] == [
         "intake",
         "qc",
         "storage",
         "rejection",
     ]
     qc_node = next(
-        item for item in payload["workflow_version"]["compiled_definition"]["nodes"] if item["node_key"] == "qc_decision"
+        item
+        for item in payload["workflow_version"]["compiled_definition"]["nodes"]
+        if item["node_key"] == "qc_decision"
     )
     assert qc_node["approval"]["required"] is True
-    assert qc_node["bindings"][0]["item_keys"] == ["qc_decision", "qc_notes", "rejection_code", "reason"]
+    assert qc_node["bindings"][0]["item_keys"] == [
+        "qc_decision",
+        "qc_notes",
+        "rejection_code",
+        "reason",
+    ]
 
     provisioned_again = client.post(
         "/api/v1/lims/reference/operations/sample-accession/provision",
@@ -81,9 +106,52 @@ def test_lims_reference_sample_accession_provision_is_idempotent(monkeypatch):
     assert provisioned_again.status_code == 200
     payload_again = provisioned_again.json()
     assert payload_again["created"] is False
-    assert payload_again["form_package_version"]["id"] == payload["form_package_version"]["id"]
+    assert (
+        payload_again["form_package_version"]["id"]
+        == payload["form_package_version"]["id"]
+    )
     assert payload_again["workflow_version"]["id"] == payload["workflow_version"]["id"]
-    assert payload_again["operation_version"]["id"] == payload["operation_version"]["id"]
+    assert (
+        payload_again["operation_version"]["id"] == payload["operation_version"]["id"]
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_lims_reference_sample_accession_provision_rejects_drifted_published_bundle(
+    monkeypatch,
+):
+    monkeypatch.setenv("EDMP_ENFORCE_ROLES", "true")
+    client = Client()
+    host = _create_lims_host(client, "tenant-reference-accession-drift")
+
+    provisioned = client.post(
+        "/api/v1/lims/reference/operations/sample-accession/provision",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+    )
+    assert provisioned.status_code == 200
+
+    operation_version = OperationVersion.objects.get(
+        definition__code="sample-accession",
+        status=OperationVersion.Status.PUBLISHED,
+    )
+    operation_version.sop_version_label = ""
+    operation_version.save(update_fields=["sop_version_label", "updated_at"])
+
+    reprovisioned = client.post(
+        "/api/v1/lims/reference/operations/sample-accession/provision",
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="lims.manager",
+    )
+    assert reprovisioned.status_code == 400
+    assert (
+        reprovisioned.json()["error"]
+        == "sample_accession_reference_bundle_invariants_failed"
+    )
+    assert {
+        "field": "operation_version.sop_version_label",
+        "code": "reference_sop_version_label_mismatch",
+    } in reprovisioned.json()["details"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -121,7 +189,9 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
     assert single_run.status_code == 201
     single_payload = single_run.json()
     assert single_payload["source_mode"] == "single"
-    intake_task = next(item for item in single_payload["tasks"] if item["node_key"] == "intake_capture")
+    intake_task = next(
+        item for item in single_payload["tasks"] if item["node_key"] == "intake_capture"
+    )
 
     intake_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{single_payload['id']}/tasks/{intake_task['id']}/submit",
@@ -141,18 +211,31 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
         HTTP_X_USER_ID="operator-1",
     )
     assert intake_submitted.status_code == 200
-    qc_task = next(item for item in intake_submitted.json()["tasks"] if item["node_key"] == "qc_decision")
+    qc_task = next(
+        item
+        for item in intake_submitted.json()["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
 
     qc_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{single_payload['id']}/tasks/{qc_task['id']}/submit",
-        data=json.dumps({"payload": {"qc_decision": "accept", "qc_notes": "Visual QC ok"}}),
+        data=json.dumps(
+            {"payload": {"qc_decision": "accept", "qc_notes": "Visual QC ok"}}
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
         HTTP_X_USER_ID="operator-1",
     )
     assert qc_submitted.status_code == 200
-    assert next(item for item in qc_submitted.json()["tasks"] if item["node_key"] == "qc_decision")["status"] == "awaiting_approval"
+    assert (
+        next(
+            item
+            for item in qc_submitted.json()["tasks"]
+            if item["node_key"] == "qc_decision"
+        )["status"]
+        == "awaiting_approval"
+    )
 
     qc_approved = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{single_payload['id']}/tasks/{qc_task['id']}/approve",
@@ -163,11 +246,17 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
         HTTP_X_USER_ID="qa-1",
     )
     assert qc_approved.status_code == 200
-    storage_task = next(item for item in qc_approved.json()["tasks"] if item["node_key"] == "storage_logging")
+    storage_task = next(
+        item
+        for item in qc_approved.json()["tasks"]
+        if item["node_key"] == "storage_logging"
+    )
 
     storage_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{single_payload['id']}/tasks/{storage_task['id']}/submit",
-        data=json.dumps({"payload": {"storage_reference": "FREEZER-A1", "storage_notes": "Shelf 2"}}),
+        data=json.dumps(
+            {"payload": {"storage_reference": "FREEZER-A1", "storage_notes": "Shelf 2"}}
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
@@ -175,7 +264,10 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
     )
     assert storage_submitted.status_code == 200
     assert storage_submitted.json()["status"] == "completed"
-    assert any(item["action"] == "stored" for item in storage_submitted.json()["material_usages"])
+    assert any(
+        item["action"] == "stored"
+        for item in storage_submitted.json()["material_usages"]
+    )
 
     batch_run = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs",
@@ -195,20 +287,36 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
     assert batch_run.status_code == 201
     batch_payload = batch_run.json()
     assert batch_payload["source_mode"] == "batch"
-    batch_intake = next(item for item in batch_payload["tasks"] if item["node_key"] == "intake_capture")
+    batch_intake = next(
+        item for item in batch_payload["tasks"] if item["node_key"] == "intake_capture"
+    )
     batch_intake_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{batch_payload['id']}/tasks/{batch_intake['id']}/submit",
-        data=json.dumps({"payload": {"subject_identifier": "SUBJ-002", "received_at": "2026-03-20"}}),
+        data=json.dumps(
+            {"payload": {"subject_identifier": "SUBJ-002", "received_at": "2026-03-20"}}
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
         HTTP_X_USER_ID="operator-1",
     )
     assert batch_intake_submitted.status_code == 200
-    batch_qc = next(item for item in batch_intake_submitted.json()["tasks"] if item["node_key"] == "qc_decision")
+    batch_qc = next(
+        item
+        for item in batch_intake_submitted.json()["tasks"]
+        if item["node_key"] == "qc_decision"
+    )
     batch_qc_submitted = client.post(
         f"/api/v1/lims/operations/{operation_id}/runs/{batch_payload['id']}/tasks/{batch_qc['id']}/submit",
-        data=json.dumps({"payload": {"qc_decision": "reject", "rejection_code": "damaged", "reason": "Tube leaked"}}),
+        data=json.dumps(
+            {
+                "payload": {
+                    "qc_decision": "reject",
+                    "rejection_code": "damaged",
+                    "reason": "Tube leaked",
+                }
+            }
+        ),
         content_type="application/json",
         HTTP_HOST=host,
         HTTP_X_USER_ROLES="lims.operator",
@@ -225,7 +333,10 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
     )
     assert batch_qc_approved.status_code == 200
     assert batch_qc_approved.json()["status"] == "rejected"
-    assert any(item["action"] == "rejected" for item in batch_qc_approved.json()["material_usages"])
+    assert any(
+        item["action"] == "rejected"
+        for item in batch_qc_approved.json()["material_usages"]
+    )
     assert batch_qc_approved.json()["qc_results"][0]["decision"] == "reject"
     assert batch_qc_approved.json()["qc_results"][0]["notes"] == "Tube leaked"
 
@@ -246,4 +357,3 @@ def test_lims_reference_sample_accession_bundle_executes_runtime_paths(monkeypat
     )
     assert edc_run.status_code == 201
     assert edc_run.json()["source_mode"] == "edc_import"
-
