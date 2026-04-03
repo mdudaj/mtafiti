@@ -203,6 +203,30 @@ DEFAULT_METADATA_VOCABULARY_PACK = (
         ),
     },
 )
+SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE = "sample-accession"
+SAMPLE_ACCESSION_REFERENCE_PACKAGE_CODE = "sample-accession-package"
+SAMPLE_ACCESSION_REFERENCE_SECTION_KEYS = [
+    "intake",
+    "qc",
+    "storage",
+    "rejection",
+]
+SAMPLE_ACCESSION_REFERENCE_SOURCE_MODES = ["single", "batch", "edc_import"]
+SAMPLE_ACCESSION_REFERENCE_TASK_KEYS = {
+    "intake": "intake_capture",
+    "qc": "qc_decision",
+    "storage": "storage_logging",
+}
+SAMPLE_ACCESSION_REFERENCE_TRANSITIONAL_ADAPTERS = [
+    "/api/v1/lims/accessioning/receive-single",
+    "/api/v1/lims/accessioning/manifests/<manifest_id>/items/" "<item_id>/receive",
+]
+SAMPLE_ACCESSION_REFERENCE_QC_BINDING_ITEM_KEYS = [
+    "qc_decision",
+    "qc_notes",
+    "rejection_code",
+    "reason",
+]
 
 
 class AddressSyncFetchError(RuntimeError):
@@ -853,6 +877,193 @@ def _stable_oid(prefix: str, key: str) -> str:
     return f"{prefix}.{normalized}"
 
 
+def _sample_accession_reference_sop_version_label(version_number: int) -> str:
+    return f"sample-accession-reference-sop-v{version_number}"
+
+
+def _sample_accession_reference_runtime_defaults() -> dict[str, object]:
+    return {
+        "reference_operation": SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE,
+        "source_modes": list(SAMPLE_ACCESSION_REFERENCE_SOURCE_MODES),
+        "task_keys": dict(SAMPLE_ACCESSION_REFERENCE_TASK_KEYS),
+        "transitional_adapters": list(SAMPLE_ACCESSION_REFERENCE_TRANSITIONAL_ADAPTERS),
+        "sop_context_required": True,
+    }
+
+
+def _sample_accession_reference_bundle_errors(
+    *,
+    form_package_version: FormPackageVersion,
+    workflow_version: WorkflowTemplateVersion,
+    operation_version: OperationVersion,
+) -> list[dict[str, str]]:
+    errors: list[dict[str, str]] = []
+
+    compiler_context = dict(form_package_version.compiler_context or {})
+    if form_package_version.package.code != SAMPLE_ACCESSION_REFERENCE_PACKAGE_CODE:
+        errors.append(
+            {
+                "field": "form_package.code",
+                "code": "reference_package_code_mismatch",
+            }
+        )
+    if (
+        compiler_context.get("reference_operation")
+        != SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE
+    ):
+        errors.append(
+            {
+                "field": "form_package_version.compiler_context.reference_operation",
+                "code": "reference_operation_mismatch",
+            }
+        )
+    if compiler_context.get("bundle_kind") != "reference_operation":
+        errors.append(
+            {
+                "field": "form_package_version.compiler_context.bundle_kind",
+                "code": "bundle_kind_mismatch",
+            }
+        )
+    if compiler_context.get("source_kind") != "canonical_reference_bundle":
+        errors.append(
+            {
+                "field": "form_package_version.compiler_context.source_kind",
+                "code": "source_kind_mismatch",
+            }
+        )
+
+    compiled_projection = (
+        form_package_version.compiled_projection.projection
+        if hasattr(form_package_version, "compiled_projection")
+        else {}
+    )
+    section_keys = [
+        str(item.get("section_key") or "")
+        for item in compiled_projection.get("sections") or []
+    ]
+    if section_keys != SAMPLE_ACCESSION_REFERENCE_SECTION_KEYS:
+        errors.append(
+            {
+                "field": "form_package_version.compiled_projection.sections",
+                "code": "reference_sections_mismatch",
+            }
+        )
+
+    if workflow_version.template.code != SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE:
+        errors.append(
+            {
+                "field": "workflow_template.code",
+                "code": "reference_workflow_code_mismatch",
+            }
+        )
+    compiled_definition = dict(workflow_version.compiled_definition or {})
+    node_map = {
+        str(node.get("node_key") or ""): node
+        for node in compiled_definition.get("nodes") or []
+    }
+    qc_node = node_map.get("qc_decision")
+    if not qc_node:
+        errors.append(
+            {
+                "field": "workflow_version.compiled_definition.nodes",
+                "code": "reference_qc_node_missing",
+            }
+        )
+    else:
+        if not bool((qc_node.get("approval") or {}).get("required")):
+            errors.append(
+                {
+                    "field": "workflow_version.compiled_definition.nodes.qc_decision.approval",
+                    "code": "reference_qc_approval_required",
+                }
+            )
+        bindings = qc_node.get("bindings") or []
+        item_keys = []
+        if bindings:
+            item_keys = list(bindings[0].get("item_keys") or [])
+        if item_keys != SAMPLE_ACCESSION_REFERENCE_QC_BINDING_ITEM_KEYS:
+            errors.append(
+                {
+                    "field": "workflow_version.compiled_definition.nodes.qc_decision.bindings",
+                    "code": "reference_qc_binding_mismatch",
+                }
+            )
+    intake_node = node_map.get("intake_capture")
+    if not intake_node:
+        errors.append(
+            {
+                "field": "workflow_version.compiled_definition.nodes",
+                "code": "reference_intake_node_missing",
+            }
+        )
+    else:
+        intake_config = dict(intake_node.get("config") or {})
+        if intake_config.get("source_modes") != SAMPLE_ACCESSION_REFERENCE_SOURCE_MODES:
+            errors.append(
+                {
+                    "field": "workflow_version.compiled_definition.nodes.intake_capture.config.source_modes",
+                    "code": "reference_source_modes_mismatch",
+                }
+            )
+        if intake_config.get("adapter_surface") != reverse("lims_receiving_page"):
+            errors.append(
+                {
+                    "field": "workflow_version.compiled_definition.nodes.intake_capture.config.adapter_surface",
+                    "code": "reference_adapter_surface_mismatch",
+                }
+            )
+
+    expected_runtime_defaults = _sample_accession_reference_runtime_defaults()
+    if operation_version.definition.code != SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE:
+        errors.append(
+            {
+                "field": "operation_definition.code",
+                "code": "reference_operation_code_mismatch",
+            }
+        )
+    if operation_version.workflow_version_id != workflow_version.id:
+        errors.append(
+            {
+                "field": "operation_version.workflow_version",
+                "code": "reference_operation_workflow_mismatch",
+            }
+        )
+    if dict(operation_version.runtime_defaults or {}) != expected_runtime_defaults:
+        errors.append(
+            {
+                "field": "operation_version.runtime_defaults",
+                "code": "reference_runtime_defaults_mismatch",
+            }
+        )
+    expected_sop_label = _sample_accession_reference_sop_version_label(
+        operation_version.version_number
+    )
+    if operation_version.sop_version_label != expected_sop_label:
+        errors.append(
+            {
+                "field": "operation_version.sop_version_label",
+                "code": "reference_sop_version_label_mismatch",
+            }
+        )
+
+    return errors
+
+
+def _assert_sample_accession_reference_bundle_invariants(
+    bundle: SampleAccessionReferenceBundle,
+) -> None:
+    errors = _sample_accession_reference_bundle_errors(
+        form_package_version=bundle.form_package_version,
+        workflow_version=bundle.workflow_version,
+        operation_version=bundle.operation_version,
+    )
+    if errors:
+        raise ReferenceOperationProvisionError(
+            "sample_accession_reference_bundle_invariants_failed",
+            errors,
+        )
+
+
 def bootstrap_form_package_version_from_schema_version(
     *,
     schema_version: MetadataSchemaVersion,
@@ -1313,7 +1524,7 @@ def _create_sample_accession_form_package_version(
         + 1,
         change_summary="Canonical sample accession reference package.",
         compiler_context={
-            "reference_operation": "sample-accession",
+            "reference_operation": SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE,
             "bundle_kind": "reference_operation",
             "source_kind": "canonical_reference_bundle",
         },
@@ -1540,7 +1751,7 @@ def _create_sample_accession_form_package_version(
         filename="sample-accession.reference.bundle.json",
         content_type="application/json",
         artifact_metadata={
-            "reference_operation": "sample-accession",
+            "reference_operation": SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE,
             "source_kind": "canonical_reference_bundle",
         },
     )
@@ -1586,7 +1797,7 @@ def _create_sample_accession_workflow_version(
         assignment_role="lims.operator",
         permission_key="lims.workflow_task.execute",
         config={
-            "source_modes": ["single", "batch", "edc_import"],
+            "source_modes": list(SAMPLE_ACCESSION_REFERENCE_SOURCE_MODES),
             "adapter_surface": reverse("lims_receiving_page"),
         },
     )
@@ -1638,7 +1849,7 @@ def _create_sample_accession_workflow_version(
                 node=qc_node,
                 form_package_version=form_package_version,
                 binding_type=WorkflowStepBinding.BindingType.ITEM_SET,
-                item_keys=["qc_decision", "qc_notes", "rejection_code", "reason"],
+                item_keys=list(SAMPLE_ACCESSION_REFERENCE_QC_BINDING_ITEM_KEYS),
             ),
             WorkflowStepBinding(
                 node=storage_node,
@@ -1713,19 +1924,16 @@ def _create_sample_accession_operation_version(
         )
         + 1,
         change_summary="Canonical sample accession reference operation.",
-        runtime_defaults={
-            "reference_operation": "sample-accession",
-            "source_modes": ["single", "batch", "edc_import"],
-            "task_keys": {
-                "intake": "intake_capture",
-                "qc": "qc_decision",
-                "storage": "storage_logging",
-            },
-            "transitional_adapters": [
-                "/api/v1/lims/accessioning/receive-single",
-                "/api/v1/lims/accessioning/manifests/<manifest_id>/items/<item_id>/receive",
-            ],
-        },
+        sop_version_label=_sample_accession_reference_sop_version_label(
+            (
+                definition.versions.order_by("-version_number")
+                .values_list("version_number", flat=True)
+                .first()
+                or 0
+            )
+            + 1
+        ),
+        runtime_defaults=_sample_accession_reference_runtime_defaults(),
     )
     _publish_operation_version(version)
     version.refresh_from_db()
@@ -1736,7 +1944,7 @@ def _create_sample_accession_operation_version(
 def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBundle:
     created = False
     form_package, package_created = FormPackage.objects.get_or_create(
-        code="sample-accession-package",
+        code=SAMPLE_ACCESSION_REFERENCE_PACKAGE_CODE,
         defaults={
             "name": "Sample accession package",
             "description": "Compiler-owned canonical form package for the sample accession reference operation.",
@@ -1758,7 +1966,7 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
         created = True
 
     workflow_template, template_created = WorkflowTemplate.objects.get_or_create(
-        code="sample-accession",
+        code=SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE,
         defaults={
             "name": "Sample accession",
             "description": "Canonical sample accession reference workflow topology.",
@@ -1783,7 +1991,7 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
 
     operation_definition, definition_created = (
         OperationDefinition.objects.get_or_create(
-            code="sample-accession",
+            code=SAMPLE_ACCESSION_REFERENCE_OPERATION_CODE,
             defaults={
                 "name": "Sample accession",
                 "description": "Canonical sample accession reference operation.",
@@ -1806,7 +2014,7 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
         )
         created = True
 
-    return SampleAccessionReferenceBundle(
+    bundle = SampleAccessionReferenceBundle(
         form_package=form_package,
         form_package_version=form_package_version,
         workflow_template=workflow_template,
@@ -1815,6 +2023,8 @@ def provision_sample_accession_reference_bundle() -> SampleAccessionReferenceBun
         operation_version=operation_version,
         created=created,
     )
+    _assert_sample_accession_reference_bundle_invariants(bundle)
+    return bundle
 
 
 def _sample_accession_operation_version() -> OperationVersion:
