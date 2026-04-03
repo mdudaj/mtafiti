@@ -13,7 +13,7 @@
 
 <section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Choose a storage or inventory workflow" panel_description="Administration stays split into focused pages so hierarchy, placement, catalog, lot, and ledger actions are not mixed together." %}
-  {% include "core/ui/includes/action_card_grid.html" with items=payload.actions action_namespace="lims" empty_title="No storage or inventory actions available" empty_description="No storage or inventory administration actions are currently available for this role." %}
+  {% include "core/ui/includes/action_card_grid.html" with items=payload.operation_page.action_cards action_namespace="lims" empty_title="No storage or inventory actions available" empty_description="No storage or inventory administration actions are currently available for this role." %}
 </section>
 
 <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
@@ -105,4 +105,8 @@
     </div>
   </section>
 </div>
+{% endblock %}
+
+{% block floating_action %}
+  {% include "core/ui/includes/floating_action_button.html" with item=payload.operation_page.floating_action %}
 {% endblock %}

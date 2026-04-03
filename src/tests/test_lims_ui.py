@@ -7,11 +7,16 @@ from django.urls import reverse
 from django_tenants.utils import schema_context
 
 from lims.models import (
+    Biospecimen,
+    BiospecimenType,
     Country,
     District,
+    InventoryLot,
+    InventoryMaterial,
     Lab,
     Region,
     Site,
+    StorageLocation,
     Street,
     Study,
     TanzaniaAddressSyncRun,
@@ -345,6 +350,35 @@ def test_lims_launchpads_render_canonical_action_links():
     storage_location_url = reverse("lims_storage_create_location_page")
     storage_transaction_url = reverse("lims_storage_create_transaction_page")
 
+    summary = client.get(
+        "/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+    schema_name = summary.json()["tenant_schema"]
+
+    with schema_context(schema_name):
+        lab = Lab.objects.create(name="Ops Storage Lab", code="ops-storage-lab")
+        location = StorageLocation.objects.create(
+            lab=lab,
+            name="Operations freezer",
+            code="operations-freezer",
+            level=StorageLocation.Level.FACILITY,
+        )
+        material = InventoryMaterial.objects.create(
+            name="Transport tube",
+            code="transport-tube",
+            category=InventoryMaterial.Category.CONSUMABLE,
+            default_unit="ea",
+        )
+        InventoryLot.objects.create(
+            material=material,
+            lab=lab,
+            storage_location=location,
+            lot_number="OPS-LOT-001",
+            initial_quantity=25,
+            on_hand_quantity=25,
+            unit_of_measure="ea",
+        )
+
     task_inbox = client.get(
         task_inbox_url, HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
     )
@@ -415,6 +449,111 @@ def test_lims_launchpads_use_shared_action_card_grid_markup():
     assert b'data-action-card="task-open-receiving"' in task_inbox.content
     assert b'data-action-card="receiving-single"' in receiving.content
     assert b'data-action-card="storage-create-location"' in storage.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_receiving_operation_page_derives_fab_from_primary_action():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-receiving-fab")
+    receiving_url = reverse("lims_receiving_single_page")
+
+    response = client.get(
+        reverse("lims_receiving_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert response.status_code == 200
+    assert b'data-floating-action="receiving-single"' in response.content
+    assert receiving_url.encode() in response.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_reference_operation_page_suppresses_fab_without_changing_cards():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-reference-no-fab")
+    reference_page = client.get(
+        reverse("lims_reference_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert reference_page.status_code == 200
+    assert b"data-floating-action=" not in reference_page.content
+    assert b'data-action-card="reference-create-lab"' in reference_page.content
+    assert b'data-action-card="reference-sample-accession"' in reference_page.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_storage_operation_page_filters_actions_by_live_context_and_keeps_fab_authoritative():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-storage-stateful")
+    summary = client.get(
+        "/api/v1/lims/summary", HTTP_HOST=host, HTTP_X_USER_ROLES="tenant.admin"
+    )
+    schema_name = summary.json()["tenant_schema"]
+
+    initial = client.get(
+        reverse("lims_storage_inventory_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert initial.status_code == 200
+    assert b'data-action-card="storage-create-location"' in initial.content
+    assert b'data-action-card="storage-create-material"' in initial.content
+    assert b'data-action-card="storage-record-placement"' not in initial.content
+    assert b'data-action-card="storage-receive-lot"' not in initial.content
+    assert b'data-action-card="storage-record-transaction"' not in initial.content
+    assert b'data-floating-action="storage-create-location"' in initial.content
+
+    with schema_context(schema_name):
+        lab = Lab.objects.create(name="Storage Lab", code="storage-lab")
+        location = StorageLocation.objects.create(
+            lab=lab,
+            name="Main freezer",
+            code="main-freezer",
+            level=StorageLocation.Level.FACILITY,
+        )
+        material = InventoryMaterial.objects.create(
+            name="Cryovial",
+            code="cryovial",
+            category=InventoryMaterial.Category.CONSUMABLE,
+            default_unit="ea",
+        )
+        InventoryLot.objects.create(
+            material=material,
+            lab=lab,
+            storage_location=location,
+            lot_number="LOT-001",
+            initial_quantity=10,
+            on_hand_quantity=10,
+            unit_of_measure="ea",
+        )
+        sample_type = BiospecimenType.objects.create(
+            name="Whole blood",
+            key="whole-blood",
+        )
+        Biospecimen.objects.create(
+            sample_type=sample_type,
+            sample_identifier="SPEC-001",
+            barcode="BC-001",
+            lab=lab,
+        )
+
+    stateful = client.get(
+        reverse("lims_storage_inventory_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert stateful.status_code == 200
+    assert b'data-action-card="storage-create-location"' in stateful.content
+    assert b'data-action-card="storage-create-material"' in stateful.content
+    assert b'data-action-card="storage-record-placement"' in stateful.content
+    assert b'data-action-card="storage-receive-lot"' in stateful.content
+    assert b'data-action-card="storage-record-transaction"' in stateful.content
+    assert b'data-floating-action="storage-create-location"' in stateful.content
 
 
 @pytest.mark.django_db(transaction=True)
@@ -837,7 +976,7 @@ def test_storage_inventory_pages_show_admin_forms():
     assert launchpad.status_code == 200
     assert b"Storage and inventory administration" in launchpad.content
     assert b"Create storage location" in launchpad.content
-    assert b"Record stock transaction" in launchpad.content
+    assert b"Record stock transaction" not in launchpad.content
 
     location_page = client.get(
         reverse("lims_storage_create_location_page"),

@@ -1,8 +1,8 @@
 # Task Tracking
 
-- Issue #136: implement the reusable action-card component and bounded card-grid rendering contract.
+- Issue #137: implement proving operation pages and FAB derivation from allowed actions.
 - Plan:
-	- extract a shared action-card partial and bounded grid wrapper under `src/core/templates/core/ui/includes/`
-	- convert the repeated LIMS launchpad card markup to the shared includes without reopening resolver logic
-	- add rendering-focused regression coverage for grid and action-card markers in `src/tests/test_lims_ui.py`
-	- run targeted UI tests and the full merge gate
+	- adopt explicit operation-page descriptors on three proving LIMS launchpads: route-heavy receiving, mixed reference, and state-sensitive storage
+	- derive optional FAB behavior from the resolved allowed card set without introducing a second action authority
+	- add resolver and UI regressions proving workflow-backed cards, state-sensitive filtering, and FAB suppression behavior
+	- run targeted navigation and LIMS UI validation before deciding whether a full gate is necessary
