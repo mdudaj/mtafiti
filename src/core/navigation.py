@@ -302,7 +302,7 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     ActionDescriptor(
         key="reference-sample-accession",
         title="Provision sample accession",
-        description="Provision and inspect the canonical sample accession reference bundle used by the receiving adapters.",
+        description="Provision and inspect the canonical sample accession reference bundle that governs runtime execution across receiving adapters.",
         icon="conversion_path",
         workflow_key="sample-accession-reference",
         sequence=50,
@@ -394,7 +394,7 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     ActionDescriptor(
         key="receiving-single",
         title="Single sample receipt",
-        description="Capture intake metadata, record a QC accept/reject decision, then log storage or rejection details.",
+        description="Launch the governed Sample Accession runtime from the single-sample receiving adapter, including QC and storage or rejection capture.",
         icon="move_to_inbox",
         route_name="lims_receiving_single_page",
         sequence=10,
@@ -406,7 +406,7 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     ActionDescriptor(
         key="receiving-batch",
         title="Batch manifest receipt",
-        description="Download an Excel-friendly CSV template, complete receipt/QC/storage columns, and import the batch.",
+        description="Launch governed Sample Accession runs from a batch manifest import with receipt, QC, and storage or rejection columns.",
         icon="upload_file",
         route_name="lims_receiving_batch_page",
         sequence=20,
@@ -417,7 +417,7 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     ActionDescriptor(
         key="receiving-edc-import",
         title="Retrieve from EDC",
-        description="Specify the lab form, expected sample, and external ID, then process the imported record through QC.",
+        description="Launch the governed Sample Accession runtime from an EDC-linked receiving adapter after import, QC, and storage or rejection capture.",
         icon="cloud_download",
         route_name="lims_receiving_edc_import_page",
         sequence=30,

@@ -590,7 +590,7 @@ def _reference_sample_accession_page_payload(request) -> dict[str, object]:
         request,
         active_key="lims-reference",
         title="Sample accession reference bundle",
-        summary="Provision and inspect the canonical form package, workflow, operation, and recent governed runs behind receiving adapters.",
+        summary="Provision and inspect the canonical reference bundle that governs Sample Accession runtime execution across the receiving adapters.",
         kicker="Reference operation",
     )
     form_package = (
@@ -993,7 +993,7 @@ def _receiving_launchpad_payload(request) -> dict[str, object]:
         request,
         active_key="lims-receiving",
         title="Receiving and accessioning",
-        summary="Choose a focused receiving flow, then complete that task on a dedicated one-form page.",
+        summary="Choose a receiving adapter. Each path launches the governed Sample Accession runtime from a dedicated entry page.",
         kicker="Accessioning",
     )
     payload["cards"] = {
@@ -1033,7 +1033,7 @@ def _receiving_single_page_payload(request) -> dict[str, object]:
         request,
         active_key="lims-receiving",
         title="Receive single specimen",
-        summary="Capture initial metadata, complete the first QC decision, then log storage or document a rejection.",
+        summary="Use this receiving adapter to launch the governed Sample Accession runtime, capture initial receipt data, complete QC, and log storage or rejection.",
         kicker="Single receipt",
     )
     payload["sample_type_options"] = [
@@ -1061,7 +1061,7 @@ def _receiving_batch_page_payload(request) -> dict[str, object]:
         request,
         active_key="lims-receiving",
         title="Receive batch manifest",
-        summary="Use one batch import form to load intake metadata, QC outcomes, and storage instructions from a template.",
+        summary="Use this receiving adapter to launch governed Sample Accession runs from one batch import template with intake, QC, and storage or rejection outcomes.",
         kicker="Batch receipt",
     )
     payload["sample_type_options"] = [
@@ -1094,7 +1094,7 @@ def _receiving_edc_import_page_payload(request) -> dict[str, object]:
         request,
         active_key="lims-receiving",
         title="Retrieve metadata from EDC",
-        summary="Capture the lab form, expected sample, external ID import target, and QC/storage outcome in one flow.",
+        summary="Use this receiving adapter to import EDC context, then launch the governed Sample Accession runtime with QC and storage or rejection outcome capture.",
         kicker="EDC intake",
     )
     payload["sample_type_options"] = [
