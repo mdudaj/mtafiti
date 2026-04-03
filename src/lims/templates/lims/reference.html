@@ -15,7 +15,7 @@
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel">
   {% include "core/ui/includes/panel_header.html" with panel_title="Choose a reference workflow" panel_description="Keep the launchpad focused on navigation and status; complete each setup action on its own page." %}
-  {% include "core/ui/includes/action_card_grid.html" with items=payload.actions action_namespace="lims" empty_title="No reference workflows available" empty_description="No reference workflows are currently available for your role." %}
+  {% include "core/ui/includes/action_card_grid.html" with items=payload.operation_page.action_cards action_namespace="lims" empty_title="No reference workflows available" empty_description="No reference workflows are currently available for your role." %}
 </section>
 {% endif %}
 

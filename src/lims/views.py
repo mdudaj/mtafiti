@@ -17,13 +17,14 @@ from core.models import CollaborationDocument, CollaborationDocumentVersion
 from core.navigation import (
     LIMS_DASHBOARD_ACTION_DESCRIPTORS,
     METADATA_ACTION_DESCRIPTORS,
-    RECEIVING_ACTION_DESCRIPTORS,
-    REFERENCE_ACTION_DESCRIPTORS,
-    STORAGE_ACTION_DESCRIPTORS,
+    RECEIVING_OPERATION_PAGE_DESCRIPTOR,
+    REFERENCE_OPERATION_PAGE_DESCRIPTOR,
+    STORAGE_OPERATION_PAGE_DESCRIPTOR,
     TASK_INBOX_ACTION_DESCRIPTORS,
     WORKSPACE_NAVIGATION_DESCRIPTORS,
     resolve_action_descriptors,
     resolve_navigation,
+    resolve_operation_page,
 )
 from core.ui_shell import resolve_ui_base_template
 
@@ -576,12 +577,11 @@ def _reference_launchpad_payload(request) -> dict[str, object]:
         sync_run_to_dict(item)
         for item in TanzaniaAddressSyncRun.objects.order_by("-created_at")[:5]
     ]
-    payload["actions"] = resolve_action_descriptors(
+    payload["operation_page"] = resolve_operation_page(
         request,
-        descriptors=REFERENCE_ACTION_DESCRIPTORS,
-        page_key="lims-reference",
-        route_name="lims_reference_page",
+        descriptor=REFERENCE_OPERATION_PAGE_DESCRIPTOR,
     )
+    payload["actions"] = payload["operation_page"]["action_cards"]
     return payload
 
 
@@ -1020,12 +1020,11 @@ def _receiving_launchpad_payload(request) -> dict[str, object]:
         _receiving_discrepancy_to_dict(item)
         for item in ReceivingDiscrepancy.objects.order_by("-created_at")[:8]
     ]
-    payload["actions"] = resolve_action_descriptors(
+    payload["operation_page"] = resolve_operation_page(
         request,
-        descriptors=RECEIVING_ACTION_DESCRIPTORS,
-        page_key="lims-receiving",
-        route_name="lims_receiving_page",
+        descriptor=RECEIVING_OPERATION_PAGE_DESCRIPTOR,
     )
+    payload["actions"] = payload["operation_page"]["action_cards"]
     return payload
 
 
@@ -1183,11 +1182,14 @@ def _storage_inventory_page_payload(request) -> dict[str, object]:
         summary="Choose a focused storage or inventory administration task, then complete it from a dedicated page.",
         kicker="Storage operations",
     )
+    locations_count = StorageLocation.objects.count()
+    materials_count = InventoryMaterial.objects.count()
+    active_lots_count = InventoryLot.objects.filter(is_active=True).count()
     payload["cards"] = {
-        "locations": StorageLocation.objects.count(),
+        "locations": locations_count,
         "storage_records": BiospecimenStorageRecord.objects.count(),
-        "materials": InventoryMaterial.objects.count(),
-        "active_lots": InventoryLot.objects.filter(is_active=True).count(),
+        "materials": materials_count,
+        "active_lots": active_lots_count,
     }
     payload["locations"] = [
         _storage_location_to_dict(item)
@@ -1227,12 +1229,25 @@ def _storage_inventory_page_payload(request) -> dict[str, object]:
             "lot", "lot__material", "location"
         ).order_by("-created_at")[:8]
     ]
-    payload["actions"] = resolve_action_descriptors(
-        request,
-        descriptors=STORAGE_ACTION_DESCRIPTORS,
-        page_key="lims-storage",
-        route_name="lims_storage_inventory_page",
+    page_states = tuple(
+        state
+        for state, is_active in (
+            ("has-storage-locations", locations_count > 0),
+            ("has-inventory-materials", materials_count > 0),
+            ("has-active-lots", active_lots_count > 0),
+        )
+        if is_active
     )
+    payload["operation_page"] = resolve_operation_page(
+        request,
+        descriptor=STORAGE_OPERATION_PAGE_DESCRIPTOR,
+        page_states=page_states,
+        data_facts={
+            "has_placeable_artifacts": Biospecimen.objects.exists()
+            or BiospecimenPool.objects.exists(),
+        },
+    )
+    payload["actions"] = payload["operation_page"]["action_cards"]
     return payload
 
 

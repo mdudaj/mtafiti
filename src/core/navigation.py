@@ -85,6 +85,7 @@ class OperationPageDescriptor:
     route_name: str | None = None
     navigation_key: str | None = None
     action_descriptors: tuple[ActionDescriptor, ...] = ()
+    fab_enabled: bool = False
 
     def __post_init__(self) -> None:
         if not self.route_name and not self.navigation_key:
@@ -260,6 +261,7 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Register one tenant lab at a time using a dedicated lab form.",
         icon="add_business",
         route_name="lims_reference_create_lab_page",
+        sequence=10,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.reference.manage"
         ),
@@ -270,6 +272,7 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Create one study and optionally attach its lead lab.",
         icon="schema",
         route_name="lims_reference_create_study_page",
+        sequence=20,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.reference.manage"
         ),
@@ -280,6 +283,7 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Register one field or collection site and link it to study and lab selectors.",
         icon="location_city",
         route_name="lims_reference_create_site_page",
+        sequence=30,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.reference.manage"
         ),
@@ -290,6 +294,7 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Start the Tanzania-backed geography import from a single sync action page.",
         icon="sync",
         route_name="lims_reference_address_sync_page",
+        sequence=40,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.reference.manage"
         ),
@@ -300,10 +305,20 @@ REFERENCE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Provision and inspect the canonical sample accession reference bundle used by the receiving adapters.",
         icon="conversion_path",
         workflow_key="sample-accession-reference",
+        sequence=50,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.reference.manage"
         ),
     ),
+)
+
+
+REFERENCE_OPERATION_PAGE_DESCRIPTOR = OperationPageDescriptor(
+    key="lims-reference",
+    title="Reference and geography",
+    route_name="lims_reference_page",
+    navigation_key="lims-reference",
+    action_descriptors=REFERENCE_ACTION_DESCRIPTORS,
 )
 
 
@@ -382,6 +397,8 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Capture intake metadata, record a QC accept/reject decision, then log storage or rejection details.",
         icon="move_to_inbox",
         route_name="lims_receiving_single_page",
+        sequence=10,
+        primary_action=True,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.artifact.view"
         ),
@@ -392,6 +409,7 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Download an Excel-friendly CSV template, complete receipt/QC/storage columns, and import the batch.",
         icon="upload_file",
         route_name="lims_receiving_batch_page",
+        sequence=20,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.artifact.view"
         ),
@@ -402,10 +420,21 @@ RECEIVING_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Specify the lab form, expected sample, and external ID, then process the imported record through QC.",
         icon="cloud_download",
         route_name="lims_receiving_edc_import_page",
+        sequence=30,
         permission_gate=lambda context: has_lims_permission_in_context(
             context, "lims.artifact.view"
         ),
     ),
+)
+
+
+RECEIVING_OPERATION_PAGE_DESCRIPTOR = OperationPageDescriptor(
+    key="lims-receiving",
+    title="Receiving and accessioning",
+    route_name="lims_receiving_page",
+    navigation_key="lims-receiving",
+    action_descriptors=RECEIVING_ACTION_DESCRIPTORS,
+    fab_enabled=True,
 )
 
 
@@ -416,6 +445,7 @@ STORAGE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Build the storage hierarchy one node at a time so facilities, equipment, containers, and positions stay valid.",
         icon="add_home_work",
         route_name="lims_storage_create_location_page",
+        sequence=10,
         enabled_gate=lambda context: has_lims_permission_in_context(
             context, "lims.storage.manage"
         ),
@@ -426,6 +456,11 @@ STORAGE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Log a biospecimen or pool placement event against the immutable storage history ledger.",
         icon="move_item",
         route_name="lims_storage_create_placement_page",
+        sequence=20,
+        required_states=("has-storage-locations",),
+        data_gate=lambda context: bool(
+            context.data_facts.get("has_placeable_artifacts")
+        ),
         enabled_gate=lambda context: has_lims_permission_in_context(
             context, "lims.storage.manage"
         ),
@@ -436,6 +471,7 @@ STORAGE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Register consumables, kits, reagents, labels, and other reusable catalog entries.",
         icon="inventory_2",
         route_name="lims_storage_create_material_page",
+        sequence=30,
         enabled_gate=lambda context: has_lims_permission_in_context(
             context, "lims.inventory.manage"
         ),
@@ -446,6 +482,8 @@ STORAGE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Capture lot receipt, storage, expiry, and opening stock in one dedicated lot form.",
         icon="local_shipping",
         route_name="lims_storage_create_lot_page",
+        sequence=40,
+        required_states=("has-inventory-materials",),
         enabled_gate=lambda context: has_lims_permission_in_context(
             context, "lims.inventory.manage"
         ),
@@ -456,10 +494,22 @@ STORAGE_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
         description="Post adjustments, reservations, releases, transfers, consumptions, and disposals to the lot ledger.",
         icon="sync_alt",
         route_name="lims_storage_create_transaction_page",
+        sequence=50,
+        required_states=("has-active-lots",),
         enabled_gate=lambda context: has_lims_permission_in_context(
             context, "lims.inventory.manage"
         ),
     ),
+)
+
+
+STORAGE_OPERATION_PAGE_DESCRIPTOR = OperationPageDescriptor(
+    key="lims-storage",
+    title="Storage and inventory administration",
+    route_name="lims_storage_inventory_page",
+    navigation_key="lims-storage",
+    action_descriptors=STORAGE_ACTION_DESCRIPTORS,
+    fab_enabled=True,
 )
 
 
@@ -725,21 +775,54 @@ def resolve_operation_page(
     allowed_action_payloads: Iterable[Mapping[str, Any]] | None = None,
     workflow_entries: Mapping[str, WorkflowEntry] | None = None,
 ) -> dict[str, Any]:
+    action_cards = resolve_operation_cards(
+        request,
+        descriptors=descriptor.action_descriptors,
+        page_key=descriptor.key,
+        route_name=descriptor.route_name,
+        page_states=page_states,
+        data_facts=data_facts,
+        allowed_action_payloads=allowed_action_payloads,
+        workflow_entries=workflow_entries,
+    )
     return {
         "key": descriptor.key,
         "title": descriptor.title,
         "route_name": descriptor.route_name,
         "navigation_key": descriptor.navigation_key,
-        "action_cards": resolve_operation_cards(
-            request,
-            descriptors=descriptor.action_descriptors,
-            page_key=descriptor.key,
-            route_name=descriptor.route_name,
-            page_states=page_states,
-            data_facts=data_facts,
-            allowed_action_payloads=allowed_action_payloads,
-            workflow_entries=workflow_entries,
+        "action_cards": action_cards,
+        "floating_action": derive_operation_fab(
+            action_cards,
+            enabled=descriptor.fab_enabled,
         ),
+    }
+
+
+def derive_operation_fab(
+    action_cards: Iterable[Mapping[str, Any]], *, enabled: bool
+) -> dict[str, Any] | None:
+    if not enabled:
+        return None
+    allowed_cards = [
+        card
+        for card in action_cards
+        if card.get("enabled", True) and (card.get("resolved_url") or card.get("href"))
+    ]
+    if not allowed_cards:
+        return None
+    primary_card = next(
+        (card for card in allowed_cards if card.get("primary_action")),
+        allowed_cards[0],
+    )
+    href = primary_card.get("resolved_url") or primary_card.get("href")
+    if not href:
+        return None
+    return {
+        "key": primary_card["key"],
+        "title": primary_card["title"],
+        "icon": primary_card.get("icon") or "arrow_forward",
+        "href": href,
+        "resolved_url": href,
     }
 
 

@@ -387,3 +387,97 @@ def test_resolve_operation_page_uses_descriptor_identity_for_context():
 
     assert operation_page["key"] == "receiving-operations"
     assert [card["key"] for card in operation_page["action_cards"]] == ["stateful-card"]
+    assert operation_page["floating_action"] is None
+
+
+def test_resolve_operation_page_derives_floating_action_from_primary_allowed_card():
+    request = RequestFactory().get("/")
+    operation_page = resolve_operation_page(
+        request,
+        descriptor=OperationPageDescriptor(
+            key="receiving-operations",
+            title="Receiving operations",
+            route_name="lims_receiving_page",
+            fab_enabled=True,
+            action_descriptors=(
+                ActionDescriptor(
+                    key="disabled-primary",
+                    title="Disabled primary",
+                    description="Should not become the FAB.",
+                    icon="block",
+                    route_name="user_portal_dashboard_page",
+                    primary_action=True,
+                    enabled_gate=lambda _context: False,
+                ),
+                ActionDescriptor(
+                    key="single-receipt",
+                    title="Single receipt",
+                    description="Explicit primary action.",
+                    icon="move_to_inbox",
+                    route_name="lims_receiving_single_page",
+                    primary_action=True,
+                ),
+                ActionDescriptor(
+                    key="batch-receipt",
+                    title="Batch receipt",
+                    description="Secondary action.",
+                    icon="upload_file",
+                    route_name="lims_receiving_batch_page",
+                ),
+            ),
+        ),
+    )
+
+    assert [card["key"] for card in operation_page["action_cards"]] == [
+        "disabled-primary",
+        "single-receipt",
+        "batch-receipt",
+    ]
+    assert operation_page["floating_action"] == {
+        "key": "single-receipt",
+        "title": "Single receipt",
+        "icon": "move_to_inbox",
+        "href": reverse("lims_receiving_single_page"),
+        "resolved_url": reverse("lims_receiving_single_page"),
+    }
+
+
+def test_resolve_operation_page_suppresses_fab_without_changing_allowed_cards():
+    request = RequestFactory().get("/")
+    operation_page = resolve_operation_page(
+        request,
+        descriptor=OperationPageDescriptor(
+            key="reference-operations",
+            title="Reference operations",
+            route_name="lims_reference_page",
+            fab_enabled=False,
+            action_descriptors=(
+                ActionDescriptor(
+                    key="create-lab",
+                    title="Create lab",
+                    description="Route backed.",
+                    icon="add_business",
+                    route_name="lims_reference_create_lab_page",
+                ),
+                ActionDescriptor(
+                    key="sample-accession",
+                    title="Provision sample accession",
+                    description="Workflow backed.",
+                    icon="conversion_path",
+                    workflow_key="sample-accession",
+                ),
+            ),
+        ),
+        workflow_entries={
+            "sample-accession": WorkflowEntry(
+                key="sample-accession",
+                href=reverse("lims_reference_sample_accession_page"),
+            )
+        },
+    )
+
+    assert [card["key"] for card in operation_page["action_cards"]] == [
+        "create-lab",
+        "sample-accession",
+    ]
+    assert operation_page["floating_action"] is None

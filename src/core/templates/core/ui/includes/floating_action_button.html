@@ -1,0 +1,11 @@
+{% if item and item.resolved_url|default:item.href %}
+<a class="button fab"
+   href="{{ item.resolved_url|default:item.href }}"
+   aria-label="{{ item.title }}"
+   title="{{ item.title }}"
+   data-tooltip="{{ item.title }}"
+   data-floating-action="{{ item.key }}">
+  <span class="fab-icon material-symbols-outlined" aria-hidden="true">{{ item.icon|default:"arrow_forward" }}</span>
+  <span class="fab-label">{{ item.title }}</span>
+</a>
+{% endif %}
