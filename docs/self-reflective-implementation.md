@@ -150,6 +150,8 @@ Treat the PR, not the branch commit list, as the primary review unit.
 * Mark the PR ready only when the description, validation notes, and risk handoff are current.
 * Human review is optional and should be requested only when the operator asks for it or the change is unusually risky.
 * Prefer squash merge so green PRs yield a clean `main` history without requiring branch-local commit curation.
+* After a successful merge, switch back to `main`, prune removed remote refs, delete merged local branches that are no longer needed, and sync local `main` before starting the next issue.
+* Treat branch creation as blocked until the local environment is clean: `main` checked out, working tree clean, and no stale merged branches lingering from prior slices.
 * If the local branch accumulates unrelated stacked commits or the local git transport cannot publish, create a clean branch from `main` and publish only the scoped files through the repository PR tooling instead of waiting or rewriting shared history on `main`.
 
 Maintainers who need to enforce the same merge contract at the repository-settings level should use the branch-protection runbook in `docs/operations-runbooks.md` and the helper at `.github/scripts/configure_branch_protection.py` instead of editing GitHub settings ad hoc.
