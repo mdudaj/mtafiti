@@ -1,5 +1,7 @@
 # Task Tracking
 
+- Pause note: work on the ontology-driven admin shell stack is paused for review before returning to this project after another task.
+
 - Issue #133: implement reusable FAB and shared action-slot workflow behavior.
 - Status: completed local implementation on `feat/reusable-fab-action-slot-workflow-behavior`.
 - Delivered:
