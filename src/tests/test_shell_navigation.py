@@ -442,6 +442,100 @@ def test_resolve_operation_page_derives_floating_action_from_primary_allowed_car
     }
 
 
+def test_resolve_operation_page_derives_shared_action_slot_from_allowed_cards():
+    request = RequestFactory().get("/")
+    operation_page = resolve_operation_page(
+        request,
+        descriptor=OperationPageDescriptor(
+            key="receiving-operations",
+            title="Receiving operations",
+            route_name="lims_receiving_page",
+            fab_enabled=True,
+            shared_action_slot_enabled=True,
+            action_descriptors=(
+                ActionDescriptor(
+                    key="disabled-primary",
+                    title="Disabled primary",
+                    description="Should not appear in the shared action slot.",
+                    icon="block",
+                    route_name="user_portal_dashboard_page",
+                    primary_action=True,
+                    enabled_gate=lambda _context: False,
+                ),
+                ActionDescriptor(
+                    key="single-receipt",
+                    title="Single receipt",
+                    description="Explicit primary action.",
+                    icon="move_to_inbox",
+                    route_name="lims_receiving_single_page",
+                    primary_action=True,
+                ),
+                ActionDescriptor(
+                    key="batch-receipt",
+                    title="Batch receipt",
+                    description="Secondary action.",
+                    icon="upload_file",
+                    route_name="lims_receiving_batch_page",
+                ),
+            ),
+        ),
+    )
+
+    assert [item["key"] for item in operation_page["shared_action_slot"]] == [
+        "single-receipt",
+        "batch-receipt",
+    ]
+    assert operation_page["shared_action_slot"][0]["resolved_url"] == reverse(
+        "lims_receiving_single_page"
+    )
+
+
+def test_resolve_operation_page_shared_action_slot_keeps_workflow_urls_server_side():
+    request = RequestFactory().get("/")
+    sample_accession_url = reverse("lims_reference_sample_accession_page")
+    operation_page = resolve_operation_page(
+        request,
+        descriptor=OperationPageDescriptor(
+            key="task-inbox",
+            title="Task inbox",
+            route_name="lims_task_inbox_page",
+            shared_action_slot_enabled=True,
+            action_descriptors=(
+                ActionDescriptor(
+                    key="inspect-operations",
+                    title="Inspect operations",
+                    description="Workflow-backed action.",
+                    icon="conversion_path",
+                    workflow_key="sample-accession",
+                ),
+            ),
+        ),
+        workflow_entries={
+            "sample-accession": WorkflowEntry(
+                key="sample-accession",
+                href=sample_accession_url,
+            )
+        },
+    )
+
+    assert operation_page["shared_action_slot"] == [
+        {
+            "key": "inspect-operations",
+            "title": "Inspect operations",
+            "description": "Workflow-backed action.",
+            "icon": "conversion_path",
+            "href": sample_accession_url,
+            "resolved_url": sample_accession_url,
+            "enabled": True,
+            "status": None,
+            "sequence": None,
+            "primary_action": False,
+            "workflow_key": "sample-accession",
+            "route_name": None,
+        }
+    ]
+
+
 def test_resolve_operation_page_suppresses_fab_without_changing_allowed_cards():
     request = RequestFactory().get("/")
     operation_page = resolve_operation_page(

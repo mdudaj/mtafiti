@@ -1,0 +1,17 @@
+{% if items %}
+<div class="button-row" data-shell-action-slot="{{ action_namespace|default:'ui' }}">
+  {% for item in items %}
+  {% with resolved_url=item.resolved_url|default:item.href %}
+  {% if resolved_url %}
+  <a class="button{% if not item.primary_action %} button-secondary{% endif %}"
+     href="{{ resolved_url }}"
+     data-action-slot-item="{{ item.key }}"
+     {% if action_namespace == "lims" %}data-lims-action-slot="{{ item.key }}"{% endif %}>
+    <span class="material-symbols-outlined button-icon" aria-hidden="true">{{ item.icon|default:"arrow_forward" }}</span>
+    <span>{{ item.title }}</span>
+  </a>
+  {% endif %}
+  {% endwith %}
+  {% endfor %}
+</div>
+{% endif %}

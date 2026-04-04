@@ -574,6 +574,37 @@ def test_reference_operation_page_suppresses_fab_without_changing_cards():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_receiving_and_task_inbox_pages_render_shared_action_slot_behavior():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-shared-action-slot")
+    sample_accession_url = reverse("lims_reference_sample_accession_page")
+
+    receiving = client.get(
+        reverse("lims_receiving_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    task_inbox = client.get(
+        reverse("lims_task_inbox_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert receiving.status_code == 200
+    assert b'data-shell-action-slot="lims"' in receiving.content
+    assert b'data-action-slot-item="receiving-single"' in receiving.content
+    assert b'data-action-slot-item="receiving-batch"' in receiving.content
+    assert b'data-floating-action="receiving-single"' in receiving.content
+
+    assert task_inbox.status_code == 200
+    assert b'data-shell-action-slot="lims"' in task_inbox.content
+    assert b'data-action-slot-item="task-open-receiving"' in task_inbox.content
+    assert b'data-action-slot-item="task-inspect-operations"' in task_inbox.content
+    assert sample_accession_url.encode() in task_inbox.content
+    assert b"data-floating-action=" not in task_inbox.content
+
+
+@pytest.mark.django_db(transaction=True)
 def test_storage_operation_page_filters_actions_by_live_context_and_keeps_fab_authoritative():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-storage-stateful")

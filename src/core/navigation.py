@@ -86,6 +86,7 @@ class OperationPageDescriptor:
     navigation_key: str | None = None
     action_descriptors: tuple[ActionDescriptor, ...] = ()
     fab_enabled: bool = False
+    shared_action_slot_enabled: bool = False
 
     def __post_init__(self) -> None:
         if not self.route_name and not self.navigation_key:
@@ -346,6 +347,16 @@ TASK_INBOX_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
 )
 
 
+TASK_INBOX_OPERATION_PAGE_DESCRIPTOR = OperationPageDescriptor(
+    key="lims-tasks",
+    title="Workflow task inbox",
+    route_name="lims_task_inbox_page",
+    navigation_key="lims-tasks",
+    action_descriptors=TASK_INBOX_ACTION_DESCRIPTORS,
+    shared_action_slot_enabled=True,
+)
+
+
 METADATA_ACTION_DESCRIPTORS: tuple[ActionDescriptor, ...] = (
     ActionDescriptor(
         key="metadata-create-vocabulary",
@@ -435,6 +446,7 @@ RECEIVING_OPERATION_PAGE_DESCRIPTOR = OperationPageDescriptor(
     navigation_key="lims-receiving",
     action_descriptors=RECEIVING_ACTION_DESCRIPTORS,
     fab_enabled=True,
+    shared_action_slot_enabled=True,
 )
 
 
@@ -791,11 +803,27 @@ def resolve_operation_page(
         "route_name": descriptor.route_name,
         "navigation_key": descriptor.navigation_key,
         "action_cards": action_cards,
+        "shared_action_slot": derive_operation_action_slot(
+            action_cards,
+            enabled=descriptor.shared_action_slot_enabled,
+        ),
         "floating_action": derive_operation_fab(
             action_cards,
             enabled=descriptor.fab_enabled,
         ),
     }
+
+
+def derive_operation_action_slot(
+    action_cards: Iterable[Mapping[str, Any]], *, enabled: bool
+) -> list[dict[str, Any]]:
+    if not enabled:
+        return []
+    return [
+        dict(card)
+        for card in action_cards
+        if card.get("enabled", True) and (card.get("resolved_url") or card.get("href"))
+    ]
 
 
 def derive_operation_fab(
