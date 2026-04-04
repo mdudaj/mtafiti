@@ -9,6 +9,8 @@
 * Start implementation work from a dedicated issue branch; do not make normal delivery changes on `main`.
 * Open or refresh the matching pull request for that branch and keep it in draft until scope, acceptance criteria, and validation notes are current.
 * Merge implementation work by auto-squash after required checks pass; do not treat direct-to-`main` commits as a normal completion path.
+* After every successful merge, clean merged local branches, prune removed remote refs, and sync back to `main` before starting the next slice.
+* Before creating a new implementation branch, ensure the local environment is clean: `main` checked out, working tree clean, and no stale merged branches left behind.
 * Do not wait for an additional review gate after all required workflow checks are green unless the operator explicitly asks for review.
 
 ## Verification contract
