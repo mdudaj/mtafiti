@@ -20,7 +20,7 @@ from core.navigation import (
     RECEIVING_OPERATION_PAGE_DESCRIPTOR,
     REFERENCE_OPERATION_PAGE_DESCRIPTOR,
     STORAGE_OPERATION_PAGE_DESCRIPTOR,
-    TASK_INBOX_ACTION_DESCRIPTORS,
+    TASK_INBOX_OPERATION_PAGE_DESCRIPTOR,
     WORKSPACE_NAVIGATION_DESCRIPTORS,
     resolve_action_descriptors,
     resolve_navigation,
@@ -481,12 +481,11 @@ def _task_inbox_page_payload(request) -> dict[str, object]:
             ]
         ).count(),
     }
-    payload["actions"] = resolve_action_descriptors(
+    payload["operation_page"] = resolve_operation_page(
         request,
-        descriptors=TASK_INBOX_ACTION_DESCRIPTORS,
-        page_key="lims-tasks",
-        route_name="lims_task_inbox_page",
+        descriptor=TASK_INBOX_OPERATION_PAGE_DESCRIPTOR,
     )
+    payload["actions"] = payload["operation_page"]["action_cards"]
     payload["open_tasks"] = open_tasks
     payload["approval_tasks"] = approval_tasks
     payload["recent_runs"] = [

@@ -1,13 +1,14 @@
 # Task Tracking
 
-- Issue #131: implement django-material admin shell contract and proving surfaces.
-- Status: completed local implementation on `feat/django-material-shell-proving-surfaces`.
+- Issue #133: implement reusable FAB and shared action-slot workflow behavior.
+- Status: completed local implementation on `feat/reusable-fab-action-slot-workflow-behavior`.
 - Delivered:
-  - promoted `lims_dashboard_page` to an explicit proving surface for the shared shell `page_actions` and `workflow_guidance` slots
-  - promoted `lims_reference_create_lab_page` to an explicit proving surface for the shared shell `page_heading`, `page_actions`, and `page_content` slots
-  - kept the create-lab reference selector URL contract intact while moving the page onto shell-slot blocks
-  - added focused UI regression coverage for dashboard and CRUD shell-slot rendering
+  - extended the resolved operation-page pipeline so one descriptor set can derive both FAB output and a shared non-floating action-slot payload from the same allowed actions
+  - kept workflow resolution server-side by reusing resolved `route_name` and `workflow_key` outputs instead of constructing workflow URLs in templates or client code
+  - proved the behavior on the receiving launchpad as the FAB-authoritative surface and the task inbox as the shared action-slot fallback surface
+  - added focused resolver and UI regressions for shared action-slot derivation, workflow-backed actions, and FAB plus fallback consistency
 - Validation:
-  - `../.venv/bin/python -m pytest tests/test_lims_ui.py -q -k 'reference_forms_expose_slug_and_address_selectors or shell_proving_surfaces_render_shared_slots_for_dashboard_and_crud'`
-  - `../.venv/bin/python -m pytest tests/test_lims_ui.py -q -k 'lims_html_pages_render_with_role_aware_actions or shell_proving_surfaces_render_shared_slots_for_dashboard_and_crud'`
-  - pending full gate: `.github/scripts/local_fast_feedback.sh --full-gate`
+  - `../.venv/bin/python -m pytest tests/test_shell_navigation.py -q`
+  - `../.venv/bin/python -m pytest tests/test_lims_ui.py -q -k 'receiving_operation_page_derives_fab_from_primary_action or reference_operation_page_suppresses_fab_without_changing_cards or receiving_and_task_inbox_pages_render_shared_action_slot_behavior'`
+  - `../.venv/bin/python -m pytest tests/test_lims_ui.py -q`
+  - `bash .github/scripts/local_fast_feedback.sh --full-gate` → `299 passed, 2 deselected`
