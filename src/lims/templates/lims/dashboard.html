@@ -4,6 +4,22 @@
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Workspace" current_label="LIMS dashboard" %}
 {% endblock %}
 
+{% block page_actions %}
+<a class="button button-secondary" href="{% url 'lims_task_inbox_page' %}" data-lims-shell-action="dashboard-task-inbox">
+  <span class="material-symbols-outlined button-icon" aria-hidden="true">task</span>
+  <span>Open task inbox</span>
+</a>
+<a class="button button-secondary" href="{% url 'lims_reference_page' %}" data-lims-shell-action="dashboard-reference">
+  <span class="material-symbols-outlined button-icon" aria-hidden="true">account_tree</span>
+  <span>Open reference</span>
+</a>
+{% endblock %}
+
+{% block workflow_guidance %}
+{% include "core/ui/includes/panel_header.html" with panel_title="Workflow guidance" panel_description="Use the launchpad for area entry, then move into task inbox or focused CRUD pages without leaving the shared shell contract." %}
+<p class="muted">Dashboard actions stay in the shell action slot, while operational content stays in the main page slot.</p>
+{% endblock %}
+
 {% block page_content %}
 <div class="stat-grid">
   {% include "core/ui/includes/count_stat_card.html" with card_title="Labs" count_label="records" count_value=payload.cards.labs link_href=payload.card_links.reference.href link_label="Open reference" %}
