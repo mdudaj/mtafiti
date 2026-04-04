@@ -319,6 +319,39 @@ def test_reference_forms_expose_slug_and_address_selectors():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_shell_proving_surfaces_render_shared_slots_for_dashboard_and_crud():
+    client = Client()
+    host = _create_lims_host(client, "tenant-ui-shell-proving-surfaces")
+
+    dashboard = client.get(
+        reverse("lims_dashboard_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+    create_lab = client.get(
+        reverse("lims_reference_create_lab_page"),
+        HTTP_HOST=host,
+        HTTP_X_USER_ROLES="tenant.admin",
+    )
+
+    assert dashboard.status_code == 200
+    assert b'data-shell-slot="heading"' in dashboard.content
+    assert b'data-shell-slot="actions"' in dashboard.content
+    assert b'data-shell-slot="workflow-guidance"' in dashboard.content
+    assert b'data-shell-slot="main-content"' in dashboard.content
+    assert b'data-lims-shell-action="dashboard-task-inbox"' in dashboard.content
+    assert b"Workflow guidance" in dashboard.content
+
+    assert create_lab.status_code == 200
+    assert b'data-shell-slot="heading"' in create_lab.content
+    assert b'data-shell-slot="actions"' in create_lab.content
+    assert b'data-shell-slot="main-content"' in create_lab.content
+    assert b'data-lims-shell-action="reference-lab-back"' in create_lab.content
+    assert b'data-lims-shell-action="reference-lab-dashboard"' in create_lab.content
+    assert b'data-lims-action="reference-lab-create"' in create_lab.content
+
+
+@pytest.mark.django_db(transaction=True)
 def test_reference_launchpad_renders_sample_accession_workflow_entry():
     client = Client()
     host = _create_lims_host(client, "tenant-ui-reference-workflow-entry")

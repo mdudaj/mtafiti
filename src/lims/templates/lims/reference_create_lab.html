@@ -1,10 +1,24 @@
 {% extends "lims/base.html" %}
 
-{% block content %}
+{% block page_heading %}
 {% url 'lims_reference_page' as lims_reference_url %}
-{% url 'lims:reference_select_options' as lims_reference_select_options_url %}
 {% include "core/ui/includes/page_intro.html" with section_label=payload.page.kicker page_title=payload.page.page_title page_summary=payload.page.page_summary parent_label="Reference" parent_url=lims_reference_url current_label="Create lab" %}
+{% endblock %}
 
+{% block page_actions %}
+{% url 'lims_reference_page' as lims_reference_url %}
+<a class="button button-secondary" href="{{ lims_reference_url }}" data-lims-shell-action="reference-lab-back">
+  <span class="material-symbols-outlined button-icon" aria-hidden="true">arrow_back</span>
+  <span>Back to reference</span>
+</a>
+<a class="button button-secondary" href="{% url 'lims_dashboard_page' %}" data-lims-shell-action="reference-lab-dashboard">
+  <span class="material-symbols-outlined button-icon" aria-hidden="true">dashboard</span>
+  <span>Open dashboard</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+{% url 'lims:reference_select_options' as lims_reference_select_options_url %}
 {% if payload.capabilities.can_manage_reference %}
 <section class="panel" data-lims-action="reference-lab-create">
   {% include "core/ui/includes/panel_header.html" with panel_title="Lab setup form" panel_description="Capture one tenant lab at a time, including its address." %}
@@ -16,7 +30,6 @@
     <p class="muted">Selecting a street will automatically infer ward, district, region, country, and postcode when possible.</p>
     <div class="button-row">
       <button class="button" type="button" onclick="createLab()"><span class="material-symbols-outlined button-icon" aria-hidden="true">add_business</span><span>Create lab</span></button>
-      <a class="button button-secondary" href="{{ lims_reference_url }}">Back to reference</a>
     </div>
   </div>
 </section>
